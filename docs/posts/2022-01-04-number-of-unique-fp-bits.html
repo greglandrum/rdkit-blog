@@ -1,0 +1,911 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en"><head>
+
+<meta charset="utf-8">
+<meta name="generator" content="quarto-1.2.269">
+
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+
+<meta name="dcterms.date" content="2022-01-04">
+<meta name="description" content="How many distinct atom environments are there in organic molecules?">
+
+<title>RDKit blog - The number of unique fingerprint bits</title>
+<style>
+code{white-space: pre-wrap;}
+span.smallcaps{font-variant: small-caps;}
+div.columns{display: flex; gap: min(4vw, 1.5em);}
+div.column{flex: auto; overflow-x: auto;}
+div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+ul.task-list{list-style: none;}
+ul.task-list li input[type="checkbox"] {
+  width: 0.8em;
+  margin: 0 0.8em 0.2em -1.6em;
+  vertical-align: middle;
+}
+pre > code.sourceCode { white-space: pre; position: relative; }
+pre > code.sourceCode > span { display: inline-block; line-height: 1.25; }
+pre > code.sourceCode > span:empty { height: 1.2em; }
+.sourceCode { overflow: visible; }
+code.sourceCode > span { color: inherit; text-decoration: inherit; }
+div.sourceCode { margin: 1em 0; }
+pre.sourceCode { margin: 0; }
+@media screen {
+div.sourceCode { overflow: auto; }
+}
+@media print {
+pre > code.sourceCode { white-space: pre-wrap; }
+pre > code.sourceCode > span { text-indent: -5em; padding-left: 5em; }
+}
+pre.numberSource code
+  { counter-reset: source-line 0; }
+pre.numberSource code > span
+  { position: relative; left: -4em; counter-increment: source-line; }
+pre.numberSource code > span > a:first-child::before
+  { content: counter(source-line);
+    position: relative; left: -1em; text-align: right; vertical-align: baseline;
+    border: none; display: inline-block;
+    -webkit-touch-callout: none; -webkit-user-select: none;
+    -khtml-user-select: none; -moz-user-select: none;
+    -ms-user-select: none; user-select: none;
+    padding: 0 4px; width: 4em;
+    color: #aaaaaa;
+  }
+pre.numberSource { margin-left: 3em; border-left: 1px solid #aaaaaa;  padding-left: 4px; }
+div.sourceCode
+  {   }
+@media screen {
+pre > code.sourceCode > span > a:first-child::before { text-decoration: underline; }
+}
+code span.al { color: #ff0000; font-weight: bold; } /* Alert */
+code span.an { color: #60a0b0; font-weight: bold; font-style: italic; } /* Annotation */
+code span.at { color: #7d9029; } /* Attribute */
+code span.bn { color: #40a070; } /* BaseN */
+code span.bu { color: #008000; } /* BuiltIn */
+code span.cf { color: #007020; font-weight: bold; } /* ControlFlow */
+code span.ch { color: #4070a0; } /* Char */
+code span.cn { color: #880000; } /* Constant */
+code span.co { color: #60a0b0; font-style: italic; } /* Comment */
+code span.cv { color: #60a0b0; font-weight: bold; font-style: italic; } /* CommentVar */
+code span.do { color: #ba2121; font-style: italic; } /* Documentation */
+code span.dt { color: #902000; } /* DataType */
+code span.dv { color: #40a070; } /* DecVal */
+code span.er { color: #ff0000; font-weight: bold; } /* Error */
+code span.ex { } /* Extension */
+code span.fl { color: #40a070; } /* Float */
+code span.fu { color: #06287e; } /* Function */
+code span.im { color: #008000; font-weight: bold; } /* Import */
+code span.in { color: #60a0b0; font-weight: bold; font-style: italic; } /* Information */
+code span.kw { color: #007020; font-weight: bold; } /* Keyword */
+code span.op { color: #666666; } /* Operator */
+code span.ot { color: #007020; } /* Other */
+code span.pp { color: #bc7a00; } /* Preprocessor */
+code span.sc { color: #4070a0; } /* SpecialChar */
+code span.ss { color: #bb6688; } /* SpecialString */
+code span.st { color: #4070a0; } /* String */
+code span.va { color: #19177c; } /* Variable */
+code span.vs { color: #4070a0; } /* VerbatimString */
+code span.wa { color: #60a0b0; font-weight: bold; font-style: italic; } /* Warning */
+</style>
+
+
+<script src="../site_libs/quarto-nav/quarto-nav.js"></script>
+<script src="../site_libs/quarto-nav/headroom.min.js"></script>
+<script src="../site_libs/clipboard/clipboard.min.js"></script>
+<script src="../site_libs/quarto-search/autocomplete.umd.js"></script>
+<script src="../site_libs/quarto-search/fuse.min.js"></script>
+<script src="../site_libs/quarto-search/quarto-search.js"></script>
+<meta name="quarto:offset" content="../">
+<script src="../site_libs/quarto-html/quarto.js"></script>
+<script src="../site_libs/quarto-html/popper.min.js"></script>
+<script src="../site_libs/quarto-html/tippy.umd.min.js"></script>
+<script src="../site_libs/quarto-html/anchor.min.js"></script>
+<link href="../site_libs/quarto-html/tippy.css" rel="stylesheet">
+<link href="../site_libs/quarto-html/quarto-syntax-highlighting.css" rel="stylesheet" id="quarto-text-highlighting-styles">
+<script src="../site_libs/bootstrap/bootstrap.min.js"></script>
+<link href="../site_libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
+<link href="../site_libs/bootstrap/bootstrap.min.css" rel="stylesheet" id="quarto-bootstrap" data-mode="light">
+<script id="quarto-search-options" type="application/json">{
+  "location": "navbar",
+  "copy-button": false,
+  "collapse-after": 3,
+  "panel-placement": "end",
+  "type": "overlay",
+  "limit": 20,
+  "language": {
+    "search-no-results-text": "No results",
+    "search-matching-documents-text": "matching documents",
+    "search-copy-link-title": "Copy link to search",
+    "search-hide-matches-text": "Hide additional matches",
+    "search-more-match-text": "more match in this document",
+    "search-more-matches-text": "more matches in this document",
+    "search-clear-button-title": "Clear",
+    "search-detached-cancel-button-title": "Cancel",
+    "search-submit-button-title": "Submit"
+  }
+}</script>
+
+
+<link rel="stylesheet" href="../styles.css">
+</head>
+
+<body class="nav-fixed">
+
+<div id="quarto-search-results"></div>
+  <header id="quarto-header" class="headroom fixed-top">
+    <nav class="navbar navbar-expand-lg navbar-dark ">
+      <div class="navbar-container container-fluid">
+      <div class="navbar-brand-container">
+    <a class="navbar-brand" href="../index.html">
+    <span class="navbar-title">RDKit blog</span>
+    </a>
+  </div>
+          <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarCollapse" aria-controls="navbarCollapse" aria-expanded="false" aria-label="Toggle navigation" onclick="if (window.quartoToggleHeadroom) { window.quartoToggleHeadroom(); }">
+  <span class="navbar-toggler-icon"></span>
+</button>
+          <div class="collapse navbar-collapse" id="navbarCollapse">
+            <ul class="navbar-nav navbar-nav-scroll ms-auto">
+  <li class="nav-item">
+    <a class="nav-link" href="../about.html">
+ <span class="menu-text">RDKit experiments, tips, and tutorials</span></a>
+  </li>  
+  <li class="nav-item compact">
+    <a class="nav-link" href="https://github.com/rdkit/rdkit"><i class="bi bi-github" role="img">
+</i> 
+ <span class="menu-text"></span></a>
+  </li>  
+  <li class="nav-item compact">
+    <a class="nav-link" href="https://twitter.com/rdkit_org"><i class="bi bi-twitter" role="img">
+</i> 
+ <span class="menu-text"></span></a>
+  </li>  
+</ul>
+              <div id="quarto-search" class="" title="Search"></div>
+          </div> <!-- /navcollapse -->
+      </div> <!-- /container-fluid -->
+    </nav>
+</header>
+<!-- content -->
+<div id="quarto-content" class="quarto-container page-columns page-rows-contents page-layout-article page-navbar">
+<!-- sidebar -->
+<!-- margin-sidebar -->
+    <div id="quarto-margin-sidebar" class="sidebar margin-sidebar">
+        <nav id="TOC" role="doc-toc" class="toc-active">
+    <h2 id="toc-title">On this page</h2>
+   
+  <ul>
+  <li><a href="#how-many-molecules-do-we-need-to-add-before-weve-seen-all-the-bits" id="toc-how-many-molecules-do-we-need-to-add-before-weve-seen-all-the-bits" class="nav-link active" data-scroll-target="#how-many-molecules-do-we-need-to-add-before-weve-seen-all-the-bits">How many molecules do we need to add before we’ve seen all the bits?</a></li>
+  </ul>
+</nav>
+    </div>
+<!-- main -->
+<main class="content" id="quarto-document-content">
+
+<header id="title-block-header" class="quarto-title-block default">
+<div class="quarto-title">
+<h1 class="title">The number of unique fingerprint bits</h1>
+  <div class="quarto-categories">
+    <div class="quarto-category">exploratory</div>
+    <div class="quarto-category">reference</div>
+  </div>
+  </div>
+
+<div>
+  <div class="description">
+    How many distinct atom environments are there in organic molecules?
+  </div>
+</div>
+
+
+<div class="quarto-title-meta">
+
+    
+    <div>
+    <div class="quarto-title-meta-heading">Published</div>
+    <div class="quarto-title-meta-contents">
+      <p class="date">January 4, 2022</p>
+    </div>
+  </div>
+  
+    
+  </div>
+  
+
+</header>
+
+<section id="how-many-molecules-do-we-need-to-add-before-weve-seen-all-the-bits" class="level1">
+<h1>How many molecules do we need to add before we’ve seen all the bits?</h1>
+<p>I did an updated post last year looking at <a href="https://greglandrum.github.io/rdkit-blog/fingerprints/reference/2021/07/06/number-of-fp-bits-set.html">the average number of bits set per molecule</a> by the various fingerprinting algorithms in the RDKit.</p>
+<p>This one explores a couple of related topics: 1. If we look at a large set of organic molecules, how many different atom environments (as defined by the individual fingerprints) do we observe? 2. How quickly does this number converge with the number of compounds considered?</p>
+<p>Obviously the answer to these questions is extremely dependent on the set of molecules you use. For this post I will use a set of around six million random molecules from Zinc20’s <a href="https://zinc20.docking.org/substances/subsets/in-stock/">“in-stock” set</a>. The six million included all have less than 50 heavy atoms after being salt stripped.</p>
+<p>The experiment itself could hardly be simpler: read in the molecules, generate fingerprints, and keep track of the unique bits set as a function of number of molecules considered. For this analysis I limit myself to fingerprints which have not been “folded” to fit into a particular bit length (with the exception of the Avalon FP, which currently only supports generating folded forms).</p>
+<p>The code and raw data are below, here are the curves showing the saturation behavior for the various fingerprints: <img src="../images/blog/unique-bits1-1.png" class="img-fluid" alt="unique-bits1-1.png"></p>
+<p>Note that the saturation behavior of the avalon fingerprint here is an artifact of the fact that the fingerprint being used was only 9192 bits long (yes, I made a typo when I entered the value in the script to generate the data); 9185 of those bits end up being set.</p>
+<p>For a bit more resolution, here’s a table with the number of unique bits set per fingerprint in that set of 6 million, the number of new bits found in the last 100K of the 6 million, as well as how many molecules needed to be considered to reach 90, 95, and 99% of the number of unique bits:</p>
+<table class="table">
+<colgroup>
+<col style="width: 23%">
+<col style="width: 20%">
+<col style="width: 22%">
+<col style="width: 11%">
+<col style="width: 11%">
+<col style="width: 11%">
+</colgroup>
+<thead>
+<tr class="header">
+<th></th>
+<th># unique bits</th>
+<th># in last 100K</th>
+<th>0.90</th>
+<th>0.95</th>
+<th>0.99</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>FeatMorgan0</td>
+<td>15</td>
+<td>0</td>
+<td>N/A</td>
+<td>N/A</td>
+<td>N/A</td>
+</tr>
+<tr class="even">
+<td>FeatMorgan1</td>
+<td>1621</td>
+<td>2</td>
+<td>2760000</td>
+<td>4080000</td>
+<td>5460000</td>
+</tr>
+<tr class="odd">
+<td>FeatMorgan2</td>
+<td>116975</td>
+<td>464</td>
+<td>4000000</td>
+<td>4870000</td>
+<td>5750000</td>
+</tr>
+<tr class="even">
+<td>FeatMorgan3</td>
+<td>1350464</td>
+<td>7478</td>
+<td>4400000</td>
+<td>5130000</td>
+<td>5810000</td>
+</tr>
+<tr class="odd">
+<td>Morgan0</td>
+<td>143</td>
+<td>0</td>
+<td>2850000</td>
+<td>4080000</td>
+<td>5080000</td>
+</tr>
+<tr class="even">
+<td>Morgan1</td>
+<td>19428</td>
+<td>67</td>
+<td>3870000</td>
+<td>4750000</td>
+<td>5720000</td>
+</tr>
+<tr class="odd">
+<td>Morgan2</td>
+<td>575817</td>
+<td>2941</td>
+<td>4320000</td>
+<td>5080000</td>
+<td>5790000</td>
+</tr>
+<tr class="even">
+<td>Morgan3</td>
+<td>3606676</td>
+<td>22970</td>
+<td>4580000</td>
+<td>5240000</td>
+<td>5830000</td>
+</tr>
+<tr class="odd">
+<td>RDKit5</td>
+<td>131029</td>
+<td>347</td>
+<td>3490000</td>
+<td>4600000</td>
+<td>5690000</td>
+</tr>
+<tr class="even">
+<td>RDKit6</td>
+<td>538500</td>
+<td>1627</td>
+<td>3600000</td>
+<td>4680000</td>
+<td>5700000</td>
+</tr>
+<tr class="odd">
+<td>RDKit7</td>
+<td>1989958</td>
+<td>6897</td>
+<td>3740000</td>
+<td>4760000</td>
+<td>5720000</td>
+</tr>
+<tr class="even">
+<td>RDKit-linear5</td>
+<td>49852</td>
+<td>136</td>
+<td>3400000</td>
+<td>4520000</td>
+<td>5680000</td>
+</tr>
+<tr class="odd">
+<td>RDKit-linear6</td>
+<td>133904</td>
+<td>402</td>
+<td>3480000</td>
+<td>4570000</td>
+<td>5690000</td>
+</tr>
+<tr class="even">
+<td>RDKit-linear7</td>
+<td>315293</td>
+<td>1032</td>
+<td>3570000</td>
+<td>4640000</td>
+<td>5700000</td>
+</tr>
+<tr class="odd">
+<td>ap-counts</td>
+<td>16585</td>
+<td>18</td>
+<td>2470000</td>
+<td>3840000</td>
+<td>5410000</td>
+</tr>
+<tr class="even">
+<td>avalon</td>
+<td>9185</td>
+<td>0</td>
+<td>20000</td>
+<td>70000</td>
+<td>490000</td>
+</tr>
+<tr class="odd">
+<td>tt-counts</td>
+<td>20723</td>
+<td>49</td>
+<td>3530000</td>
+<td>4570000</td>
+<td>5640000</td>
+</tr>
+</tbody>
+</table>
+<p>To help with the interpretation of this: a total of 131029 unique bits were found for the RDKit5 fingerprint in the set of 6 million molecules and 95% of those bits had been found after looking at 4.6 million molecules. The last 100K molecules added 347 new bits.</p>
+<p>The thing that I find most interesting (and somewhat surprising) about these results is how far we are from having encountered “all” of the bits; new bits are being encountered for almost all of the fingerprint types even after 5.9 million molecules have been encountered. I can probably still wave my hands and estimate the order-of-magnitude number of distinct bits for each of the FP types in the full set of ~14 million substances in the ZINC20 “in-stock” set. Here’s a few of those estimates: - FeatMorgan2: 120-150K - FeatMorgan3: 1.4-1.6 million - Morgan1: 20-25K - Morgan2: 600-700K - Morgan3: 3.6-4.0 million</p>
+<p>These are also rough lower bounds on the number of atom environments in those compounds (it’s a lower bound due to the possibility of hash collisions causing multiple atom environments to hash to the same fingerprint bit).</p>
+<blockquote class="blockquote">
+<p><em>Aside:</em> it’s worth mentioning that this, of course, isn’t the first time someone has looked at this topic. I don’t normally include references for blog posts, but this paper from the PubChem team is a nice look at the atom environments in the (huge) PubChem dataset: http://www.jcheminf.com/content/7/1/41</p>
+</blockquote>
+<p>The rest of the post has the code for generating the data and doing the analysis.</p>
+<div class="cell" data-execution_count="1">
+<div class="sourceCode cell-code" id="cb1"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> rdkit <span class="im">import</span> Chem,DataStructs</span>
+<span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> time,random,gzip,pickle,copy</span>
+<span id="cb1-3"><a href="#cb1-3" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> numpy <span class="im">as</span> np</span>
+<span id="cb1-4"><a href="#cb1-4" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> collections <span class="im">import</span> Counter,defaultdict</span>
+<span id="cb1-5"><a href="#cb1-5" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> rdkit.Chem <span class="im">import</span> Draw</span>
+<span id="cb1-6"><a href="#cb1-6" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> rdkit.Chem <span class="im">import</span> rdMolDescriptors</span>
+<span id="cb1-7"><a href="#cb1-7" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> rdkit.Chem.MolStandardize <span class="im">import</span> rdMolStandardize</span>
+<span id="cb1-8"><a href="#cb1-8" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> rdkit.Avalon <span class="im">import</span> pyAvalonTools</span>
+<span id="cb1-9"><a href="#cb1-9" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> rdkit.Chem.Draw <span class="im">import</span> IPythonConsole</span>
+<span id="cb1-10"><a href="#cb1-10" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> rdkit <span class="im">import</span> DataStructs</span>
+<span id="cb1-11"><a href="#cb1-11" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> rdkit <span class="im">import</span> rdBase</span>
+<span id="cb1-12"><a href="#cb1-12" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> rdkit <span class="im">import</span> RDLogger</span>
+<span id="cb1-13"><a href="#cb1-13" aria-hidden="true" tabindex="-1"></a><span class="op">%</span>pylab inline</span>
+<span id="cb1-14"><a href="#cb1-14" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-15"><a href="#cb1-15" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(rdBase.rdkitVersion)</span>
+<span id="cb1-16"><a href="#cb1-16" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> time</span>
+<span id="cb1-17"><a href="#cb1-17" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(time.asctime())</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>Populating the interactive namespace from numpy and matplotlib
+2021.09.3
+Tue Jan  4 13:17:00 2022</code></pre>
+</div>
+<div class="cell-output cell-output-stderr">
+<pre><code>/home/glandrum/miniconda3/envs/rdkit_blog/lib/python3.9/site-packages/IPython/core/magics/pylab.py:159: UserWarning: pylab import has clobbered these variables: ['random', 'copy']
+`%matplotlib` prevents importing * from pylab and numpy
+  warn("pylab import has clobbered these variables: %s"  % clobbered +</code></pre>
+</div>
+</div>
+<div class="cell" data-execution_count="2">
+<div class="sourceCode cell-code" id="cb4"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a><span class="cf">try</span>:</span>
+<span id="cb4-2"><a href="#cb4-2" aria-hidden="true" tabindex="-1"></a>    <span class="im">import</span> ipyparallel <span class="im">as</span> ipp</span>
+<span id="cb4-3"><a href="#cb4-3" aria-hidden="true" tabindex="-1"></a>    rc <span class="op">=</span> ipp.Client()</span>
+<span id="cb4-4"><a href="#cb4-4" aria-hidden="true" tabindex="-1"></a>    dview <span class="op">=</span> rc[:]</span>
+<span id="cb4-5"><a href="#cb4-5" aria-hidden="true" tabindex="-1"></a>    dview.execute(<span class="st">'from rdkit import Chem'</span>)</span>
+<span id="cb4-6"><a href="#cb4-6" aria-hidden="true" tabindex="-1"></a>    dview.execute(<span class="st">'from rdkit import Descriptors'</span>)</span>
+<span id="cb4-7"><a href="#cb4-7" aria-hidden="true" tabindex="-1"></a>    dview.execute(<span class="st">'from rdkit.Chem import rdMolDescriptors'</span>)</span>
+<span id="cb4-8"><a href="#cb4-8" aria-hidden="true" tabindex="-1"></a>    dview.execute(<span class="st">'from rdkit.Avalon import pyAvalonTools'</span>)</span>
+<span id="cb4-9"><a href="#cb4-9" aria-hidden="true" tabindex="-1"></a><span class="cf">except</span>:</span>
+<span id="cb4-10"><a href="#cb4-10" aria-hidden="true" tabindex="-1"></a>    <span class="bu">print</span>(<span class="st">"could not use ipyparallel"</span>)</span>
+<span id="cb4-11"><a href="#cb4-11" aria-hidden="true" tabindex="-1"></a>    dview <span class="op">=</span> <span class="va">None</span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+<p>Here’s my local copy of the ~14 million “in stock” compounds I grabbed from ZINC (this file is too big for github):</p>
+<div class="cell" data-execution_count="3">
+<div class="sourceCode cell-code" id="cb5"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a>filen<span class="op">=</span><span class="st">'/scratch/RDKit_git/LocalData/Zinc20/purchasable/zinc20_instock.pkl.shuffled.gz'</span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+<p>Loop over the molecules, strip salts, skip anything with more than 50 atoms, and build fingerprints for all the others.</p>
+<p>The fingerprints I generate for this analysis are: - Sparse Morgan with radii 1, 2, and 3 - Sparse FeatureMorgan with radii 1, 2, and 3 - Sparse RDKit with maxPath 5, 6, and 7 - Sparse RDKit, no branches, with maxPath 5, 6, and 7 - Avalon BitVect - Sparse Atom Pairs - Sparse Topological Torsions</p>
+<p>All of the BitVect fingerprints are 4096 bits long</p>
+<div class="cell" data-scrolled="true">
+<div class="sourceCode cell-code" id="cb6"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb6-1"><a href="#cb6-1" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> copy</span>
+<span id="cb6-2"><a href="#cb6-2" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> collections <span class="im">import</span> defaultdict</span>
+<span id="cb6-3"><a href="#cb6-3" aria-hidden="true" tabindex="-1"></a>historyf <span class="op">=</span> gzip.<span class="bu">open</span>(<span class="st">'../data/fp_bit_counts.history.pkl.gz'</span>,<span class="st">'wb+'</span>)</span>
+<span id="cb6-4"><a href="#cb6-4" aria-hidden="true" tabindex="-1"></a>RDLogger.DisableLog(<span class="st">'rdApp.info'</span>)</span>
+<span id="cb6-5"><a href="#cb6-5" aria-hidden="true" tabindex="-1"></a>frm <span class="op">=</span> rdMolStandardize.LargestFragmentChooser()</span>
+<span id="cb6-6"><a href="#cb6-6" aria-hidden="true" tabindex="-1"></a>counts<span class="op">=</span>defaultdict(<span class="bu">list</span>)</span>
+<span id="cb6-7"><a href="#cb6-7" aria-hidden="true" tabindex="-1"></a>accum<span class="op">=</span>defaultdict(<span class="bu">set</span>)</span>
+<span id="cb6-8"><a href="#cb6-8" aria-hidden="true" tabindex="-1"></a>t1 <span class="op">=</span> time.time()</span>
+<span id="cb6-9"><a href="#cb6-9" aria-hidden="true" tabindex="-1"></a><span class="cf">with</span> gzip.<span class="bu">open</span>(filen,<span class="st">'rb'</span>) <span class="im">as</span> inf:</span>
+<span id="cb6-10"><a href="#cb6-10" aria-hidden="true" tabindex="-1"></a>    i <span class="op">=</span> <span class="dv">0</span></span>
+<span id="cb6-11"><a href="#cb6-11" aria-hidden="true" tabindex="-1"></a>    ms <span class="op">=</span> []</span>
+<span id="cb6-12"><a href="#cb6-12" aria-hidden="true" tabindex="-1"></a>    <span class="cf">while</span> <span class="dv">1</span>:</span>
+<span id="cb6-13"><a href="#cb6-13" aria-hidden="true" tabindex="-1"></a>        <span class="cf">try</span>:</span>
+<span id="cb6-14"><a href="#cb6-14" aria-hidden="true" tabindex="-1"></a>            m,nm <span class="op">=</span> pickle.load(inf)</span>
+<span id="cb6-15"><a href="#cb6-15" aria-hidden="true" tabindex="-1"></a>        <span class="cf">except</span> <span class="pp">EOFError</span>:</span>
+<span id="cb6-16"><a href="#cb6-16" aria-hidden="true" tabindex="-1"></a>            <span class="cf">break</span></span>
+<span id="cb6-17"><a href="#cb6-17" aria-hidden="true" tabindex="-1"></a>        <span class="cf">if</span> <span class="kw">not</span> m:</span>
+<span id="cb6-18"><a href="#cb6-18" aria-hidden="true" tabindex="-1"></a>            <span class="cf">continue</span></span>
+<span id="cb6-19"><a href="#cb6-19" aria-hidden="true" tabindex="-1"></a>        <span class="co"># strip salts:</span></span>
+<span id="cb6-20"><a href="#cb6-20" aria-hidden="true" tabindex="-1"></a>        m <span class="op">=</span> frm.choose(m)</span>
+<span id="cb6-21"><a href="#cb6-21" aria-hidden="true" tabindex="-1"></a>        <span class="cf">if</span> m.GetNumHeavyAtoms()<span class="op">&gt;</span><span class="dv">50</span>: </span>
+<span id="cb6-22"><a href="#cb6-22" aria-hidden="true" tabindex="-1"></a>            <span class="cf">continue</span></span>
+<span id="cb6-23"><a href="#cb6-23" aria-hidden="true" tabindex="-1"></a>        ms.append(m)</span>
+<span id="cb6-24"><a href="#cb6-24" aria-hidden="true" tabindex="-1"></a>        i<span class="op">+=</span><span class="dv">1</span></span>
+<span id="cb6-25"><a href="#cb6-25" aria-hidden="true" tabindex="-1"></a>        <span class="cf">if</span> <span class="bu">len</span>(ms)<span class="op">&gt;=</span><span class="dv">10000</span>:</span>
+<span id="cb6-26"><a href="#cb6-26" aria-hidden="true" tabindex="-1"></a>            <span class="cf">for</span> v <span class="kw">in</span> <span class="dv">0</span>,<span class="dv">1</span>,<span class="dv">2</span>,<span class="dv">3</span>:</span>
+<span id="cb6-27"><a href="#cb6-27" aria-hidden="true" tabindex="-1"></a>                k <span class="op">=</span> (<span class="st">'Morgan'</span>,v)</span>
+<span id="cb6-28"><a href="#cb6-28" aria-hidden="true" tabindex="-1"></a>                cnts <span class="op">=</span> dview.map_sync(<span class="kw">lambda</span> x,v<span class="op">=</span>v:<span class="bu">set</span>(rdMolDescriptors.GetMorganFingerprint(x,v).GetNonzeroElements().keys()),</span>
+<span id="cb6-29"><a href="#cb6-29" aria-hidden="true" tabindex="-1"></a>                                     ms)</span>
+<span id="cb6-30"><a href="#cb6-30" aria-hidden="true" tabindex="-1"></a>                <span class="cf">for</span> obc <span class="kw">in</span> cnts:</span>
+<span id="cb6-31"><a href="#cb6-31" aria-hidden="true" tabindex="-1"></a>                    accum[k].update(obc)</span>
+<span id="cb6-32"><a href="#cb6-32" aria-hidden="true" tabindex="-1"></a>                counts[k].append((i,<span class="bu">len</span>(accum[k])))</span>
+<span id="cb6-33"><a href="#cb6-33" aria-hidden="true" tabindex="-1"></a>            <span class="cf">for</span> v <span class="kw">in</span> <span class="dv">0</span>,<span class="dv">1</span>,<span class="dv">2</span>,<span class="dv">3</span>:</span>
+<span id="cb6-34"><a href="#cb6-34" aria-hidden="true" tabindex="-1"></a>                k <span class="op">=</span> (<span class="st">'FeatMorgan'</span>,v)</span>
+<span id="cb6-35"><a href="#cb6-35" aria-hidden="true" tabindex="-1"></a>                cnts <span class="op">=</span> dview.map_sync(<span class="kw">lambda</span> x,v<span class="op">=</span>v:<span class="bu">set</span>(rdMolDescriptors.GetMorganFingerprint(x,v,useFeatures<span class="op">=</span><span class="va">True</span>).GetNonzeroElements().keys()),</span>
+<span id="cb6-36"><a href="#cb6-36" aria-hidden="true" tabindex="-1"></a>                                     ms)</span>
+<span id="cb6-37"><a href="#cb6-37" aria-hidden="true" tabindex="-1"></a>                <span class="cf">for</span> obc <span class="kw">in</span> cnts:</span>
+<span id="cb6-38"><a href="#cb6-38" aria-hidden="true" tabindex="-1"></a>                    accum[k].update(obc)</span>
+<span id="cb6-39"><a href="#cb6-39" aria-hidden="true" tabindex="-1"></a>                counts[k].append((i,<span class="bu">len</span>(accum[k])))</span>
+<span id="cb6-40"><a href="#cb6-40" aria-hidden="true" tabindex="-1"></a>            <span class="cf">for</span> v <span class="kw">in</span> <span class="dv">5</span>,<span class="dv">6</span>,<span class="dv">7</span>:</span>
+<span id="cb6-41"><a href="#cb6-41" aria-hidden="true" tabindex="-1"></a>                k <span class="op">=</span> (<span class="st">'RDKit'</span>,v)</span>
+<span id="cb6-42"><a href="#cb6-42" aria-hidden="true" tabindex="-1"></a>                cnts <span class="op">=</span> dview.map_sync(<span class="kw">lambda</span> x,v<span class="op">=</span>v:<span class="bu">set</span>(Chem.UnfoldedRDKFingerprintCountBased(x,maxPath<span class="op">=</span>v).GetNonzeroElements().keys()),</span>
+<span id="cb6-43"><a href="#cb6-43" aria-hidden="true" tabindex="-1"></a>                                      ms)</span>
+<span id="cb6-44"><a href="#cb6-44" aria-hidden="true" tabindex="-1"></a>                <span class="cf">for</span> obc <span class="kw">in</span> cnts:</span>
+<span id="cb6-45"><a href="#cb6-45" aria-hidden="true" tabindex="-1"></a>                    accum[k].update(obc)</span>
+<span id="cb6-46"><a href="#cb6-46" aria-hidden="true" tabindex="-1"></a>                counts[k].append((i,<span class="bu">len</span>(accum[k])))</span>
+<span id="cb6-47"><a href="#cb6-47" aria-hidden="true" tabindex="-1"></a>            <span class="cf">for</span> v <span class="kw">in</span> <span class="dv">5</span>,<span class="dv">6</span>,<span class="dv">7</span>:</span>
+<span id="cb6-48"><a href="#cb6-48" aria-hidden="true" tabindex="-1"></a>                k <span class="op">=</span> (<span class="st">'RDKit-linear'</span>,v)</span>
+<span id="cb6-49"><a href="#cb6-49" aria-hidden="true" tabindex="-1"></a>                cnts <span class="op">=</span> dview.map_sync(<span class="kw">lambda</span> x,v<span class="op">=</span>v:<span class="bu">set</span>(Chem.UnfoldedRDKFingerprintCountBased(x,maxPath<span class="op">=</span>v,branchedPaths<span class="op">=</span><span class="va">False</span>).GetNonzeroElements().keys()),</span>
+<span id="cb6-50"><a href="#cb6-50" aria-hidden="true" tabindex="-1"></a>                                      ms)</span>
+<span id="cb6-51"><a href="#cb6-51" aria-hidden="true" tabindex="-1"></a>                <span class="cf">for</span> obc <span class="kw">in</span> cnts:</span>
+<span id="cb6-52"><a href="#cb6-52" aria-hidden="true" tabindex="-1"></a>                    accum[k].update(obc)</span>
+<span id="cb6-53"><a href="#cb6-53" aria-hidden="true" tabindex="-1"></a>                counts[k].append((i,<span class="bu">len</span>(accum[k])))</span>
+<span id="cb6-54"><a href="#cb6-54" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb6-55"><a href="#cb6-55" aria-hidden="true" tabindex="-1"></a>            k <span class="op">=</span> (<span class="st">'avalon'</span>,<span class="op">-</span><span class="dv">1</span>)</span>
+<span id="cb6-56"><a href="#cb6-56" aria-hidden="true" tabindex="-1"></a>            cnts <span class="op">=</span> dview.map_sync(<span class="kw">lambda</span> x:<span class="bu">set</span>(pyAvalonTools.GetAvalonFP(x,nBits<span class="op">=</span><span class="dv">9192</span>).GetOnBits()),</span>
+<span id="cb6-57"><a href="#cb6-57" aria-hidden="true" tabindex="-1"></a>                                  ms)</span>
+<span id="cb6-58"><a href="#cb6-58" aria-hidden="true" tabindex="-1"></a>            <span class="cf">for</span> obc <span class="kw">in</span> cnts:</span>
+<span id="cb6-59"><a href="#cb6-59" aria-hidden="true" tabindex="-1"></a>                accum[k].update(obc)</span>
+<span id="cb6-60"><a href="#cb6-60" aria-hidden="true" tabindex="-1"></a>            counts[k].append((i,<span class="bu">len</span>(accum[k])))</span>
+<span id="cb6-61"><a href="#cb6-61" aria-hidden="true" tabindex="-1"></a>            </span>
+<span id="cb6-62"><a href="#cb6-62" aria-hidden="true" tabindex="-1"></a>            k <span class="op">=</span> (<span class="st">'ap-counts'</span>,<span class="op">-</span><span class="dv">1</span>)</span>
+<span id="cb6-63"><a href="#cb6-63" aria-hidden="true" tabindex="-1"></a>            cnts <span class="op">=</span> dview.map_sync(<span class="kw">lambda</span> x:<span class="bu">set</span>(rdMolDescriptors.GetAtomPairFingerprint(x).GetNonzeroElements().keys()),</span>
+<span id="cb6-64"><a href="#cb6-64" aria-hidden="true" tabindex="-1"></a>                                  ms)</span>
+<span id="cb6-65"><a href="#cb6-65" aria-hidden="true" tabindex="-1"></a>            <span class="cf">for</span> obc <span class="kw">in</span> cnts:</span>
+<span id="cb6-66"><a href="#cb6-66" aria-hidden="true" tabindex="-1"></a>                accum[k].update(obc)</span>
+<span id="cb6-67"><a href="#cb6-67" aria-hidden="true" tabindex="-1"></a>            counts[k].append((i,<span class="bu">len</span>(accum[k])))</span>
+<span id="cb6-68"><a href="#cb6-68" aria-hidden="true" tabindex="-1"></a>            k <span class="op">=</span> (<span class="st">'tt-counts'</span>,<span class="op">-</span><span class="dv">1</span>)</span>
+<span id="cb6-69"><a href="#cb6-69" aria-hidden="true" tabindex="-1"></a>            cnts <span class="op">=</span> dview.map_sync(<span class="kw">lambda</span> x:<span class="bu">set</span>(rdMolDescriptors.GetTopologicalTorsionFingerprint(x).GetNonzeroElements().keys()),</span>
+<span id="cb6-70"><a href="#cb6-70" aria-hidden="true" tabindex="-1"></a>                                  ms)</span>
+<span id="cb6-71"><a href="#cb6-71" aria-hidden="true" tabindex="-1"></a>            <span class="cf">for</span> obc <span class="kw">in</span> cnts:</span>
+<span id="cb6-72"><a href="#cb6-72" aria-hidden="true" tabindex="-1"></a>                accum[k].update(obc)</span>
+<span id="cb6-73"><a href="#cb6-73" aria-hidden="true" tabindex="-1"></a>            counts[k].append((i,<span class="bu">len</span>(accum[k])))</span>
+<span id="cb6-74"><a href="#cb6-74" aria-hidden="true" tabindex="-1"></a>            ms <span class="op">=</span> []</span>
+<span id="cb6-75"><a href="#cb6-75" aria-hidden="true" tabindex="-1"></a>            </span>
+<span id="cb6-76"><a href="#cb6-76" aria-hidden="true" tabindex="-1"></a>        <span class="cf">if</span> <span class="kw">not</span> i<span class="op">%</span><span class="dv">50000</span>:</span>
+<span id="cb6-77"><a href="#cb6-77" aria-hidden="true" tabindex="-1"></a>            t2 <span class="op">=</span> time.time()</span>
+<span id="cb6-78"><a href="#cb6-78" aria-hidden="true" tabindex="-1"></a>            <span class="bu">print</span>(<span class="st">"Done </span><span class="sc">%d</span><span class="st"> in </span><span class="sc">%.2f</span><span class="st"> sec"</span><span class="op">%</span>(i,t2<span class="op">-</span>t1))</span>
+<span id="cb6-79"><a href="#cb6-79" aria-hidden="true" tabindex="-1"></a>        <span class="cf">if</span> <span class="kw">not</span> i<span class="op">%</span><span class="dv">500000</span>:</span>
+<span id="cb6-80"><a href="#cb6-80" aria-hidden="true" tabindex="-1"></a>            pickle.dump(<span class="bu">dict</span>(counts),historyf)</span>
+<span id="cb6-81"><a href="#cb6-81" aria-hidden="true" tabindex="-1"></a>            pickle.dump(<span class="bu">dict</span>(accum),historyf)</span>
+<span id="cb6-82"><a href="#cb6-82" aria-hidden="true" tabindex="-1"></a>        <span class="cf">if</span> i<span class="op">&gt;=</span><span class="dv">5500000</span>:</span>
+<span id="cb6-83"><a href="#cb6-83" aria-hidden="true" tabindex="-1"></a>            <span class="cf">break</span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+<div class="cell" data-execution_count="7">
+<div class="sourceCode cell-code" id="cb7"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb7-1"><a href="#cb7-1" aria-hidden="true" tabindex="-1"></a><span class="cf">with</span> gzip.<span class="bu">open</span>(<span class="st">'../data/fp_bit_counts.history.pkl.gz'</span>,<span class="st">'wb+'</span>) <span class="im">as</span> outf:</span>
+<span id="cb7-2"><a href="#cb7-2" aria-hidden="true" tabindex="-1"></a>    pickle.dump(<span class="bu">dict</span>(counts),outf)</span>
+<span id="cb7-3"><a href="#cb7-3" aria-hidden="true" tabindex="-1"></a>    pickle.dump(<span class="bu">dict</span>(accum),outf)</span>
+<span id="cb7-4"><a href="#cb7-4" aria-hidden="true" tabindex="-1"></a>        </span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+<div class="cell" data-execution_count="14">
+<div class="sourceCode cell-code" id="cb8"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb8-1"><a href="#cb8-1" aria-hidden="true" tabindex="-1"></a><span class="cf">with</span> gzip.<span class="bu">open</span>(<span class="st">'../data/fp_bit_counts.history.pkl.gz'</span>,<span class="st">'rb'</span>) <span class="im">as</span> inf:</span>
+<span id="cb8-2"><a href="#cb8-2" aria-hidden="true" tabindex="-1"></a>    counts <span class="op">=</span> pickle.load(inf)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+<p>Now plot the distributions of the number of bits set</p>
+<p>We have a few extra data points, let’s stick to the first 6 million molecules</p>
+<div class="cell" data-execution_count="21">
+<div class="sourceCode cell-code" id="cb9"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb9-1"><a href="#cb9-1" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> k,v <span class="kw">in</span> counts.items():</span>
+<span id="cb9-2"><a href="#cb9-2" aria-hidden="true" tabindex="-1"></a>    v <span class="op">=</span> [x <span class="cf">for</span> x <span class="kw">in</span> v <span class="cf">if</span> x[<span class="dv">0</span>]<span class="op">&lt;</span><span class="dv">6000000</span>]</span>
+<span id="cb9-3"><a href="#cb9-3" aria-hidden="true" tabindex="-1"></a>    counts[k] <span class="op">=</span> v</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+<div class="cell" data-execution_count="22">
+<div class="sourceCode cell-code" id="cb10"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb10-1"><a href="#cb10-1" aria-hidden="true" tabindex="-1"></a>morgan_ks <span class="op">=</span> [x <span class="cf">for</span> x <span class="kw">in</span> <span class="bu">sorted</span>(counts.keys()) <span class="cf">if</span> x[<span class="dv">0</span>] <span class="op">==</span><span class="st">'Morgan'</span>]</span>
+<span id="cb10-2"><a href="#cb10-2" aria-hidden="true" tabindex="-1"></a>featmorgan_ks <span class="op">=</span> [x <span class="cf">for</span> x <span class="kw">in</span> <span class="bu">sorted</span>(counts.keys()) <span class="cf">if</span> x[<span class="dv">0</span>] <span class="op">==</span><span class="st">'FeatMorgan'</span>]</span>
+<span id="cb10-3"><a href="#cb10-3" aria-hidden="true" tabindex="-1"></a>rdkit_ks <span class="op">=</span> [x <span class="cf">for</span> x <span class="kw">in</span> <span class="bu">sorted</span>(counts.keys()) <span class="cf">if</span> x[<span class="dv">0</span>] <span class="op">==</span> <span class="st">'RDKit'</span>]</span>
+<span id="cb10-4"><a href="#cb10-4" aria-hidden="true" tabindex="-1"></a>rdkitlin_ks <span class="op">=</span> [x <span class="cf">for</span> x <span class="kw">in</span> <span class="bu">sorted</span>(counts.keys()) <span class="cf">if</span> x[<span class="dv">0</span>] <span class="op">==</span> <span class="st">'RDKit-linear'</span>]</span>
+<span id="cb10-5"><a href="#cb10-5" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb10-6"><a href="#cb10-6" aria-hidden="true" tabindex="-1"></a>figure(figsize<span class="op">=</span>(<span class="dv">15</span>,<span class="dv">20</span>))</span>
+<span id="cb10-7"><a href="#cb10-7" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb10-8"><a href="#cb10-8" aria-hidden="true" tabindex="-1"></a>pidx<span class="op">=</span><span class="dv">1</span></span>
+<span id="cb10-9"><a href="#cb10-9" aria-hidden="true" tabindex="-1"></a>subplot(<span class="dv">3</span>,<span class="dv">2</span>,pidx)</span>
+<span id="cb10-10"><a href="#cb10-10" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> n,r <span class="kw">in</span> rdkit_ks:</span>
+<span id="cb10-11"><a href="#cb10-11" aria-hidden="true" tabindex="-1"></a>    cnts <span class="op">=</span> counts[(n,r)]</span>
+<span id="cb10-12"><a href="#cb10-12" aria-hidden="true" tabindex="-1"></a>    </span>
+<span id="cb10-13"><a href="#cb10-13" aria-hidden="true" tabindex="-1"></a>    plot([x <span class="cf">for</span> x,y <span class="kw">in</span> cnts],[y <span class="cf">for</span> x,y <span class="kw">in</span> cnts],label<span class="op">=</span></span>
+<span id="cb10-14"><a href="#cb10-14" aria-hidden="true" tabindex="-1"></a>        <span class="ss">f"r=</span><span class="sc">{</span>r<span class="sc">}</span><span class="ss">"</span>)</span>
+<span id="cb10-15"><a href="#cb10-15" aria-hidden="true" tabindex="-1"></a>_<span class="op">=</span>title(<span class="st">"RDKit"</span>)</span>
+<span id="cb10-16"><a href="#cb10-16" aria-hidden="true" tabindex="-1"></a>_<span class="op">=</span>ylabel(<span class="st">"unique bits observed"</span>)</span>
+<span id="cb10-17"><a href="#cb10-17" aria-hidden="true" tabindex="-1"></a>_<span class="op">=</span>xlabel(<span class="st">"num molecules"</span>)</span>
+<span id="cb10-18"><a href="#cb10-18" aria-hidden="true" tabindex="-1"></a>_<span class="op">=</span>legend()</span>
+<span id="cb10-19"><a href="#cb10-19" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb10-20"><a href="#cb10-20" aria-hidden="true" tabindex="-1"></a>pidx<span class="op">=</span><span class="dv">2</span></span>
+<span id="cb10-21"><a href="#cb10-21" aria-hidden="true" tabindex="-1"></a>subplot(<span class="dv">3</span>,<span class="dv">2</span>,pidx)</span>
+<span id="cb10-22"><a href="#cb10-22" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> n,r <span class="kw">in</span> rdkitlin_ks:</span>
+<span id="cb10-23"><a href="#cb10-23" aria-hidden="true" tabindex="-1"></a>    cnts <span class="op">=</span> counts[(n,r)]</span>
+<span id="cb10-24"><a href="#cb10-24" aria-hidden="true" tabindex="-1"></a>    </span>
+<span id="cb10-25"><a href="#cb10-25" aria-hidden="true" tabindex="-1"></a>    plot([x <span class="cf">for</span> x,y <span class="kw">in</span> cnts],[y <span class="cf">for</span> x,y <span class="kw">in</span> cnts],label<span class="op">=</span></span>
+<span id="cb10-26"><a href="#cb10-26" aria-hidden="true" tabindex="-1"></a>        <span class="ss">f"r=</span><span class="sc">{</span>r<span class="sc">}</span><span class="ss">"</span>)</span>
+<span id="cb10-27"><a href="#cb10-27" aria-hidden="true" tabindex="-1"></a>_<span class="op">=</span>title(<span class="st">"RDKit linear"</span>)</span>
+<span id="cb10-28"><a href="#cb10-28" aria-hidden="true" tabindex="-1"></a>_<span class="op">=</span>ylabel(<span class="st">"unique bits observed"</span>)</span>
+<span id="cb10-29"><a href="#cb10-29" aria-hidden="true" tabindex="-1"></a>_<span class="op">=</span>xlabel(<span class="st">"num molecules"</span>)</span>
+<span id="cb10-30"><a href="#cb10-30" aria-hidden="true" tabindex="-1"></a>_<span class="op">=</span>legend()</span>
+<span id="cb10-31"><a href="#cb10-31" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb10-32"><a href="#cb10-32" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb10-33"><a href="#cb10-33" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb10-34"><a href="#cb10-34" aria-hidden="true" tabindex="-1"></a>pidx<span class="op">=</span><span class="dv">3</span></span>
+<span id="cb10-35"><a href="#cb10-35" aria-hidden="true" tabindex="-1"></a>subplot(<span class="dv">3</span>,<span class="dv">2</span>,pidx)</span>
+<span id="cb10-36"><a href="#cb10-36" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> n,r <span class="kw">in</span> morgan_ks:</span>
+<span id="cb10-37"><a href="#cb10-37" aria-hidden="true" tabindex="-1"></a>    cnts <span class="op">=</span> counts[(n,r)]</span>
+<span id="cb10-38"><a href="#cb10-38" aria-hidden="true" tabindex="-1"></a>    </span>
+<span id="cb10-39"><a href="#cb10-39" aria-hidden="true" tabindex="-1"></a>    plot([x <span class="cf">for</span> x,y <span class="kw">in</span> cnts],[y <span class="cf">for</span> x,y <span class="kw">in</span> cnts],label<span class="op">=</span></span>
+<span id="cb10-40"><a href="#cb10-40" aria-hidden="true" tabindex="-1"></a>        <span class="ss">f"r=</span><span class="sc">{</span>r<span class="sc">}</span><span class="ss">"</span>)</span>
+<span id="cb10-41"><a href="#cb10-41" aria-hidden="true" tabindex="-1"></a>_<span class="op">=</span>title(<span class="st">"Morgan"</span>)</span>
+<span id="cb10-42"><a href="#cb10-42" aria-hidden="true" tabindex="-1"></a>_<span class="op">=</span>ylabel(<span class="st">"unique bits observed"</span>)</span>
+<span id="cb10-43"><a href="#cb10-43" aria-hidden="true" tabindex="-1"></a>_<span class="op">=</span>xlabel(<span class="st">"num molecules"</span>)</span>
+<span id="cb10-44"><a href="#cb10-44" aria-hidden="true" tabindex="-1"></a>_<span class="op">=</span>legend()</span>
+<span id="cb10-45"><a href="#cb10-45" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb10-46"><a href="#cb10-46" aria-hidden="true" tabindex="-1"></a>pidx<span class="op">=</span><span class="dv">4</span></span>
+<span id="cb10-47"><a href="#cb10-47" aria-hidden="true" tabindex="-1"></a>subplot(<span class="dv">3</span>,<span class="dv">2</span>,pidx)</span>
+<span id="cb10-48"><a href="#cb10-48" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> n,r <span class="kw">in</span> featmorgan_ks:</span>
+<span id="cb10-49"><a href="#cb10-49" aria-hidden="true" tabindex="-1"></a>    cnts <span class="op">=</span> counts[(n,r)]</span>
+<span id="cb10-50"><a href="#cb10-50" aria-hidden="true" tabindex="-1"></a>    </span>
+<span id="cb10-51"><a href="#cb10-51" aria-hidden="true" tabindex="-1"></a>    plot([x <span class="cf">for</span> x,y <span class="kw">in</span> cnts],[y <span class="cf">for</span> x,y <span class="kw">in</span> cnts],label<span class="op">=</span></span>
+<span id="cb10-52"><a href="#cb10-52" aria-hidden="true" tabindex="-1"></a>        <span class="ss">f"r=</span><span class="sc">{</span>r<span class="sc">}</span><span class="ss">"</span>)</span>
+<span id="cb10-53"><a href="#cb10-53" aria-hidden="true" tabindex="-1"></a>_<span class="op">=</span>title(<span class="st">"FeatMorgan"</span>)</span>
+<span id="cb10-54"><a href="#cb10-54" aria-hidden="true" tabindex="-1"></a>_<span class="op">=</span>ylabel(<span class="st">"unique bits observed"</span>)</span>
+<span id="cb10-55"><a href="#cb10-55" aria-hidden="true" tabindex="-1"></a>_<span class="op">=</span>xlabel(<span class="st">"num molecules"</span>)</span>
+<span id="cb10-56"><a href="#cb10-56" aria-hidden="true" tabindex="-1"></a>_<span class="op">=</span>legend()</span>
+<span id="cb10-57"><a href="#cb10-57" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb10-58"><a href="#cb10-58" aria-hidden="true" tabindex="-1"></a>pidx<span class="op">+=</span><span class="dv">1</span></span>
+<span id="cb10-59"><a href="#cb10-59" aria-hidden="true" tabindex="-1"></a>subplot(<span class="dv">3</span>,<span class="dv">2</span>,pidx)</span>
+<span id="cb10-60"><a href="#cb10-60" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> k <span class="kw">in</span> counts.keys():</span>
+<span id="cb10-61"><a href="#cb10-61" aria-hidden="true" tabindex="-1"></a>    <span class="cf">if</span> k[<span class="dv">0</span>].startswith(<span class="st">'Morgan'</span>) <span class="kw">or</span> k[<span class="dv">0</span>].startswith(<span class="st">'FeatMorgan'</span>) <span class="kw">or</span> k[<span class="dv">0</span>].startswith(<span class="st">'RDKit'</span>):</span>
+<span id="cb10-62"><a href="#cb10-62" aria-hidden="true" tabindex="-1"></a>        <span class="cf">continue</span></span>
+<span id="cb10-63"><a href="#cb10-63" aria-hidden="true" tabindex="-1"></a>    pidx<span class="op">+=</span><span class="dv">1</span></span>
+<span id="cb10-64"><a href="#cb10-64" aria-hidden="true" tabindex="-1"></a>    cnts <span class="op">=</span> counts[k]</span>
+<span id="cb10-65"><a href="#cb10-65" aria-hidden="true" tabindex="-1"></a>    plot([x <span class="cf">for</span> x,y <span class="kw">in</span> cnts],[y <span class="cf">for</span> x,y <span class="kw">in</span> cnts],label<span class="op">=</span>k[<span class="dv">0</span>])</span>
+<span id="cb10-66"><a href="#cb10-66" aria-hidden="true" tabindex="-1"></a>_<span class="op">=</span>title(<span class="st">'others'</span>)</span>
+<span id="cb10-67"><a href="#cb10-67" aria-hidden="true" tabindex="-1"></a>_<span class="op">=</span>ylabel(<span class="st">"unique bits observed"</span>)</span>
+<span id="cb10-68"><a href="#cb10-68" aria-hidden="true" tabindex="-1"></a>_<span class="op">=</span>xlabel(<span class="st">"num molecules"</span>)</span>
+<span id="cb10-69"><a href="#cb10-69" aria-hidden="true" tabindex="-1"></a>_<span class="op">=</span>legend()</span>
+<span id="cb10-70"><a href="#cb10-70" aria-hidden="true" tabindex="-1"></a>   </span>
+<span id="cb10-71"><a href="#cb10-71" aria-hidden="true" tabindex="-1"></a>tight_layout()<span class="op">;</span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-display">
+<p><img src="2022-01-04-number-of-unique-fp-bits_files/figure-html/cell-9-output-1.png" class="img-fluid"></p>
+</div>
+</div>
+<p>Mabye better to plot those on a log scale?</p>
+<div class="cell" data-execution_count="23">
+<div class="sourceCode cell-code" id="cb11"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb11-1"><a href="#cb11-1" aria-hidden="true" tabindex="-1"></a>morgan_ks <span class="op">=</span> [x <span class="cf">for</span> x <span class="kw">in</span> <span class="bu">sorted</span>(counts.keys()) <span class="cf">if</span> x[<span class="dv">0</span>] <span class="op">==</span><span class="st">'Morgan'</span>]</span>
+<span id="cb11-2"><a href="#cb11-2" aria-hidden="true" tabindex="-1"></a>featmorgan_ks <span class="op">=</span> [x <span class="cf">for</span> x <span class="kw">in</span> <span class="bu">sorted</span>(counts.keys()) <span class="cf">if</span> x[<span class="dv">0</span>] <span class="op">==</span><span class="st">'FeatMorgan'</span>]</span>
+<span id="cb11-3"><a href="#cb11-3" aria-hidden="true" tabindex="-1"></a>rdkit_ks <span class="op">=</span> [x <span class="cf">for</span> x <span class="kw">in</span> <span class="bu">sorted</span>(counts.keys()) <span class="cf">if</span> x[<span class="dv">0</span>] <span class="op">==</span> <span class="st">'RDKit'</span>]</span>
+<span id="cb11-4"><a href="#cb11-4" aria-hidden="true" tabindex="-1"></a>rdkitlin_ks <span class="op">=</span> [x <span class="cf">for</span> x <span class="kw">in</span> <span class="bu">sorted</span>(counts.keys()) <span class="cf">if</span> x[<span class="dv">0</span>] <span class="op">==</span> <span class="st">'RDKit-linear'</span>]</span>
+<span id="cb11-5"><a href="#cb11-5" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb11-6"><a href="#cb11-6" aria-hidden="true" tabindex="-1"></a>figure(figsize<span class="op">=</span>(<span class="dv">15</span>,<span class="dv">20</span>))</span>
+<span id="cb11-7"><a href="#cb11-7" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb11-8"><a href="#cb11-8" aria-hidden="true" tabindex="-1"></a>pidx<span class="op">=</span><span class="dv">1</span></span>
+<span id="cb11-9"><a href="#cb11-9" aria-hidden="true" tabindex="-1"></a>subplot(<span class="dv">3</span>,<span class="dv">2</span>,pidx)</span>
+<span id="cb11-10"><a href="#cb11-10" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> n,r <span class="kw">in</span> rdkit_ks:</span>
+<span id="cb11-11"><a href="#cb11-11" aria-hidden="true" tabindex="-1"></a>    cnts <span class="op">=</span> counts[(n,r)]</span>
+<span id="cb11-12"><a href="#cb11-12" aria-hidden="true" tabindex="-1"></a>    </span>
+<span id="cb11-13"><a href="#cb11-13" aria-hidden="true" tabindex="-1"></a>    plot([x <span class="cf">for</span> x,y <span class="kw">in</span> cnts],[y <span class="cf">for</span> x,y <span class="kw">in</span> cnts],label<span class="op">=</span></span>
+<span id="cb11-14"><a href="#cb11-14" aria-hidden="true" tabindex="-1"></a>        <span class="ss">f"r=</span><span class="sc">{</span>r<span class="sc">}</span><span class="ss">"</span>)</span>
+<span id="cb11-15"><a href="#cb11-15" aria-hidden="true" tabindex="-1"></a>_<span class="op">=</span>title(<span class="st">"RDKit"</span>)</span>
+<span id="cb11-16"><a href="#cb11-16" aria-hidden="true" tabindex="-1"></a>_<span class="op">=</span>ylabel(<span class="st">"unique bits observed"</span>)</span>
+<span id="cb11-17"><a href="#cb11-17" aria-hidden="true" tabindex="-1"></a>_<span class="op">=</span>xlabel(<span class="st">"num molecules"</span>)</span>
+<span id="cb11-18"><a href="#cb11-18" aria-hidden="true" tabindex="-1"></a>_<span class="op">=</span>yscale(<span class="st">'log'</span>)</span>
+<span id="cb11-19"><a href="#cb11-19" aria-hidden="true" tabindex="-1"></a>_<span class="op">=</span>legend()</span>
+<span id="cb11-20"><a href="#cb11-20" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb11-21"><a href="#cb11-21" aria-hidden="true" tabindex="-1"></a>pidx<span class="op">=</span><span class="dv">2</span></span>
+<span id="cb11-22"><a href="#cb11-22" aria-hidden="true" tabindex="-1"></a>subplot(<span class="dv">3</span>,<span class="dv">2</span>,pidx)</span>
+<span id="cb11-23"><a href="#cb11-23" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> n,r <span class="kw">in</span> rdkitlin_ks:</span>
+<span id="cb11-24"><a href="#cb11-24" aria-hidden="true" tabindex="-1"></a>    cnts <span class="op">=</span> counts[(n,r)]</span>
+<span id="cb11-25"><a href="#cb11-25" aria-hidden="true" tabindex="-1"></a>    </span>
+<span id="cb11-26"><a href="#cb11-26" aria-hidden="true" tabindex="-1"></a>    plot([x <span class="cf">for</span> x,y <span class="kw">in</span> cnts],[y <span class="cf">for</span> x,y <span class="kw">in</span> cnts],label<span class="op">=</span></span>
+<span id="cb11-27"><a href="#cb11-27" aria-hidden="true" tabindex="-1"></a>        <span class="ss">f"r=</span><span class="sc">{</span>r<span class="sc">}</span><span class="ss">"</span>)</span>
+<span id="cb11-28"><a href="#cb11-28" aria-hidden="true" tabindex="-1"></a>_<span class="op">=</span>title(<span class="st">"RDKit linear"</span>)</span>
+<span id="cb11-29"><a href="#cb11-29" aria-hidden="true" tabindex="-1"></a>_<span class="op">=</span>ylabel(<span class="st">"unique bits observed"</span>)</span>
+<span id="cb11-30"><a href="#cb11-30" aria-hidden="true" tabindex="-1"></a>_<span class="op">=</span>xlabel(<span class="st">"num molecules"</span>)</span>
+<span id="cb11-31"><a href="#cb11-31" aria-hidden="true" tabindex="-1"></a>_<span class="op">=</span>yscale(<span class="st">'log'</span>)</span>
+<span id="cb11-32"><a href="#cb11-32" aria-hidden="true" tabindex="-1"></a>_<span class="op">=</span>legend()</span>
+<span id="cb11-33"><a href="#cb11-33" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb11-34"><a href="#cb11-34" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb11-35"><a href="#cb11-35" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb11-36"><a href="#cb11-36" aria-hidden="true" tabindex="-1"></a>pidx<span class="op">=</span><span class="dv">3</span></span>
+<span id="cb11-37"><a href="#cb11-37" aria-hidden="true" tabindex="-1"></a>subplot(<span class="dv">3</span>,<span class="dv">2</span>,pidx)</span>
+<span id="cb11-38"><a href="#cb11-38" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> n,r <span class="kw">in</span> morgan_ks:</span>
+<span id="cb11-39"><a href="#cb11-39" aria-hidden="true" tabindex="-1"></a>    cnts <span class="op">=</span> counts[(n,r)]</span>
+<span id="cb11-40"><a href="#cb11-40" aria-hidden="true" tabindex="-1"></a>    </span>
+<span id="cb11-41"><a href="#cb11-41" aria-hidden="true" tabindex="-1"></a>    plot([x <span class="cf">for</span> x,y <span class="kw">in</span> cnts],[y <span class="cf">for</span> x,y <span class="kw">in</span> cnts],label<span class="op">=</span></span>
+<span id="cb11-42"><a href="#cb11-42" aria-hidden="true" tabindex="-1"></a>        <span class="ss">f"r=</span><span class="sc">{</span>r<span class="sc">}</span><span class="ss">"</span>)</span>
+<span id="cb11-43"><a href="#cb11-43" aria-hidden="true" tabindex="-1"></a>_<span class="op">=</span>title(<span class="st">"Morgan"</span>)</span>
+<span id="cb11-44"><a href="#cb11-44" aria-hidden="true" tabindex="-1"></a>_<span class="op">=</span>ylabel(<span class="st">"unique bits observed"</span>)</span>
+<span id="cb11-45"><a href="#cb11-45" aria-hidden="true" tabindex="-1"></a>_<span class="op">=</span>xlabel(<span class="st">"num molecules"</span>)</span>
+<span id="cb11-46"><a href="#cb11-46" aria-hidden="true" tabindex="-1"></a>_<span class="op">=</span>yscale(<span class="st">'log'</span>)</span>
+<span id="cb11-47"><a href="#cb11-47" aria-hidden="true" tabindex="-1"></a>_<span class="op">=</span>legend()</span>
+<span id="cb11-48"><a href="#cb11-48" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb11-49"><a href="#cb11-49" aria-hidden="true" tabindex="-1"></a>pidx<span class="op">=</span><span class="dv">4</span></span>
+<span id="cb11-50"><a href="#cb11-50" aria-hidden="true" tabindex="-1"></a>subplot(<span class="dv">3</span>,<span class="dv">2</span>,pidx)</span>
+<span id="cb11-51"><a href="#cb11-51" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> n,r <span class="kw">in</span> featmorgan_ks:</span>
+<span id="cb11-52"><a href="#cb11-52" aria-hidden="true" tabindex="-1"></a>    cnts <span class="op">=</span> counts[(n,r)]</span>
+<span id="cb11-53"><a href="#cb11-53" aria-hidden="true" tabindex="-1"></a>    </span>
+<span id="cb11-54"><a href="#cb11-54" aria-hidden="true" tabindex="-1"></a>    plot([x <span class="cf">for</span> x,y <span class="kw">in</span> cnts],[y <span class="cf">for</span> x,y <span class="kw">in</span> cnts],label<span class="op">=</span></span>
+<span id="cb11-55"><a href="#cb11-55" aria-hidden="true" tabindex="-1"></a>        <span class="ss">f"r=</span><span class="sc">{</span>r<span class="sc">}</span><span class="ss">"</span>)</span>
+<span id="cb11-56"><a href="#cb11-56" aria-hidden="true" tabindex="-1"></a>_<span class="op">=</span>title(<span class="st">"FeatMorgan"</span>)</span>
+<span id="cb11-57"><a href="#cb11-57" aria-hidden="true" tabindex="-1"></a>_<span class="op">=</span>ylabel(<span class="st">"unique bits observed"</span>)</span>
+<span id="cb11-58"><a href="#cb11-58" aria-hidden="true" tabindex="-1"></a>_<span class="op">=</span>xlabel(<span class="st">"num molecules"</span>)</span>
+<span id="cb11-59"><a href="#cb11-59" aria-hidden="true" tabindex="-1"></a>_<span class="op">=</span>yscale(<span class="st">'log'</span>)</span>
+<span id="cb11-60"><a href="#cb11-60" aria-hidden="true" tabindex="-1"></a>_<span class="op">=</span>legend()</span>
+<span id="cb11-61"><a href="#cb11-61" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb11-62"><a href="#cb11-62" aria-hidden="true" tabindex="-1"></a>pidx<span class="op">+=</span><span class="dv">1</span></span>
+<span id="cb11-63"><a href="#cb11-63" aria-hidden="true" tabindex="-1"></a>subplot(<span class="dv">3</span>,<span class="dv">2</span>,pidx)</span>
+<span id="cb11-64"><a href="#cb11-64" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> k <span class="kw">in</span> counts.keys():</span>
+<span id="cb11-65"><a href="#cb11-65" aria-hidden="true" tabindex="-1"></a>    <span class="cf">if</span> k[<span class="dv">0</span>].startswith(<span class="st">'Morgan'</span>) <span class="kw">or</span> k[<span class="dv">0</span>].startswith(<span class="st">'FeatMorgan'</span>) <span class="kw">or</span> k[<span class="dv">0</span>].startswith(<span class="st">'RDKit'</span>):</span>
+<span id="cb11-66"><a href="#cb11-66" aria-hidden="true" tabindex="-1"></a>        <span class="cf">continue</span></span>
+<span id="cb11-67"><a href="#cb11-67" aria-hidden="true" tabindex="-1"></a>    pidx<span class="op">+=</span><span class="dv">1</span></span>
+<span id="cb11-68"><a href="#cb11-68" aria-hidden="true" tabindex="-1"></a>    cnts <span class="op">=</span> counts[k]</span>
+<span id="cb11-69"><a href="#cb11-69" aria-hidden="true" tabindex="-1"></a>    plot([x <span class="cf">for</span> x,y <span class="kw">in</span> cnts],[y <span class="cf">for</span> x,y <span class="kw">in</span> cnts],label<span class="op">=</span>k[<span class="dv">0</span>])</span>
+<span id="cb11-70"><a href="#cb11-70" aria-hidden="true" tabindex="-1"></a>_<span class="op">=</span>title(<span class="st">'others'</span>)</span>
+<span id="cb11-71"><a href="#cb11-71" aria-hidden="true" tabindex="-1"></a>_<span class="op">=</span>ylabel(<span class="st">"unique bits observed"</span>)</span>
+<span id="cb11-72"><a href="#cb11-72" aria-hidden="true" tabindex="-1"></a>_<span class="op">=</span>yscale(<span class="st">'log'</span>)</span>
+<span id="cb11-73"><a href="#cb11-73" aria-hidden="true" tabindex="-1"></a>_<span class="op">=</span>xlabel(<span class="st">"num molecules"</span>)</span>
+<span id="cb11-74"><a href="#cb11-74" aria-hidden="true" tabindex="-1"></a>_<span class="op">=</span>legend()</span>
+<span id="cb11-75"><a href="#cb11-75" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb11-76"><a href="#cb11-76" aria-hidden="true" tabindex="-1"></a>tight_layout()<span class="op">;</span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-display">
+<p><img src="2022-01-04-number-of-unique-fp-bits_files/figure-html/cell-10-output-1.png" class="img-fluid"></p>
+</div>
+</div>
+<p><em>Notes:</em> - FeatMorgan with r=0 is super boring since there are only 15 types observed and 14 of them appear within the first 10K compounds (the last appears after around 1.2 million compounds). By way of comparison, there are 143 different Morgan0 types observed and the last of those doesn’t show up until after about 5.1 million compounds. - The Avalon fingerprint was 9192 bits long and it ends up setting all essentially of those bits (9185). It probably would have been better to run this with a longer fingerprint.</p>
+<p>How many compounds do we need to look at in order to see particular fractions of the total number of bits there?</p>
+<div class="cell" data-execution_count="25">
+<div class="sourceCode cell-code" id="cb12"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb12-1"><a href="#cb12-1" aria-hidden="true" tabindex="-1"></a>bins <span class="op">=</span> (<span class="fl">0.9</span>,<span class="fl">0.95</span>,<span class="fl">0.99</span>)</span>
+<span id="cb12-2"><a href="#cb12-2" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="st">'|'</span>,<span class="st">' '</span><span class="op">*</span><span class="dv">15</span>,<span class="st">'|'</span>,<span class="st">'# unique bits'</span>,<span class="st">'|'</span>,<span class="st">'# in last 100K'</span>,<span class="st">'|'</span>,<span class="st">' | '</span>.join(<span class="ss">f'</span><span class="sc">{</span>x<span class="sc">:7.2f}</span><span class="ss">'</span> <span class="cf">for</span> x <span class="kw">in</span> bins),<span class="st">'|'</span>)</span>
+<span id="cb12-3"><a href="#cb12-3" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="st">'|'</span>,<span class="st">'-'</span><span class="op">*</span><span class="dv">15</span>,<span class="st">'|'</span>,<span class="st">'-'</span><span class="op">*</span><span class="dv">13</span>,<span class="st">'|'</span>,<span class="st">'-'</span><span class="op">*</span><span class="dv">14</span>,<span class="st">'|'</span>,<span class="st">' | '</span>.join(<span class="st">'-'</span><span class="op">*</span><span class="dv">7</span> <span class="cf">for</span> x <span class="kw">in</span> bins),<span class="st">'|'</span>)</span>
+<span id="cb12-4"><a href="#cb12-4" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> k,cnts <span class="kw">in</span> <span class="bu">sorted</span>(counts.items()):</span>
+<span id="cb12-5"><a href="#cb12-5" aria-hidden="true" tabindex="-1"></a>    label <span class="op">=</span> <span class="st">''</span>.join(<span class="bu">str</span>(x) <span class="cf">for</span> x <span class="kw">in</span> k <span class="cf">if</span> x<span class="op">!=-</span><span class="dv">1</span>)</span>
+<span id="cb12-6"><a href="#cb12-6" aria-hidden="true" tabindex="-1"></a>    maxv <span class="op">=</span> cnts[<span class="op">-</span><span class="dv">1</span>][<span class="dv">1</span>]</span>
+<span id="cb12-7"><a href="#cb12-7" aria-hidden="true" tabindex="-1"></a>    last100K <span class="op">=</span> cnts[<span class="op">-</span><span class="dv">1</span>][<span class="dv">1</span>] <span class="op">-</span> cnts[<span class="op">-</span><span class="dv">11</span>][<span class="dv">1</span>]</span>
+<span id="cb12-8"><a href="#cb12-8" aria-hidden="true" tabindex="-1"></a>    <span class="cf">if</span> label<span class="op">==</span><span class="st">'FeatMorgan0'</span>:</span>
+<span id="cb12-9"><a href="#cb12-9" aria-hidden="true" tabindex="-1"></a>        accum <span class="op">=</span> <span class="st">' | '</span>.join([<span class="ss">f'</span><span class="sc">{</span><span class="st">"N/A"</span><span class="sc">:7s}</span><span class="ss">'</span>]<span class="op">*</span><span class="dv">3</span>)</span>
+<span id="cb12-10"><a href="#cb12-10" aria-hidden="true" tabindex="-1"></a>    <span class="cf">else</span>:</span>
+<span id="cb12-11"><a href="#cb12-11" aria-hidden="true" tabindex="-1"></a>        accum <span class="op">=</span> []</span>
+<span id="cb12-12"><a href="#cb12-12" aria-hidden="true" tabindex="-1"></a>        <span class="cf">for</span> <span class="bu">bin</span> <span class="kw">in</span> bins:</span>
+<span id="cb12-13"><a href="#cb12-13" aria-hidden="true" tabindex="-1"></a>            <span class="cf">for</span> idx <span class="kw">in</span> <span class="bu">range</span>(<span class="bu">len</span>(cnts),<span class="dv">0</span>,<span class="op">-</span><span class="dv">1</span>):</span>
+<span id="cb12-14"><a href="#cb12-14" aria-hidden="true" tabindex="-1"></a>                <span class="cf">if</span> cnts[idx<span class="op">-</span><span class="dv">1</span>][<span class="dv">1</span>]<span class="op">&lt;</span><span class="bu">bin</span><span class="op">*</span>maxv:</span>
+<span id="cb12-15"><a href="#cb12-15" aria-hidden="true" tabindex="-1"></a>                    accum.append(cnts[idx<span class="op">-</span><span class="dv">1</span>][<span class="dv">0</span>])</span>
+<span id="cb12-16"><a href="#cb12-16" aria-hidden="true" tabindex="-1"></a>                    <span class="cf">break</span></span>
+<span id="cb12-17"><a href="#cb12-17" aria-hidden="true" tabindex="-1"></a>        accum <span class="op">=</span> <span class="st">' | '</span>.join(<span class="ss">f'</span><span class="sc">{</span>x<span class="sc">:7d}</span><span class="ss">'</span> <span class="cf">for</span> x <span class="kw">in</span> accum)</span>
+<span id="cb12-18"><a href="#cb12-18" aria-hidden="true" tabindex="-1"></a>    <span class="bu">print</span>(<span class="st">'|'</span>,<span class="ss">f'</span><span class="sc">{</span>label<span class="sc">:15s}</span><span class="ss">'</span>,<span class="st">'|'</span>,<span class="ss">f'</span><span class="sc">{</span>maxv<span class="sc">:13d}</span><span class="ss">'</span>,<span class="st">'|'</span>,<span class="ss">f'</span><span class="sc">{</span>last100K<span class="sc">:14d}</span><span class="ss">'</span>,<span class="st">'|'</span>,accum,<span class="st">'|'</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>|                 | # unique bits | # in last 100K |    0.90 |    0.95 |    0.99 |
+| --------------- | ------------- | -------------- | ------- | ------- | ------- |
+| FeatMorgan0     |            15 |              0 | N/A     | N/A     | N/A     |
+| FeatMorgan1     |          1621 |              2 | 2760000 | 4080000 | 5460000 |
+| FeatMorgan2     |        116975 |            464 | 4000000 | 4870000 | 5750000 |
+| FeatMorgan3     |       1350464 |           7478 | 4400000 | 5130000 | 5810000 |
+| Morgan0         |           143 |              0 | 2850000 | 4080000 | 5080000 |
+| Morgan1         |         19428 |             67 | 3870000 | 4750000 | 5720000 |
+| Morgan2         |        575817 |           2941 | 4320000 | 5080000 | 5790000 |
+| Morgan3         |       3606676 |          22970 | 4580000 | 5240000 | 5830000 |
+| RDKit5          |        131029 |            347 | 3490000 | 4600000 | 5690000 |
+| RDKit6          |        538500 |           1627 | 3600000 | 4680000 | 5700000 |
+| RDKit7          |       1989958 |           6897 | 3740000 | 4760000 | 5720000 |
+| RDKit-linear5   |         49852 |            136 | 3400000 | 4520000 | 5680000 |
+| RDKit-linear6   |        133904 |            402 | 3480000 | 4570000 | 5690000 |
+| RDKit-linear7   |        315293 |           1032 | 3570000 | 4640000 | 5700000 |
+| ap-counts       |         16585 |             18 | 2470000 | 3840000 | 5410000 |
+| avalon          |          9185 |              0 |   20000 |   70000 |  490000 |
+| tt-counts       |         20723 |             49 | 3530000 | 4570000 | 5640000 |</code></pre>
+</div>
+</div>
+<p>What fraction of the overall number of bits appear in the last 100K compounds?</p>
+<div class="cell" data-execution_count="26">
+<div class="sourceCode cell-code" id="cb14"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb14-1"><a href="#cb14-1" aria-hidden="true" tabindex="-1"></a>bins <span class="op">=</span> (<span class="fl">0.9</span>,<span class="fl">0.95</span>,<span class="fl">0.99</span>)</span>
+<span id="cb14-2"><a href="#cb14-2" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> k,cnts <span class="kw">in</span> <span class="bu">sorted</span>(counts.items()):</span>
+<span id="cb14-3"><a href="#cb14-3" aria-hidden="true" tabindex="-1"></a>    label <span class="op">=</span> <span class="st">''</span>.join(<span class="bu">str</span>(x) <span class="cf">for</span> x <span class="kw">in</span> k <span class="cf">if</span> x<span class="op">!=-</span><span class="dv">1</span>)</span>
+<span id="cb14-4"><a href="#cb14-4" aria-hidden="true" tabindex="-1"></a>    maxv <span class="op">=</span> cnts[<span class="op">-</span><span class="dv">1</span>][<span class="dv">1</span>]</span>
+<span id="cb14-5"><a href="#cb14-5" aria-hidden="true" tabindex="-1"></a>    last100K <span class="op">=</span> cnts[<span class="op">-</span><span class="dv">1</span>][<span class="dv">1</span>] <span class="op">-</span> cnts[<span class="op">-</span><span class="dv">11</span>][<span class="dv">1</span>]</span>
+<span id="cb14-6"><a href="#cb14-6" aria-hidden="true" tabindex="-1"></a>    <span class="bu">print</span>(label,last100K<span class="op">/</span>maxv)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>FeatMorgan0 0.0
+FeatMorgan1 0.0012338062924120913
+FeatMorgan2 0.003966659542637315
+FeatMorgan3 0.005537356049476328
+Morgan0 0.0
+Morgan1 0.0034486308420835906
+Morgan2 0.005107525481185863
+Morgan3 0.006368745071639371
+RDKit5 0.0026482687038747147
+RDKit6 0.003021355617455896
+RDKit7 0.0034659022954253308
+RDKit-linear5 0.0027280751023028163
+RDKit-linear6 0.003002150794599116
+RDKit-linear7 0.00327314593092774
+ap-counts 0.0010853180584865843
+avalon 0.0
+tt-counts 0.002364522511219418</code></pre>
+</div>
+</div>
+
+
+</section>
+
+</main> <!-- /main -->
+<script id="quarto-html-after-body" type="application/javascript">
+window.document.addEventListener("DOMContentLoaded", function (event) {
+  const toggleBodyColorMode = (bsSheetEl) => {
+    const mode = bsSheetEl.getAttribute("data-mode");
+    const bodyEl = window.document.querySelector("body");
+    if (mode === "dark") {
+      bodyEl.classList.add("quarto-dark");
+      bodyEl.classList.remove("quarto-light");
+    } else {
+      bodyEl.classList.add("quarto-light");
+      bodyEl.classList.remove("quarto-dark");
+    }
+  }
+  const toggleBodyColorPrimary = () => {
+    const bsSheetEl = window.document.querySelector("link#quarto-bootstrap");
+    if (bsSheetEl) {
+      toggleBodyColorMode(bsSheetEl);
+    }
+  }
+  toggleBodyColorPrimary();  
+  const icon = "";
+  const anchorJS = new window.AnchorJS();
+  anchorJS.options = {
+    placement: 'right',
+    icon: icon
+  };
+  anchorJS.add('.anchored');
+  const clipboard = new window.ClipboardJS('.code-copy-button', {
+    target: function(trigger) {
+      return trigger.previousElementSibling;
+    }
+  });
+  clipboard.on('success', function(e) {
+    // button target
+    const button = e.trigger;
+    // don't keep focus
+    button.blur();
+    // flash "checked"
+    button.classList.add('code-copy-button-checked');
+    var currentTitle = button.getAttribute("title");
+    button.setAttribute("title", "Copied!");
+    let tooltip;
+    if (window.bootstrap) {
+      button.setAttribute("data-bs-toggle", "tooltip");
+      button.setAttribute("data-bs-placement", "left");
+      button.setAttribute("data-bs-title", "Copied!");
+      tooltip = new bootstrap.Tooltip(button, 
+        { trigger: "manual", 
+          customClass: "code-copy-button-tooltip",
+          offset: [0, -8]});
+      tooltip.show();    
+    }
+    setTimeout(function() {
+      if (tooltip) {
+        tooltip.hide();
+        button.removeAttribute("data-bs-title");
+        button.removeAttribute("data-bs-toggle");
+        button.removeAttribute("data-bs-placement");
+      }
+      button.setAttribute("title", currentTitle);
+      button.classList.remove('code-copy-button-checked');
+    }, 1000);
+    // clear code selection
+    e.clearSelection();
+  });
+  function tippyHover(el, contentFn) {
+    const config = {
+      allowHTML: true,
+      content: contentFn,
+      maxWidth: 500,
+      delay: 100,
+      arrow: false,
+      appendTo: function(el) {
+          return el.parentElement;
+      },
+      interactive: true,
+      interactiveBorder: 10,
+      theme: 'quarto',
+      placement: 'bottom-start'
+    };
+    window.tippy(el, config); 
+  }
+  const noterefs = window.document.querySelectorAll('a[role="doc-noteref"]');
+  for (var i=0; i<noterefs.length; i++) {
+    const ref = noterefs[i];
+    tippyHover(ref, function() {
+      // use id or data attribute instead here
+      let href = ref.getAttribute('data-footnote-href') || ref.getAttribute('href');
+      try { href = new URL(href).hash; } catch {}
+      const id = href.replace(/^#\/?/, "");
+      const note = window.document.getElementById(id);
+      return note.innerHTML;
+    });
+  }
+  const findCites = (el) => {
+    const parentEl = el.parentElement;
+    if (parentEl) {
+      const cites = parentEl.dataset.cites;
+      if (cites) {
+        return {
+          el,
+          cites: cites.split(' ')
+        };
+      } else {
+        return findCites(el.parentElement)
+      }
+    } else {
+      return undefined;
+    }
+  };
+  var bibliorefs = window.document.querySelectorAll('a[role="doc-biblioref"]');
+  for (var i=0; i<bibliorefs.length; i++) {
+    const ref = bibliorefs[i];
+    const citeInfo = findCites(ref);
+    if (citeInfo) {
+      tippyHover(citeInfo.el, function() {
+        var popup = window.document.createElement('div');
+        citeInfo.cites.forEach(function(cite) {
+          var citeDiv = window.document.createElement('div');
+          citeDiv.classList.add('hanging-indent');
+          citeDiv.classList.add('csl-entry');
+          var biblioDiv = window.document.getElementById('ref-' + cite);
+          if (biblioDiv) {
+            citeDiv.innerHTML = biblioDiv.innerHTML;
+          }
+          popup.appendChild(citeDiv);
+        });
+        return popup.innerHTML;
+      });
+    }
+  }
+});
+</script>
+</div> <!-- /content -->
+
+
+
+</body></html>

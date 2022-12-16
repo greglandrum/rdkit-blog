@@ -1,0 +1,499 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en"><head>
+
+<meta charset="utf-8">
+<meta name="generator" content="quarto-1.2.269">
+
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+
+<meta name="dcterms.date" content="2021-05-01">
+<meta name="description" content="Introducing the RDKit CFFI interface">
+
+<title>RDKit blog - A new way to use the RDKit from other languages</title>
+<style>
+code{white-space: pre-wrap;}
+span.smallcaps{font-variant: small-caps;}
+div.columns{display: flex; gap: min(4vw, 1.5em);}
+div.column{flex: auto; overflow-x: auto;}
+div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+ul.task-list{list-style: none;}
+ul.task-list li input[type="checkbox"] {
+  width: 0.8em;
+  margin: 0 0.8em 0.2em -1.6em;
+  vertical-align: middle;
+}
+</style>
+
+
+<script src="../site_libs/quarto-nav/quarto-nav.js"></script>
+<script src="../site_libs/quarto-nav/headroom.min.js"></script>
+<script src="../site_libs/clipboard/clipboard.min.js"></script>
+<script src="../site_libs/quarto-search/autocomplete.umd.js"></script>
+<script src="../site_libs/quarto-search/fuse.min.js"></script>
+<script src="../site_libs/quarto-search/quarto-search.js"></script>
+<meta name="quarto:offset" content="../">
+<script src="../site_libs/quarto-html/quarto.js"></script>
+<script src="../site_libs/quarto-html/popper.min.js"></script>
+<script src="../site_libs/quarto-html/tippy.umd.min.js"></script>
+<script src="../site_libs/quarto-html/anchor.min.js"></script>
+<link href="../site_libs/quarto-html/tippy.css" rel="stylesheet">
+<link href="../site_libs/quarto-html/quarto-syntax-highlighting.css" rel="stylesheet" id="quarto-text-highlighting-styles">
+<script src="../site_libs/bootstrap/bootstrap.min.js"></script>
+<link href="../site_libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
+<link href="../site_libs/bootstrap/bootstrap.min.css" rel="stylesheet" id="quarto-bootstrap" data-mode="light">
+<script id="quarto-search-options" type="application/json">{
+  "location": "navbar",
+  "copy-button": false,
+  "collapse-after": 3,
+  "panel-placement": "end",
+  "type": "overlay",
+  "limit": 20,
+  "language": {
+    "search-no-results-text": "No results",
+    "search-matching-documents-text": "matching documents",
+    "search-copy-link-title": "Copy link to search",
+    "search-hide-matches-text": "Hide additional matches",
+    "search-more-match-text": "more match in this document",
+    "search-more-matches-text": "more matches in this document",
+    "search-clear-button-title": "Clear",
+    "search-detached-cancel-button-title": "Cancel",
+    "search-submit-button-title": "Submit"
+  }
+}</script>
+
+
+<link rel="stylesheet" href="../styles.css">
+</head>
+
+<body class="nav-fixed">
+
+<div id="quarto-search-results"></div>
+  <header id="quarto-header" class="headroom fixed-top">
+    <nav class="navbar navbar-expand-lg navbar-dark ">
+      <div class="navbar-container container-fluid">
+      <div class="navbar-brand-container">
+    <a class="navbar-brand" href="../index.html">
+    <span class="navbar-title">RDKit blog</span>
+    </a>
+  </div>
+          <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarCollapse" aria-controls="navbarCollapse" aria-expanded="false" aria-label="Toggle navigation" onclick="if (window.quartoToggleHeadroom) { window.quartoToggleHeadroom(); }">
+  <span class="navbar-toggler-icon"></span>
+</button>
+          <div class="collapse navbar-collapse" id="navbarCollapse">
+            <ul class="navbar-nav navbar-nav-scroll ms-auto">
+  <li class="nav-item">
+    <a class="nav-link" href="../about.html">
+ <span class="menu-text">RDKit experiments, tips, and tutorials</span></a>
+  </li>  
+  <li class="nav-item compact">
+    <a class="nav-link" href="https://github.com/rdkit/rdkit"><i class="bi bi-github" role="img">
+</i> 
+ <span class="menu-text"></span></a>
+  </li>  
+  <li class="nav-item compact">
+    <a class="nav-link" href="https://twitter.com/rdkit_org"><i class="bi bi-twitter" role="img">
+</i> 
+ <span class="menu-text"></span></a>
+  </li>  
+</ul>
+              <div id="quarto-search" class="" title="Search"></div>
+          </div> <!-- /navcollapse -->
+      </div> <!-- /container-fluid -->
+    </nav>
+</header>
+<!-- content -->
+<div id="quarto-content" class="quarto-container page-columns page-rows-contents page-layout-article page-navbar">
+<!-- sidebar -->
+<!-- margin-sidebar -->
+    <div id="quarto-margin-sidebar" class="sidebar margin-sidebar">
+        <nav id="TOC" role="doc-toc" class="toc-active">
+    <h2 id="toc-title">On this page</h2>
+   
+  <ul>
+  <li><a href="#tldr" id="toc-tldr" class="nav-link active" data-scroll-target="#tldr">TL;DR</a></li>
+  <li><a href="#intro" id="toc-intro" class="nav-link" data-scroll-target="#intro">Intro</a></li>
+  <li><a href="#how-it-works" id="toc-how-it-works" class="nav-link" data-scroll-target="#how-it-works">How it works</a>
+  <ul class="collapse">
+  <li><a href="#parsing-molecule-formats-and-operating-on-molecules" id="toc-parsing-molecule-formats-and-operating-on-molecules" class="nav-link" data-scroll-target="#parsing-molecule-formats-and-operating-on-molecules">Parsing molecule formats and operating on molecules</a></li>
+  <li><a href="#modifying-molecules" id="toc-modifying-molecules" class="nav-link" data-scroll-target="#modifying-molecules">Modifying molecules</a></li>
+  </ul></li>
+  <li><a href="#an-aside-about-an-interesting-way-rdkit-cffi-could-be-used" id="toc-an-aside-about-an-interesting-way-rdkit-cffi-could-be-used" class="nav-link" data-scroll-target="#an-aside-about-an-interesting-way-rdkit-cffi-could-be-used">An aside about an interesting way rdkit-cffi could be used</a></li>
+  <li><a href="#status" id="toc-status" class="nav-link" data-scroll-target="#status">Status</a></li>
+  <li><a href="#wrapping-up" id="toc-wrapping-up" class="nav-link" data-scroll-target="#wrapping-up">Wrapping up</a></li>
+  </ul>
+</nav>
+    </div>
+<!-- main -->
+<main class="content" id="quarto-document-content">
+
+<header id="title-block-header" class="quarto-title-block default">
+<div class="quarto-title">
+<h1 class="title">A new way to use the RDKit from other languages</h1>
+  <div class="quarto-categories">
+    <div class="quarto-category">technical</div>
+  </div>
+  </div>
+
+<div>
+  <div class="description">
+    Introducing the RDKit CFFI interface
+  </div>
+</div>
+
+
+<div class="quarto-title-meta">
+
+    
+    <div>
+    <div class="quarto-title-meta-heading">Published</div>
+    <div class="quarto-title-meta-contents">
+      <p class="date">May 1, 2021</p>
+    </div>
+  </div>
+  
+    
+  </div>
+  
+
+</header>
+
+<section id="tldr" class="level1">
+<h1>TL;DR</h1>
+<p>We’ve added a new API which makes it easy to use the RDKit from programming languages other than C++, Python, Java or C#.</p>
+</section>
+<section id="intro" class="level1">
+<h1>Intro</h1>
+<p>The majority of the RDKit is written in C++, but we also make wrappers allowing you to use it from other programming languages. The main one of these, and the most complete, is for Python and is written by hand (using Boost::Python). The Java and C# wrappers are generated more or less automatically using SWIG.</p>
+<p>Back in 2019 we decided to do a JavaScript (JS) wrapper which follows a slightly different approach: instead of wrapping the whole toolkit the new JS wrappers provide access to a useful subset of RDKit functionality provided as functions. We called this <code>MinimalLib</code> and there’s more information in an <a href="http://rdkit.blogspot.com/2019/11/introducing-new-rdkit-javascript.html">earlier blog post</a>.</p>
+<p>We’ve now extended <code>MinimalLib</code> and made it useable from any programming language which supports calling into external libraries written in C (often called using a “C Foreign Function Interface”, or CFFI). Since most common programming languages support CFFI, I think this will help bring chemistry to a bunch of other languages.</p>
+</section>
+<section id="how-it-works" class="level1">
+<h1>How it works</h1>
+<p>This is easiest explained with an example. Since each programming language implements CFFI slightly differently, and I’m not even close to being good at some of the more intersting ones like go, Rust, or Julia, I’ll demonstrate using C itself and sample code adapted from <a href="https://github.com/rdkit/rdkit/blob/master/Code/MinimalLib/cffi_test.c">cffi_test.c</a>, one of the files used to test the new interface.</p>
+<p>The general pattern when working with rdkit-cffi is to parse a molecule input format to get back a serialized (“pickled”) form of that molecule and then to pass that pickled molecule to other functions which do the chemistry operations you’re interested in.</p>
+<section id="parsing-molecule-formats-and-operating-on-molecules" class="level2">
+<h2 class="anchored" data-anchor-id="parsing-molecule-formats-and-operating-on-molecules">Parsing molecule formats and operating on molecules</h2>
+<p>The “hello world” equivalent in cheminformatics is generating canonical SMILES. Here’s a full C program showing how you do that with rdkit-cffi, I will explain the rdkit-cffi functions and how they are used in more detail below:</p>
+<pre><code>#include &lt;stdio.h&gt;
+#include &lt;string.h&gt;
+#include &lt;stdlib.h&gt;
+#include "cffiwrapper.h"
+
+void canon_smiles(){
+  char *pkl;
+  size_t pkl_size;
+  
+  pkl = get_mol("c1cc(O)ccc1",&amp;pkl_size,"");
+  char *smiles=get_smiles(pkl,pkl_size,NULL);
+  printf("Canonical SMILES: %s\n",smiles);
+  free(smiles);
+  free(pkl);
+}
+
+int main(){
+  enable_logging();
+  printf("hello %s\n",version()); 
+  canon_smiles();
+  return 0;
+}</code></pre>
+<p>I compiled this on my linux machine as follows:</p>
+<pre><code>% cc -o demo.exe -I $RDBASE/Code demo.c $RDBASE/lib/librdkitcffi.so</code></pre>
+<p>Running it produces:</p>
+<pre><code>% ./demo.exe
+hello 2021.09.1pre
+Canonical SMILES: Oc1ccccc1</code></pre>
+<p>Let’s look at the rdkit-cffi parts of this, starting with the <code>main()</code> function.</p>
+<p>We start by enabling the RDKit’s logging system:</p>
+<pre><code>  enable_logging();</code></pre>
+<p>If you skip this, you won’t see any of the usual RDKit errors or warnings.</p>
+<p>Next we use the <code>version()</code> function to get the version of the RDKit which is being used and then print that out.</p>
+<p>With that basic initialization out of the way we call the function <code>canon_smiles()</code>, which is where the real work happens. Here we start by parsing a SMILES using the <code>get_mol()</code> function:</p>
+<pre><code>  pkl = get_mol("c1cc(O)ccc1",&amp;pkl_size,"");
+</code></pre>
+<p><code>get_mol()</code> returns a binary string with the pickled representation of the molecule and uses the <code>pkl_size</code> argument (an integer) to return the length of that string (this is an unfortunately necessary implementation detail). The final argument to <code>get_mol()</code>, the empty string, can be used to pass in an JSON string containing additional arguments controlling the parsing (we could have also passed this argument as NULL). <code>get_mol()</code> currently supports constructing molecules from SMILES (and CXSMILES), Mol/SDF, and the RDKit’s JSON format; it recognized automatically which parser should be used. We will be expanding the list of supported formats in the future.</p>
+<p>After we have the molecule processed we can get the canonical SMILES for it by calling the <code>get_smiles()</code> function:</p>
+<pre><code>  char *smiles=get_smiles(pkl,pkl_size,NULL);</code></pre>
+<p><code>get_smiles()</code> follows the general pattern for rdkit-cffi functions which operate on molecules: the first two arguments are the pickled molecule and the length of the pickle string, the third argument is a JSON string with additional options to be used when generating the SMILES; in this case we want the defaults, so we pass a NULL pointer (we could also have used the empty string <code>""</code>).</p>
+<p>Finally, and not to be overlooked when working in C, we need to free the memory which was allocated to hold the molecule pickle and the SMILES:</p>
+<pre><code>  free(smiles);
+  free(pkl);</code></pre>
+<p>The functions which are available are declared in <a href="https://github.com/rdkit/rdkit/blob/master/Code/MinimalLib/cffiwrapper.h">cffiwrapper.h</a>.</p>
+</section>
+<section id="modifying-molecules" class="level2">
+<h2 class="anchored" data-anchor-id="modifying-molecules">Modifying molecules</h2>
+<p>Some rdkit-cffi functions modify the molecule. In this case the general pattern is the modify the molecule <em>in place</em>, i.e.&nbsp;to modify the current molecule instead of returning a new one.</p>
+<p>Here’s a simple function which parses a SMILES, add Hs to the molecule, generates a 3D conformer using a fixed random seed, and then prints out the molblock for the modified molecule:</p>
+<pre><code>void generate_conformer(){
+  char *pkl;
+  size_t pkl_size;
+  
+  pkl = get_mol("c1cc(O)ccc1",&amp;pkl_size,NULL);
+
+  add_hs(&amp;pkl,&amp;pkl_size);
+
+  set_3d_coords(&amp;pkl,&amp;pkl_size,"{\"randomSeed\":42}");
+
+  char *molb = get_molblock(pkl,pkl_size,NULL);
+  printf("%s\n",molb);
+  free(molb);
+  free(pkl);
+}</code></pre>
+<p>We’ve already seen <code>get_mol()</code>. As mentioned above <code>add_hs()</code> modifies the molecule in place, so you need to pass pointers to the pickle string and pickle size so that they can be modifed. <code>set_3d_coords()</code> also modifies the molecule in place to add the conformer. This is also the first time we use the JSON string that most of the functions take as their last argument: here we set the random number seed used in the conformer generation so that we get reproducible results. Finally <code>get_molblock()</code>, like <code>get_smiles()</code>, returns a string with the MOL file data for the molecule. This can be saved to a file and opened in most chemistry software.</p>
+</section>
+</section>
+<section id="an-aside-about-an-interesting-way-rdkit-cffi-could-be-used" class="level1">
+<h1>An aside about an interesting way rdkit-cffi could be used</h1>
+<p>The RDKit has a lot of functionality, and covering all of that in the interface exposed by <code>rdkit-cffi</code> is not a goal. We want to provide a useful (hopefully very useful) subset of the functionality for use in other languages. If there’s something you think is missing, please <a href="https://github.com/rdkit/rdkit/discussions">ask about it</a>.</p>
+<p>I think you there’s another interesting use case for this though. Suppose you have an idea for some interesting new piece of cheminformatics functionality, and you’d like to work in a language like Rust or Julia but you don’t want to have to deal with all the basic cheminformatics plumbing yourself. <code>rdkit-cffi</code> can really help here. The key functionality for this mode is the <code>get_json()</code> function, which returns an easily parsed JSON representation of the molecule using the RDKit’s extension to the <a href="https://github.com/CommonChem/CommonChem">commonchem JSON format</a>.</p>
+<pre><code>void json_output(){
+  char *pkl;
+  size_t pkl_size;
+  
+  pkl = get_mol("c1cc(O)ccc1",&amp;pkl_size,"");
+  char *json=get_json(pkl,pkl_size,NULL);
+  printf("%s\n",json);
+  free(json);
+  free(pkl);
+}</code></pre>
+<p>The output here (after running through a JSON pretty printer) is:</p>
+<pre><code>{
+  "commonchem": {
+    "version": 10
+  },
+  "defaults": {
+    "atom": {
+      "z": 6,
+      "impHs": 0,
+      "chg": 0,
+      "nRad": 0,
+      "isotope": 0,
+      "stereo": "unspecified"
+    },
+    "bond": {
+      "bo": 1,
+      "stereo": "unspecified"
+    }
+  },
+  "molecules": [
+    {
+      "atoms": [
+        {
+          "impHs": 1
+        },
+        {
+          "impHs": 1
+        },
+        {},
+        {
+          "z": 8,
+          "impHs": 1
+        },
+        {
+          "impHs": 1
+        },
+        {
+          "impHs": 1
+        },
+        {
+          "impHs": 1
+        }
+      ],
+      "bonds": [
+        {
+          "bo": 2,
+          "atoms": [0,1]
+        },
+        {
+          "atoms": [1,2]
+        },
+        {
+          "atoms": [2,3]
+        },
+        {
+          "bo": 2,
+          "atoms": [2,4]
+        },
+        {
+          "atoms": [4,5]
+        },
+        {
+          "bo": 2,
+          "atoms": [5,6]
+        },
+        {
+          "atoms": [6,0]
+        }
+      ],
+      "extensions": [
+        {
+          "name": "rdkitRepresentation",
+          "formatVersion": 1,
+          "toolkitVersion": "2021.09.1pre",
+          "aromaticAtoms": [0,1,2,4,5,6],
+          "aromaticBonds": [0,1,3,4,5,6],
+          "atomRings": [[0,6,5,4,2,1]
+          ]
+        }
+      ]
+    }
+  ]
+}</code></pre>
+<p>It should be easy to parse this with the JSON parser in any modern programming language, and the format provides all the information you need to reconstruct a molecule in whatever representation you’re using in your language of choice. But you can do it without having to worry about dealing with chemistry perception, ring finding, etc.</p>
+</section>
+<section id="status" class="level1">
+<h1>Status</h1>
+<p>The new CFFI interface is currently available on the RDKit master branch. It hasn’t yet been officially released, but I’m publicizing it now because I’d like to try and get people using it and providing feedback and suggestions so that we can get it as polished and useful as possible before the 2021.09 release later this year.</p>
+<p>I’ve setup a <a href="https://github.com/greglandrum/rdkit-minimallib-build">separate repo in github</a> which has a link to Azure Pipelines to automatically do builds of the CFFI wrappers and make the shared libraries available. The README there also includes links you can use to download the most recent builds for Linux and the Mac (I still need to get the automated Windows builds working). I haven’t figured out how to actually make this easy (unless you have the azure CLI installed, in which case there’s a single command you can execute), so there are a number of clicks needed:</p>
+<p>Start by picking the build you want from the README: <img src="images/blog/cffi-shot1.png" class="img-fluid"></p>
+<p>Now click the build identifier (this page also has the azure CLI command to get the build directly): <img src="images/blog/cffi-shot2.png" class="img-fluid"></p>
+<p>Pick the appropriate job: <img src="images/blog/cffi-shot3.png" class="img-fluid"></p>
+<p>Click the “1 artifact” link: <img src="images/blog/cffi-shot4.png" class="img-fluid"></p>
+<p>now you can actually download the artifact: <img src="images/blog/cffi-shot5.png" class="img-fluid"></p>
+<p><em>sigh</em> I will try to find a way to make this simpler…</p>
+</section>
+<section id="wrapping-up" class="level1">
+<h1>Wrapping up</h1>
+<p>I will likely do another post on rdkit-cffi before the next release, most likely one looking at things like performance (since that’s something I tend to do). In the meantime please let me know if you start using it!</p>
+
+
+</section>
+
+</main> <!-- /main -->
+<script id="quarto-html-after-body" type="application/javascript">
+window.document.addEventListener("DOMContentLoaded", function (event) {
+  const toggleBodyColorMode = (bsSheetEl) => {
+    const mode = bsSheetEl.getAttribute("data-mode");
+    const bodyEl = window.document.querySelector("body");
+    if (mode === "dark") {
+      bodyEl.classList.add("quarto-dark");
+      bodyEl.classList.remove("quarto-light");
+    } else {
+      bodyEl.classList.add("quarto-light");
+      bodyEl.classList.remove("quarto-dark");
+    }
+  }
+  const toggleBodyColorPrimary = () => {
+    const bsSheetEl = window.document.querySelector("link#quarto-bootstrap");
+    if (bsSheetEl) {
+      toggleBodyColorMode(bsSheetEl);
+    }
+  }
+  toggleBodyColorPrimary();  
+  const icon = "";
+  const anchorJS = new window.AnchorJS();
+  anchorJS.options = {
+    placement: 'right',
+    icon: icon
+  };
+  anchorJS.add('.anchored');
+  const clipboard = new window.ClipboardJS('.code-copy-button', {
+    target: function(trigger) {
+      return trigger.previousElementSibling;
+    }
+  });
+  clipboard.on('success', function(e) {
+    // button target
+    const button = e.trigger;
+    // don't keep focus
+    button.blur();
+    // flash "checked"
+    button.classList.add('code-copy-button-checked');
+    var currentTitle = button.getAttribute("title");
+    button.setAttribute("title", "Copied!");
+    let tooltip;
+    if (window.bootstrap) {
+      button.setAttribute("data-bs-toggle", "tooltip");
+      button.setAttribute("data-bs-placement", "left");
+      button.setAttribute("data-bs-title", "Copied!");
+      tooltip = new bootstrap.Tooltip(button, 
+        { trigger: "manual", 
+          customClass: "code-copy-button-tooltip",
+          offset: [0, -8]});
+      tooltip.show();    
+    }
+    setTimeout(function() {
+      if (tooltip) {
+        tooltip.hide();
+        button.removeAttribute("data-bs-title");
+        button.removeAttribute("data-bs-toggle");
+        button.removeAttribute("data-bs-placement");
+      }
+      button.setAttribute("title", currentTitle);
+      button.classList.remove('code-copy-button-checked');
+    }, 1000);
+    // clear code selection
+    e.clearSelection();
+  });
+  function tippyHover(el, contentFn) {
+    const config = {
+      allowHTML: true,
+      content: contentFn,
+      maxWidth: 500,
+      delay: 100,
+      arrow: false,
+      appendTo: function(el) {
+          return el.parentElement;
+      },
+      interactive: true,
+      interactiveBorder: 10,
+      theme: 'quarto',
+      placement: 'bottom-start'
+    };
+    window.tippy(el, config); 
+  }
+  const noterefs = window.document.querySelectorAll('a[role="doc-noteref"]');
+  for (var i=0; i<noterefs.length; i++) {
+    const ref = noterefs[i];
+    tippyHover(ref, function() {
+      // use id or data attribute instead here
+      let href = ref.getAttribute('data-footnote-href') || ref.getAttribute('href');
+      try { href = new URL(href).hash; } catch {}
+      const id = href.replace(/^#\/?/, "");
+      const note = window.document.getElementById(id);
+      return note.innerHTML;
+    });
+  }
+  const findCites = (el) => {
+    const parentEl = el.parentElement;
+    if (parentEl) {
+      const cites = parentEl.dataset.cites;
+      if (cites) {
+        return {
+          el,
+          cites: cites.split(' ')
+        };
+      } else {
+        return findCites(el.parentElement)
+      }
+    } else {
+      return undefined;
+    }
+  };
+  var bibliorefs = window.document.querySelectorAll('a[role="doc-biblioref"]');
+  for (var i=0; i<bibliorefs.length; i++) {
+    const ref = bibliorefs[i];
+    const citeInfo = findCites(ref);
+    if (citeInfo) {
+      tippyHover(citeInfo.el, function() {
+        var popup = window.document.createElement('div');
+        citeInfo.cites.forEach(function(cite) {
+          var citeDiv = window.document.createElement('div');
+          citeDiv.classList.add('hanging-indent');
+          citeDiv.classList.add('csl-entry');
+          var biblioDiv = window.document.getElementById('ref-' + cite);
+          if (biblioDiv) {
+            citeDiv.innerHTML = biblioDiv.innerHTML;
+          }
+          popup.appendChild(citeDiv);
+        });
+        return popup.innerHTML;
+      });
+    }
+  }
+});
+</script>
+</div> <!-- /content -->
+
+
+
+</body></html>

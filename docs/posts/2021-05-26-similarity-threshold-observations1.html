@@ -1,0 +1,837 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en"><head>
+
+<meta charset="utf-8">
+<meta name="generator" content="quarto-1.2.269">
+
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+
+<meta name="dcterms.date" content="2021-05-26">
+<meta name="description" content="Fingerprint efficiency">
+
+<title>RDKit blog - Some observations about similarity search thresholds</title>
+<style>
+code{white-space: pre-wrap;}
+span.smallcaps{font-variant: small-caps;}
+div.columns{display: flex; gap: min(4vw, 1.5em);}
+div.column{flex: auto; overflow-x: auto;}
+div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+ul.task-list{list-style: none;}
+ul.task-list li input[type="checkbox"] {
+  width: 0.8em;
+  margin: 0 0.8em 0.2em -1.6em;
+  vertical-align: middle;
+}
+</style>
+
+
+<script src="../site_libs/quarto-nav/quarto-nav.js"></script>
+<script src="../site_libs/quarto-nav/headroom.min.js"></script>
+<script src="../site_libs/clipboard/clipboard.min.js"></script>
+<script src="../site_libs/quarto-search/autocomplete.umd.js"></script>
+<script src="../site_libs/quarto-search/fuse.min.js"></script>
+<script src="../site_libs/quarto-search/quarto-search.js"></script>
+<meta name="quarto:offset" content="../">
+<script src="../site_libs/quarto-html/quarto.js"></script>
+<script src="../site_libs/quarto-html/popper.min.js"></script>
+<script src="../site_libs/quarto-html/tippy.umd.min.js"></script>
+<script src="../site_libs/quarto-html/anchor.min.js"></script>
+<link href="../site_libs/quarto-html/tippy.css" rel="stylesheet">
+<link href="../site_libs/quarto-html/quarto-syntax-highlighting.css" rel="stylesheet" id="quarto-text-highlighting-styles">
+<script src="../site_libs/bootstrap/bootstrap.min.js"></script>
+<link href="../site_libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
+<link href="../site_libs/bootstrap/bootstrap.min.css" rel="stylesheet" id="quarto-bootstrap" data-mode="light">
+<script id="quarto-search-options" type="application/json">{
+  "location": "navbar",
+  "copy-button": false,
+  "collapse-after": 3,
+  "panel-placement": "end",
+  "type": "overlay",
+  "limit": 20,
+  "language": {
+    "search-no-results-text": "No results",
+    "search-matching-documents-text": "matching documents",
+    "search-copy-link-title": "Copy link to search",
+    "search-hide-matches-text": "Hide additional matches",
+    "search-more-match-text": "more match in this document",
+    "search-more-matches-text": "more matches in this document",
+    "search-clear-button-title": "Clear",
+    "search-detached-cancel-button-title": "Cancel",
+    "search-submit-button-title": "Submit"
+  }
+}</script>
+
+
+<link rel="stylesheet" href="../styles.css">
+</head>
+
+<body class="nav-fixed">
+
+<div id="quarto-search-results"></div>
+  <header id="quarto-header" class="headroom fixed-top">
+    <nav class="navbar navbar-expand-lg navbar-dark ">
+      <div class="navbar-container container-fluid">
+      <div class="navbar-brand-container">
+    <a class="navbar-brand" href="../index.html">
+    <span class="navbar-title">RDKit blog</span>
+    </a>
+  </div>
+          <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarCollapse" aria-controls="navbarCollapse" aria-expanded="false" aria-label="Toggle navigation" onclick="if (window.quartoToggleHeadroom) { window.quartoToggleHeadroom(); }">
+  <span class="navbar-toggler-icon"></span>
+</button>
+          <div class="collapse navbar-collapse" id="navbarCollapse">
+            <ul class="navbar-nav navbar-nav-scroll ms-auto">
+  <li class="nav-item">
+    <a class="nav-link" href="../about.html">
+ <span class="menu-text">RDKit experiments, tips, and tutorials</span></a>
+  </li>  
+  <li class="nav-item compact">
+    <a class="nav-link" href="https://github.com/rdkit/rdkit"><i class="bi bi-github" role="img">
+</i> 
+ <span class="menu-text"></span></a>
+  </li>  
+  <li class="nav-item compact">
+    <a class="nav-link" href="https://twitter.com/rdkit_org"><i class="bi bi-twitter" role="img">
+</i> 
+ <span class="menu-text"></span></a>
+  </li>  
+</ul>
+              <div id="quarto-search" class="" title="Search"></div>
+          </div> <!-- /navcollapse -->
+      </div> <!-- /container-fluid -->
+    </nav>
+</header>
+<!-- content -->
+<div id="quarto-content" class="quarto-container page-columns page-rows-contents page-layout-article page-navbar">
+<!-- sidebar -->
+<!-- margin-sidebar -->
+    <div id="quarto-margin-sidebar" class="sidebar margin-sidebar">
+        <nav id="TOC" role="doc-toc" class="toc-active">
+    <h2 id="toc-title">On this page</h2>
+   
+  <ul>
+  <li><a href="#tldr" id="toc-tldr" class="nav-link active" data-scroll-target="#tldr">TL;DR</a></li>
+  <li><a href="#intro-results" id="toc-intro-results" class="nav-link" data-scroll-target="#intro-results">Intro / Results</a></li>
+  </ul>
+</nav>
+    </div>
+<!-- main -->
+<main class="content" id="quarto-document-content">
+
+<header id="title-block-header" class="quarto-title-block default">
+<div class="quarto-title">
+<h1 class="title">Some observations about similarity search thresholds</h1>
+  <div class="quarto-categories">
+    <div class="quarto-category">similarity</div>
+    <div class="quarto-category">reference</div>
+  </div>
+  </div>
+
+<div>
+  <div class="description">
+    Fingerprint efficiency
+  </div>
+</div>
+
+
+<div class="quarto-title-meta">
+
+    
+    <div>
+    <div class="quarto-title-meta-heading">Published</div>
+    <div class="quarto-title-meta-contents">
+      <p class="date">May 26, 2021</p>
+    </div>
+  </div>
+  
+    
+  </div>
+  
+
+</header>
+
+<p><strong>Updated 08.06.2021</strong> after I expanded the set of “related compounds”. The source of the previous version of the post is available <a href="https://github.com/greglandrum/rdkit-blog/blob/c5eb92294c45e7fe77b6c5658d1de5388090d7f1/_posts/2021-05-26-similarity-threshold-observations1.md">in github.</a> The updates didn’t change the discussion that much.</p>
+<section id="tldr" class="level1">
+<h1>TL;DR</h1>
+<p>Based on the analysis here it looks like the fingerprint the RDKit provides which does the best job of efficiently retrieving chemically similar structures is the RDKit fingerprint with <code>maxPath</code> set to 6.</p>
+</section>
+<section id="intro-results" class="level1">
+<h1>Intro / Results</h1>
+<p>I recently did a post presenting an <a href="https://greglandrum.github.io/rdkit-blog/similarity/reference/2021/05/21/similarity-search-thresholds.html">approach for finding reasonable thresholds</a> for similarity searches using the fingerprints the RDKit provides. This is a followup to that one written after I’ve done some more looking at the data. I want to come up with a suggestion for which fingerprint to use for similarity searches when the goal is retrieving as many chemically related compounds as possible. I’ll do that by looking at search efficiency as measured by the fraction of the total database retrieved when using similarity thresholds sufficient to return 90-95% of the related compounds. See the <a href="https://greglandrum.github.io/rdkit-blog/similarity/reference/2021/05/21/similarity-search-thresholds.html">earlier post</a> for an explanation of what “related compounds” means here and how the searches were done.</p>
+<p>As a reminder, this is how I presented the results in that post and how to interpret the data:</p>
+
+<table>
+<tbody><tr>
+<th>
+</th>
+<th>
+</th>
+<th colspan="2">
+0.95 of related compounds
+</th>
+<th colspan="2">
+0.9 of related compounds
+</th>
+<th colspan="2">
+0.8 of related compounds
+</th>
+<th colspan="2">
+0.5 of related compounds
+</th>
+</tr>
+<tr>
+<th>
+Fingerprint
+</th>
+<th>
+0.95 noise level
+</th>
+<th>
+threshold
+</th>
+<th>
+db fraction / count per million
+</th>
+<th>
+threshold
+</th>
+<th>
+db fraction / count per million
+</th>
+<th>
+threshold
+</th>
+<th>
+db fraction / count per million
+</th>
+<th>
+threshold
+</th>
+<th>
+db fraction / count per million
+</th>
+</tr>
+<tr>
+<td>
+<b>Morgan2 (bits)</b>
+</td>
+<td>
+0.27
+</td>
+<td>
+0.4
+</td>
+<td>
+0.00019 / 190
+</td>
+<td>
+0.4
+</td>
+<td>
+0.00019 / 190
+</td>
+<td>
+0.45
+</td>
+<td>
+0.00012 / 115
+</td>
+<td>
+0.55
+</td>
+<td>
+2.5e-05 / 25
+</td>
+</tr>
+
+</tbody></table>
+<p>The 0.95 noise level (from the previous analysis) for the MFP2 fingerprint is 0.27. If I want to retrieve 95% of the related compounds I need to set the similarity threshold to 0.4. With this threshold I would retrieve ~190 compounds per million compounds in the database (0.4% of the database). Similarly, if I were willing to live with finding 50% of the related actives I could set the search threshold to 0.55, in which case I’d only retrieve ~25 rows per million compounds in the database.</p>
+<p>I won’t reproduce the full results table from the post here, but here are the rows with the highest search efficiencies (lowest number of compounds returned from the “background database”) at 90% and 95% of related compounds found. I sorted the table by the efficiency at 90% of related compounds retrieved:</p>
+
+<table>
+<tbody><tr>
+<th>
+</th>
+<th>
+</th>
+<th colspan="2">
+0.95 of related compounds
+</th>
+<th colspan="2">
+0.9 of related compounds
+</th>
+<th colspan="2">
+0.8 of related compounds
+</th>
+<th colspan="2">
+0.5 of related compounds
+</th>
+</tr>
+<tr>
+<th>
+Fingerprint
+</th>
+<th>
+0.95 noise level
+</th>
+<th>
+threshold
+</th>
+<th>
+db fraction / count per million
+</th>
+<th>
+threshold
+</th>
+<th>
+db fraction / count per million
+</th>
+<th>
+threshold
+</th>
+<th>
+db fraction / count per million
+</th>
+<th>
+threshold
+</th>
+<th>
+db fraction / count per million
+</th>
+</tr>
+<tr>
+<td>
+<b>RDKit 7 (bits)</b>
+</td>
+<td>
+0.43
+</td>
+<td>
+0.55
+</td>
+<td>
+0.00051 / 510
+</td>
+<td>
+0.6
+</td>
+<td>
+8e-05 / 80
+</td>
+<td>
+0.6
+</td>
+<td>
+8e-05 / 80
+</td>
+<td>
+0.7
+</td>
+<td>
+3e-05 / 30
+</td>
+</tr>
+<tr>
+<td>
+<b>Topological Torsions (counts)</b>
+</td>
+<td>
+0.19
+</td>
+<td>
+0.35
+</td>
+<td>
+0.00049 / 489
+</td>
+<td>
+0.4
+</td>
+<td>
+0.00011 / 110
+</td>
+<td>
+0.45
+</td>
+<td>
+7.5e-05 / 75
+</td>
+<td>
+0.55
+</td>
+<td>
+2.5e-05 / 25
+</td>
+</tr>
+<tr>
+<td>
+<b>linear RDKit 7 (bits)</b>
+</td>
+<td>
+0.26
+</td>
+<td>
+0.45
+</td>
+<td>
+0.00053 / 535
+</td>
+<td>
+0.5
+</td>
+<td>
+0.00013 / 130
+</td>
+<td>
+0.55
+</td>
+<td>
+9e-05 / 90
+</td>
+<td>
+0.65
+</td>
+<td>
+3.5e-05 / 35
+</td>
+</tr>
+<tr>
+<td>
+<b>RDKit 6 (bits)</b>
+</td>
+<td>
+0.31
+</td>
+<td>
+0.5
+</td>
+<td>
+0.00021 / 210
+</td>
+<td>
+0.55
+</td>
+<td>
+0.00014 / 135
+</td>
+<td>
+0.6
+</td>
+<td>
+6e-05 / 60
+</td>
+<td>
+0.7
+</td>
+<td>
+3e-05 / 30
+</td>
+</tr>
+<tr>
+<td>
+<b>Morgan2 (counts)</b>
+</td>
+<td>
+0.25
+</td>
+<td>
+0.4
+</td>
+<td>
+0.00014 / 140
+</td>
+<td>
+0.4
+</td>
+<td>
+0.00014 / 140
+</td>
+<td>
+0.45
+</td>
+<td>
+8.5e-05 / 84
+</td>
+<td>
+0.55
+</td>
+<td>
+2e-05 / 20
+</td>
+</tr>
+<tr>
+<td>
+<b>Avalon 1024 (bits)</b>
+</td>
+<td>
+0.37
+</td>
+<td>
+0.55
+</td>
+<td>
+0.00075 / 750
+</td>
+<td>
+0.6
+</td>
+<td>
+0.00014 / 140
+</td>
+<td>
+0.65
+</td>
+<td>
+9e-05 / 90
+</td>
+<td>
+0.75
+</td>
+<td>
+2.5e-05 / 25
+</td>
+</tr>
+<tr>
+<td>
+<b>Morgan3 (counts)</b>
+</td>
+<td>
+0.20
+</td>
+<td>
+0.3
+</td>
+<td>
+0.00026 / 260
+</td>
+<td>
+0.35
+</td>
+<td>
+0.00015 / 154
+</td>
+<td>
+0.35
+</td>
+<td>
+0.00015 / 154
+</td>
+<td>
+0.45
+</td>
+<td>
+3.5e-05 / 35
+</td>
+</tr>
+<tr>
+<td>
+<b>RDKit 5 (bits)</b>
+</td>
+<td>
+0.29
+</td>
+<td>
+0.5
+</td>
+<td>
+0.00025 / 250
+</td>
+<td>
+0.55
+</td>
+<td>
+0.00016 / 155
+</td>
+<td>
+0.6
+</td>
+<td>
+6e-05 / 60
+</td>
+<td>
+0.7
+</td>
+<td>
+3e-05 / 30
+</td>
+</tr>
+<tr>
+<td>
+<b>Topological Torsions (bits)</b>
+</td>
+<td>
+0.22
+</td>
+<td>
+0.4
+</td>
+<td>
+0.00016 / 160
+</td>
+<td>
+0.4
+</td>
+<td>
+0.00016 / 160
+</td>
+<td>
+0.45
+</td>
+<td>
+0.00011 / 105
+</td>
+<td>
+0.55
+</td>
+<td>
+3.5e-05 / 35
+</td>
+</tr>
+<tr>
+<td>
+<b>Morgan2 (bits)</b>
+</td>
+<td>
+0.27
+</td>
+<td>
+0.4
+</td>
+<td>
+0.00019 / 190
+</td>
+<td>
+0.4
+</td>
+<td>
+0.00019 / 190
+</td>
+<td>
+0.45
+</td>
+<td>
+0.00012 / 115
+</td>
+<td>
+0.55
+</td>
+<td>
+2.5e-05 / 25
+</td>
+</tr>
+<tr>
+<td>
+<b>FeatMorgan3 (counts)</b>
+</td>
+<td>
+0.28
+</td>
+<td>
+0.4
+</td>
+<td>
+0.00022 / 220
+</td>
+<td>
+0.4
+</td>
+<td>
+0.00022 / 220
+</td>
+<td>
+0.45
+</td>
+<td>
+0.00013 / 130
+</td>
+<td>
+0.55
+</td>
+<td>
+3e-05 / 30
+</td>
+</tr>
+<tr>
+<td>
+<b>linear RDKit 6 (bits)</b>
+</td>
+<td>
+0.28
+</td>
+<td>
+0.5
+</td>
+<td>
+0.00022 / 220
+</td>
+<td>
+0.5
+</td>
+<td>
+0.00022 / 220
+</td>
+<td>
+0.55
+</td>
+<td>
+0.00014 / 140
+</td>
+<td>
+0.7
+</td>
+<td>
+3e-05 / 30
+</td>
+</tr>
+
+</tbody></table>
+<p>The threshold values are rounded to the nearest 0.05.</p>
+<p>I’ve included count-based fingerprints in the above table, but they wouldn’t be my first choice for use in a real-world similarity search application. Calculating similarity for count-based fingerprints is significantly slower than bit vector fingerprints, so they really aren’t practical for large datasets. Note that the RDKit has a method for approximating counts using bit vector fingerprints which is used by the Atom Pair and Topological Torsion fingeprints and could also be an option for the other fingerprint types, but that’s a topic for another post.</p>
+<p>Based on these numbers (and, of course, the dataset I used) it looks like the RDKit fingerprint is the optimal choice for chemical similarity search. Taking the efficiency at both 90% and 95% into account, the version of the fingerprint with <code>maxPath=6</code> is arguably better than the version with <code>maxPath=7</code> (which is the default). There’s not a publication for the RDKit fingerprint but it is <a href="https://www.rdkit.org/docs/RDKit_Book.html#rdkit-fingerprints">described in detail in the RDKit documentation</a>.</p>
+<p>The Morgan3 fingerprint, which is what I kind of expected to be the best at this task, doesn’t do that well - the bit-vector based form didn’t even make this list of top performaers. The Morgan2 fingerprint, on the other hand, seems like another good choice. The Morgan fingerprints are the RDKit’s implementation of the circular fingerprints described in <a href="https://doi.org/10.1021/ci100050t">this publication</a>.</p>
+<p>A real surprise to me was how well the topological torsions fingerprint does at this chemical search. I had (I guess without much evidence) thought of it as more of a fuzzy (or “scaffold-hopping”) fingerprint, but the high efficiency on this chemical search problem makes me reconsider that. Topological torsions were introduced in <a href="https://doi.org/10.1021/ci00054a008">this publication</a>.</p>
+<p>The Avalon fingerprint seems to be another decent choice, at least at 90%. This isn’t surprising to me, but I’ll probably remain resistant to making heavy of it due to the complexity of the fingerprint itself. The only non-code description I’m aware of for the Avalon FP is in the supplementary material for <a href="https://pubs.acs.org/doi/10.1021/ci050413p">this paper</a>; it’s likely that the current version of the fingerprint, which was under active development for at least 10 years after that paper appeared, deviates from that.</p>
+<p>Before getting any deeper into details with this kind of analysis, I think I would like to look into using more than 10K of the “related” molecules and increasing the size of the background database just to make sure the statistics are solid. I’ll do that in a separate post and leave the count-based fingerprints out.</p>
+
+
+</section>
+
+</main> <!-- /main -->
+<script id="quarto-html-after-body" type="application/javascript">
+window.document.addEventListener("DOMContentLoaded", function (event) {
+  const toggleBodyColorMode = (bsSheetEl) => {
+    const mode = bsSheetEl.getAttribute("data-mode");
+    const bodyEl = window.document.querySelector("body");
+    if (mode === "dark") {
+      bodyEl.classList.add("quarto-dark");
+      bodyEl.classList.remove("quarto-light");
+    } else {
+      bodyEl.classList.add("quarto-light");
+      bodyEl.classList.remove("quarto-dark");
+    }
+  }
+  const toggleBodyColorPrimary = () => {
+    const bsSheetEl = window.document.querySelector("link#quarto-bootstrap");
+    if (bsSheetEl) {
+      toggleBodyColorMode(bsSheetEl);
+    }
+  }
+  toggleBodyColorPrimary();  
+  const icon = "";
+  const anchorJS = new window.AnchorJS();
+  anchorJS.options = {
+    placement: 'right',
+    icon: icon
+  };
+  anchorJS.add('.anchored');
+  const clipboard = new window.ClipboardJS('.code-copy-button', {
+    target: function(trigger) {
+      return trigger.previousElementSibling;
+    }
+  });
+  clipboard.on('success', function(e) {
+    // button target
+    const button = e.trigger;
+    // don't keep focus
+    button.blur();
+    // flash "checked"
+    button.classList.add('code-copy-button-checked');
+    var currentTitle = button.getAttribute("title");
+    button.setAttribute("title", "Copied!");
+    let tooltip;
+    if (window.bootstrap) {
+      button.setAttribute("data-bs-toggle", "tooltip");
+      button.setAttribute("data-bs-placement", "left");
+      button.setAttribute("data-bs-title", "Copied!");
+      tooltip = new bootstrap.Tooltip(button, 
+        { trigger: "manual", 
+          customClass: "code-copy-button-tooltip",
+          offset: [0, -8]});
+      tooltip.show();    
+    }
+    setTimeout(function() {
+      if (tooltip) {
+        tooltip.hide();
+        button.removeAttribute("data-bs-title");
+        button.removeAttribute("data-bs-toggle");
+        button.removeAttribute("data-bs-placement");
+      }
+      button.setAttribute("title", currentTitle);
+      button.classList.remove('code-copy-button-checked');
+    }, 1000);
+    // clear code selection
+    e.clearSelection();
+  });
+  function tippyHover(el, contentFn) {
+    const config = {
+      allowHTML: true,
+      content: contentFn,
+      maxWidth: 500,
+      delay: 100,
+      arrow: false,
+      appendTo: function(el) {
+          return el.parentElement;
+      },
+      interactive: true,
+      interactiveBorder: 10,
+      theme: 'quarto',
+      placement: 'bottom-start'
+    };
+    window.tippy(el, config); 
+  }
+  const noterefs = window.document.querySelectorAll('a[role="doc-noteref"]');
+  for (var i=0; i<noterefs.length; i++) {
+    const ref = noterefs[i];
+    tippyHover(ref, function() {
+      // use id or data attribute instead here
+      let href = ref.getAttribute('data-footnote-href') || ref.getAttribute('href');
+      try { href = new URL(href).hash; } catch {}
+      const id = href.replace(/^#\/?/, "");
+      const note = window.document.getElementById(id);
+      return note.innerHTML;
+    });
+  }
+  const findCites = (el) => {
+    const parentEl = el.parentElement;
+    if (parentEl) {
+      const cites = parentEl.dataset.cites;
+      if (cites) {
+        return {
+          el,
+          cites: cites.split(' ')
+        };
+      } else {
+        return findCites(el.parentElement)
+      }
+    } else {
+      return undefined;
+    }
+  };
+  var bibliorefs = window.document.querySelectorAll('a[role="doc-biblioref"]');
+  for (var i=0; i<bibliorefs.length; i++) {
+    const ref = bibliorefs[i];
+    const citeInfo = findCites(ref);
+    if (citeInfo) {
+      tippyHover(citeInfo.el, function() {
+        var popup = window.document.createElement('div');
+        citeInfo.cites.forEach(function(cite) {
+          var citeDiv = window.document.createElement('div');
+          citeDiv.classList.add('hanging-indent');
+          citeDiv.classList.add('csl-entry');
+          var biblioDiv = window.document.getElementById('ref-' + cite);
+          if (biblioDiv) {
+            citeDiv.innerHTML = biblioDiv.innerHTML;
+          }
+          popup.appendChild(citeDiv);
+        });
+        return popup.innerHTML;
+      });
+    }
+  }
+});
+</script>
+</div> <!-- /content -->
+
+
+
+</body></html>

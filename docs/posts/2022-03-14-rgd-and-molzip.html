@@ -1,0 +1,593 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en"><head>
+
+<meta charset="utf-8">
+<meta name="generator" content="quarto-1.2.269">
+
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+
+<meta name="dcterms.date" content="2022-03-14">
+<meta name="description" content="Generating molecules from all possible combinations of R groups">
+
+<title>RDKit blog - R-group decomposition and molzip</title>
+<style>
+code{white-space: pre-wrap;}
+span.smallcaps{font-variant: small-caps;}
+div.columns{display: flex; gap: min(4vw, 1.5em);}
+div.column{flex: auto; overflow-x: auto;}
+div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+ul.task-list{list-style: none;}
+ul.task-list li input[type="checkbox"] {
+  width: 0.8em;
+  margin: 0 0.8em 0.2em -1.6em;
+  vertical-align: middle;
+}
+pre > code.sourceCode { white-space: pre; position: relative; }
+pre > code.sourceCode > span { display: inline-block; line-height: 1.25; }
+pre > code.sourceCode > span:empty { height: 1.2em; }
+.sourceCode { overflow: visible; }
+code.sourceCode > span { color: inherit; text-decoration: inherit; }
+div.sourceCode { margin: 1em 0; }
+pre.sourceCode { margin: 0; }
+@media screen {
+div.sourceCode { overflow: auto; }
+}
+@media print {
+pre > code.sourceCode { white-space: pre-wrap; }
+pre > code.sourceCode > span { text-indent: -5em; padding-left: 5em; }
+}
+pre.numberSource code
+  { counter-reset: source-line 0; }
+pre.numberSource code > span
+  { position: relative; left: -4em; counter-increment: source-line; }
+pre.numberSource code > span > a:first-child::before
+  { content: counter(source-line);
+    position: relative; left: -1em; text-align: right; vertical-align: baseline;
+    border: none; display: inline-block;
+    -webkit-touch-callout: none; -webkit-user-select: none;
+    -khtml-user-select: none; -moz-user-select: none;
+    -ms-user-select: none; user-select: none;
+    padding: 0 4px; width: 4em;
+    color: #aaaaaa;
+  }
+pre.numberSource { margin-left: 3em; border-left: 1px solid #aaaaaa;  padding-left: 4px; }
+div.sourceCode
+  {   }
+@media screen {
+pre > code.sourceCode > span > a:first-child::before { text-decoration: underline; }
+}
+code span.al { color: #ff0000; font-weight: bold; } /* Alert */
+code span.an { color: #60a0b0; font-weight: bold; font-style: italic; } /* Annotation */
+code span.at { color: #7d9029; } /* Attribute */
+code span.bn { color: #40a070; } /* BaseN */
+code span.bu { color: #008000; } /* BuiltIn */
+code span.cf { color: #007020; font-weight: bold; } /* ControlFlow */
+code span.ch { color: #4070a0; } /* Char */
+code span.cn { color: #880000; } /* Constant */
+code span.co { color: #60a0b0; font-style: italic; } /* Comment */
+code span.cv { color: #60a0b0; font-weight: bold; font-style: italic; } /* CommentVar */
+code span.do { color: #ba2121; font-style: italic; } /* Documentation */
+code span.dt { color: #902000; } /* DataType */
+code span.dv { color: #40a070; } /* DecVal */
+code span.er { color: #ff0000; font-weight: bold; } /* Error */
+code span.ex { } /* Extension */
+code span.fl { color: #40a070; } /* Float */
+code span.fu { color: #06287e; } /* Function */
+code span.im { color: #008000; font-weight: bold; } /* Import */
+code span.in { color: #60a0b0; font-weight: bold; font-style: italic; } /* Information */
+code span.kw { color: #007020; font-weight: bold; } /* Keyword */
+code span.op { color: #666666; } /* Operator */
+code span.ot { color: #007020; } /* Other */
+code span.pp { color: #bc7a00; } /* Preprocessor */
+code span.sc { color: #4070a0; } /* SpecialChar */
+code span.ss { color: #bb6688; } /* SpecialString */
+code span.st { color: #4070a0; } /* String */
+code span.va { color: #19177c; } /* Variable */
+code span.vs { color: #4070a0; } /* VerbatimString */
+code span.wa { color: #60a0b0; font-weight: bold; font-style: italic; } /* Warning */
+</style>
+
+
+<script src="../site_libs/quarto-nav/quarto-nav.js"></script>
+<script src="../site_libs/quarto-nav/headroom.min.js"></script>
+<script src="../site_libs/clipboard/clipboard.min.js"></script>
+<script src="../site_libs/quarto-search/autocomplete.umd.js"></script>
+<script src="../site_libs/quarto-search/fuse.min.js"></script>
+<script src="../site_libs/quarto-search/quarto-search.js"></script>
+<meta name="quarto:offset" content="../">
+<script src="../site_libs/quarto-html/quarto.js"></script>
+<script src="../site_libs/quarto-html/popper.min.js"></script>
+<script src="../site_libs/quarto-html/tippy.umd.min.js"></script>
+<script src="../site_libs/quarto-html/anchor.min.js"></script>
+<link href="../site_libs/quarto-html/tippy.css" rel="stylesheet">
+<link href="../site_libs/quarto-html/quarto-syntax-highlighting.css" rel="stylesheet" id="quarto-text-highlighting-styles">
+<script src="../site_libs/bootstrap/bootstrap.min.js"></script>
+<link href="../site_libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
+<link href="../site_libs/bootstrap/bootstrap.min.css" rel="stylesheet" id="quarto-bootstrap" data-mode="light">
+<script id="quarto-search-options" type="application/json">{
+  "location": "navbar",
+  "copy-button": false,
+  "collapse-after": 3,
+  "panel-placement": "end",
+  "type": "overlay",
+  "limit": 20,
+  "language": {
+    "search-no-results-text": "No results",
+    "search-matching-documents-text": "matching documents",
+    "search-copy-link-title": "Copy link to search",
+    "search-hide-matches-text": "Hide additional matches",
+    "search-more-match-text": "more match in this document",
+    "search-more-matches-text": "more matches in this document",
+    "search-clear-button-title": "Clear",
+    "search-detached-cancel-button-title": "Cancel",
+    "search-submit-button-title": "Submit"
+  }
+}</script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.6/require.min.js" integrity="sha512-c3Nl8+7g4LMSTdrm621y7kf9v3SDPnhxLNhcjFJbKECVnmZHTdo+IRO05sNLTH/D3vA6u1X32ehoLC7WFVdheg==" crossorigin="anonymous"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.5.1/jquery.min.js" integrity="sha512-bLT0Qm9VnAYZDflyKcBaQ2gg0hSYNQrJ8RilYldYQ1FxQYoCLtUjuuRuZo+fjqhx/qtq/1itJ0C2ejDxltZVFg==" crossorigin="anonymous"></script>
+<script type="application/javascript">define('jquery', [],function() {return window.jQuery;})</script>
+
+
+<link rel="stylesheet" href="../styles.css">
+</head>
+
+<body class="nav-fixed">
+
+<div id="quarto-search-results"></div>
+  <header id="quarto-header" class="headroom fixed-top">
+    <nav class="navbar navbar-expand-lg navbar-dark ">
+      <div class="navbar-container container-fluid">
+      <div class="navbar-brand-container">
+    <a class="navbar-brand" href="../index.html">
+    <span class="navbar-title">RDKit blog</span>
+    </a>
+  </div>
+          <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarCollapse" aria-controls="navbarCollapse" aria-expanded="false" aria-label="Toggle navigation" onclick="if (window.quartoToggleHeadroom) { window.quartoToggleHeadroom(); }">
+  <span class="navbar-toggler-icon"></span>
+</button>
+          <div class="collapse navbar-collapse" id="navbarCollapse">
+            <ul class="navbar-nav navbar-nav-scroll ms-auto">
+  <li class="nav-item">
+    <a class="nav-link" href="../about.html">
+ <span class="menu-text">RDKit experiments, tips, and tutorials</span></a>
+  </li>  
+  <li class="nav-item compact">
+    <a class="nav-link" href="https://github.com/rdkit/rdkit"><i class="bi bi-github" role="img">
+</i> 
+ <span class="menu-text"></span></a>
+  </li>  
+  <li class="nav-item compact">
+    <a class="nav-link" href="https://twitter.com/rdkit_org"><i class="bi bi-twitter" role="img">
+</i> 
+ <span class="menu-text"></span></a>
+  </li>  
+</ul>
+              <div id="quarto-search" class="" title="Search"></div>
+          </div> <!-- /navcollapse -->
+      </div> <!-- /container-fluid -->
+    </nav>
+</header>
+<!-- content -->
+<div id="quarto-content" class="quarto-container page-columns page-rows-contents page-layout-article page-navbar">
+<!-- sidebar -->
+<!-- margin-sidebar -->
+    <div id="quarto-margin-sidebar" class="sidebar margin-sidebar">
+        <nav id="TOC" role="doc-toc" class="toc-active">
+    <h2 id="toc-title">On this page</h2>
+   
+  <ul>
+  <li><a href="#read-in-the-dataset" id="toc-read-in-the-dataset" class="nav-link active" data-scroll-target="#read-in-the-dataset">Read in the dataset</a></li>
+  <li><a href="#doing-the-r-group-decomposition" id="toc-doing-the-r-group-decomposition" class="nav-link" data-scroll-target="#doing-the-r-group-decomposition">Doing the R-group decomposition</a></li>
+  <li><a href="#enumerating-all-possible-molecules-from-the-r-groups" id="toc-enumerating-all-possible-molecules-from-the-r-groups" class="nav-link" data-scroll-target="#enumerating-all-possible-molecules-from-the-r-groups">Enumerating all possible molecules from the R groups</a>
+  <ul class="collapse">
+  <li><a href="#quick-intro-to-molzip" id="toc-quick-intro-to-molzip" class="nav-link" data-scroll-target="#quick-intro-to-molzip">Quick intro to molzip</a></li>
+  <li><a href="#using-molzip-with-rgd-output" id="toc-using-molzip-with-rgd-output" class="nav-link" data-scroll-target="#using-molzip-with-rgd-output">Using molzip with RGD output</a></li>
+  </ul></li>
+  </ul>
+</nav>
+    </div>
+<!-- main -->
+<main class="content" id="quarto-document-content">
+
+<header id="title-block-header" class="quarto-title-block default">
+<div class="quarto-title">
+<h1 class="title">R-group decomposition and molzip</h1>
+  <div class="quarto-categories">
+    <div class="quarto-category">tutorial</div>
+    <div class="quarto-category">rgd</div>
+  </div>
+  </div>
+
+<div>
+  <div class="description">
+    Generating molecules from all possible combinations of R groups
+  </div>
+</div>
+
+
+<div class="quarto-title-meta">
+
+    
+    <div>
+    <div class="quarto-title-meta-heading">Published</div>
+    <div class="quarto-title-meta-contents">
+      <p class="date">March 14, 2022</p>
+    </div>
+  </div>
+  
+    
+  </div>
+  
+
+</header>
+
+<p>Recently a couple of customers have asked questions along the lines of: “How do I do an R-group decomposition and then recombine the cores and R groups to create new molecules?” That’s an interesting and useful task which the RDKit has some built-in tools to help with, so I figured I’d do a blog post.</p>
+<div class="cell" data-execution_count="1">
+<div class="sourceCode cell-code" id="cb1"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> rdkit <span class="im">import</span> Chem</span>
+<span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> rdkit.Chem <span class="im">import</span> Draw</span>
+<span id="cb1-3"><a href="#cb1-3" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> rdkit.Chem <span class="im">import</span> rdqueries</span>
+<span id="cb1-4"><a href="#cb1-4" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> rdkit.Chem.Draw <span class="im">import</span> IPythonConsole</span>
+<span id="cb1-5"><a href="#cb1-5" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> rdkit.Chem <span class="im">import</span> rdRGroupDecomposition</span>
+<span id="cb1-6"><a href="#cb1-6" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> rdkit.Chem <span class="im">import</span> rdDepictor</span>
+<span id="cb1-7"><a href="#cb1-7" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> rdkit <span class="im">import</span> Geometry</span>
+<span id="cb1-8"><a href="#cb1-8" aria-hidden="true" tabindex="-1"></a>rdDepictor.SetPreferCoordGen(<span class="va">True</span>)</span>
+<span id="cb1-9"><a href="#cb1-9" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> itertools</span>
+<span id="cb1-10"><a href="#cb1-10" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> rdkit</span>
+<span id="cb1-11"><a href="#cb1-11" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(rdkit.__version__)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>2022.03.1pre</code></pre>
+</div>
+</div>
+<p>Note: Though I’m doing this blog post using a local build from RDKit master all of the functionality which I demonstrate here is already available in the 2021.09 release series.</p>
+<section id="read-in-the-dataset" class="level1">
+<h1>Read in the dataset</h1>
+<p>Read in a bunch of molecules from a J Med Chem paper (https://doi.org/10.1021/acs.jmedchem.7b00306 the paper is open access). Here I downloaded the SMILES in the supporting information, sketched the scaffold manually, and then saved the scaffold + molecules to an SD file. The scaffold is the first molecule in the SDF.</p>
+<div class="cell" data-execution_count="2">
+<div class="sourceCode cell-code" id="cb3"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a>ms <span class="op">=</span> [mol <span class="cf">for</span> mol <span class="kw">in</span> Chem.SDMolSupplier(<span class="st">'../data/jm7b00306.sdf'</span>)]</span>
+<span id="cb3-2"><a href="#cb3-2" aria-hidden="true" tabindex="-1"></a>core <span class="op">=</span> ms[<span class="dv">0</span>]</span>
+<span id="cb3-3"><a href="#cb3-3" aria-hidden="true" tabindex="-1"></a>ms.pop(<span class="dv">0</span>)</span>
+<span id="cb3-4"><a href="#cb3-4" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f'There are </span><span class="sc">{</span><span class="bu">len</span>(ms)<span class="sc">}</span><span class="ss"> molecules'</span>)</span>
+<span id="cb3-5"><a href="#cb3-5" aria-hidden="true" tabindex="-1"></a>core</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>There are 31 molecules</code></pre>
+</div>
+<div class="cell-output cell-output-display" data-execution_count="2">
+
+<table><tbody><tr><td colspan="2" style="text-align:center"><img src="data:image/png;base64,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"></td></tr>
+<tr><th style="text-align:right">scaffold</th><td style="text-align:left">1</td></tr></tbody></table>
+</div>
+</div>
+<p>Now let’s look at some of the other molecules</p>
+<div class="cell" data-execution_count="3">
+<div class="sourceCode cell-code" id="cb5"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a>Draw.MolsToGridImage(ms[:<span class="dv">12</span>],molsPerRow<span class="op">=</span><span class="dv">4</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-display" data-execution_count="3">
+<p><img src="2022-03-14-rgd-and-molzip_files/figure-html/cell-4-output-1.png" class="img-fluid"></p>
+</div>
+</div>
+</section>
+<section id="doing-the-r-group-decomposition" class="level1">
+<h1>Doing the R-group decomposition</h1>
+<p>The RGD code takes a list of cores to be used along with a list of molecules. It returns a 2-tuple with: 1. a dictionary with the results 2. a list with the indices of the molecules which failed; these are molecules which did not match any of the cores</p>
+<p>I’ve blogged about the RGD code before <a href="http://rdkit.blogspot.com/2019/12/using-r-group-decomposition-code.html">here</a> and <a href="https://greglandrum.github.io/rdkit-blog/tutorial/prototypes/drawing/2021/08/07/rgd-and-highlighting.html">here</a> if you want to read more about it. It’s probably time for another post with an update, but those are hopefully already useful.</p>
+<div class="cell" data-execution_count="4">
+<div class="sourceCode cell-code" id="cb6"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb6-1"><a href="#cb6-1" aria-hidden="true" tabindex="-1"></a>rgd,failed <span class="op">=</span> rdRGroupDecomposition.RGroupDecompose([core],ms,asRows<span class="op">=</span><span class="va">False</span>)</span>
+<span id="cb6-2"><a href="#cb6-2" aria-hidden="true" tabindex="-1"></a><span class="bu">len</span>(failed)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-display" data-execution_count="4">
+<pre><code>6</code></pre>
+</div>
+</div>
+<div class="cell" data-execution_count="5">
+<div class="sourceCode cell-code" id="cb8"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb8-1"><a href="#cb8-1" aria-hidden="true" tabindex="-1"></a>failed</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-display" data-execution_count="5">
+<pre><code>[0, 1, 2, 3, 29, 30]</code></pre>
+</div>
+</div>
+<div class="cell" data-execution_count="6">
+<div class="sourceCode cell-code" id="cb10"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb10-1"><a href="#cb10-1" aria-hidden="true" tabindex="-1"></a>rgd.keys()</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-display" data-execution_count="6">
+<pre><code>dict_keys(['Core', 'R1', 'R2', 'R3'])</code></pre>
+</div>
+</div>
+<p>Let’s look at the results</p>
+<div class="cell" data-scrolled="true" data-execution_count="7">
+<div class="sourceCode cell-code" id="cb12"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb12-1"><a href="#cb12-1" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f'There are </span><span class="sc">{</span><span class="bu">len</span>(rgd[<span class="st">"R1"</span>])<span class="sc">}</span><span class="ss"> R1s'</span>)</span>
+<span id="cb12-2"><a href="#cb12-2" aria-hidden="true" tabindex="-1"></a>Draw.MolsToGridImage(rgd[<span class="st">'R1'</span>][:<span class="dv">12</span>],molsPerRow<span class="op">=</span><span class="dv">4</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>There are 25 R1s</code></pre>
+</div>
+<div class="cell-output cell-output-display" data-execution_count="7">
+<p><img src="2022-03-14-rgd-and-molzip_files/figure-html/cell-8-output-2.png" class="img-fluid"></p>
+</div>
+</div>
+<p>Remove any R groups which have more than one dummy atom. This happens if an R group is attached to the core at multiple points and it may mess up the rest of the analysis.</p>
+<div class="cell" data-execution_count="8">
+<div class="sourceCode cell-code" id="cb14"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb14-1"><a href="#cb14-1" aria-hidden="true" tabindex="-1"></a>qa <span class="op">=</span> rdqueries.AtomNumEqualsQueryAtom(<span class="dv">0</span>)</span>
+<span id="cb14-2"><a href="#cb14-2" aria-hidden="true" tabindex="-1"></a>r1 <span class="op">=</span> [x <span class="cf">for</span> x <span class="kw">in</span> rgd[<span class="st">'R1'</span>] <span class="cf">if</span> <span class="bu">len</span>(x.GetAtomsMatchingQuery(qa))<span class="op">==</span><span class="dv">1</span>]</span>
+<span id="cb14-3"><a href="#cb14-3" aria-hidden="true" tabindex="-1"></a>r2 <span class="op">=</span> [x <span class="cf">for</span> x <span class="kw">in</span> rgd[<span class="st">'R2'</span>] <span class="cf">if</span> <span class="bu">len</span>(x.GetAtomsMatchingQuery(qa))<span class="op">==</span><span class="dv">1</span>]</span>
+<span id="cb14-4"><a href="#cb14-4" aria-hidden="true" tabindex="-1"></a>r3 <span class="op">=</span> [x <span class="cf">for</span> x <span class="kw">in</span> rgd[<span class="st">'R3'</span>] <span class="cf">if</span> <span class="bu">len</span>(x.GetAtomsMatchingQuery(qa))<span class="op">==</span><span class="dv">1</span>]</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+<p>Now find the unique members in each set of R groups:</p>
+<div class="cell" data-execution_count="9">
+<div class="sourceCode cell-code" id="cb15"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb15-1"><a href="#cb15-1" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> uniquify(rgs):</span>
+<span id="cb15-2"><a href="#cb15-2" aria-hidden="true" tabindex="-1"></a>    seen <span class="op">=</span> <span class="bu">set</span>()</span>
+<span id="cb15-3"><a href="#cb15-3" aria-hidden="true" tabindex="-1"></a>    keep <span class="op">=</span> []</span>
+<span id="cb15-4"><a href="#cb15-4" aria-hidden="true" tabindex="-1"></a>    <span class="cf">for</span> rg <span class="kw">in</span> rgs:</span>
+<span id="cb15-5"><a href="#cb15-5" aria-hidden="true" tabindex="-1"></a>        smi <span class="op">=</span> Chem.MolToSmiles(rg)</span>
+<span id="cb15-6"><a href="#cb15-6" aria-hidden="true" tabindex="-1"></a>        <span class="cf">if</span> smi <span class="kw">not</span> <span class="kw">in</span> seen:</span>
+<span id="cb15-7"><a href="#cb15-7" aria-hidden="true" tabindex="-1"></a>            keep.append(rg)</span>
+<span id="cb15-8"><a href="#cb15-8" aria-hidden="true" tabindex="-1"></a>            seen.add(smi)</span>
+<span id="cb15-9"><a href="#cb15-9" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> keep</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+<div class="cell" data-execution_count="10">
+<div class="sourceCode cell-code" id="cb16"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb16-1"><a href="#cb16-1" aria-hidden="true" tabindex="-1"></a>r1s <span class="op">=</span> uniquify(r1)</span>
+<span id="cb16-2"><a href="#cb16-2" aria-hidden="true" tabindex="-1"></a>r2s <span class="op">=</span> uniquify(r2)</span>
+<span id="cb16-3"><a href="#cb16-3" aria-hidden="true" tabindex="-1"></a>r3s<span class="op">=</span> uniquify(r3)</span>
+<span id="cb16-4"><a href="#cb16-4" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="bu">len</span>(r1s),<span class="bu">len</span>(r2s),<span class="bu">len</span>(r3s))</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>15 6 6</code></pre>
+</div>
+</div>
+<p>Look at the unique R1s:</p>
+<div class="cell" data-execution_count="11">
+<div class="sourceCode cell-code" id="cb18"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb18-1"><a href="#cb18-1" aria-hidden="true" tabindex="-1"></a>Draw.MolsToGridImage(r1s[:<span class="dv">12</span>],molsPerRow<span class="op">=</span><span class="dv">4</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-display" data-execution_count="11">
+<p><img src="2022-03-14-rgd-and-molzip_files/figure-html/cell-12-output-1.png" class="img-fluid"></p>
+</div>
+</div>
+</section>
+<section id="enumerating-all-possible-molecules-from-the-r-groups" class="level1">
+<h1>Enumerating all possible molecules from the R groups</h1>
+<section id="quick-intro-to-molzip" class="level2">
+<h2 class="anchored" data-anchor-id="quick-intro-to-molzip">Quick intro to molzip</h2>
+<p>We’ll use the RDKit’s <code>molzip()</code> function to recombine the cores with the side chains.</p>
+<p><code>molzip</code> lets you take a molecule containing multiple fragments and “zip” them together. The atoms which should be bonded in the final molecule are labelled by connecting them to dummy atoms. The code identifies matching dummy atoms (by default this means dummies with the same isotopic label) in the fragments, adds bonds between the atoms connected to the dummies, and then removes the dummies.</p>
+<p>Here’s a simple example using a molecule with three fragments:</p>
+<div class="cell" data-execution_count="12">
+<div class="sourceCode cell-code" id="cb19"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb19-1"><a href="#cb19-1" aria-hidden="true" tabindex="-1"></a>sample <span class="op">=</span> Chem.MolFromSmiles(<span class="st">'[*:1]c1nc([*:2])ncc1.CO[*:1].[*:2]N(C)C'</span>)</span>
+<span id="cb19-2"><a href="#cb19-2" aria-hidden="true" tabindex="-1"></a>sample</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-display" data-execution_count="12">
+<p><img src="2022-03-14-rgd-and-molzip_files/figure-html/cell-13-output-1.png" class="img-fluid"></p>
+</div>
+</div>
+<p>And this is what happens when we zip those together:</p>
+<div class="cell" data-execution_count="13">
+<div class="sourceCode cell-code" id="cb20"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb20-1"><a href="#cb20-1" aria-hidden="true" tabindex="-1"></a>Chem.molzip(sample)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-display" data-execution_count="13">
+<p><img src="2022-03-14-rgd-and-molzip_files/figure-html/cell-14-output-1.png" class="img-fluid"></p>
+</div>
+</div>
+</section>
+<section id="using-molzip-with-rgd-output" class="level2">
+<h2 class="anchored" data-anchor-id="using-molzip-with-rgd-output">Using molzip with RGD output</h2>
+<p>The molzip function is perfect for working with the output from an R-group decomposition.</p>
+<p>Here I’ll define the function we’re going to use to enumerate all of the products:</p>
+<div class="cell" data-execution_count="14">
+<div class="sourceCode cell-code" id="cb21"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb21-1"><a href="#cb21-1" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> random</span>
+<span id="cb21-2"><a href="#cb21-2" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> enumerate_all_products(core,<span class="op">*</span>rgroups,randomOrder<span class="op">=</span><span class="va">False</span>):</span>
+<span id="cb21-3"><a href="#cb21-3" aria-hidden="true" tabindex="-1"></a>    <span class="co"># preserve the positions of the non-dummy core atoms, </span></span>
+<span id="cb21-4"><a href="#cb21-4" aria-hidden="true" tabindex="-1"></a>    <span class="co"># we will use these to make sure the cores are drawn</span></span>
+<span id="cb21-5"><a href="#cb21-5" aria-hidden="true" tabindex="-1"></a>    <span class="co"># the same way in each molecule we generate</span></span>
+<span id="cb21-6"><a href="#cb21-6" aria-hidden="true" tabindex="-1"></a>    corePos <span class="op">=</span> {}</span>
+<span id="cb21-7"><a href="#cb21-7" aria-hidden="true" tabindex="-1"></a>    conf <span class="op">=</span> core.GetConformer()</span>
+<span id="cb21-8"><a href="#cb21-8" aria-hidden="true" tabindex="-1"></a>    <span class="cf">for</span> i <span class="kw">in</span> <span class="bu">range</span>(conf.GetNumAtoms()):</span>
+<span id="cb21-9"><a href="#cb21-9" aria-hidden="true" tabindex="-1"></a>        corePos[i] <span class="op">=</span> Geometry.Point2D(conf.GetAtomPosition(i))</span>
+<span id="cb21-10"><a href="#cb21-10" aria-hidden="true" tabindex="-1"></a>        </span>
+<span id="cb21-11"><a href="#cb21-11" aria-hidden="true" tabindex="-1"></a>    <span class="co"># Python's itertools handles doing the combinatorics of generating</span></span>
+<span id="cb21-12"><a href="#cb21-12" aria-hidden="true" tabindex="-1"></a>    <span class="co"># every possible combination of R groups:</span></span>
+<span id="cb21-13"><a href="#cb21-13" aria-hidden="true" tabindex="-1"></a>    order <span class="op">=</span> itertools.product(<span class="op">*</span>rgroups)</span>
+<span id="cb21-14"><a href="#cb21-14" aria-hidden="true" tabindex="-1"></a>    <span class="cf">if</span> randomOrder:</span>
+<span id="cb21-15"><a href="#cb21-15" aria-hidden="true" tabindex="-1"></a>        order <span class="op">=</span> <span class="bu">list</span>(order)</span>
+<span id="cb21-16"><a href="#cb21-16" aria-hidden="true" tabindex="-1"></a>        random.shuffle(order)</span>
+<span id="cb21-17"><a href="#cb21-17" aria-hidden="true" tabindex="-1"></a>        </span>
+<span id="cb21-18"><a href="#cb21-18" aria-hidden="true" tabindex="-1"></a>    <span class="co"># now we just loop over each combination, copy all the pieces into</span></span>
+<span id="cb21-19"><a href="#cb21-19" aria-hidden="true" tabindex="-1"></a>    <span class="co"># one molecule, and zip it. That's our product</span></span>
+<span id="cb21-20"><a href="#cb21-20" aria-hidden="true" tabindex="-1"></a>    <span class="cf">for</span> tpl <span class="kw">in</span> order:</span>
+<span id="cb21-21"><a href="#cb21-21" aria-hidden="true" tabindex="-1"></a>        tm <span class="op">=</span> Chem.RWMol(core)</span>
+<span id="cb21-22"><a href="#cb21-22" aria-hidden="true" tabindex="-1"></a>        <span class="cf">for</span> r <span class="kw">in</span> tpl:</span>
+<span id="cb21-23"><a href="#cb21-23" aria-hidden="true" tabindex="-1"></a>            tm.InsertMol(r)</span>
+<span id="cb21-24"><a href="#cb21-24" aria-hidden="true" tabindex="-1"></a>        prod <span class="op">=</span> Chem.molzip(tm)</span>
+<span id="cb21-25"><a href="#cb21-25" aria-hidden="true" tabindex="-1"></a>        <span class="cf">if</span> prod <span class="kw">is</span> <span class="kw">not</span> <span class="va">None</span>:</span>
+<span id="cb21-26"><a href="#cb21-26" aria-hidden="true" tabindex="-1"></a>            <span class="co"># generate 2d coordinates with the core fixed in place</span></span>
+<span id="cb21-27"><a href="#cb21-27" aria-hidden="true" tabindex="-1"></a>            rdDepictor.Compute2DCoords(prod,canonOrient<span class="op">=</span><span class="va">False</span>,coordMap<span class="op">=</span>corePos)</span>
+<span id="cb21-28"><a href="#cb21-28" aria-hidden="true" tabindex="-1"></a>            </span>
+<span id="cb21-29"><a href="#cb21-29" aria-hidden="true" tabindex="-1"></a>            <span class="co"># and finally yield the product molecule</span></span>
+<span id="cb21-30"><a href="#cb21-30" aria-hidden="true" tabindex="-1"></a>            <span class="cf">yield</span> prod</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+<p>We’re going to use the core which came from the RGD since it’s labelled in the same way as the sidechains</p>
+<div class="cell" data-execution_count="15">
+<div class="sourceCode cell-code" id="cb22"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb22-1"><a href="#cb22-1" aria-hidden="true" tabindex="-1"></a>rgd_core <span class="op">=</span> rgd[<span class="st">'Core'</span>][<span class="dv">0</span>]</span>
+<span id="cb22-2"><a href="#cb22-2" aria-hidden="true" tabindex="-1"></a>rgd_core</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-display" data-execution_count="15">
+
+<table><tbody><tr><td colspan="2" style="text-align:center"><img src="data:image/png;base64,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"></td></tr>
+<tr><th style="text-align:right">scaffold</th><td style="text-align:left">1</td></tr></tbody></table>
+</div>
+</div>
+<p>Let’s try it out:</p>
+<div class="cell" data-execution_count="16">
+<div class="sourceCode cell-code" id="cb23"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb23-1"><a href="#cb23-1" aria-hidden="true" tabindex="-1"></a><span class="co"># this returns a generator which produces products:</span></span>
+<span id="cb23-2"><a href="#cb23-2" aria-hidden="true" tabindex="-1"></a>prod_gen <span class="op">=</span> enumerate_all_products(rgd_core,r1s,r2s,r3s)</span>
+<span id="cb23-3"><a href="#cb23-3" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb23-4"><a href="#cb23-4" aria-hidden="true" tabindex="-1"></a><span class="co"># now get the first unique products </span></span>
+<span id="cb23-5"><a href="#cb23-5" aria-hidden="true" tabindex="-1"></a>prods <span class="op">=</span> []</span>
+<span id="cb23-6"><a href="#cb23-6" aria-hidden="true" tabindex="-1"></a>seen <span class="op">=</span> <span class="bu">set</span>()</span>
+<span id="cb23-7"><a href="#cb23-7" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> prod <span class="kw">in</span> prod_gen:</span>
+<span id="cb23-8"><a href="#cb23-8" aria-hidden="true" tabindex="-1"></a>    <span class="cf">if</span> prod <span class="kw">is</span> <span class="kw">not</span> <span class="va">None</span>:</span>
+<span id="cb23-9"><a href="#cb23-9" aria-hidden="true" tabindex="-1"></a>        Chem.SanitizeMol(prod)</span>
+<span id="cb23-10"><a href="#cb23-10" aria-hidden="true" tabindex="-1"></a>        smi <span class="op">=</span> Chem.MolToSmiles(prod)</span>
+<span id="cb23-11"><a href="#cb23-11" aria-hidden="true" tabindex="-1"></a>        <span class="cf">if</span> smi <span class="kw">not</span> <span class="kw">in</span> seen:</span>
+<span id="cb23-12"><a href="#cb23-12" aria-hidden="true" tabindex="-1"></a>            prods.append(prod)</span>
+<span id="cb23-13"><a href="#cb23-13" aria-hidden="true" tabindex="-1"></a>            seen.add(smi)</span>
+<span id="cb23-14"><a href="#cb23-14" aria-hidden="true" tabindex="-1"></a>        <span class="cf">if</span> <span class="bu">len</span>(prods)<span class="op">&gt;=</span><span class="dv">12</span>:</span>
+<span id="cb23-15"><a href="#cb23-15" aria-hidden="true" tabindex="-1"></a>            <span class="cf">break</span></span>
+<span id="cb23-16"><a href="#cb23-16" aria-hidden="true" tabindex="-1"></a>Draw.MolsToGridImage(prods,molsPerRow<span class="op">=</span><span class="dv">4</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-display" data-execution_count="16">
+<p><img src="2022-03-14-rgd-and-molzip_files/figure-html/cell-17-output-1.png" class="img-fluid"></p>
+</div>
+</div>
+<p>Those come back ordered by the R groups (i.e.&nbsp;all products created using the first value of R1, then all products created using the second value of R1, etc.). This is fine if we’re planning on enumerating all the molecules, but if we only need a subset we can tell <code>enumerate_all_products()</code> to return the results in a random order:</p>
+<div class="cell" data-execution_count="17">
+<div class="sourceCode cell-code" id="cb24"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb24-1"><a href="#cb24-1" aria-hidden="true" tabindex="-1"></a><span class="co"># set a random seed so that we get reproducible results</span></span>
+<span id="cb24-2"><a href="#cb24-2" aria-hidden="true" tabindex="-1"></a>random.seed(<span class="bn">0xbaff7ed</span>)</span>
+<span id="cb24-3"><a href="#cb24-3" aria-hidden="true" tabindex="-1"></a>prod_gen <span class="op">=</span> enumerate_all_products(rgd_core,r1s,r2s,r3s,randomOrder<span class="op">=</span><span class="va">True</span>)</span>
+<span id="cb24-4"><a href="#cb24-4" aria-hidden="true" tabindex="-1"></a>prods <span class="op">=</span> []</span>
+<span id="cb24-5"><a href="#cb24-5" aria-hidden="true" tabindex="-1"></a>seen <span class="op">=</span> <span class="bu">set</span>()</span>
+<span id="cb24-6"><a href="#cb24-6" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> prod <span class="kw">in</span> prod_gen:</span>
+<span id="cb24-7"><a href="#cb24-7" aria-hidden="true" tabindex="-1"></a>    <span class="cf">if</span> prod <span class="kw">is</span> <span class="kw">not</span> <span class="va">None</span>:</span>
+<span id="cb24-8"><a href="#cb24-8" aria-hidden="true" tabindex="-1"></a>        Chem.SanitizeMol(prod)</span>
+<span id="cb24-9"><a href="#cb24-9" aria-hidden="true" tabindex="-1"></a>        smi <span class="op">=</span> Chem.MolToSmiles(prod)</span>
+<span id="cb24-10"><a href="#cb24-10" aria-hidden="true" tabindex="-1"></a>        <span class="cf">if</span> smi <span class="kw">not</span> <span class="kw">in</span> seen:</span>
+<span id="cb24-11"><a href="#cb24-11" aria-hidden="true" tabindex="-1"></a>            prods.append(prod)</span>
+<span id="cb24-12"><a href="#cb24-12" aria-hidden="true" tabindex="-1"></a>            seen.add(smi)</span>
+<span id="cb24-13"><a href="#cb24-13" aria-hidden="true" tabindex="-1"></a>        <span class="cf">if</span> <span class="bu">len</span>(prods)<span class="op">&gt;=</span><span class="dv">12</span>:</span>
+<span id="cb24-14"><a href="#cb24-14" aria-hidden="true" tabindex="-1"></a>            <span class="cf">break</span></span>
+<span id="cb24-15"><a href="#cb24-15" aria-hidden="true" tabindex="-1"></a>Draw.MolsToGridImage(prods,molsPerRow<span class="op">=</span><span class="dv">4</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-display" data-execution_count="17">
+<p><img src="2022-03-14-rgd-and-molzip_files/figure-html/cell-18-output-1.png" class="img-fluid"></p>
+</div>
+</div>
+<p>Hopefully this brief post is useful!</p>
+
+
+</section>
+</section>
+
+</main> <!-- /main -->
+<script id="quarto-html-after-body" type="application/javascript">
+window.document.addEventListener("DOMContentLoaded", function (event) {
+  const toggleBodyColorMode = (bsSheetEl) => {
+    const mode = bsSheetEl.getAttribute("data-mode");
+    const bodyEl = window.document.querySelector("body");
+    if (mode === "dark") {
+      bodyEl.classList.add("quarto-dark");
+      bodyEl.classList.remove("quarto-light");
+    } else {
+      bodyEl.classList.add("quarto-light");
+      bodyEl.classList.remove("quarto-dark");
+    }
+  }
+  const toggleBodyColorPrimary = () => {
+    const bsSheetEl = window.document.querySelector("link#quarto-bootstrap");
+    if (bsSheetEl) {
+      toggleBodyColorMode(bsSheetEl);
+    }
+  }
+  toggleBodyColorPrimary();  
+  const icon = "";
+  const anchorJS = new window.AnchorJS();
+  anchorJS.options = {
+    placement: 'right',
+    icon: icon
+  };
+  anchorJS.add('.anchored');
+  const clipboard = new window.ClipboardJS('.code-copy-button', {
+    target: function(trigger) {
+      return trigger.previousElementSibling;
+    }
+  });
+  clipboard.on('success', function(e) {
+    // button target
+    const button = e.trigger;
+    // don't keep focus
+    button.blur();
+    // flash "checked"
+    button.classList.add('code-copy-button-checked');
+    var currentTitle = button.getAttribute("title");
+    button.setAttribute("title", "Copied!");
+    let tooltip;
+    if (window.bootstrap) {
+      button.setAttribute("data-bs-toggle", "tooltip");
+      button.setAttribute("data-bs-placement", "left");
+      button.setAttribute("data-bs-title", "Copied!");
+      tooltip = new bootstrap.Tooltip(button, 
+        { trigger: "manual", 
+          customClass: "code-copy-button-tooltip",
+          offset: [0, -8]});
+      tooltip.show();    
+    }
+    setTimeout(function() {
+      if (tooltip) {
+        tooltip.hide();
+        button.removeAttribute("data-bs-title");
+        button.removeAttribute("data-bs-toggle");
+        button.removeAttribute("data-bs-placement");
+      }
+      button.setAttribute("title", currentTitle);
+      button.classList.remove('code-copy-button-checked');
+    }, 1000);
+    // clear code selection
+    e.clearSelection();
+  });
+  function tippyHover(el, contentFn) {
+    const config = {
+      allowHTML: true,
+      content: contentFn,
+      maxWidth: 500,
+      delay: 100,
+      arrow: false,
+      appendTo: function(el) {
+          return el.parentElement;
+      },
+      interactive: true,
+      interactiveBorder: 10,
+      theme: 'quarto',
+      placement: 'bottom-start'
+    };
+    window.tippy(el, config); 
+  }
+  const noterefs = window.document.querySelectorAll('a[role="doc-noteref"]');
+  for (var i=0; i<noterefs.length; i++) {
+    const ref = noterefs[i];
+    tippyHover(ref, function() {
+      // use id or data attribute instead here
+      let href = ref.getAttribute('data-footnote-href') || ref.getAttribute('href');
+      try { href = new URL(href).hash; } catch {}
+      const id = href.replace(/^#\/?/, "");
+      const note = window.document.getElementById(id);
+      return note.innerHTML;
+    });
+  }
+  const findCites = (el) => {
+    const parentEl = el.parentElement;
+    if (parentEl) {
+      const cites = parentEl.dataset.cites;
+      if (cites) {
+        return {
+          el,
+          cites: cites.split(' ')
+        };
+      } else {
+        return findCites(el.parentElement)
+      }
+    } else {
+      return undefined;
+    }
+  };
+  var bibliorefs = window.document.querySelectorAll('a[role="doc-biblioref"]');
+  for (var i=0; i<bibliorefs.length; i++) {
+    const ref = bibliorefs[i];
+    const citeInfo = findCites(ref);
+    if (citeInfo) {
+      tippyHover(citeInfo.el, function() {
+        var popup = window.document.createElement('div');
+        citeInfo.cites.forEach(function(cite) {
+          var citeDiv = window.document.createElement('div');
+          citeDiv.classList.add('hanging-indent');
+          citeDiv.classList.add('csl-entry');
+          var biblioDiv = window.document.getElementById('ref-' + cite);
+          if (biblioDiv) {
+            citeDiv.innerHTML = biblioDiv.innerHTML;
+          }
+          popup.appendChild(citeDiv);
+        });
+        return popup.innerHTML;
+      });
+    }
+  }
+});
+</script>
+</div> <!-- /content -->
+
+
+
+</body></html>

@@ -1,0 +1,1399 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en"><head>
+
+<meta charset="utf-8">
+<meta name="generator" content="quarto-1.2.269">
+
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+
+<meta name="dcterms.date" content="2021-01-31">
+<meta name="description" content="An alternative starting point for conformer generation">
+
+<title>RDKit blog - Looking at random-coordinate embedding</title>
+<style>
+code{white-space: pre-wrap;}
+span.smallcaps{font-variant: small-caps;}
+div.columns{display: flex; gap: min(4vw, 1.5em);}
+div.column{flex: auto; overflow-x: auto;}
+div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+ul.task-list{list-style: none;}
+ul.task-list li input[type="checkbox"] {
+  width: 0.8em;
+  margin: 0 0.8em 0.2em -1.6em;
+  vertical-align: middle;
+}
+pre > code.sourceCode { white-space: pre; position: relative; }
+pre > code.sourceCode > span { display: inline-block; line-height: 1.25; }
+pre > code.sourceCode > span:empty { height: 1.2em; }
+.sourceCode { overflow: visible; }
+code.sourceCode > span { color: inherit; text-decoration: inherit; }
+div.sourceCode { margin: 1em 0; }
+pre.sourceCode { margin: 0; }
+@media screen {
+div.sourceCode { overflow: auto; }
+}
+@media print {
+pre > code.sourceCode { white-space: pre-wrap; }
+pre > code.sourceCode > span { text-indent: -5em; padding-left: 5em; }
+}
+pre.numberSource code
+  { counter-reset: source-line 0; }
+pre.numberSource code > span
+  { position: relative; left: -4em; counter-increment: source-line; }
+pre.numberSource code > span > a:first-child::before
+  { content: counter(source-line);
+    position: relative; left: -1em; text-align: right; vertical-align: baseline;
+    border: none; display: inline-block;
+    -webkit-touch-callout: none; -webkit-user-select: none;
+    -khtml-user-select: none; -moz-user-select: none;
+    -ms-user-select: none; user-select: none;
+    padding: 0 4px; width: 4em;
+    color: #aaaaaa;
+  }
+pre.numberSource { margin-left: 3em; border-left: 1px solid #aaaaaa;  padding-left: 4px; }
+div.sourceCode
+  {   }
+@media screen {
+pre > code.sourceCode > span > a:first-child::before { text-decoration: underline; }
+}
+code span.al { color: #ff0000; font-weight: bold; } /* Alert */
+code span.an { color: #60a0b0; font-weight: bold; font-style: italic; } /* Annotation */
+code span.at { color: #7d9029; } /* Attribute */
+code span.bn { color: #40a070; } /* BaseN */
+code span.bu { color: #008000; } /* BuiltIn */
+code span.cf { color: #007020; font-weight: bold; } /* ControlFlow */
+code span.ch { color: #4070a0; } /* Char */
+code span.cn { color: #880000; } /* Constant */
+code span.co { color: #60a0b0; font-style: italic; } /* Comment */
+code span.cv { color: #60a0b0; font-weight: bold; font-style: italic; } /* CommentVar */
+code span.do { color: #ba2121; font-style: italic; } /* Documentation */
+code span.dt { color: #902000; } /* DataType */
+code span.dv { color: #40a070; } /* DecVal */
+code span.er { color: #ff0000; font-weight: bold; } /* Error */
+code span.ex { } /* Extension */
+code span.fl { color: #40a070; } /* Float */
+code span.fu { color: #06287e; } /* Function */
+code span.im { color: #008000; font-weight: bold; } /* Import */
+code span.in { color: #60a0b0; font-weight: bold; font-style: italic; } /* Information */
+code span.kw { color: #007020; font-weight: bold; } /* Keyword */
+code span.op { color: #666666; } /* Operator */
+code span.ot { color: #007020; } /* Other */
+code span.pp { color: #bc7a00; } /* Preprocessor */
+code span.sc { color: #4070a0; } /* SpecialChar */
+code span.ss { color: #bb6688; } /* SpecialString */
+code span.st { color: #4070a0; } /* String */
+code span.va { color: #19177c; } /* Variable */
+code span.vs { color: #4070a0; } /* VerbatimString */
+code span.wa { color: #60a0b0; font-weight: bold; font-style: italic; } /* Warning */
+</style>
+
+
+<script src="../site_libs/quarto-nav/quarto-nav.js"></script>
+<script src="../site_libs/quarto-nav/headroom.min.js"></script>
+<script src="../site_libs/clipboard/clipboard.min.js"></script>
+<script src="../site_libs/quarto-search/autocomplete.umd.js"></script>
+<script src="../site_libs/quarto-search/fuse.min.js"></script>
+<script src="../site_libs/quarto-search/quarto-search.js"></script>
+<meta name="quarto:offset" content="../">
+<script src="../site_libs/quarto-html/quarto.js"></script>
+<script src="../site_libs/quarto-html/popper.min.js"></script>
+<script src="../site_libs/quarto-html/tippy.umd.min.js"></script>
+<script src="../site_libs/quarto-html/anchor.min.js"></script>
+<link href="../site_libs/quarto-html/tippy.css" rel="stylesheet">
+<link href="../site_libs/quarto-html/quarto-syntax-highlighting.css" rel="stylesheet" id="quarto-text-highlighting-styles">
+<script src="../site_libs/bootstrap/bootstrap.min.js"></script>
+<link href="../site_libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
+<link href="../site_libs/bootstrap/bootstrap.min.css" rel="stylesheet" id="quarto-bootstrap" data-mode="light">
+<script id="quarto-search-options" type="application/json">{
+  "location": "navbar",
+  "copy-button": false,
+  "collapse-after": 3,
+  "panel-placement": "end",
+  "type": "overlay",
+  "limit": 20,
+  "language": {
+    "search-no-results-text": "No results",
+    "search-matching-documents-text": "matching documents",
+    "search-copy-link-title": "Copy link to search",
+    "search-hide-matches-text": "Hide additional matches",
+    "search-more-match-text": "more match in this document",
+    "search-more-matches-text": "more matches in this document",
+    "search-clear-button-title": "Clear",
+    "search-detached-cancel-button-title": "Cancel",
+    "search-submit-button-title": "Submit"
+  }
+}</script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.6/require.min.js" integrity="sha512-c3Nl8+7g4LMSTdrm621y7kf9v3SDPnhxLNhcjFJbKECVnmZHTdo+IRO05sNLTH/D3vA6u1X32ehoLC7WFVdheg==" crossorigin="anonymous"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.5.1/jquery.min.js" integrity="sha512-bLT0Qm9VnAYZDflyKcBaQ2gg0hSYNQrJ8RilYldYQ1FxQYoCLtUjuuRuZo+fjqhx/qtq/1itJ0C2ejDxltZVFg==" crossorigin="anonymous"></script>
+<script type="application/javascript">define('jquery', [],function() {return window.jQuery;})</script>
+
+
+<link rel="stylesheet" href="../styles.css">
+</head>
+
+<body class="nav-fixed">
+
+<div id="quarto-search-results"></div>
+  <header id="quarto-header" class="headroom fixed-top">
+    <nav class="navbar navbar-expand-lg navbar-dark ">
+      <div class="navbar-container container-fluid">
+      <div class="navbar-brand-container">
+    <a class="navbar-brand" href="../index.html">
+    <span class="navbar-title">RDKit blog</span>
+    </a>
+  </div>
+          <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarCollapse" aria-controls="navbarCollapse" aria-expanded="false" aria-label="Toggle navigation" onclick="if (window.quartoToggleHeadroom) { window.quartoToggleHeadroom(); }">
+  <span class="navbar-toggler-icon"></span>
+</button>
+          <div class="collapse navbar-collapse" id="navbarCollapse">
+            <ul class="navbar-nav navbar-nav-scroll ms-auto">
+  <li class="nav-item">
+    <a class="nav-link" href="../about.html">
+ <span class="menu-text">RDKit experiments, tips, and tutorials</span></a>
+  </li>  
+  <li class="nav-item compact">
+    <a class="nav-link" href="https://github.com/rdkit/rdkit"><i class="bi bi-github" role="img">
+</i> 
+ <span class="menu-text"></span></a>
+  </li>  
+  <li class="nav-item compact">
+    <a class="nav-link" href="https://twitter.com/rdkit_org"><i class="bi bi-twitter" role="img">
+</i> 
+ <span class="menu-text"></span></a>
+  </li>  
+</ul>
+              <div id="quarto-search" class="" title="Search"></div>
+          </div> <!-- /navcollapse -->
+      </div> <!-- /container-fluid -->
+    </nav>
+</header>
+<!-- content -->
+<div id="quarto-content" class="quarto-container page-columns page-rows-contents page-layout-article page-navbar">
+<!-- sidebar -->
+<!-- margin-sidebar -->
+    <div id="quarto-margin-sidebar" class="sidebar margin-sidebar">
+        <nav id="TOC" role="doc-toc" class="toc-active">
+    <h2 id="toc-title">On this page</h2>
+   
+  <ul>
+  <li><a href="#collecting-test-molecules-from-chembl" id="toc-collecting-test-molecules-from-chembl" class="nav-link active" data-scroll-target="#collecting-test-molecules-from-chembl">Collecting test molecules from ChEMBL</a></li>
+  <li><a href="#run-the-experiments" id="toc-run-the-experiments" class="nav-link" data-scroll-target="#run-the-experiments">Run the experiments</a>
+  <ul class="collapse">
+  <li><a href="#single-conformer" id="toc-single-conformer" class="nav-link" data-scroll-target="#single-conformer">Single conformer</a></li>
+  <li><a href="#conformers" id="toc-conformers" class="nav-link" data-scroll-target="#conformers">50 conformers</a></li>
+  </ul></li>
+  <li><a href="#include-rms-pruning" id="toc-include-rms-pruning" class="nav-link" data-scroll-target="#include-rms-pruning">Include RMS Pruning</a></li>
+  <li><a href="#do-the-analysis" id="toc-do-the-analysis" class="nav-link" data-scroll-target="#do-the-analysis">Do the Analysis</a>
+  <ul class="collapse">
+  <li><a href="#number-of-conformers-generated" id="toc-number-of-conformers-generated" class="nav-link" data-scroll-target="#number-of-conformers-generated">Number of conformers generated</a></li>
+  <li><a href="#time-per-conformer-generated" id="toc-time-per-conformer-generated" class="nav-link" data-scroll-target="#time-per-conformer-generated">Time per conformer generated</a></li>
+  <li><a href="#ignoring-chirality" id="toc-ignoring-chirality" class="nav-link" data-scroll-target="#ignoring-chirality">Ignoring chirality</a></li>
+  <li><a href="#impact-of-box-size-on-random-embedding" id="toc-impact-of-box-size-on-random-embedding" class="nav-link" data-scroll-target="#impact-of-box-size-on-random-embedding">Impact of box size on random embedding</a></li>
+  <li><a href="#summaries" id="toc-summaries" class="nav-link" data-scroll-target="#summaries">Summaries</a></li>
+  </ul></li>
+  <li><a href="#look-at-some-of-the-troublesome-structures" id="toc-look-at-some-of-the-troublesome-structures" class="nav-link" data-scroll-target="#look-at-some-of-the-troublesome-structures">Look at some of the troublesome structures</a></li>
+  </ul>
+</nav>
+    </div>
+<!-- main -->
+<main class="content" id="quarto-document-content">
+
+<header id="title-block-header" class="quarto-title-block default">
+<div class="quarto-title">
+<h1 class="title">Looking at random-coordinate embedding</h1>
+  <div class="quarto-categories">
+    <div class="quarto-category">conformers</div>
+    <div class="quarto-category">exploration</div>
+  </div>
+  </div>
+
+<div>
+  <div class="description">
+    An alternative starting point for conformer generation
+  </div>
+</div>
+
+
+<div class="quarto-title-meta">
+
+    
+    <div>
+    <div class="quarto-title-meta-heading">Published</div>
+    <div class="quarto-title-meta-contents">
+      <p class="date">January 31, 2021</p>
+    </div>
+  </div>
+  
+    
+  </div>
+  
+
+</header>
+
+<p>This post discusses and shows the impact of the <code>useRandomCoords</code> option for the RDKit’s conformer generator.</p>
+<p>The RDKit’s conformation generator is based on distance geometry. Here are the basic steps for the standard approach:</p>
+<ol type="1">
+<li>The molecule’s distance bounds matrix is calculated based on the connection table and a set of rules.</li>
+<li>The bounds matrix is smoothed using a triangle-bounds smoothing algorithm.</li>
+<li>A random distance matrix that satisfies the bounds matrix is generated.</li>
+<li>This distance matrix is embedded in 3 or 4 dimensions (producing coordinates for each atom).</li>
+<li>The resulting coordinates are cleaned up somewhat using a crude force field (the “distance geometry force field”) and the bounds matrix.</li>
+<li>If 4D embedding was done: another minimization is done with the distance geometry force field including a term to drive the 4th coordinate to zero.</li>
+<li>If either experimental torsions (ET) or basic knowledge terms (K) are being used (the default is to use both because the conformations are higher quality), a final minimization is done using the “ET”, “K”, or “ETK” force fields.</li>
+</ol>
+<p>Another way to generate the initial set of coordinates is to replace steps 3 and 4 with just picking a set of random coordinates (i.e.&nbsp;scatter the atoms randomly about a 3D box) and then moving on to step 5 and minimizing those using the distance geometry force field mentioned above. I learned of this approach from David Spellmeyer, who published it back in 1997: https://doi.org/10.1016/S1093-3263(97)00014-4</p>
+<p>Starting from random coordinates has been possible within the RDKit more or less since the beginning (I’ve known David a long time ;-), but it’s not the default because my implementation of it was slower than the standard embedding approach in the early testing and validation work I did. I’ve been saying for years that random-coordinate embedding is more robust (though slower), but I haven’t actually gone back and tested/quantified that since my initial experiments. This blog post aims to clear some of that up.</p>
+<p>TL;DR: I ran some experiments using a set of 900 molecules with varying numbers of rotatable bonds and two different macrocycle sizes. Each molecule has at least two specified stereocenters. Given the current implementation, random-coordinate embedding is more robust - it’s more likely to produce the requested number of conformers for these structures than the standard metric embedding is - but it still tends to be a bit slower.</p>
+<p>Here’s a graphical summary of the results: <img src="../images/blog/random-coordinate-embedding2.png" class="img-fluid" alt="image-2.png"> The main conclusion about timing can be see by comparing the red (metric) and blue (random) data.</p>
+<p>Here’s a plot comparing how long it takes to generate each conformer when trying for 50 conformers (left) or 50 more diverse conformers (right), the plot has been zoomed in, so a few extreme outliers (which impact the standard metric embedding more severely than the random-coordinate embedding) are not visible.</p>
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="../images/blog/random-coordinate-embedding1.png" class="img-fluid figure-img"></p>
+<p></p><figcaption class="figure-caption">image.png</figcaption><p></p>
+</figure>
+</div>
+<p>Given that it is certainly more robust and that the overall performance difference isn’t huge, I think I’m likely to switch to using random-coordinate embedding for my future work. Maybe we can think about making it the default in the RDKit too.</p>
+<p>For those who are interested, here’s the original literature about ETKDG: - The original ETKDG publication: https://pubs.acs.org/doi/abs/10.1021/acs.jcim.5b00654 - Sereina Riniker’s presentation at the 2015 RDKit UGM: https://github.com/rdkit/UGM_2015/blob/master/Presentations/ETKDG.SereinaRiniker.pdf - An update describing ETKDGv3 and extensions to better handle small rings and macrocycles: https://pubs.acs.org/doi/abs/10.1021/acs.jcim.0c00025</p>
+<p>If you want to play with the compounds yourself, the SMILES are all in the <a href="https://github.com/greglandrum/rdkit_blog/blob/master/data/chembl27_confgen_tgts.txt">rdkit_blog github repo</a></p>
+<p>Ok, let’s get to work and generate the data.</p>
+<div class="cell" data-execution_count="147">
+<div class="sourceCode cell-code" id="cb1"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> rdkit <span class="im">import</span> Chem</span>
+<span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> rdkit.Chem <span class="im">import</span> Draw</span>
+<span id="cb1-3"><a href="#cb1-3" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> rdkit.Chem.Draw <span class="im">import</span> IPythonConsole</span>
+<span id="cb1-4"><a href="#cb1-4" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> rdkit.Chem <span class="im">import</span> rdDepictor</span>
+<span id="cb1-5"><a href="#cb1-5" aria-hidden="true" tabindex="-1"></a>rdDepictor.SetPreferCoordGen(<span class="va">True</span>)</span>
+<span id="cb1-6"><a href="#cb1-6" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> pandas <span class="im">as</span> pd</span>
+<span id="cb1-7"><a href="#cb1-7" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> rdkit</span>
+<span id="cb1-8"><a href="#cb1-8" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(rdkit.__version__)</span>
+<span id="cb1-9"><a href="#cb1-9" aria-hidden="true" tabindex="-1"></a><span class="op">%</span>load_ext sql</span>
+<span id="cb1-10"><a href="#cb1-10" aria-hidden="true" tabindex="-1"></a><span class="op">%</span>pylab inline</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>2020.09.4
+The sql extension is already loaded. To reload it, use:
+  %reload_ext sql
+Populating the interactive namespace from numpy and matplotlib</code></pre>
+</div>
+</div>
+<section id="collecting-test-molecules-from-chembl" class="level1">
+<h1>Collecting test molecules from ChEMBL</h1>
+<p>For this exercise I want a set of molecules which have varying numbers of rotatable bonds and which include at least two specified chiral centers. I include the constraint on chiral centers because the RDKit’s conformation generator normally only returns conformations which match the specified stereochemistry. This can make conformation generation slower and I’m curious to see the impact of that as part of this post.</p>
+<p>Start with a few queries against my local copy of ChEMBL27 to see how many molecules with at least two specified chiral centers are available with different numbers of rotatable bonds:</p>
+<div class="cell" data-scrolled="true" data-execution_count="2">
+<div class="sourceCode cell-code" id="cb3"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a><span class="op">%</span>sql postgresql:<span class="op">//</span>localhost<span class="op">/</span>chembl_27 <span class="op">\</span></span>
+<span id="cb3-2"><a href="#cb3-2" aria-hidden="true" tabindex="-1"></a>    select count(<span class="op">*</span>) <span class="im">from</span> compound_properties <span class="op">\</span></span>
+<span id="cb3-3"><a href="#cb3-3" aria-hidden="true" tabindex="-1"></a>    join compound_structures using (molregno) <span class="op">\</span></span>
+<span id="cb3-4"><a href="#cb3-4" aria-hidden="true" tabindex="-1"></a>    where rtb <span class="op">=</span> <span class="dv">2</span> <span class="kw">and</span> <span class="op">\</span></span>
+<span id="cb3-5"><a href="#cb3-5" aria-hidden="true" tabindex="-1"></a>    array_length(regexp_split_to_array(canonical_smiles,<span class="st">'@+'</span>),<span class="dv">1</span>)<span class="op">-</span><span class="dv">1</span> <span class="op">&gt;</span><span class="dv">2</span><span class="op">;</span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>1 rows affected.</code></pre>
+</div>
+<div class="cell-output cell-output-display" data-execution_count="2">
+
+<table>
+    <thead>
+        <tr>
+            <th>count</th>
+        </tr>
+    </thead>
+    <tbody>
+        <tr>
+            <td>14904</td>
+        </tr>
+    </tbody>
+</table>
+</div>
+</div>
+<div class="cell" data-execution_count="3">
+<div class="sourceCode cell-code" id="cb5"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a><span class="op">%</span>sql postgresql:<span class="op">//</span>localhost<span class="op">/</span>chembl_27 <span class="op">\</span></span>
+<span id="cb5-2"><a href="#cb5-2" aria-hidden="true" tabindex="-1"></a>    select count(<span class="op">*</span>) <span class="im">from</span> compound_properties <span class="op">\</span></span>
+<span id="cb5-3"><a href="#cb5-3" aria-hidden="true" tabindex="-1"></a>    join compound_structures using (molregno) <span class="op">\</span></span>
+<span id="cb5-4"><a href="#cb5-4" aria-hidden="true" tabindex="-1"></a>    where rtb <span class="op">=</span> <span class="dv">5</span> <span class="kw">and</span> <span class="op">\</span></span>
+<span id="cb5-5"><a href="#cb5-5" aria-hidden="true" tabindex="-1"></a>    array_length(regexp_split_to_array(canonical_smiles,<span class="st">'@+'</span>),<span class="dv">1</span>)<span class="op">-</span><span class="dv">1</span> <span class="op">&gt;</span><span class="dv">2</span><span class="op">;</span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>1 rows affected.</code></pre>
+</div>
+<div class="cell-output cell-output-display" data-execution_count="3">
+
+<table>
+    <thead>
+        <tr>
+            <th>count</th>
+        </tr>
+    </thead>
+    <tbody>
+        <tr>
+            <td>20586</td>
+        </tr>
+    </tbody>
+</table>
+</div>
+</div>
+<div class="cell" data-execution_count="4">
+<div class="sourceCode cell-code" id="cb7"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb7-1"><a href="#cb7-1" aria-hidden="true" tabindex="-1"></a><span class="op">%</span>sql postgresql:<span class="op">//</span>localhost<span class="op">/</span>chembl_27 <span class="op">\</span></span>
+<span id="cb7-2"><a href="#cb7-2" aria-hidden="true" tabindex="-1"></a>    select count(<span class="op">*</span>) <span class="im">from</span> compound_properties <span class="op">\</span></span>
+<span id="cb7-3"><a href="#cb7-3" aria-hidden="true" tabindex="-1"></a>    join compound_structures using (molregno) <span class="op">\</span></span>
+<span id="cb7-4"><a href="#cb7-4" aria-hidden="true" tabindex="-1"></a>    where rtb <span class="op">=</span> <span class="dv">10</span> <span class="kw">and</span> <span class="op">\</span></span>
+<span id="cb7-5"><a href="#cb7-5" aria-hidden="true" tabindex="-1"></a>    array_length(regexp_split_to_array(canonical_smiles,<span class="st">'@+'</span>),<span class="dv">1</span>)<span class="op">-</span><span class="dv">1</span> <span class="op">&gt;</span><span class="dv">2</span><span class="op">;</span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>1 rows affected.</code></pre>
+</div>
+<div class="cell-output cell-output-display" data-execution_count="4">
+
+<table>
+    <thead>
+        <tr>
+            <th>count</th>
+        </tr>
+    </thead>
+    <tbody>
+        <tr>
+            <td>9845</td>
+        </tr>
+    </tbody>
+</table>
+</div>
+</div>
+<div class="cell" data-execution_count="5">
+<div class="sourceCode cell-code" id="cb9"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb9-1"><a href="#cb9-1" aria-hidden="true" tabindex="-1"></a><span class="op">%</span>sql postgresql:<span class="op">//</span>localhost<span class="op">/</span>chembl_27 <span class="op">\</span></span>
+<span id="cb9-2"><a href="#cb9-2" aria-hidden="true" tabindex="-1"></a>    select count(<span class="op">*</span>) <span class="im">from</span> compound_properties <span class="op">\</span></span>
+<span id="cb9-3"><a href="#cb9-3" aria-hidden="true" tabindex="-1"></a>    join compound_structures using (molregno) <span class="op">\</span></span>
+<span id="cb9-4"><a href="#cb9-4" aria-hidden="true" tabindex="-1"></a>    where rtb <span class="op">=</span> <span class="dv">15</span> <span class="kw">and</span> <span class="op">\</span></span>
+<span id="cb9-5"><a href="#cb9-5" aria-hidden="true" tabindex="-1"></a>    array_length(regexp_split_to_array(canonical_smiles,<span class="st">'@+'</span>),<span class="dv">1</span>)<span class="op">-</span><span class="dv">1</span> <span class="op">&gt;</span><span class="dv">2</span><span class="op">;</span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>1 rows affected.</code></pre>
+</div>
+<div class="cell-output cell-output-display" data-execution_count="5">
+
+<table>
+    <thead>
+        <tr>
+            <th>count</th>
+        </tr>
+    </thead>
+    <tbody>
+        <tr>
+            <td>3834</td>
+        </tr>
+    </tbody>
+</table>
+</div>
+</div>
+<div class="cell" data-execution_count="6">
+<div class="sourceCode cell-code" id="cb11"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb11-1"><a href="#cb11-1" aria-hidden="true" tabindex="-1"></a><span class="op">%</span>sql postgresql:<span class="op">//</span>localhost<span class="op">/</span>chembl_27 <span class="op">\</span></span>
+<span id="cb11-2"><a href="#cb11-2" aria-hidden="true" tabindex="-1"></a>    select count(<span class="op">*</span>) <span class="im">from</span> compound_properties <span class="op">\</span></span>
+<span id="cb11-3"><a href="#cb11-3" aria-hidden="true" tabindex="-1"></a>    join compound_structures using (molregno) <span class="op">\</span></span>
+<span id="cb11-4"><a href="#cb11-4" aria-hidden="true" tabindex="-1"></a>    where rtb <span class="op">=</span> <span class="dv">25</span> <span class="kw">and</span> <span class="op">\</span></span>
+<span id="cb11-5"><a href="#cb11-5" aria-hidden="true" tabindex="-1"></a>    array_length(regexp_split_to_array(canonical_smiles,<span class="st">'@+'</span>),<span class="dv">1</span>)<span class="op">-</span><span class="dv">1</span> <span class="op">&gt;</span><span class="dv">2</span><span class="op">;</span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>1 rows affected.</code></pre>
+</div>
+<div class="cell-output cell-output-display" data-execution_count="6">
+
+<table>
+    <thead>
+        <tr>
+            <th>count</th>
+        </tr>
+    </thead>
+    <tbody>
+        <tr>
+            <td>1129</td>
+        </tr>
+    </tbody>
+</table>
+</div>
+</div>
+<p>Looks like we can get plenty of molecules with up to 25 rotatable bonds, so let’s go ahead and collect a set of 100 molecules for each of the rotatable bond counts 1, 2, 5, 10, 15, 20, and 25. I also include two additional sets of 100 molecules: one which contains at least one ring of size 10 and one which contains at least one ring of size 14. These macrocycles show up in what comes below with negative numbers of rotatable bonds: -10 for the compounds with a 10-ring and -14 for compounds with a 14-ring.</p>
+<div class="cell" data-execution_count="24">
+<div class="sourceCode cell-code" id="cb13"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb13-1"><a href="#cb13-1" aria-hidden="true" tabindex="-1"></a>overall_data <span class="op">=</span> []</span>
+<span id="cb13-2"><a href="#cb13-2" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> tgt <span class="kw">in</span> (<span class="dv">1</span>,<span class="dv">2</span>,<span class="dv">5</span>,<span class="dv">10</span>,<span class="dv">15</span>,<span class="dv">20</span>,<span class="dv">25</span>):</span>
+<span id="cb13-3"><a href="#cb13-3" aria-hidden="true" tabindex="-1"></a>    d <span class="op">=</span> <span class="op">%</span>sql postgresql:<span class="op">//</span>localhost<span class="op">/</span>chembl_27 <span class="op">\</span></span>
+<span id="cb13-4"><a href="#cb13-4" aria-hidden="true" tabindex="-1"></a>      select <span class="op">*</span> <span class="im">from</span> (select canonical_smiles,chembl_id,rtb <span class="im">from</span> compound_properties <span class="op">\</span></span>
+<span id="cb13-5"><a href="#cb13-5" aria-hidden="true" tabindex="-1"></a>      join compound_structures using (molregno) <span class="op">\</span></span>
+<span id="cb13-6"><a href="#cb13-6" aria-hidden="true" tabindex="-1"></a>      join chembl_id_lookup on (molregno<span class="op">=</span>entity_id <span class="kw">and</span> entity_type<span class="op">=</span><span class="st">'COMPOUND'</span>) <span class="op">\</span></span>
+<span id="cb13-7"><a href="#cb13-7" aria-hidden="true" tabindex="-1"></a>      where rtb <span class="op">=</span> :tgt <span class="kw">and</span> <span class="op">\</span></span>
+<span id="cb13-8"><a href="#cb13-8" aria-hidden="true" tabindex="-1"></a>      mw_freebase <span class="op">=</span> full_mwt <span class="kw">and</span> <span class="op">\</span></span>
+<span id="cb13-9"><a href="#cb13-9" aria-hidden="true" tabindex="-1"></a>      array_length(regexp_split_to_array(canonical_smiles,<span class="st">'@+'</span>),<span class="dv">1</span>)<span class="op">-</span><span class="dv">1</span> <span class="op">&gt;</span><span class="dv">2</span>) tmp <span class="op">\</span></span>
+<span id="cb13-10"><a href="#cb13-10" aria-hidden="true" tabindex="-1"></a>      order by random() <span class="op">\</span></span>
+<span id="cb13-11"><a href="#cb13-11" aria-hidden="true" tabindex="-1"></a>      limit <span class="dv">100</span><span class="op">;</span></span>
+<span id="cb13-12"><a href="#cb13-12" aria-hidden="true" tabindex="-1"></a>    overall_data.extend(d)</span>
+<span id="cb13-13"><a href="#cb13-13" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> tgt <span class="kw">in</span> (<span class="dv">10</span>,<span class="dv">14</span>):</span>
+<span id="cb13-14"><a href="#cb13-14" aria-hidden="true" tabindex="-1"></a>    sma <span class="op">=</span> <span class="ss">f'[r</span><span class="sc">{</span>tgt<span class="sc">}</span><span class="ss">]'</span></span>
+<span id="cb13-15"><a href="#cb13-15" aria-hidden="true" tabindex="-1"></a>    d <span class="op">=</span> <span class="op">%</span>sql postgresql:<span class="op">//</span>localhost<span class="op">/</span>chembl_27 <span class="op">\</span></span>
+<span id="cb13-16"><a href="#cb13-16" aria-hidden="true" tabindex="-1"></a>      select <span class="op">*</span> <span class="im">from</span> (select canonical_smiles,chembl_id,<span class="op">-</span><span class="dv">1</span> <span class="op">*</span> :tgt <span class="im">from</span> compound_properties <span class="op">\</span></span>
+<span id="cb13-17"><a href="#cb13-17" aria-hidden="true" tabindex="-1"></a>      join compound_structures using (molregno) <span class="op">\</span></span>
+<span id="cb13-18"><a href="#cb13-18" aria-hidden="true" tabindex="-1"></a>      join rdk.mols using (molregno) <span class="op">\</span></span>
+<span id="cb13-19"><a href="#cb13-19" aria-hidden="true" tabindex="-1"></a>      join chembl_id_lookup on (molregno<span class="op">=</span>entity_id <span class="kw">and</span> entity_type<span class="op">=</span><span class="st">'COMPOUND'</span>) <span class="op">\</span></span>
+<span id="cb13-20"><a href="#cb13-20" aria-hidden="true" tabindex="-1"></a>      where m<span class="op">@&gt;</span>:sma ::qmol <span class="kw">and</span> <span class="op">\</span></span>
+<span id="cb13-21"><a href="#cb13-21" aria-hidden="true" tabindex="-1"></a>      mw_freebase <span class="op">=</span> full_mwt <span class="kw">and</span> <span class="op">\</span></span>
+<span id="cb13-22"><a href="#cb13-22" aria-hidden="true" tabindex="-1"></a>      array_length(regexp_split_to_array(canonical_smiles,<span class="st">'@+'</span>),<span class="dv">1</span>)<span class="op">-</span><span class="dv">1</span> <span class="op">&gt;</span><span class="dv">2</span>) tmp <span class="op">\</span></span>
+<span id="cb13-23"><a href="#cb13-23" aria-hidden="true" tabindex="-1"></a>      order by random() <span class="op">\</span></span>
+<span id="cb13-24"><a href="#cb13-24" aria-hidden="true" tabindex="-1"></a>      limit <span class="dv">100</span><span class="op">;</span></span>
+<span id="cb13-25"><a href="#cb13-25" aria-hidden="true" tabindex="-1"></a>    overall_data.extend(d)</span>
+<span id="cb13-26"><a href="#cb13-26" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb13-27"><a href="#cb13-27" aria-hidden="true" tabindex="-1"></a><span class="cf">with</span> <span class="bu">open</span>(<span class="st">'../data/chembl27_confgen_tgts.txt'</span>,<span class="st">'w+'</span>) <span class="im">as</span> outf:</span>
+<span id="cb13-28"><a href="#cb13-28" aria-hidden="true" tabindex="-1"></a>    outf.write(<span class="st">'SMILES CHEMBL_ID RTB</span><span class="ch">\n</span><span class="st">'</span>)</span>
+<span id="cb13-29"><a href="#cb13-29" aria-hidden="true" tabindex="-1"></a>    <span class="cf">for</span> line <span class="kw">in</span> overall_data:</span>
+<span id="cb13-30"><a href="#cb13-30" aria-hidden="true" tabindex="-1"></a>        outf.write(<span class="st">' '</span>.join(<span class="bu">str</span>(x) <span class="cf">for</span> x <span class="kw">in</span> line)<span class="op">+</span><span class="st">'</span><span class="ch">\n</span><span class="st">'</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>100 rows affected.
+100 rows affected.
+100 rows affected.
+100 rows affected.
+100 rows affected.
+100 rows affected.
+100 rows affected.
+100 rows affected.
+100 rows affected.</code></pre>
+</div>
+</div>
+<div class="cell" data-execution_count="25">
+<div class="sourceCode cell-code" id="cb15"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb15-1"><a href="#cb15-1" aria-hidden="true" tabindex="-1"></a><span class="op">!</span>head ..<span class="op">/</span>data<span class="op">/</span>chembl27_confgen_tgts.txt</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>SMILES CHEMBL_ID RTB
+C[C@@H]1C[C@@]2(C)[C@@H](CC[C@H]3[C@@H]4CC[C@H](O)[C@@]4(C)CC[C@@H]32)C/C1=N\N=C1/C[C@@H]2CC[C@H]3[C@@H]4CC[C@H](O)[C@@]4(C)CC[C@@H]3[C@@]2(C)C[C@H]1C CHEMBL2104408 1
+CC(C)[C@@H]1OC(=O)C2(/C=C/c3ccc4ccc(nc4c3)[C@@H](C)NC(=O)[C@@H]3CCCN(N3)C(=O)[C@H](C)NC1=O)CCS(=O)(=O)CC2 CHEMBL4175329 1
+CC(=O)O[C@H]1CCC[C@@H]2COC(=O)[C@@H]21 CHEMBL2228334 1
+CNC(=O)O[C@H]1OC(=O)[C@H]2[C@H]3C=C[C@H](C3)[C@H]21 CHEMBL3989617 1
+CC1(C)CC[C@]2(C)CC[C@]3(C(=O)O)C(=CC[C@@H]4[C@@]5(C)CC[C@H](O)C(C)(C)[C@@H]5CC[C@]43C)[C@@H]2C1 CHEMBL559587 1
+CC1(C)[C@@H](O)CC[C@]2(C)C3=C(CC[C@@H]12)[C@@]1(C)CC[C@@]2(C)CC[C@@](C)(CO)C[C@H]2[C@]1(C)CC3 CHEMBL484238 1
+C[C@]12CC[C@H](c3cc(F)c(O)cc3F)C[C@H]1CC[C@@H]2O CHEMBL1651144 1
+Cc1cncc(C2=CC=C3[C@@H]4CCC5CNC(=O)CC[C@]5(C)[C@H]4CC[C@]23C)c1 CHEMBL3938064 1
+C[C@H](O)[C@H]1O[C@@H]2SC(N3CCCC3)=N[C@@H]2[C@@H](O)[C@@H]1O CHEMBL3647379 1</code></pre>
+</div>
+</div>
+</section>
+<section id="run-the-experiments" class="level1">
+<h1>Run the experiments</h1>
+<p>Now we read those molecules back in and then start collecting data.</p>
+<p>Here are the different experiments:</p>
+<ol type="1">
+<li>Generate a single conformer for each molecule.</li>
+<li>Try to generate 50 conformers for each molecule.</li>
+<li>Try to generate 50 diverse conformers for each molecule using an RMSD filter of 0.5</li>
+<li>Try to generate 50 conformers for each molecule ignoring stereochemistry</li>
+</ol>
+<p>We will use ETKDGv3 and repeat each run once starting from standard embedding and once starting from random coordinates.</p>
+<div class="cell" data-execution_count="26">
+<div class="sourceCode cell-code" id="cb17"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb17-1"><a href="#cb17-1" aria-hidden="true" tabindex="-1"></a>suppl <span class="op">=</span> Chem.SmilesMolSupplier(<span class="st">'../data/chembl27_confgen_tgts.txt'</span>)</span>
+<span id="cb17-2"><a href="#cb17-2" aria-hidden="true" tabindex="-1"></a>ms <span class="op">=</span> [Chem.AddHs(m) <span class="cf">for</span> m <span class="kw">in</span> suppl]</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+<div class="cell" data-execution_count="27">
+<div class="sourceCode cell-code" id="cb18"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb18-1"><a href="#cb18-1" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> rdkit.Chem <span class="im">import</span> AllChem</span>
+<span id="cb18-2"><a href="#cb18-2" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> collections <span class="im">import</span> defaultdict</span>
+<span id="cb18-3"><a href="#cb18-3" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> time</span>
+<span id="cb18-4"><a href="#cb18-4" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> pickle</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+<section id="single-conformer" class="level2">
+<h2 class="anchored" data-anchor-id="single-conformer">Single conformer</h2>
+<div class="cell" data-scrolled="true">
+<div class="sourceCode cell-code" id="cb19"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb19-1"><a href="#cb19-1" aria-hidden="true" tabindex="-1"></a>ps <span class="op">=</span> AllChem.ETKDGv3()</span>
+<span id="cb19-2"><a href="#cb19-2" aria-hidden="true" tabindex="-1"></a>ps.randomSeed<span class="op">=</span><span class="bn">0xf00d</span></span>
+<span id="cb19-3"><a href="#cb19-3" aria-hidden="true" tabindex="-1"></a>metric_etkdg_res <span class="op">=</span> []</span>
+<span id="cb19-4"><a href="#cb19-4" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> i,m <span class="kw">in</span> <span class="bu">enumerate</span>(ms):</span>
+<span id="cb19-5"><a href="#cb19-5" aria-hidden="true" tabindex="-1"></a>    <span class="cf">if</span> <span class="kw">not</span> (i<span class="op">+</span><span class="dv">1</span>)<span class="op">%</span><span class="dv">10</span>:</span>
+<span id="cb19-6"><a href="#cb19-6" aria-hidden="true" tabindex="-1"></a>        <span class="bu">print</span>(<span class="ss">f'Doing </span><span class="sc">{</span>i<span class="op">+</span><span class="dv">1</span><span class="sc">}</span><span class="ss"> of </span><span class="sc">{</span><span class="bu">len</span>(ms)<span class="sc">}</span><span class="ss">'</span>)</span>
+<span id="cb19-7"><a href="#cb19-7" aria-hidden="true" tabindex="-1"></a>    m <span class="op">=</span> Chem.Mol(m)</span>
+<span id="cb19-8"><a href="#cb19-8" aria-hidden="true" tabindex="-1"></a>    t1 <span class="op">=</span> time.time()</span>
+<span id="cb19-9"><a href="#cb19-9" aria-hidden="true" tabindex="-1"></a>    AllChem.EmbedMolecule(m,ps)</span>
+<span id="cb19-10"><a href="#cb19-10" aria-hidden="true" tabindex="-1"></a>    t2 <span class="op">=</span> time.time()</span>
+<span id="cb19-11"><a href="#cb19-11" aria-hidden="true" tabindex="-1"></a>    metric_etkdg_res.append((t2<span class="op">-</span>t1,m.GetNumConformers(),m,m.GetIntProp(<span class="st">'RTB'</span>)))</span>
+<span id="cb19-12"><a href="#cb19-12" aria-hidden="true" tabindex="-1"></a><span class="cf">with</span> <span class="bu">open</span>(<span class="st">'./results/random_coords_expt.pkl'</span>,<span class="st">'wb+'</span>) <span class="im">as</span> outf:</span>
+<span id="cb19-13"><a href="#cb19-13" aria-hidden="true" tabindex="-1"></a>    pickle.dump((metric_etkdg_res,),outf)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb20"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb20-1"><a href="#cb20-1" aria-hidden="true" tabindex="-1"></a>ps <span class="op">=</span> AllChem.ETKDGv3()</span>
+<span id="cb20-2"><a href="#cb20-2" aria-hidden="true" tabindex="-1"></a>ps.randomSeed<span class="op">=</span><span class="bn">0xf00d</span></span>
+<span id="cb20-3"><a href="#cb20-3" aria-hidden="true" tabindex="-1"></a>ps.useRandomCoords <span class="op">=</span> <span class="va">True</span></span>
+<span id="cb20-4"><a href="#cb20-4" aria-hidden="true" tabindex="-1"></a>random_etkdg_res <span class="op">=</span> []</span>
+<span id="cb20-5"><a href="#cb20-5" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> i,m <span class="kw">in</span> <span class="bu">enumerate</span>(ms):</span>
+<span id="cb20-6"><a href="#cb20-6" aria-hidden="true" tabindex="-1"></a>    <span class="cf">if</span> <span class="kw">not</span> (i<span class="op">+</span><span class="dv">1</span>)<span class="op">%</span><span class="dv">10</span>:</span>
+<span id="cb20-7"><a href="#cb20-7" aria-hidden="true" tabindex="-1"></a>        <span class="bu">print</span>(<span class="ss">f'Doing </span><span class="sc">{</span>i<span class="op">+</span><span class="dv">1</span><span class="sc">}</span><span class="ss"> of </span><span class="sc">{</span><span class="bu">len</span>(ms)<span class="sc">}</span><span class="ss">'</span>)</span>
+<span id="cb20-8"><a href="#cb20-8" aria-hidden="true" tabindex="-1"></a>    m <span class="op">=</span> Chem.Mol(m)</span>
+<span id="cb20-9"><a href="#cb20-9" aria-hidden="true" tabindex="-1"></a>    t1 <span class="op">=</span> time.time()</span>
+<span id="cb20-10"><a href="#cb20-10" aria-hidden="true" tabindex="-1"></a>    AllChem.EmbedMolecule(m,ps)</span>
+<span id="cb20-11"><a href="#cb20-11" aria-hidden="true" tabindex="-1"></a>    t2 <span class="op">=</span> time.time()</span>
+<span id="cb20-12"><a href="#cb20-12" aria-hidden="true" tabindex="-1"></a>    random_etkdg_res.append((t2<span class="op">-</span>t1,m.GetNumConformers(),m,m.GetIntProp(<span class="st">'RTB'</span>)))</span>
+<span id="cb20-13"><a href="#cb20-13" aria-hidden="true" tabindex="-1"></a><span class="cf">with</span> <span class="bu">open</span>(<span class="st">'./results/random_coords_expt.pkl'</span>,<span class="st">'wb+'</span>) <span class="im">as</span> outf:</span>
+<span id="cb20-14"><a href="#cb20-14" aria-hidden="true" tabindex="-1"></a>    pickle.dump((metric_etkdg_res,random_etkdg_res,),outf)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+</section>
+<section id="conformers" class="level2">
+<h2 class="anchored" data-anchor-id="conformers">50 conformers</h2>
+<div class="cell" data-scrolled="true">
+<div class="sourceCode cell-code" id="cb21"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb21-1"><a href="#cb21-1" aria-hidden="true" tabindex="-1"></a>ps <span class="op">=</span> AllChem.ETKDGv3()</span>
+<span id="cb21-2"><a href="#cb21-2" aria-hidden="true" tabindex="-1"></a>ps.randomSeed<span class="op">=</span><span class="bn">0xf00d</span></span>
+<span id="cb21-3"><a href="#cb21-3" aria-hidden="true" tabindex="-1"></a>ps.numThreads <span class="op">=</span> <span class="dv">4</span></span>
+<span id="cb21-4"><a href="#cb21-4" aria-hidden="true" tabindex="-1"></a>metric_etkdg50_res <span class="op">=</span> []</span>
+<span id="cb21-5"><a href="#cb21-5" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> i,m <span class="kw">in</span> <span class="bu">enumerate</span>(ms):</span>
+<span id="cb21-6"><a href="#cb21-6" aria-hidden="true" tabindex="-1"></a>    <span class="cf">if</span> <span class="kw">not</span> (i<span class="op">+</span><span class="dv">1</span>)<span class="op">%</span><span class="dv">10</span>:</span>
+<span id="cb21-7"><a href="#cb21-7" aria-hidden="true" tabindex="-1"></a>        <span class="bu">print</span>(<span class="ss">f'Doing </span><span class="sc">{</span>i<span class="op">+</span><span class="dv">1</span><span class="sc">}</span><span class="ss"> of </span><span class="sc">{</span><span class="bu">len</span>(ms)<span class="sc">}</span><span class="ss">'</span>)</span>
+<span id="cb21-8"><a href="#cb21-8" aria-hidden="true" tabindex="-1"></a>    m <span class="op">=</span> Chem.Mol(m)</span>
+<span id="cb21-9"><a href="#cb21-9" aria-hidden="true" tabindex="-1"></a>    t1 <span class="op">=</span> time.time()</span>
+<span id="cb21-10"><a href="#cb21-10" aria-hidden="true" tabindex="-1"></a>    AllChem.EmbedMultipleConfs(m,<span class="dv">50</span>,ps)</span>
+<span id="cb21-11"><a href="#cb21-11" aria-hidden="true" tabindex="-1"></a>    t2 <span class="op">=</span> time.time()</span>
+<span id="cb21-12"><a href="#cb21-12" aria-hidden="true" tabindex="-1"></a>    metric_etkdg50_res.append((t2<span class="op">-</span>t1,m.GetNumConformers(),m,m.GetIntProp(<span class="st">'RTB'</span>)))</span>
+<span id="cb21-13"><a href="#cb21-13" aria-hidden="true" tabindex="-1"></a><span class="cf">with</span> <span class="bu">open</span>(<span class="st">'./results/random_coords_expt.pkl'</span>,<span class="st">'wb+'</span>) <span class="im">as</span> outf:</span>
+<span id="cb21-14"><a href="#cb21-14" aria-hidden="true" tabindex="-1"></a>    pickle.dump((metric_etkdg_res,random_etkdg_res,metric_etkdg50_res,),outf)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+<div class="cell" data-scrolled="true">
+<div class="sourceCode cell-code" id="cb22"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb22-1"><a href="#cb22-1" aria-hidden="true" tabindex="-1"></a>ps <span class="op">=</span> AllChem.ETKDGv3()</span>
+<span id="cb22-2"><a href="#cb22-2" aria-hidden="true" tabindex="-1"></a>ps.randomSeed<span class="op">=</span><span class="bn">0xf00d</span></span>
+<span id="cb22-3"><a href="#cb22-3" aria-hidden="true" tabindex="-1"></a>ps.numThreads <span class="op">=</span> <span class="dv">4</span></span>
+<span id="cb22-4"><a href="#cb22-4" aria-hidden="true" tabindex="-1"></a>ps.useRandomCoords <span class="op">=</span> <span class="va">True</span></span>
+<span id="cb22-5"><a href="#cb22-5" aria-hidden="true" tabindex="-1"></a>random_etkdg50_res <span class="op">=</span> []</span>
+<span id="cb22-6"><a href="#cb22-6" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> i,m <span class="kw">in</span> <span class="bu">enumerate</span>(ms):</span>
+<span id="cb22-7"><a href="#cb22-7" aria-hidden="true" tabindex="-1"></a>    <span class="cf">if</span> <span class="kw">not</span> (i<span class="op">+</span><span class="dv">1</span>)<span class="op">%</span><span class="dv">10</span>:</span>
+<span id="cb22-8"><a href="#cb22-8" aria-hidden="true" tabindex="-1"></a>        <span class="bu">print</span>(<span class="ss">f'Doing </span><span class="sc">{</span>i<span class="op">+</span><span class="dv">1</span><span class="sc">}</span><span class="ss"> of </span><span class="sc">{</span><span class="bu">len</span>(ms)<span class="sc">}</span><span class="ss">'</span>)</span>
+<span id="cb22-9"><a href="#cb22-9" aria-hidden="true" tabindex="-1"></a>    m <span class="op">=</span> Chem.Mol(m)</span>
+<span id="cb22-10"><a href="#cb22-10" aria-hidden="true" tabindex="-1"></a>    t1 <span class="op">=</span> time.time()</span>
+<span id="cb22-11"><a href="#cb22-11" aria-hidden="true" tabindex="-1"></a>    AllChem.EmbedMultipleConfs(m,<span class="dv">50</span>,ps)</span>
+<span id="cb22-12"><a href="#cb22-12" aria-hidden="true" tabindex="-1"></a>    t2 <span class="op">=</span> time.time()</span>
+<span id="cb22-13"><a href="#cb22-13" aria-hidden="true" tabindex="-1"></a>    random_etkdg50_res.append((t2<span class="op">-</span>t1,m.GetNumConformers(),m,m.GetIntProp(<span class="st">'RTB'</span>)))</span>
+<span id="cb22-14"><a href="#cb22-14" aria-hidden="true" tabindex="-1"></a><span class="cf">with</span> <span class="bu">open</span>(<span class="st">'./results/random_coords_expt.pkl'</span>,<span class="st">'wb+'</span>) <span class="im">as</span> outf:</span>
+<span id="cb22-15"><a href="#cb22-15" aria-hidden="true" tabindex="-1"></a>    pickle.dump((metric_etkdg_res,random_etkdg_res,metric_etkdg50_res,random_etkdg50_res,),outf)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+</section>
+</section>
+<section id="include-rms-pruning" class="level1">
+<h1>Include RMS Pruning</h1>
+<div class="cell" data-scrolled="true">
+<div class="sourceCode cell-code" id="cb23"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb23-1"><a href="#cb23-1" aria-hidden="true" tabindex="-1"></a>ps <span class="op">=</span> AllChem.ETKDGv3()</span>
+<span id="cb23-2"><a href="#cb23-2" aria-hidden="true" tabindex="-1"></a>ps.randomSeed<span class="op">=</span><span class="bn">0xf00d</span></span>
+<span id="cb23-3"><a href="#cb23-3" aria-hidden="true" tabindex="-1"></a>ps.numThreads <span class="op">=</span> <span class="dv">4</span></span>
+<span id="cb23-4"><a href="#cb23-4" aria-hidden="true" tabindex="-1"></a>ps.pruneRmsThresh <span class="op">=</span> <span class="fl">0.5</span></span>
+<span id="cb23-5"><a href="#cb23-5" aria-hidden="true" tabindex="-1"></a>metric_etkdg50_rms_res <span class="op">=</span> []</span>
+<span id="cb23-6"><a href="#cb23-6" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> i,m <span class="kw">in</span> <span class="bu">enumerate</span>(ms):</span>
+<span id="cb23-7"><a href="#cb23-7" aria-hidden="true" tabindex="-1"></a>    <span class="cf">if</span> <span class="kw">not</span> (i<span class="op">+</span><span class="dv">1</span>)<span class="op">%</span><span class="dv">10</span>:</span>
+<span id="cb23-8"><a href="#cb23-8" aria-hidden="true" tabindex="-1"></a>        <span class="bu">print</span>(<span class="ss">f'Doing </span><span class="sc">{</span>i<span class="op">+</span><span class="dv">1</span><span class="sc">}</span><span class="ss"> of </span><span class="sc">{</span><span class="bu">len</span>(ms)<span class="sc">}</span><span class="ss">'</span>)</span>
+<span id="cb23-9"><a href="#cb23-9" aria-hidden="true" tabindex="-1"></a>    m <span class="op">=</span> Chem.Mol(m)</span>
+<span id="cb23-10"><a href="#cb23-10" aria-hidden="true" tabindex="-1"></a>    t1 <span class="op">=</span> time.time()</span>
+<span id="cb23-11"><a href="#cb23-11" aria-hidden="true" tabindex="-1"></a>    AllChem.EmbedMultipleConfs(m,<span class="dv">50</span>,ps)</span>
+<span id="cb23-12"><a href="#cb23-12" aria-hidden="true" tabindex="-1"></a>    t2 <span class="op">=</span> time.time()</span>
+<span id="cb23-13"><a href="#cb23-13" aria-hidden="true" tabindex="-1"></a>    metric_etkdg50_rms_res.append((t2<span class="op">-</span>t1,m.GetNumConformers(),m,m.GetIntProp(<span class="st">'RTB'</span>)))</span>
+<span id="cb23-14"><a href="#cb23-14" aria-hidden="true" tabindex="-1"></a><span class="cf">with</span> <span class="bu">open</span>(<span class="st">'./results/random_coords_expt.pkl'</span>,<span class="st">'wb+'</span>) <span class="im">as</span> outf:</span>
+<span id="cb23-15"><a href="#cb23-15" aria-hidden="true" tabindex="-1"></a>    pickle.dump((metric_etkdg_res,random_etkdg_res,metric_etkdg50_res,random_etkdg50_res,</span>
+<span id="cb23-16"><a href="#cb23-16" aria-hidden="true" tabindex="-1"></a>                 metric_etkdg50_rms_res,),outf)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+<div class="cell" data-scrolled="true">
+<div class="sourceCode cell-code" id="cb24"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb24-1"><a href="#cb24-1" aria-hidden="true" tabindex="-1"></a>ps <span class="op">=</span> AllChem.ETKDGv3()</span>
+<span id="cb24-2"><a href="#cb24-2" aria-hidden="true" tabindex="-1"></a>ps.randomSeed<span class="op">=</span><span class="bn">0xf00d</span></span>
+<span id="cb24-3"><a href="#cb24-3" aria-hidden="true" tabindex="-1"></a>ps.numThreads <span class="op">=</span> <span class="dv">4</span></span>
+<span id="cb24-4"><a href="#cb24-4" aria-hidden="true" tabindex="-1"></a>ps.useRandomCoords <span class="op">=</span> <span class="va">True</span></span>
+<span id="cb24-5"><a href="#cb24-5" aria-hidden="true" tabindex="-1"></a>ps.pruneRmsThresh <span class="op">=</span> <span class="fl">0.5</span></span>
+<span id="cb24-6"><a href="#cb24-6" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb24-7"><a href="#cb24-7" aria-hidden="true" tabindex="-1"></a>random_etkdg50_rms_res <span class="op">=</span> []</span>
+<span id="cb24-8"><a href="#cb24-8" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> i,m <span class="kw">in</span> <span class="bu">enumerate</span>(ms):</span>
+<span id="cb24-9"><a href="#cb24-9" aria-hidden="true" tabindex="-1"></a>    <span class="cf">if</span> <span class="kw">not</span> (i<span class="op">+</span><span class="dv">1</span>)<span class="op">%</span><span class="dv">10</span>:</span>
+<span id="cb24-10"><a href="#cb24-10" aria-hidden="true" tabindex="-1"></a>        <span class="bu">print</span>(<span class="ss">f'Doing </span><span class="sc">{</span>i<span class="op">+</span><span class="dv">1</span><span class="sc">}</span><span class="ss"> of </span><span class="sc">{</span><span class="bu">len</span>(ms)<span class="sc">}</span><span class="ss">'</span>)</span>
+<span id="cb24-11"><a href="#cb24-11" aria-hidden="true" tabindex="-1"></a>    m <span class="op">=</span> Chem.Mol(m)</span>
+<span id="cb24-12"><a href="#cb24-12" aria-hidden="true" tabindex="-1"></a>    t1 <span class="op">=</span> time.time()</span>
+<span id="cb24-13"><a href="#cb24-13" aria-hidden="true" tabindex="-1"></a>    AllChem.EmbedMultipleConfs(m,<span class="dv">50</span>,ps)</span>
+<span id="cb24-14"><a href="#cb24-14" aria-hidden="true" tabindex="-1"></a>    t2 <span class="op">=</span> time.time()</span>
+<span id="cb24-15"><a href="#cb24-15" aria-hidden="true" tabindex="-1"></a>    random_etkdg50_rms_res.append((t2<span class="op">-</span>t1,m.GetNumConformers(),m,m.GetIntProp(<span class="st">'RTB'</span>)))</span>
+<span id="cb24-16"><a href="#cb24-16" aria-hidden="true" tabindex="-1"></a><span class="cf">with</span> <span class="bu">open</span>(<span class="st">'./results/random_coords_expt.pkl'</span>,<span class="st">'wb+'</span>) <span class="im">as</span> outf:</span>
+<span id="cb24-17"><a href="#cb24-17" aria-hidden="true" tabindex="-1"></a>    pickle.dump((metric_etkdg_res,random_etkdg_res,metric_etkdg50_res,random_etkdg50_res,</span>
+<span id="cb24-18"><a href="#cb24-18" aria-hidden="true" tabindex="-1"></a>                 metric_etkdg50_rms_res,random_etkdg50_rms_res),outf)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+<div class="cell" data-scrolled="true">
+<div class="sourceCode cell-code" id="cb25"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb25-1"><a href="#cb25-1" aria-hidden="true" tabindex="-1"></a>ps <span class="op">=</span> AllChem.ETKDGv3()</span>
+<span id="cb25-2"><a href="#cb25-2" aria-hidden="true" tabindex="-1"></a>ps.randomSeed<span class="op">=</span><span class="bn">0xf00d</span></span>
+<span id="cb25-3"><a href="#cb25-3" aria-hidden="true" tabindex="-1"></a>ps.numThreads <span class="op">=</span> <span class="dv">4</span></span>
+<span id="cb25-4"><a href="#cb25-4" aria-hidden="true" tabindex="-1"></a>ps.enforceChirality <span class="op">=</span> <span class="va">False</span></span>
+<span id="cb25-5"><a href="#cb25-5" aria-hidden="true" tabindex="-1"></a>metric_etkdg50_nochiral_res <span class="op">=</span> []</span>
+<span id="cb25-6"><a href="#cb25-6" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> i,m <span class="kw">in</span> <span class="bu">enumerate</span>(ms):</span>
+<span id="cb25-7"><a href="#cb25-7" aria-hidden="true" tabindex="-1"></a>    <span class="cf">if</span> <span class="kw">not</span> (i<span class="op">+</span><span class="dv">1</span>)<span class="op">%</span><span class="dv">10</span>:</span>
+<span id="cb25-8"><a href="#cb25-8" aria-hidden="true" tabindex="-1"></a>        <span class="bu">print</span>(<span class="ss">f'Doing </span><span class="sc">{</span>i<span class="op">+</span><span class="dv">1</span><span class="sc">}</span><span class="ss"> of </span><span class="sc">{</span><span class="bu">len</span>(ms)<span class="sc">}</span><span class="ss">'</span>)</span>
+<span id="cb25-9"><a href="#cb25-9" aria-hidden="true" tabindex="-1"></a>    m <span class="op">=</span> Chem.Mol(m)</span>
+<span id="cb25-10"><a href="#cb25-10" aria-hidden="true" tabindex="-1"></a>    t1 <span class="op">=</span> time.time()</span>
+<span id="cb25-11"><a href="#cb25-11" aria-hidden="true" tabindex="-1"></a>    AllChem.EmbedMultipleConfs(m,<span class="dv">50</span>,ps)</span>
+<span id="cb25-12"><a href="#cb25-12" aria-hidden="true" tabindex="-1"></a>    t2 <span class="op">=</span> time.time()</span>
+<span id="cb25-13"><a href="#cb25-13" aria-hidden="true" tabindex="-1"></a>    metric_etkdg50_nochiral_res.append((t2<span class="op">-</span>t1,m.GetNumConformers(),m,m.GetIntProp(<span class="st">'RTB'</span>)))</span>
+<span id="cb25-14"><a href="#cb25-14" aria-hidden="true" tabindex="-1"></a><span class="cf">with</span> <span class="bu">open</span>(<span class="st">'./results/random_coords_expt.pkl'</span>,<span class="st">'wb+'</span>) <span class="im">as</span> outf:</span>
+<span id="cb25-15"><a href="#cb25-15" aria-hidden="true" tabindex="-1"></a>    pickle.dump((metric_etkdg_res,random_etkdg_res,metric_etkdg50_res,random_etkdg50_res,</span>
+<span id="cb25-16"><a href="#cb25-16" aria-hidden="true" tabindex="-1"></a>                 metric_etkdg50_rms_res,random_etkdg50_rms_res,metric_etkdg50_nochiral_res,),outf)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+<div class="cell" data-scrolled="true">
+<div class="sourceCode cell-code" id="cb26"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb26-1"><a href="#cb26-1" aria-hidden="true" tabindex="-1"></a>ps <span class="op">=</span> AllChem.ETKDGv3()</span>
+<span id="cb26-2"><a href="#cb26-2" aria-hidden="true" tabindex="-1"></a>ps.randomSeed<span class="op">=</span><span class="bn">0xf00d</span></span>
+<span id="cb26-3"><a href="#cb26-3" aria-hidden="true" tabindex="-1"></a>ps.numThreads <span class="op">=</span> <span class="dv">4</span></span>
+<span id="cb26-4"><a href="#cb26-4" aria-hidden="true" tabindex="-1"></a>ps.useRandomCoords <span class="op">=</span> <span class="va">True</span></span>
+<span id="cb26-5"><a href="#cb26-5" aria-hidden="true" tabindex="-1"></a>ps.enforceChirality <span class="op">=</span> <span class="va">False</span></span>
+<span id="cb26-6"><a href="#cb26-6" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb26-7"><a href="#cb26-7" aria-hidden="true" tabindex="-1"></a>random_etkdg50_nochiral_res <span class="op">=</span> []</span>
+<span id="cb26-8"><a href="#cb26-8" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> i,m <span class="kw">in</span> <span class="bu">enumerate</span>(ms):</span>
+<span id="cb26-9"><a href="#cb26-9" aria-hidden="true" tabindex="-1"></a>    <span class="cf">if</span> <span class="kw">not</span> (i<span class="op">+</span><span class="dv">1</span>)<span class="op">%</span><span class="dv">10</span>:</span>
+<span id="cb26-10"><a href="#cb26-10" aria-hidden="true" tabindex="-1"></a>        <span class="bu">print</span>(<span class="ss">f'Doing </span><span class="sc">{</span>i<span class="op">+</span><span class="dv">1</span><span class="sc">}</span><span class="ss"> of </span><span class="sc">{</span><span class="bu">len</span>(ms)<span class="sc">}</span><span class="ss">'</span>)</span>
+<span id="cb26-11"><a href="#cb26-11" aria-hidden="true" tabindex="-1"></a>    m <span class="op">=</span> Chem.Mol(m)</span>
+<span id="cb26-12"><a href="#cb26-12" aria-hidden="true" tabindex="-1"></a>    t1 <span class="op">=</span> time.time()</span>
+<span id="cb26-13"><a href="#cb26-13" aria-hidden="true" tabindex="-1"></a>    AllChem.EmbedMultipleConfs(m,<span class="dv">50</span>,ps)</span>
+<span id="cb26-14"><a href="#cb26-14" aria-hidden="true" tabindex="-1"></a>    t2 <span class="op">=</span> time.time()</span>
+<span id="cb26-15"><a href="#cb26-15" aria-hidden="true" tabindex="-1"></a>    random_etkdg50_nochiral_res.append((t2<span class="op">-</span>t1,m.GetNumConformers(),m,m.GetIntProp(<span class="st">'RTB'</span>)))</span>
+<span id="cb26-16"><a href="#cb26-16" aria-hidden="true" tabindex="-1"></a><span class="cf">with</span> <span class="bu">open</span>(<span class="st">'./results/random_coords_expt.pkl'</span>,<span class="st">'wb+'</span>) <span class="im">as</span> outf:</span>
+<span id="cb26-17"><a href="#cb26-17" aria-hidden="true" tabindex="-1"></a>    pickle.dump((metric_etkdg_res,random_etkdg_res,metric_etkdg50_res,random_etkdg50_res,</span>
+<span id="cb26-18"><a href="#cb26-18" aria-hidden="true" tabindex="-1"></a>                 metric_etkdg50_rms_res,random_etkdg50_rms_res,metric_etkdg50_nochiral_res,</span>
+<span id="cb26-19"><a href="#cb26-19" aria-hidden="true" tabindex="-1"></a>                 random_etkdg50_nochiral_res),outf)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+<div class="cell" data-scrolled="true">
+<div class="sourceCode cell-code" id="cb27"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb27-1"><a href="#cb27-1" aria-hidden="true" tabindex="-1"></a>ps <span class="op">=</span> AllChem.ETKDGv3()</span>
+<span id="cb27-2"><a href="#cb27-2" aria-hidden="true" tabindex="-1"></a>ps.randomSeed<span class="op">=</span><span class="bn">0xf00d</span></span>
+<span id="cb27-3"><a href="#cb27-3" aria-hidden="true" tabindex="-1"></a>ps.numThreads <span class="op">=</span> <span class="dv">4</span></span>
+<span id="cb27-4"><a href="#cb27-4" aria-hidden="true" tabindex="-1"></a>ps.useRandomCoords <span class="op">=</span> <span class="va">True</span></span>
+<span id="cb27-5"><a href="#cb27-5" aria-hidden="true" tabindex="-1"></a>ps.boxSizeMult <span class="op">=</span> <span class="fl">1.0</span></span>
+<span id="cb27-6"><a href="#cb27-6" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb27-7"><a href="#cb27-7" aria-hidden="true" tabindex="-1"></a>random_etkdg50_box1_res <span class="op">=</span> []</span>
+<span id="cb27-8"><a href="#cb27-8" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> i,m <span class="kw">in</span> <span class="bu">enumerate</span>(ms):</span>
+<span id="cb27-9"><a href="#cb27-9" aria-hidden="true" tabindex="-1"></a>    <span class="cf">if</span> <span class="kw">not</span> (i<span class="op">+</span><span class="dv">1</span>)<span class="op">%</span><span class="dv">10</span>:</span>
+<span id="cb27-10"><a href="#cb27-10" aria-hidden="true" tabindex="-1"></a>        <span class="bu">print</span>(<span class="ss">f'Doing </span><span class="sc">{</span>i<span class="op">+</span><span class="dv">1</span><span class="sc">}</span><span class="ss"> of </span><span class="sc">{</span><span class="bu">len</span>(ms)<span class="sc">}</span><span class="ss">'</span>)</span>
+<span id="cb27-11"><a href="#cb27-11" aria-hidden="true" tabindex="-1"></a>    m <span class="op">=</span> Chem.Mol(m)</span>
+<span id="cb27-12"><a href="#cb27-12" aria-hidden="true" tabindex="-1"></a>    t1 <span class="op">=</span> time.time()</span>
+<span id="cb27-13"><a href="#cb27-13" aria-hidden="true" tabindex="-1"></a>    AllChem.EmbedMultipleConfs(m,<span class="dv">50</span>,ps)</span>
+<span id="cb27-14"><a href="#cb27-14" aria-hidden="true" tabindex="-1"></a>    t2 <span class="op">=</span> time.time()</span>
+<span id="cb27-15"><a href="#cb27-15" aria-hidden="true" tabindex="-1"></a>    random_etkdg50_box1_res.append((t2<span class="op">-</span>t1,m.GetNumConformers(),m,m.GetIntProp(<span class="st">'RTB'</span>)))</span>
+<span id="cb27-16"><a href="#cb27-16" aria-hidden="true" tabindex="-1"></a><span class="cf">with</span> <span class="bu">open</span>(<span class="st">'./results/random_coords_expt.pkl'</span>,<span class="st">'wb+'</span>) <span class="im">as</span> outf:</span>
+<span id="cb27-17"><a href="#cb27-17" aria-hidden="true" tabindex="-1"></a>    pickle.dump((metric_etkdg_res,random_etkdg_res,metric_etkdg50_res,random_etkdg50_res,</span>
+<span id="cb27-18"><a href="#cb27-18" aria-hidden="true" tabindex="-1"></a>                 metric_etkdg50_rms_res,random_etkdg50_rms_res,metric_etkdg50_nochiral_res,</span>
+<span id="cb27-19"><a href="#cb27-19" aria-hidden="true" tabindex="-1"></a>                 random_etkdg50_nochiral_res, random_etkdg50_box1_res),outf)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+<div class="cell" data-scrolled="true">
+<div class="sourceCode cell-code" id="cb28"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb28-1"><a href="#cb28-1" aria-hidden="true" tabindex="-1"></a>ps <span class="op">=</span> AllChem.ETKDGv3()</span>
+<span id="cb28-2"><a href="#cb28-2" aria-hidden="true" tabindex="-1"></a>ps.randomSeed<span class="op">=</span><span class="bn">0xf00d</span></span>
+<span id="cb28-3"><a href="#cb28-3" aria-hidden="true" tabindex="-1"></a>ps.numThreads <span class="op">=</span> <span class="dv">4</span></span>
+<span id="cb28-4"><a href="#cb28-4" aria-hidden="true" tabindex="-1"></a>ps.useRandomCoords <span class="op">=</span> <span class="va">True</span></span>
+<span id="cb28-5"><a href="#cb28-5" aria-hidden="true" tabindex="-1"></a>ps.boxSizeMult <span class="op">=</span> <span class="fl">0.5</span></span>
+<span id="cb28-6"><a href="#cb28-6" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb28-7"><a href="#cb28-7" aria-hidden="true" tabindex="-1"></a>random_etkdg50_box2_res <span class="op">=</span> []</span>
+<span id="cb28-8"><a href="#cb28-8" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> i,m <span class="kw">in</span> <span class="bu">enumerate</span>(ms):</span>
+<span id="cb28-9"><a href="#cb28-9" aria-hidden="true" tabindex="-1"></a>    <span class="cf">if</span> <span class="kw">not</span> (i<span class="op">+</span><span class="dv">1</span>)<span class="op">%</span><span class="dv">10</span>:</span>
+<span id="cb28-10"><a href="#cb28-10" aria-hidden="true" tabindex="-1"></a>        <span class="bu">print</span>(<span class="ss">f'Doing </span><span class="sc">{</span>i<span class="op">+</span><span class="dv">1</span><span class="sc">}</span><span class="ss"> of </span><span class="sc">{</span><span class="bu">len</span>(ms)<span class="sc">}</span><span class="ss">'</span>)</span>
+<span id="cb28-11"><a href="#cb28-11" aria-hidden="true" tabindex="-1"></a>    m <span class="op">=</span> Chem.Mol(m)</span>
+<span id="cb28-12"><a href="#cb28-12" aria-hidden="true" tabindex="-1"></a>    t1 <span class="op">=</span> time.time()</span>
+<span id="cb28-13"><a href="#cb28-13" aria-hidden="true" tabindex="-1"></a>    AllChem.EmbedMultipleConfs(m,<span class="dv">50</span>,ps)</span>
+<span id="cb28-14"><a href="#cb28-14" aria-hidden="true" tabindex="-1"></a>    t2 <span class="op">=</span> time.time()</span>
+<span id="cb28-15"><a href="#cb28-15" aria-hidden="true" tabindex="-1"></a>    random_etkdg50_box2_res.append((t2<span class="op">-</span>t1,m.GetNumConformers(),m,m.GetIntProp(<span class="st">'RTB'</span>)))</span>
+<span id="cb28-16"><a href="#cb28-16" aria-hidden="true" tabindex="-1"></a><span class="cf">with</span> <span class="bu">open</span>(<span class="st">'./results/random_coords_expt.pkl'</span>,<span class="st">'wb+'</span>) <span class="im">as</span> outf:</span>
+<span id="cb28-17"><a href="#cb28-17" aria-hidden="true" tabindex="-1"></a>    pickle.dump((metric_etkdg_res,random_etkdg_res,metric_etkdg50_res,random_etkdg50_res,</span>
+<span id="cb28-18"><a href="#cb28-18" aria-hidden="true" tabindex="-1"></a>                 metric_etkdg50_rms_res,random_etkdg50_rms_res,metric_etkdg50_nochiral_res,</span>
+<span id="cb28-19"><a href="#cb28-19" aria-hidden="true" tabindex="-1"></a>                 random_etkdg50_nochiral_res, random_etkdg50_box1_res, random_etkdg50_box2_res),outf)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+</section>
+<section id="do-the-analysis" class="level1">
+<h1>Do the Analysis</h1>
+<div class="cell" data-execution_count="170">
+<div class="sourceCode cell-code" id="cb29"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb29-1"><a href="#cb29-1" aria-hidden="true" tabindex="-1"></a>figsize(<span class="dv">15</span>,<span class="dv">6</span>)</span>
+<span id="cb29-2"><a href="#cb29-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb29-3"><a href="#cb29-3" aria-hidden="true" tabindex="-1"></a>nrots <span class="op">=</span> <span class="bu">sorted</span>(<span class="bu">set</span>(x[<span class="op">-</span><span class="dv">1</span>] <span class="cf">for</span> x <span class="kw">in</span> metric_etkdg_res))</span>
+<span id="cb29-4"><a href="#cb29-4" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb29-5"><a href="#cb29-5" aria-hidden="true" tabindex="-1"></a>subplot(<span class="dv">1</span>,<span class="dv">2</span>,<span class="dv">1</span>)</span>
+<span id="cb29-6"><a href="#cb29-6" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> nrot <span class="kw">in</span> nrots:</span>
+<span id="cb29-7"><a href="#cb29-7" aria-hidden="true" tabindex="-1"></a>    xp <span class="op">=</span> [x[<span class="dv">0</span>] <span class="cf">for</span> x <span class="kw">in</span> metric_etkdg_res <span class="cf">if</span> x[<span class="op">-</span><span class="dv">1</span>]<span class="op">==</span>nrot]</span>
+<span id="cb29-8"><a href="#cb29-8" aria-hidden="true" tabindex="-1"></a>    yp <span class="op">=</span> [x[<span class="dv">0</span>] <span class="cf">for</span> x <span class="kw">in</span> random_etkdg_res <span class="cf">if</span> x[<span class="op">-</span><span class="dv">1</span>]<span class="op">==</span>nrot]</span>
+<span id="cb29-9"><a href="#cb29-9" aria-hidden="true" tabindex="-1"></a>    scatter(xp,yp,label<span class="op">=</span><span class="bu">str</span>(nrot))</span>
+<span id="cb29-10"><a href="#cb29-10" aria-hidden="true" tabindex="-1"></a>legend()<span class="op">;</span></span>
+<span id="cb29-11"><a href="#cb29-11" aria-hidden="true" tabindex="-1"></a>xlim(<span class="dv">0</span>,<span class="fl">3.5</span>)<span class="op">;</span></span>
+<span id="cb29-12"><a href="#cb29-12" aria-hidden="true" tabindex="-1"></a>ylim(<span class="dv">0</span>,<span class="dv">4</span>)<span class="op">;</span></span>
+<span id="cb29-13"><a href="#cb29-13" aria-hidden="true" tabindex="-1"></a>plot((<span class="dv">0</span>,<span class="dv">4</span>),(<span class="dv">0</span>,<span class="dv">4</span>))</span>
+<span id="cb29-14"><a href="#cb29-14" aria-hidden="true" tabindex="-1"></a>xlabel(<span class="st">'metric'</span>)</span>
+<span id="cb29-15"><a href="#cb29-15" aria-hidden="true" tabindex="-1"></a>ylabel(<span class="st">'random coords'</span>)<span class="op">;</span></span>
+<span id="cb29-16"><a href="#cb29-16" aria-hidden="true" tabindex="-1"></a>title(<span class="st">'zoom'</span>)<span class="op">;</span></span>
+<span id="cb29-17"><a href="#cb29-17" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb29-18"><a href="#cb29-18" aria-hidden="true" tabindex="-1"></a>subplot(<span class="dv">1</span>,<span class="dv">2</span>,<span class="dv">2</span>)</span>
+<span id="cb29-19"><a href="#cb29-19" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> nrot <span class="kw">in</span> nrots:</span>
+<span id="cb29-20"><a href="#cb29-20" aria-hidden="true" tabindex="-1"></a>    xp <span class="op">=</span> [x[<span class="dv">0</span>] <span class="cf">for</span> x <span class="kw">in</span> metric_etkdg_res <span class="cf">if</span> x[<span class="op">-</span><span class="dv">1</span>]<span class="op">==</span>nrot]</span>
+<span id="cb29-21"><a href="#cb29-21" aria-hidden="true" tabindex="-1"></a>    yp <span class="op">=</span> [x[<span class="dv">0</span>] <span class="cf">for</span> x <span class="kw">in</span> random_etkdg_res <span class="cf">if</span> x[<span class="op">-</span><span class="dv">1</span>]<span class="op">==</span>nrot]</span>
+<span id="cb29-22"><a href="#cb29-22" aria-hidden="true" tabindex="-1"></a>    scatter(xp,yp,label<span class="op">=</span><span class="bu">str</span>(nrot))</span>
+<span id="cb29-23"><a href="#cb29-23" aria-hidden="true" tabindex="-1"></a>legend()<span class="op">;</span></span>
+<span id="cb29-24"><a href="#cb29-24" aria-hidden="true" tabindex="-1"></a>xlabel(<span class="st">'metric'</span>)</span>
+<span id="cb29-25"><a href="#cb29-25" aria-hidden="true" tabindex="-1"></a>ylabel(<span class="st">'random coords'</span>)<span class="op">;</span></span>
+<span id="cb29-26"><a href="#cb29-26" aria-hidden="true" tabindex="-1"></a>title(<span class="st">'full range'</span>)<span class="op">;</span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-display">
+<p><img src="2021-01-31-looking-at-random-coordinate-embedding_files/figure-html/cell-22-output-1.png" class="img-fluid"></p>
+</div>
+</div>
+<div class="cell" data-execution_count="171">
+<div class="sourceCode cell-code" id="cb30"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb30-1"><a href="#cb30-1" aria-hidden="true" tabindex="-1"></a>figsize(<span class="dv">15</span>,<span class="dv">6</span>)</span>
+<span id="cb30-2"><a href="#cb30-2" aria-hidden="true" tabindex="-1"></a>nrots <span class="op">=</span> <span class="bu">sorted</span>(<span class="bu">set</span>(x[<span class="op">-</span><span class="dv">1</span>] <span class="cf">for</span> x <span class="kw">in</span> metric_etkdg_res))</span>
+<span id="cb30-3"><a href="#cb30-3" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb30-4"><a href="#cb30-4" aria-hidden="true" tabindex="-1"></a>subplot(<span class="dv">1</span>,<span class="dv">2</span>,<span class="dv">1</span>)</span>
+<span id="cb30-5"><a href="#cb30-5" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> nrot <span class="kw">in</span> nrots:</span>
+<span id="cb30-6"><a href="#cb30-6" aria-hidden="true" tabindex="-1"></a>    xp <span class="op">=</span> [x[<span class="dv">0</span>] <span class="cf">for</span> x <span class="kw">in</span> metric_etkdg50_res <span class="cf">if</span> x[<span class="op">-</span><span class="dv">1</span>]<span class="op">==</span>nrot]</span>
+<span id="cb30-7"><a href="#cb30-7" aria-hidden="true" tabindex="-1"></a>    yp <span class="op">=</span> [x[<span class="dv">0</span>] <span class="cf">for</span> x <span class="kw">in</span> random_etkdg50_res <span class="cf">if</span> x[<span class="op">-</span><span class="dv">1</span>]<span class="op">==</span>nrot]</span>
+<span id="cb30-8"><a href="#cb30-8" aria-hidden="true" tabindex="-1"></a>    scatter(xp,yp,label<span class="op">=</span><span class="bu">str</span>(nrot))</span>
+<span id="cb30-9"><a href="#cb30-9" aria-hidden="true" tabindex="-1"></a>legend()<span class="op">;</span></span>
+<span id="cb30-10"><a href="#cb30-10" aria-hidden="true" tabindex="-1"></a>xlim(<span class="dv">0</span>,<span class="dv">50</span>)<span class="op">;</span></span>
+<span id="cb30-11"><a href="#cb30-11" aria-hidden="true" tabindex="-1"></a>ylim(<span class="dv">0</span>,<span class="dv">80</span>)<span class="op">;</span></span>
+<span id="cb30-12"><a href="#cb30-12" aria-hidden="true" tabindex="-1"></a>plot((<span class="dv">0</span>,<span class="dv">35</span>),(<span class="dv">0</span>,<span class="dv">35</span>))</span>
+<span id="cb30-13"><a href="#cb30-13" aria-hidden="true" tabindex="-1"></a>title(<span class="st">'time (s)'</span>)</span>
+<span id="cb30-14"><a href="#cb30-14" aria-hidden="true" tabindex="-1"></a>xlabel(<span class="st">'metric'</span>)</span>
+<span id="cb30-15"><a href="#cb30-15" aria-hidden="true" tabindex="-1"></a>ylabel(<span class="st">'random coords'</span>)<span class="op">;</span></span>
+<span id="cb30-16"><a href="#cb30-16" aria-hidden="true" tabindex="-1"></a>title(<span class="st">'zoom'</span>)<span class="op">;</span></span>
+<span id="cb30-17"><a href="#cb30-17" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb30-18"><a href="#cb30-18" aria-hidden="true" tabindex="-1"></a>subplot(<span class="dv">1</span>,<span class="dv">2</span>,<span class="dv">2</span>)</span>
+<span id="cb30-19"><a href="#cb30-19" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> nrot <span class="kw">in</span> nrots:</span>
+<span id="cb30-20"><a href="#cb30-20" aria-hidden="true" tabindex="-1"></a>    xp <span class="op">=</span> [x[<span class="dv">0</span>] <span class="cf">for</span> x <span class="kw">in</span> metric_etkdg50_res <span class="cf">if</span> x[<span class="op">-</span><span class="dv">1</span>]<span class="op">==</span>nrot]</span>
+<span id="cb30-21"><a href="#cb30-21" aria-hidden="true" tabindex="-1"></a>    yp <span class="op">=</span> [x[<span class="dv">0</span>] <span class="cf">for</span> x <span class="kw">in</span> random_etkdg50_res <span class="cf">if</span> x[<span class="op">-</span><span class="dv">1</span>]<span class="op">==</span>nrot]</span>
+<span id="cb30-22"><a href="#cb30-22" aria-hidden="true" tabindex="-1"></a>    scatter(xp,yp,label<span class="op">=</span><span class="bu">str</span>(nrot))</span>
+<span id="cb30-23"><a href="#cb30-23" aria-hidden="true" tabindex="-1"></a>legend()<span class="op">;</span></span>
+<span id="cb30-24"><a href="#cb30-24" aria-hidden="true" tabindex="-1"></a><span class="co">#xlim(0,25);</span></span>
+<span id="cb30-25"><a href="#cb30-25" aria-hidden="true" tabindex="-1"></a><span class="co">#ylim(0,35);</span></span>
+<span id="cb30-26"><a href="#cb30-26" aria-hidden="true" tabindex="-1"></a>plot((<span class="dv">0</span>,<span class="dv">500</span>),(<span class="dv">0</span>,<span class="dv">500</span>))</span>
+<span id="cb30-27"><a href="#cb30-27" aria-hidden="true" tabindex="-1"></a>title(<span class="st">'time (s)'</span>)</span>
+<span id="cb30-28"><a href="#cb30-28" aria-hidden="true" tabindex="-1"></a>xlabel(<span class="st">'metric'</span>)</span>
+<span id="cb30-29"><a href="#cb30-29" aria-hidden="true" tabindex="-1"></a>ylabel(<span class="st">'random coords'</span>)<span class="op">;</span></span>
+<span id="cb30-30"><a href="#cb30-30" aria-hidden="true" tabindex="-1"></a>title(<span class="st">'full range'</span>)<span class="op">;</span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-display">
+<p><img src="2021-01-31-looking-at-random-coordinate-embedding_files/figure-html/cell-23-output-1.png" class="img-fluid"></p>
+</div>
+</div>
+<section id="number-of-conformers-generated" class="level2">
+<h2 class="anchored" data-anchor-id="number-of-conformers-generated">Number of conformers generated</h2>
+<div class="cell" data-execution_count="54">
+<div class="sourceCode cell-code" id="cb31"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb31-1"><a href="#cb31-1" aria-hidden="true" tabindex="-1"></a>figsize(<span class="fl">7.5</span>,<span class="dv">6</span>)</span>
+<span id="cb31-2"><a href="#cb31-2" aria-hidden="true" tabindex="-1"></a>nrots <span class="op">=</span> <span class="bu">sorted</span>(<span class="bu">set</span>(x[<span class="op">-</span><span class="dv">1</span>] <span class="cf">for</span> x <span class="kw">in</span> metric_etkdg_res))</span>
+<span id="cb31-3"><a href="#cb31-3" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f'number of mols with below 50 conformers:'</span>)</span>
+<span id="cb31-4"><a href="#cb31-4" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> nrot <span class="kw">in</span> nrots:</span>
+<span id="cb31-5"><a href="#cb31-5" aria-hidden="true" tabindex="-1"></a>    xp <span class="op">=</span> [x[<span class="dv">1</span>] <span class="cf">for</span> x <span class="kw">in</span> metric_etkdg50_res <span class="cf">if</span> x[<span class="op">-</span><span class="dv">1</span>]<span class="op">==</span>nrot]</span>
+<span id="cb31-6"><a href="#cb31-6" aria-hidden="true" tabindex="-1"></a>    yp <span class="op">=</span> [x[<span class="dv">1</span>] <span class="cf">for</span> x <span class="kw">in</span> random_etkdg50_res <span class="cf">if</span> x[<span class="op">-</span><span class="dv">1</span>]<span class="op">==</span>nrot]</span>
+<span id="cb31-7"><a href="#cb31-7" aria-hidden="true" tabindex="-1"></a>    <span class="bu">print</span>(<span class="ss">f'  </span><span class="sc">{</span>nrot<span class="sc">}</span><span class="ss"> rotatable bonds, metric: </span><span class="sc">{</span><span class="bu">len</span>([<span class="dv">1</span> <span class="cf">for</span> x <span class="kw">in</span> xp <span class="cf">if</span> x<span class="op">!=</span><span class="dv">50</span>])<span class="sc">}</span><span class="ss"> random: </span><span class="sc">{</span><span class="bu">len</span>([<span class="dv">1</span> <span class="cf">for</span> x <span class="kw">in</span> yp <span class="cf">if</span> x<span class="op">!=</span><span class="dv">50</span>])<span class="sc">}</span><span class="ss">'</span>)</span>
+<span id="cb31-8"><a href="#cb31-8" aria-hidden="true" tabindex="-1"></a>    scatter(xp,yp,label<span class="op">=</span><span class="bu">str</span>(nrot))</span>
+<span id="cb31-9"><a href="#cb31-9" aria-hidden="true" tabindex="-1"></a>legend()<span class="op">;</span></span>
+<span id="cb31-10"><a href="#cb31-10" aria-hidden="true" tabindex="-1"></a><span class="co">#xlim(0,30);</span></span>
+<span id="cb31-11"><a href="#cb31-11" aria-hidden="true" tabindex="-1"></a><span class="co">#ylim(0,40);</span></span>
+<span id="cb31-12"><a href="#cb31-12" aria-hidden="true" tabindex="-1"></a><span class="co">#plot((0,30),(0,30))</span></span>
+<span id="cb31-13"><a href="#cb31-13" aria-hidden="true" tabindex="-1"></a>title(<span class="st">'num confs generated out of 50'</span>)</span>
+<span id="cb31-14"><a href="#cb31-14" aria-hidden="true" tabindex="-1"></a>xlabel(<span class="st">'metric'</span>)</span>
+<span id="cb31-15"><a href="#cb31-15" aria-hidden="true" tabindex="-1"></a>ylabel(<span class="st">'random coords'</span>)<span class="op">;</span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>number of mols with below 50 conformers:
+  -14 rotatable bonds, metric: 8 random: 0
+  -10 rotatable bonds, metric: 1 random: 1
+  1 rotatable bonds, metric: 2 random: 2
+  2 rotatable bonds, metric: 2 random: 2
+  5 rotatable bonds, metric: 1 random: 1
+  10 rotatable bonds, metric: 4 random: 0
+  15 rotatable bonds, metric: 10 random: 0
+  20 rotatable bonds, metric: 27 random: 0
+  25 rotatable bonds, metric: 28 random: 0</code></pre>
+</div>
+<div class="cell-output cell-output-display">
+<p><img src="2021-01-31-looking-at-random-coordinate-embedding_files/figure-html/cell-24-output-2.png" class="img-fluid"></p>
+</div>
+</div>
+<div class="cell" data-execution_count="55">
+<div class="sourceCode cell-code" id="cb33"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb33-1"><a href="#cb33-1" aria-hidden="true" tabindex="-1"></a>figsize(<span class="fl">7.5</span>,<span class="dv">6</span>)</span>
+<span id="cb33-2"><a href="#cb33-2" aria-hidden="true" tabindex="-1"></a>nrots <span class="op">=</span> <span class="bu">sorted</span>(<span class="bu">set</span>(x[<span class="op">-</span><span class="dv">1</span>] <span class="cf">for</span> x <span class="kw">in</span> metric_etkdg_res))</span>
+<span id="cb33-3"><a href="#cb33-3" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f'number of mols with below 50 conformers:'</span>)</span>
+<span id="cb33-4"><a href="#cb33-4" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> nrot <span class="kw">in</span> nrots:</span>
+<span id="cb33-5"><a href="#cb33-5" aria-hidden="true" tabindex="-1"></a>    xp <span class="op">=</span> [x[<span class="dv">1</span>] <span class="cf">for</span> x <span class="kw">in</span> metric_etkdg50_rms_res <span class="cf">if</span> x[<span class="op">-</span><span class="dv">1</span>]<span class="op">==</span>nrot]</span>
+<span id="cb33-6"><a href="#cb33-6" aria-hidden="true" tabindex="-1"></a>    yp <span class="op">=</span> [x[<span class="dv">1</span>] <span class="cf">for</span> x <span class="kw">in</span> random_etkdg50_rms_res <span class="cf">if</span> x[<span class="op">-</span><span class="dv">1</span>]<span class="op">==</span>nrot]</span>
+<span id="cb33-7"><a href="#cb33-7" aria-hidden="true" tabindex="-1"></a>    <span class="bu">print</span>(<span class="ss">f'  </span><span class="sc">{</span>nrot<span class="sc">}</span><span class="ss"> rotatable bonds, metric: </span><span class="sc">{</span><span class="bu">len</span>([<span class="dv">1</span> <span class="cf">for</span> x <span class="kw">in</span> xp <span class="cf">if</span> x<span class="op">!=</span><span class="dv">50</span>])<span class="sc">}</span><span class="ss"> random: </span><span class="sc">{</span><span class="bu">len</span>([<span class="dv">1</span> <span class="cf">for</span> x <span class="kw">in</span> yp <span class="cf">if</span> x<span class="op">!=</span><span class="dv">50</span>])<span class="sc">}</span><span class="ss">'</span>)</span>
+<span id="cb33-8"><a href="#cb33-8" aria-hidden="true" tabindex="-1"></a>    scatter(xp,yp,label<span class="op">=</span><span class="bu">str</span>(nrot))</span>
+<span id="cb33-9"><a href="#cb33-9" aria-hidden="true" tabindex="-1"></a>legend()<span class="op">;</span></span>
+<span id="cb33-10"><a href="#cb33-10" aria-hidden="true" tabindex="-1"></a><span class="co">#xlim(0,30);</span></span>
+<span id="cb33-11"><a href="#cb33-11" aria-hidden="true" tabindex="-1"></a><span class="co">#ylim(0,40);</span></span>
+<span id="cb33-12"><a href="#cb33-12" aria-hidden="true" tabindex="-1"></a>plot((<span class="dv">0</span>,<span class="dv">50</span>),(<span class="dv">0</span>,<span class="dv">50</span>))</span>
+<span id="cb33-13"><a href="#cb33-13" aria-hidden="true" tabindex="-1"></a>title(<span class="st">'num diverse confs generated out of 50'</span>)</span>
+<span id="cb33-14"><a href="#cb33-14" aria-hidden="true" tabindex="-1"></a>xlabel(<span class="st">'metric'</span>)</span>
+<span id="cb33-15"><a href="#cb33-15" aria-hidden="true" tabindex="-1"></a>ylabel(<span class="st">'random coords'</span>)<span class="op">;</span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>number of mols with below 50 conformers:
+  -14 rotatable bonds, metric: 31 random: 17
+  -10 rotatable bonds, metric: 85 random: 83
+  1 rotatable bonds, metric: 99 random: 99
+  2 rotatable bonds, metric: 100 random: 100
+  5 rotatable bonds, metric: 93 random: 85
+  10 rotatable bonds, metric: 32 random: 19
+  15 rotatable bonds, metric: 13 random: 1
+  20 rotatable bonds, metric: 27 random: 0
+  25 rotatable bonds, metric: 28 random: 0</code></pre>
+</div>
+<div class="cell-output cell-output-display">
+<p><img src="2021-01-31-looking-at-random-coordinate-embedding_files/figure-html/cell-25-output-2.png" class="img-fluid"></p>
+</div>
+</div>
+<div class="cell" data-execution_count="56">
+<div class="sourceCode cell-code" id="cb35"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb35-1"><a href="#cb35-1" aria-hidden="true" tabindex="-1"></a>figsize(<span class="fl">7.5</span>,<span class="dv">6</span>)</span>
+<span id="cb35-2"><a href="#cb35-2" aria-hidden="true" tabindex="-1"></a>nrots <span class="op">=</span> <span class="bu">sorted</span>(<span class="bu">set</span>(x[<span class="op">-</span><span class="dv">1</span>] <span class="cf">for</span> x <span class="kw">in</span> metric_etkdg_res))</span>
+<span id="cb35-3"><a href="#cb35-3" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f'number of mols with below 50 conformers:'</span>)</span>
+<span id="cb35-4"><a href="#cb35-4" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> nrot <span class="kw">in</span> nrots:</span>
+<span id="cb35-5"><a href="#cb35-5" aria-hidden="true" tabindex="-1"></a>    xp <span class="op">=</span> [x[<span class="dv">1</span>] <span class="cf">for</span> x <span class="kw">in</span> metric_etkdg50_nochiral_res <span class="cf">if</span> x[<span class="op">-</span><span class="dv">1</span>]<span class="op">==</span>nrot]</span>
+<span id="cb35-6"><a href="#cb35-6" aria-hidden="true" tabindex="-1"></a>    yp <span class="op">=</span> [x[<span class="dv">1</span>] <span class="cf">for</span> x <span class="kw">in</span> random_etkdg50_nochiral_res <span class="cf">if</span> x[<span class="op">-</span><span class="dv">1</span>]<span class="op">==</span>nrot]</span>
+<span id="cb35-7"><a href="#cb35-7" aria-hidden="true" tabindex="-1"></a>    <span class="bu">print</span>(<span class="ss">f'  </span><span class="sc">{</span>nrot<span class="sc">}</span><span class="ss"> rotatable bonds, metric: </span><span class="sc">{</span><span class="bu">len</span>([<span class="dv">1</span> <span class="cf">for</span> x <span class="kw">in</span> xp <span class="cf">if</span> x<span class="op">!=</span><span class="dv">50</span>])<span class="sc">}</span><span class="ss"> random: </span><span class="sc">{</span><span class="bu">len</span>([<span class="dv">1</span> <span class="cf">for</span> x <span class="kw">in</span> yp <span class="cf">if</span> x<span class="op">!=</span><span class="dv">50</span>])<span class="sc">}</span><span class="ss">'</span>)</span>
+<span id="cb35-8"><a href="#cb35-8" aria-hidden="true" tabindex="-1"></a>    scatter(xp,yp,label<span class="op">=</span><span class="bu">str</span>(nrot))</span>
+<span id="cb35-9"><a href="#cb35-9" aria-hidden="true" tabindex="-1"></a>legend()<span class="op">;</span></span>
+<span id="cb35-10"><a href="#cb35-10" aria-hidden="true" tabindex="-1"></a><span class="co">#xlim(0,30);</span></span>
+<span id="cb35-11"><a href="#cb35-11" aria-hidden="true" tabindex="-1"></a><span class="co">#ylim(0,40);</span></span>
+<span id="cb35-12"><a href="#cb35-12" aria-hidden="true" tabindex="-1"></a><span class="co">#plot((0,30),(0,30))</span></span>
+<span id="cb35-13"><a href="#cb35-13" aria-hidden="true" tabindex="-1"></a>title(<span class="st">'num nochiral confs generated out of 50'</span>)</span>
+<span id="cb35-14"><a href="#cb35-14" aria-hidden="true" tabindex="-1"></a>xlabel(<span class="st">'metric'</span>)</span>
+<span id="cb35-15"><a href="#cb35-15" aria-hidden="true" tabindex="-1"></a>ylabel(<span class="st">'random coords'</span>)<span class="op">;</span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>number of mols with below 50 conformers:
+  -14 rotatable bonds, metric: 6 random: 0
+  -10 rotatable bonds, metric: 0 random: 0
+  1 rotatable bonds, metric: 0 random: 0
+  2 rotatable bonds, metric: 0 random: 0
+  5 rotatable bonds, metric: 0 random: 0
+  10 rotatable bonds, metric: 2 random: 0
+  15 rotatable bonds, metric: 9 random: 0
+  20 rotatable bonds, metric: 26 random: 0
+  25 rotatable bonds, metric: 21 random: 0</code></pre>
+</div>
+<div class="cell-output cell-output-display">
+<p><img src="2021-01-31-looking-at-random-coordinate-embedding_files/figure-html/cell-26-output-2.png" class="img-fluid"></p>
+</div>
+</div>
+<p>The random coordinate embedding produces 50 conformers in almost every case, while there are a significant number of examples where metric embedding is unable to produce all 50 conformers.</p>
+</section>
+<section id="time-per-conformer-generated" class="level2">
+<h2 class="anchored" data-anchor-id="time-per-conformer-generated">Time per conformer generated</h2>
+<div class="cell" data-execution_count="62">
+<div class="sourceCode cell-code" id="cb37"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb37-1"><a href="#cb37-1" aria-hidden="true" tabindex="-1"></a>figsize(<span class="dv">15</span>,<span class="dv">6</span>)</span>
+<span id="cb37-2"><a href="#cb37-2" aria-hidden="true" tabindex="-1"></a>nrots <span class="op">=</span> <span class="bu">sorted</span>(<span class="bu">set</span>(x[<span class="op">-</span><span class="dv">1</span>] <span class="cf">for</span> x <span class="kw">in</span> metric_etkdg_res))</span>
+<span id="cb37-3"><a href="#cb37-3" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb37-4"><a href="#cb37-4" aria-hidden="true" tabindex="-1"></a>subplot(<span class="dv">1</span>,<span class="dv">2</span>,<span class="dv">1</span>)</span>
+<span id="cb37-5"><a href="#cb37-5" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> nrot <span class="kw">in</span> nrots:</span>
+<span id="cb37-6"><a href="#cb37-6" aria-hidden="true" tabindex="-1"></a>    keep <span class="op">=</span> [i <span class="cf">for</span> i,(x,y) <span class="kw">in</span> <span class="bu">enumerate</span>(<span class="bu">zip</span>(metric_etkdg50_res,random_etkdg50_res)) <span class="cf">if</span> x[<span class="op">-</span><span class="dv">1</span>]<span class="op">==</span>nrot <span class="kw">and</span> x[<span class="dv">1</span>]<span class="op">!=</span><span class="dv">0</span> <span class="kw">and</span> y[<span class="dv">1</span>]<span class="op">!=</span><span class="dv">0</span>]</span>
+<span id="cb37-7"><a href="#cb37-7" aria-hidden="true" tabindex="-1"></a>    xp <span class="op">=</span> [metric_etkdg50_res[x][<span class="dv">0</span>]<span class="op">/</span>metric_etkdg50_res[x][<span class="dv">1</span>] <span class="cf">for</span> x <span class="kw">in</span> keep]</span>
+<span id="cb37-8"><a href="#cb37-8" aria-hidden="true" tabindex="-1"></a>    yp <span class="op">=</span> [random_etkdg50_res[x][<span class="dv">0</span>]<span class="op">/</span>random_etkdg50_res[x][<span class="dv">1</span>] <span class="cf">for</span> x <span class="kw">in</span> keep]</span>
+<span id="cb37-9"><a href="#cb37-9" aria-hidden="true" tabindex="-1"></a>    scatter(xp,yp,label<span class="op">=</span><span class="bu">str</span>(nrot))</span>
+<span id="cb37-10"><a href="#cb37-10" aria-hidden="true" tabindex="-1"></a>legend()<span class="op">;</span></span>
+<span id="cb37-11"><a href="#cb37-11" aria-hidden="true" tabindex="-1"></a>xlim(<span class="dv">0</span>,<span class="fl">1.5</span>)<span class="op">;</span></span>
+<span id="cb37-12"><a href="#cb37-12" aria-hidden="true" tabindex="-1"></a>ylim(<span class="dv">0</span>,<span class="fl">1.2</span>)<span class="op">;</span></span>
+<span id="cb37-13"><a href="#cb37-13" aria-hidden="true" tabindex="-1"></a>plot((<span class="dv">0</span>,<span class="fl">.8</span>),(<span class="dv">0</span>,<span class="fl">.8</span>))</span>
+<span id="cb37-14"><a href="#cb37-14" aria-hidden="true" tabindex="-1"></a>title(<span class="st">'time per conformer produced (4 threads)'</span>)</span>
+<span id="cb37-15"><a href="#cb37-15" aria-hidden="true" tabindex="-1"></a>xlabel(<span class="st">'metric'</span>)</span>
+<span id="cb37-16"><a href="#cb37-16" aria-hidden="true" tabindex="-1"></a>ylabel(<span class="st">'random coords'</span>)<span class="op">;</span></span>
+<span id="cb37-17"><a href="#cb37-17" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb37-18"><a href="#cb37-18" aria-hidden="true" tabindex="-1"></a>subplot(<span class="dv">1</span>,<span class="dv">2</span>,<span class="dv">2</span>)</span>
+<span id="cb37-19"><a href="#cb37-19" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> nrot <span class="kw">in</span> nrots:</span>
+<span id="cb37-20"><a href="#cb37-20" aria-hidden="true" tabindex="-1"></a>    keep <span class="op">=</span> [i <span class="cf">for</span> i,(x,y) <span class="kw">in</span> <span class="bu">enumerate</span>(<span class="bu">zip</span>(metric_etkdg50_rms_res,random_etkdg50_rms_res)) <span class="cf">if</span> x[<span class="op">-</span><span class="dv">1</span>]<span class="op">==</span>nrot <span class="kw">and</span> x[<span class="dv">1</span>]<span class="op">!=</span><span class="dv">0</span> <span class="kw">and</span> y[<span class="dv">1</span>]<span class="op">!=</span><span class="dv">0</span>]</span>
+<span id="cb37-21"><a href="#cb37-21" aria-hidden="true" tabindex="-1"></a>    xp <span class="op">=</span> [metric_etkdg50_res[x][<span class="dv">0</span>]<span class="op">/</span>metric_etkdg50_rms_res[x][<span class="dv">1</span>] <span class="cf">for</span> x <span class="kw">in</span> keep]</span>
+<span id="cb37-22"><a href="#cb37-22" aria-hidden="true" tabindex="-1"></a>    yp <span class="op">=</span> [random_etkdg50_res[x][<span class="dv">0</span>]<span class="op">/</span>random_etkdg50_rms_res[x][<span class="dv">1</span>] <span class="cf">for</span> x <span class="kw">in</span> keep]</span>
+<span id="cb37-23"><a href="#cb37-23" aria-hidden="true" tabindex="-1"></a>    scatter(xp,yp,label<span class="op">=</span><span class="bu">str</span>(nrot))</span>
+<span id="cb37-24"><a href="#cb37-24" aria-hidden="true" tabindex="-1"></a>legend()<span class="op">;</span></span>
+<span id="cb37-25"><a href="#cb37-25" aria-hidden="true" tabindex="-1"></a>xlim(<span class="dv">0</span>,<span class="fl">1.5</span>)<span class="op">;</span></span>
+<span id="cb37-26"><a href="#cb37-26" aria-hidden="true" tabindex="-1"></a>ylim(<span class="dv">0</span>,<span class="dv">2</span>)<span class="op">;</span></span>
+<span id="cb37-27"><a href="#cb37-27" aria-hidden="true" tabindex="-1"></a>plot((<span class="dv">0</span>,<span class="dv">1</span>),(<span class="dv">0</span>,<span class="dv">1</span>))</span>
+<span id="cb37-28"><a href="#cb37-28" aria-hidden="true" tabindex="-1"></a>title(<span class="st">'time per diverse conformer produced (4 threads)'</span>)</span>
+<span id="cb37-29"><a href="#cb37-29" aria-hidden="true" tabindex="-1"></a>xlabel(<span class="st">'metric'</span>)</span>
+<span id="cb37-30"><a href="#cb37-30" aria-hidden="true" tabindex="-1"></a>ylabel(<span class="st">'random coords'</span>)<span class="op">;</span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-display">
+<p><img src="2021-01-31-looking-at-random-coordinate-embedding_files/figure-html/cell-27-output-1.png" class="img-fluid"></p>
+</div>
+</div>
+<p>Look at the same thing without cropping outliers.</p>
+<div class="cell" data-execution_count="173">
+<div class="sourceCode cell-code" id="cb38"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb38-1"><a href="#cb38-1" aria-hidden="true" tabindex="-1"></a>figsize(<span class="dv">15</span>,<span class="dv">6</span>)</span>
+<span id="cb38-2"><a href="#cb38-2" aria-hidden="true" tabindex="-1"></a>nrots <span class="op">=</span> <span class="bu">sorted</span>(<span class="bu">set</span>(x[<span class="op">-</span><span class="dv">1</span>] <span class="cf">for</span> x <span class="kw">in</span> metric_etkdg_res))</span>
+<span id="cb38-3"><a href="#cb38-3" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb38-4"><a href="#cb38-4" aria-hidden="true" tabindex="-1"></a>subplot(<span class="dv">1</span>,<span class="dv">2</span>,<span class="dv">1</span>)</span>
+<span id="cb38-5"><a href="#cb38-5" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> nrot <span class="kw">in</span> nrots:</span>
+<span id="cb38-6"><a href="#cb38-6" aria-hidden="true" tabindex="-1"></a>    keep <span class="op">=</span> [i <span class="cf">for</span> i,(x,y) <span class="kw">in</span> <span class="bu">enumerate</span>(<span class="bu">zip</span>(metric_etkdg50_res,random_etkdg50_res)) <span class="cf">if</span> x[<span class="op">-</span><span class="dv">1</span>]<span class="op">==</span>nrot <span class="kw">and</span> x[<span class="dv">1</span>]<span class="op">!=</span><span class="dv">0</span> <span class="kw">and</span> y[<span class="dv">1</span>]<span class="op">!=</span><span class="dv">0</span>]</span>
+<span id="cb38-7"><a href="#cb38-7" aria-hidden="true" tabindex="-1"></a>    xp <span class="op">=</span> [metric_etkdg50_res[x][<span class="dv">0</span>]<span class="op">/</span>metric_etkdg50_res[x][<span class="dv">1</span>] <span class="cf">for</span> x <span class="kw">in</span> keep]</span>
+<span id="cb38-8"><a href="#cb38-8" aria-hidden="true" tabindex="-1"></a>    yp <span class="op">=</span> [random_etkdg50_res[x][<span class="dv">0</span>]<span class="op">/</span>random_etkdg50_res[x][<span class="dv">1</span>] <span class="cf">for</span> x <span class="kw">in</span> keep]</span>
+<span id="cb38-9"><a href="#cb38-9" aria-hidden="true" tabindex="-1"></a>    scatter(xp,yp,label<span class="op">=</span><span class="bu">str</span>(nrot))</span>
+<span id="cb38-10"><a href="#cb38-10" aria-hidden="true" tabindex="-1"></a>legend()<span class="op">;</span></span>
+<span id="cb38-11"><a href="#cb38-11" aria-hidden="true" tabindex="-1"></a>plot((<span class="dv">0</span>,<span class="fl">3.5</span>),(<span class="dv">0</span>,<span class="fl">3.5</span>))</span>
+<span id="cb38-12"><a href="#cb38-12" aria-hidden="true" tabindex="-1"></a>title(<span class="st">'time per conformer produced (4 threads)'</span>)</span>
+<span id="cb38-13"><a href="#cb38-13" aria-hidden="true" tabindex="-1"></a>xlabel(<span class="st">'metric'</span>)</span>
+<span id="cb38-14"><a href="#cb38-14" aria-hidden="true" tabindex="-1"></a>ylabel(<span class="st">'random coords'</span>)<span class="op">;</span></span>
+<span id="cb38-15"><a href="#cb38-15" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb38-16"><a href="#cb38-16" aria-hidden="true" tabindex="-1"></a>subplot(<span class="dv">1</span>,<span class="dv">2</span>,<span class="dv">2</span>)</span>
+<span id="cb38-17"><a href="#cb38-17" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> nrot <span class="kw">in</span> nrots:</span>
+<span id="cb38-18"><a href="#cb38-18" aria-hidden="true" tabindex="-1"></a>    keep <span class="op">=</span> [i <span class="cf">for</span> i,(x,y) <span class="kw">in</span> <span class="bu">enumerate</span>(<span class="bu">zip</span>(metric_etkdg50_rms_res,random_etkdg50_rms_res)) <span class="cf">if</span> x[<span class="op">-</span><span class="dv">1</span>]<span class="op">==</span>nrot <span class="kw">and</span> x[<span class="dv">1</span>]<span class="op">!=</span><span class="dv">0</span> <span class="kw">and</span> y[<span class="dv">1</span>]<span class="op">!=</span><span class="dv">0</span>]</span>
+<span id="cb38-19"><a href="#cb38-19" aria-hidden="true" tabindex="-1"></a>    xp <span class="op">=</span> [metric_etkdg50_res[x][<span class="dv">0</span>]<span class="op">/</span>metric_etkdg50_rms_res[x][<span class="dv">1</span>] <span class="cf">for</span> x <span class="kw">in</span> keep]</span>
+<span id="cb38-20"><a href="#cb38-20" aria-hidden="true" tabindex="-1"></a>    yp <span class="op">=</span> [random_etkdg50_res[x][<span class="dv">0</span>]<span class="op">/</span>random_etkdg50_rms_res[x][<span class="dv">1</span>] <span class="cf">for</span> x <span class="kw">in</span> keep]</span>
+<span id="cb38-21"><a href="#cb38-21" aria-hidden="true" tabindex="-1"></a>    scatter(xp,yp,label<span class="op">=</span><span class="bu">str</span>(nrot))</span>
+<span id="cb38-22"><a href="#cb38-22" aria-hidden="true" tabindex="-1"></a>legend()<span class="op">;</span></span>
+<span id="cb38-23"><a href="#cb38-23" aria-hidden="true" tabindex="-1"></a>plot((<span class="dv">0</span>,<span class="fl">3.5</span>),(<span class="dv">0</span>,<span class="fl">3.5</span>))</span>
+<span id="cb38-24"><a href="#cb38-24" aria-hidden="true" tabindex="-1"></a>title(<span class="st">'time per diverse conformer produced (4 threads)'</span>)</span>
+<span id="cb38-25"><a href="#cb38-25" aria-hidden="true" tabindex="-1"></a>xlabel(<span class="st">'metric'</span>)</span>
+<span id="cb38-26"><a href="#cb38-26" aria-hidden="true" tabindex="-1"></a>ylabel(<span class="st">'random coords'</span>)<span class="op">;</span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-display">
+<p><img src="2021-01-31-looking-at-random-coordinate-embedding_files/figure-html/cell-28-output-1.png" class="img-fluid"></p>
+</div>
+</div>
+<p>Note that these times per conformer cannot be directly compared to the time to generate a single conformer since these were run using multiple threads.</p>
+</section>
+<section id="ignoring-chirality" class="level2">
+<h2 class="anchored" data-anchor-id="ignoring-chirality">Ignoring chirality</h2>
+<div class="cell" data-execution_count="63">
+<div class="sourceCode cell-code" id="cb39"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb39-1"><a href="#cb39-1" aria-hidden="true" tabindex="-1"></a>figsize(<span class="fl">7.5</span>,<span class="dv">6</span>)</span>
+<span id="cb39-2"><a href="#cb39-2" aria-hidden="true" tabindex="-1"></a>nrots <span class="op">=</span> <span class="bu">sorted</span>(<span class="bu">set</span>(x[<span class="op">-</span><span class="dv">1</span>] <span class="cf">for</span> x <span class="kw">in</span> metric_etkdg_res))</span>
+<span id="cb39-3"><a href="#cb39-3" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> nrot <span class="kw">in</span> nrots:</span>
+<span id="cb39-4"><a href="#cb39-4" aria-hidden="true" tabindex="-1"></a>    xp <span class="op">=</span> [x[<span class="dv">0</span>] <span class="cf">for</span> x <span class="kw">in</span> metric_etkdg50_nochiral_res <span class="cf">if</span> x[<span class="op">-</span><span class="dv">1</span>]<span class="op">==</span>nrot]</span>
+<span id="cb39-5"><a href="#cb39-5" aria-hidden="true" tabindex="-1"></a>    yp <span class="op">=</span> [x[<span class="dv">0</span>] <span class="cf">for</span> x <span class="kw">in</span> random_etkdg50_nochiral_res <span class="cf">if</span> x[<span class="op">-</span><span class="dv">1</span>]<span class="op">==</span>nrot]</span>
+<span id="cb39-6"><a href="#cb39-6" aria-hidden="true" tabindex="-1"></a>    scatter(xp,yp,label<span class="op">=</span><span class="bu">str</span>(nrot))</span>
+<span id="cb39-7"><a href="#cb39-7" aria-hidden="true" tabindex="-1"></a>legend()<span class="op">;</span></span>
+<span id="cb39-8"><a href="#cb39-8" aria-hidden="true" tabindex="-1"></a><span class="co">#xlim(0,30);</span></span>
+<span id="cb39-9"><a href="#cb39-9" aria-hidden="true" tabindex="-1"></a><span class="co">#ylim(0,40);</span></span>
+<span id="cb39-10"><a href="#cb39-10" aria-hidden="true" tabindex="-1"></a>plot((<span class="dv">0</span>,<span class="dv">15</span>),(<span class="dv">0</span>,<span class="dv">15</span>))</span>
+<span id="cb39-11"><a href="#cb39-11" aria-hidden="true" tabindex="-1"></a>title(<span class="st">'nochiral time(s)'</span>)</span>
+<span id="cb39-12"><a href="#cb39-12" aria-hidden="true" tabindex="-1"></a>xlabel(<span class="st">'metric'</span>)</span>
+<span id="cb39-13"><a href="#cb39-13" aria-hidden="true" tabindex="-1"></a>ylabel(<span class="st">'random coords'</span>)<span class="op">;</span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-display">
+<p><img src="2021-01-31-looking-at-random-coordinate-embedding_files/figure-html/cell-29-output-1.png" class="img-fluid"></p>
+</div>
+</div>
+<p>General impact of ignoring chirality</p>
+<div class="cell" data-execution_count="71">
+<div class="sourceCode cell-code" id="cb40"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb40-1"><a href="#cb40-1" aria-hidden="true" tabindex="-1"></a>nrots <span class="op">=</span> <span class="bu">sorted</span>(<span class="bu">set</span>(x[<span class="op">-</span><span class="dv">1</span>] <span class="cf">for</span> x <span class="kw">in</span> metric_etkdg_res))</span>
+<span id="cb40-2"><a href="#cb40-2" aria-hidden="true" tabindex="-1"></a>figsize(<span class="dv">15</span>,<span class="dv">6</span>)</span>
+<span id="cb40-3"><a href="#cb40-3" aria-hidden="true" tabindex="-1"></a>subplot(<span class="dv">1</span>,<span class="dv">2</span>,<span class="dv">1</span>)</span>
+<span id="cb40-4"><a href="#cb40-4" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> nrot <span class="kw">in</span> nrots:</span>
+<span id="cb40-5"><a href="#cb40-5" aria-hidden="true" tabindex="-1"></a>    xp <span class="op">=</span> [x[<span class="dv">0</span>] <span class="cf">for</span> x <span class="kw">in</span> metric_etkdg50_res <span class="cf">if</span> x[<span class="op">-</span><span class="dv">1</span>]<span class="op">==</span>nrot]</span>
+<span id="cb40-6"><a href="#cb40-6" aria-hidden="true" tabindex="-1"></a>    yp <span class="op">=</span> [x[<span class="dv">0</span>] <span class="cf">for</span> x <span class="kw">in</span> metric_etkdg50_nochiral_res <span class="cf">if</span> x[<span class="op">-</span><span class="dv">1</span>]<span class="op">==</span>nrot]</span>
+<span id="cb40-7"><a href="#cb40-7" aria-hidden="true" tabindex="-1"></a>    scatter(xp,yp,label<span class="op">=</span><span class="bu">str</span>(nrot))</span>
+<span id="cb40-8"><a href="#cb40-8" aria-hidden="true" tabindex="-1"></a>legend()<span class="op">;</span></span>
+<span id="cb40-9"><a href="#cb40-9" aria-hidden="true" tabindex="-1"></a>xlim(<span class="dv">0</span>,<span class="dv">50</span>)<span class="op">;</span></span>
+<span id="cb40-10"><a href="#cb40-10" aria-hidden="true" tabindex="-1"></a>ylim(<span class="dv">0</span>,<span class="dv">30</span>)<span class="op">;</span></span>
+<span id="cb40-11"><a href="#cb40-11" aria-hidden="true" tabindex="-1"></a>plot((<span class="dv">0</span>,<span class="dv">30</span>),(<span class="dv">0</span>,<span class="dv">30</span>))</span>
+<span id="cb40-12"><a href="#cb40-12" aria-hidden="true" tabindex="-1"></a>title(<span class="st">'metric embedding time(s)'</span>)</span>
+<span id="cb40-13"><a href="#cb40-13" aria-hidden="true" tabindex="-1"></a>xlabel(<span class="st">'chiral'</span>)</span>
+<span id="cb40-14"><a href="#cb40-14" aria-hidden="true" tabindex="-1"></a>ylabel(<span class="st">'nochiral'</span>)<span class="op">;</span></span>
+<span id="cb40-15"><a href="#cb40-15" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb40-16"><a href="#cb40-16" aria-hidden="true" tabindex="-1"></a>subplot(<span class="dv">1</span>,<span class="dv">2</span>,<span class="dv">2</span>)</span>
+<span id="cb40-17"><a href="#cb40-17" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> nrot <span class="kw">in</span> nrots:</span>
+<span id="cb40-18"><a href="#cb40-18" aria-hidden="true" tabindex="-1"></a>    xp <span class="op">=</span> [x[<span class="dv">0</span>] <span class="cf">for</span> x <span class="kw">in</span> random_etkdg50_res <span class="cf">if</span> x[<span class="op">-</span><span class="dv">1</span>]<span class="op">==</span>nrot]</span>
+<span id="cb40-19"><a href="#cb40-19" aria-hidden="true" tabindex="-1"></a>    yp <span class="op">=</span> [x[<span class="dv">0</span>] <span class="cf">for</span> x <span class="kw">in</span> random_etkdg50_nochiral_res <span class="cf">if</span> x[<span class="op">-</span><span class="dv">1</span>]<span class="op">==</span>nrot]</span>
+<span id="cb40-20"><a href="#cb40-20" aria-hidden="true" tabindex="-1"></a>    scatter(xp,yp,label<span class="op">=</span><span class="bu">str</span>(nrot))</span>
+<span id="cb40-21"><a href="#cb40-21" aria-hidden="true" tabindex="-1"></a>legend()<span class="op">;</span></span>
+<span id="cb40-22"><a href="#cb40-22" aria-hidden="true" tabindex="-1"></a>xlim(<span class="dv">0</span>,<span class="dv">50</span>)<span class="op">;</span></span>
+<span id="cb40-23"><a href="#cb40-23" aria-hidden="true" tabindex="-1"></a>ylim(<span class="dv">0</span>,<span class="dv">40</span>)<span class="op">;</span></span>
+<span id="cb40-24"><a href="#cb40-24" aria-hidden="true" tabindex="-1"></a>plot((<span class="dv">0</span>,<span class="dv">40</span>),(<span class="dv">0</span>,<span class="dv">40</span>))</span>
+<span id="cb40-25"><a href="#cb40-25" aria-hidden="true" tabindex="-1"></a>title(<span class="st">'random embedding time(s)'</span>)</span>
+<span id="cb40-26"><a href="#cb40-26" aria-hidden="true" tabindex="-1"></a>xlabel(<span class="st">'chiral'</span>)</span>
+<span id="cb40-27"><a href="#cb40-27" aria-hidden="true" tabindex="-1"></a>ylabel(<span class="st">'nochiral'</span>)<span class="op">;</span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-display">
+<p><img src="2021-01-31-looking-at-random-coordinate-embedding_files/figure-html/cell-30-output-1.png" class="img-fluid"></p>
+</div>
+</div>
+</section>
+<section id="impact-of-box-size-on-random-embedding" class="level2">
+<h2 class="anchored" data-anchor-id="impact-of-box-size-on-random-embedding">Impact of box size on random embedding</h2>
+<div class="cell" data-execution_count="80">
+<div class="sourceCode cell-code" id="cb41"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb41-1"><a href="#cb41-1" aria-hidden="true" tabindex="-1"></a>nrots <span class="op">=</span> <span class="bu">sorted</span>(<span class="bu">set</span>(x[<span class="op">-</span><span class="dv">1</span>] <span class="cf">for</span> x <span class="kw">in</span> metric_etkdg_res))</span>
+<span id="cb41-2"><a href="#cb41-2" aria-hidden="true" tabindex="-1"></a>figsize(<span class="dv">15</span>,<span class="dv">6</span>)</span>
+<span id="cb41-3"><a href="#cb41-3" aria-hidden="true" tabindex="-1"></a>subplot(<span class="dv">1</span>,<span class="dv">2</span>,<span class="dv">1</span>)</span>
+<span id="cb41-4"><a href="#cb41-4" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> nrot <span class="kw">in</span> nrots:</span>
+<span id="cb41-5"><a href="#cb41-5" aria-hidden="true" tabindex="-1"></a>    xp <span class="op">=</span> [x[<span class="dv">0</span>] <span class="cf">for</span> x <span class="kw">in</span> random_etkdg50_res <span class="cf">if</span> x[<span class="op">-</span><span class="dv">1</span>]<span class="op">==</span>nrot]</span>
+<span id="cb41-6"><a href="#cb41-6" aria-hidden="true" tabindex="-1"></a>    yp <span class="op">=</span> [x[<span class="dv">0</span>] <span class="cf">for</span> x <span class="kw">in</span> random_etkdg50_box1_res <span class="cf">if</span> x[<span class="op">-</span><span class="dv">1</span>]<span class="op">==</span>nrot]</span>
+<span id="cb41-7"><a href="#cb41-7" aria-hidden="true" tabindex="-1"></a>    scatter(xp,yp,label<span class="op">=</span><span class="bu">str</span>(nrot))</span>
+<span id="cb41-8"><a href="#cb41-8" aria-hidden="true" tabindex="-1"></a>legend()<span class="op">;</span></span>
+<span id="cb41-9"><a href="#cb41-9" aria-hidden="true" tabindex="-1"></a>xlim(<span class="dv">0</span>,<span class="dv">80</span>)<span class="op">;</span></span>
+<span id="cb41-10"><a href="#cb41-10" aria-hidden="true" tabindex="-1"></a>ylim(<span class="dv">0</span>,<span class="dv">80</span>)<span class="op">;</span></span>
+<span id="cb41-11"><a href="#cb41-11" aria-hidden="true" tabindex="-1"></a>plot((<span class="dv">0</span>,<span class="dv">60</span>),(<span class="dv">0</span>,<span class="dv">60</span>))</span>
+<span id="cb41-12"><a href="#cb41-12" aria-hidden="true" tabindex="-1"></a>title(<span class="st">'random embedding time(s)'</span>)</span>
+<span id="cb41-13"><a href="#cb41-13" aria-hidden="true" tabindex="-1"></a>xlabel(<span class="st">'mult=2 (default)'</span>)</span>
+<span id="cb41-14"><a href="#cb41-14" aria-hidden="true" tabindex="-1"></a>ylabel(<span class="st">'mult=1'</span>)<span class="op">;</span></span>
+<span id="cb41-15"><a href="#cb41-15" aria-hidden="true" tabindex="-1"></a>    </span>
+<span id="cb41-16"><a href="#cb41-16" aria-hidden="true" tabindex="-1"></a>    </span>
+<span id="cb41-17"><a href="#cb41-17" aria-hidden="true" tabindex="-1"></a>subplot(<span class="dv">1</span>,<span class="dv">2</span>,<span class="dv">2</span>)</span>
+<span id="cb41-18"><a href="#cb41-18" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> nrot <span class="kw">in</span> nrots:</span>
+<span id="cb41-19"><a href="#cb41-19" aria-hidden="true" tabindex="-1"></a>    xp <span class="op">=</span> [x[<span class="dv">0</span>] <span class="cf">for</span> x <span class="kw">in</span> random_etkdg50_res <span class="cf">if</span> x[<span class="op">-</span><span class="dv">1</span>]<span class="op">==</span>nrot]</span>
+<span id="cb41-20"><a href="#cb41-20" aria-hidden="true" tabindex="-1"></a>    yp <span class="op">=</span> [x[<span class="dv">0</span>] <span class="cf">for</span> x <span class="kw">in</span> random_etkdg50_box2_res <span class="cf">if</span> x[<span class="op">-</span><span class="dv">1</span>]<span class="op">==</span>nrot]</span>
+<span id="cb41-21"><a href="#cb41-21" aria-hidden="true" tabindex="-1"></a>    scatter(xp,yp,label<span class="op">=</span><span class="bu">str</span>(nrot))</span>
+<span id="cb41-22"><a href="#cb41-22" aria-hidden="true" tabindex="-1"></a>legend()<span class="op">;</span></span>
+<span id="cb41-23"><a href="#cb41-23" aria-hidden="true" tabindex="-1"></a>xlim(<span class="dv">0</span>,<span class="dv">80</span>)<span class="op">;</span></span>
+<span id="cb41-24"><a href="#cb41-24" aria-hidden="true" tabindex="-1"></a>ylim(<span class="dv">0</span>,<span class="dv">80</span>)<span class="op">;</span></span>
+<span id="cb41-25"><a href="#cb41-25" aria-hidden="true" tabindex="-1"></a>plot((<span class="dv">0</span>,<span class="dv">60</span>),(<span class="dv">0</span>,<span class="dv">60</span>))</span>
+<span id="cb41-26"><a href="#cb41-26" aria-hidden="true" tabindex="-1"></a>title(<span class="st">'random embedding time(s)'</span>)</span>
+<span id="cb41-27"><a href="#cb41-27" aria-hidden="true" tabindex="-1"></a>xlabel(<span class="st">'mult=2 (default)'</span>)</span>
+<span id="cb41-28"><a href="#cb41-28" aria-hidden="true" tabindex="-1"></a>ylabel(<span class="st">'mult=0.5'</span>)<span class="op">;</span></span>
+<span id="cb41-29"><a href="#cb41-29" aria-hidden="true" tabindex="-1"></a>    </span>
+<span id="cb41-30"><a href="#cb41-30" aria-hidden="true" tabindex="-1"></a>    </span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-display">
+<p><img src="2021-01-31-looking-at-random-coordinate-embedding_files/figure-html/cell-31-output-1.png" class="img-fluid"></p>
+</div>
+</div>
+</section>
+<section id="summaries" class="level2">
+<h2 class="anchored" data-anchor-id="summaries">Summaries</h2>
+<div class="cell" data-execution_count="135">
+<div class="sourceCode cell-code" id="cb42"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb42-1"><a href="#cb42-1" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> set_box_color(bp, color):</span>
+<span id="cb42-2"><a href="#cb42-2" aria-hidden="true" tabindex="-1"></a>    setp(bp[<span class="st">'boxes'</span>], color<span class="op">=</span>color)</span>
+<span id="cb42-3"><a href="#cb42-3" aria-hidden="true" tabindex="-1"></a>    setp(bp[<span class="st">'whiskers'</span>], color<span class="op">=</span>color)</span>
+<span id="cb42-4"><a href="#cb42-4" aria-hidden="true" tabindex="-1"></a>    setp(bp[<span class="st">'caps'</span>], color<span class="op">=</span>color)</span>
+<span id="cb42-5"><a href="#cb42-5" aria-hidden="true" tabindex="-1"></a>    setp(bp[<span class="st">'medians'</span>], color<span class="op">=</span>color)</span>
+<span id="cb42-6"><a href="#cb42-6" aria-hidden="true" tabindex="-1"></a>    setp(bp[<span class="st">'fliers'</span>], markeredgecolor<span class="op">=</span>color)</span>
+<span id="cb42-7"><a href="#cb42-7" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb42-8"><a href="#cb42-8" aria-hidden="true" tabindex="-1"></a>figsize(<span class="dv">15</span>,<span class="dv">6</span>)</span>
+<span id="cb42-9"><a href="#cb42-9" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb42-10"><a href="#cb42-10" aria-hidden="true" tabindex="-1"></a>ax <span class="op">=</span> axes()</span>
+<span id="cb42-11"><a href="#cb42-11" aria-hidden="true" tabindex="-1"></a>ax.set_yscale(<span class="st">'log'</span>)<span class="op">;</span></span>
+<span id="cb42-12"><a href="#cb42-12" aria-hidden="true" tabindex="-1"></a>ax.set_ylabel(<span class="st">'time(s)'</span>)</span>
+<span id="cb42-13"><a href="#cb42-13" aria-hidden="true" tabindex="-1"></a>ax.set_xlabel(<span class="st">'nrot'</span>)</span>
+<span id="cb42-14"><a href="#cb42-14" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb42-15"><a href="#cb42-15" aria-hidden="true" tabindex="-1"></a>nrots <span class="op">=</span> <span class="bu">sorted</span>(<span class="bu">set</span>(x[<span class="op">-</span><span class="dv">1</span>] <span class="cf">for</span> x <span class="kw">in</span> metric_etkdg_res))</span>
+<span id="cb42-16"><a href="#cb42-16" aria-hidden="true" tabindex="-1"></a>d <span class="op">=</span> [[x[<span class="dv">0</span>] <span class="cf">for</span> x <span class="kw">in</span> metric_etkdg50_res <span class="cf">if</span> x[<span class="op">-</span><span class="dv">1</span>]<span class="op">==</span>nrot] <span class="cf">for</span> nrot <span class="kw">in</span> nrots]</span>
+<span id="cb42-17"><a href="#cb42-17" aria-hidden="true" tabindex="-1"></a>bp <span class="op">=</span> ax.boxplot(d,positions <span class="op">=</span> [<span class="dv">3</span><span class="op">*</span>x <span class="cf">for</span> x <span class="kw">in</span> <span class="bu">range</span>(<span class="bu">len</span>(d))])<span class="op">;</span></span>
+<span id="cb42-18"><a href="#cb42-18" aria-hidden="true" tabindex="-1"></a>set_box_color(bp,<span class="st">'r'</span>)</span>
+<span id="cb42-19"><a href="#cb42-19" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb42-20"><a href="#cb42-20" aria-hidden="true" tabindex="-1"></a>d <span class="op">=</span> [[x[<span class="dv">0</span>] <span class="cf">for</span> x <span class="kw">in</span> random_etkdg50_res <span class="cf">if</span> x[<span class="op">-</span><span class="dv">1</span>]<span class="op">==</span>nrot] <span class="cf">for</span> nrot <span class="kw">in</span> nrots]</span>
+<span id="cb42-21"><a href="#cb42-21" aria-hidden="true" tabindex="-1"></a>bp <span class="op">=</span> ax.boxplot(d,positions <span class="op">=</span> [<span class="dv">3</span><span class="op">*</span>x<span class="op">+</span><span class="fl">.5</span> <span class="cf">for</span> x <span class="kw">in</span> <span class="bu">range</span>(<span class="bu">len</span>(d))])<span class="op">;</span></span>
+<span id="cb42-22"><a href="#cb42-22" aria-hidden="true" tabindex="-1"></a>set_box_color(bp,<span class="st">'b'</span>)</span>
+<span id="cb42-23"><a href="#cb42-23" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb42-24"><a href="#cb42-24" aria-hidden="true" tabindex="-1"></a>d <span class="op">=</span> [[x[<span class="dv">0</span>] <span class="cf">for</span> x <span class="kw">in</span> random_etkdg50_nochiral_res <span class="cf">if</span> x[<span class="op">-</span><span class="dv">1</span>]<span class="op">==</span>nrot] <span class="cf">for</span> nrot <span class="kw">in</span> nrots]</span>
+<span id="cb42-25"><a href="#cb42-25" aria-hidden="true" tabindex="-1"></a>bp <span class="op">=</span> ax.boxplot(d,positions <span class="op">=</span> [<span class="dv">3</span><span class="op">*</span>x<span class="op">+</span><span class="dv">1</span> <span class="cf">for</span> x <span class="kw">in</span> <span class="bu">range</span>(<span class="bu">len</span>(d))])<span class="op">;</span></span>
+<span id="cb42-26"><a href="#cb42-26" aria-hidden="true" tabindex="-1"></a>set_box_color(bp,<span class="st">'c'</span>)</span>
+<span id="cb42-27"><a href="#cb42-27" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb42-28"><a href="#cb42-28" aria-hidden="true" tabindex="-1"></a>d <span class="op">=</span> [[x[<span class="dv">0</span>] <span class="cf">for</span> x <span class="kw">in</span> random_etkdg50_box1_res <span class="cf">if</span> x[<span class="op">-</span><span class="dv">1</span>]<span class="op">==</span>nrot] <span class="cf">for</span> nrot <span class="kw">in</span> nrots]</span>
+<span id="cb42-29"><a href="#cb42-29" aria-hidden="true" tabindex="-1"></a>bp <span class="op">=</span> ax.boxplot(d,positions <span class="op">=</span> [<span class="dv">3</span><span class="op">*</span>x<span class="op">+</span><span class="fl">1.5</span> <span class="cf">for</span> x <span class="kw">in</span> <span class="bu">range</span>(<span class="bu">len</span>(d))])<span class="op">;</span></span>
+<span id="cb42-30"><a href="#cb42-30" aria-hidden="true" tabindex="-1"></a>set_box_color(bp,<span class="st">'m'</span>)</span>
+<span id="cb42-31"><a href="#cb42-31" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb42-32"><a href="#cb42-32" aria-hidden="true" tabindex="-1"></a>d <span class="op">=</span> [[x[<span class="dv">0</span>] <span class="cf">for</span> x <span class="kw">in</span> random_etkdg50_box2_res <span class="cf">if</span> x[<span class="op">-</span><span class="dv">1</span>]<span class="op">==</span>nrot] <span class="cf">for</span> nrot <span class="kw">in</span> nrots]</span>
+<span id="cb42-33"><a href="#cb42-33" aria-hidden="true" tabindex="-1"></a>bp <span class="op">=</span> ax.boxplot(d,positions <span class="op">=</span> [<span class="dv">3</span><span class="op">*</span>x<span class="op">+</span><span class="dv">2</span> <span class="cf">for</span> x <span class="kw">in</span> <span class="bu">range</span>(<span class="bu">len</span>(d))])<span class="op">;</span></span>
+<span id="cb42-34"><a href="#cb42-34" aria-hidden="true" tabindex="-1"></a>set_box_color(bp,<span class="st">'y'</span>)</span>
+<span id="cb42-35"><a href="#cb42-35" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb42-36"><a href="#cb42-36" aria-hidden="true" tabindex="-1"></a><span class="co">#set_axis_style(ax, [str(x) for x in nrots])</span></span>
+<span id="cb42-37"><a href="#cb42-37" aria-hidden="true" tabindex="-1"></a>ticks <span class="op">=</span> [<span class="bu">str</span>(x) <span class="cf">for</span> x <span class="kw">in</span> nrots]</span>
+<span id="cb42-38"><a href="#cb42-38" aria-hidden="true" tabindex="-1"></a>xticks(np.arange(<span class="dv">0</span>, <span class="bu">len</span>(ticks) <span class="op">*</span> <span class="dv">3</span>, <span class="dv">3</span>)<span class="op">+</span><span class="dv">1</span>, ticks)<span class="op">;</span></span>
+<span id="cb42-39"><a href="#cb42-39" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb42-40"><a href="#cb42-40" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb42-41"><a href="#cb42-41" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb42-42"><a href="#cb42-42" aria-hidden="true" tabindex="-1"></a>plot([], c<span class="op">=</span><span class="st">'r'</span>, label<span class="op">=</span><span class="st">'metric'</span>)</span>
+<span id="cb42-43"><a href="#cb42-43" aria-hidden="true" tabindex="-1"></a>plot([], c<span class="op">=</span><span class="st">'b'</span>, label<span class="op">=</span><span class="st">'random'</span>)</span>
+<span id="cb42-44"><a href="#cb42-44" aria-hidden="true" tabindex="-1"></a>plot([], c<span class="op">=</span><span class="st">'c'</span>, label<span class="op">=</span><span class="st">'random-nochiral'</span>)</span>
+<span id="cb42-45"><a href="#cb42-45" aria-hidden="true" tabindex="-1"></a>plot([], c<span class="op">=</span><span class="st">'m'</span>, label<span class="op">=</span><span class="st">'random-box1'</span>)</span>
+<span id="cb42-46"><a href="#cb42-46" aria-hidden="true" tabindex="-1"></a>plot([], c<span class="op">=</span><span class="st">'y'</span>, label<span class="op">=</span><span class="st">'random-box0.5'</span>)</span>
+<span id="cb42-47"><a href="#cb42-47" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb42-48"><a href="#cb42-48" aria-hidden="true" tabindex="-1"></a>legend()<span class="op">;</span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-display">
+<p><img src="2021-01-31-looking-at-random-coordinate-embedding_files/figure-html/cell-32-output-1.png" class="img-fluid"></p>
+</div>
+</div>
+<div class="cell" data-execution_count="174">
+<div class="sourceCode cell-code" id="cb43"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb43-1"><a href="#cb43-1" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> set_box_color(bp, color):</span>
+<span id="cb43-2"><a href="#cb43-2" aria-hidden="true" tabindex="-1"></a>    setp(bp[<span class="st">'boxes'</span>], color<span class="op">=</span>color)</span>
+<span id="cb43-3"><a href="#cb43-3" aria-hidden="true" tabindex="-1"></a>    setp(bp[<span class="st">'whiskers'</span>], color<span class="op">=</span>color)</span>
+<span id="cb43-4"><a href="#cb43-4" aria-hidden="true" tabindex="-1"></a>    setp(bp[<span class="st">'caps'</span>], color<span class="op">=</span>color)</span>
+<span id="cb43-5"><a href="#cb43-5" aria-hidden="true" tabindex="-1"></a>    setp(bp[<span class="st">'medians'</span>], color<span class="op">=</span>color)</span>
+<span id="cb43-6"><a href="#cb43-6" aria-hidden="true" tabindex="-1"></a>    setp(bp[<span class="st">'fliers'</span>], markeredgecolor<span class="op">=</span>color)</span>
+<span id="cb43-7"><a href="#cb43-7" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb43-8"><a href="#cb43-8" aria-hidden="true" tabindex="-1"></a>figsize(<span class="dv">15</span>,<span class="dv">6</span>)</span>
+<span id="cb43-9"><a href="#cb43-9" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb43-10"><a href="#cb43-10" aria-hidden="true" tabindex="-1"></a>ax <span class="op">=</span> axes()</span>
+<span id="cb43-11"><a href="#cb43-11" aria-hidden="true" tabindex="-1"></a>ax.set_yscale(<span class="st">'log'</span>)<span class="op">;</span></span>
+<span id="cb43-12"><a href="#cb43-12" aria-hidden="true" tabindex="-1"></a>ax.set_ylabel(<span class="st">'time per conformer (s)'</span>)</span>
+<span id="cb43-13"><a href="#cb43-13" aria-hidden="true" tabindex="-1"></a>ax.set_xlabel(<span class="st">'nrot'</span>)</span>
+<span id="cb43-14"><a href="#cb43-14" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb43-15"><a href="#cb43-15" aria-hidden="true" tabindex="-1"></a>nrots <span class="op">=</span> <span class="bu">sorted</span>(<span class="bu">set</span>(x[<span class="op">-</span><span class="dv">1</span>] <span class="cf">for</span> x <span class="kw">in</span> metric_etkdg_res))</span>
+<span id="cb43-16"><a href="#cb43-16" aria-hidden="true" tabindex="-1"></a>d <span class="op">=</span> [[x[<span class="dv">0</span>]<span class="op">/</span>x[<span class="dv">2</span>].GetNumConformers() <span class="cf">for</span> x <span class="kw">in</span> metric_etkdg50_res <span class="cf">if</span> x[<span class="op">-</span><span class="dv">1</span>]<span class="op">==</span>nrot <span class="kw">and</span> x[<span class="dv">2</span>].GetNumConformers()<span class="op">!=</span><span class="dv">0</span>] <span class="cf">for</span> nrot <span class="kw">in</span> nrots]</span>
+<span id="cb43-17"><a href="#cb43-17" aria-hidden="true" tabindex="-1"></a>bp <span class="op">=</span> ax.boxplot(d,positions <span class="op">=</span> [<span class="dv">3</span><span class="op">*</span>x <span class="cf">for</span> x <span class="kw">in</span> <span class="bu">range</span>(<span class="bu">len</span>(d))])<span class="op">;</span></span>
+<span id="cb43-18"><a href="#cb43-18" aria-hidden="true" tabindex="-1"></a>set_box_color(bp,<span class="st">'r'</span>)</span>
+<span id="cb43-19"><a href="#cb43-19" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb43-20"><a href="#cb43-20" aria-hidden="true" tabindex="-1"></a>d <span class="op">=</span> [[x[<span class="dv">0</span>]<span class="op">/</span>x[<span class="dv">2</span>].GetNumConformers() <span class="cf">for</span> x <span class="kw">in</span> metric_etkdg50_rms_res <span class="cf">if</span> x[<span class="op">-</span><span class="dv">1</span>]<span class="op">==</span>nrot <span class="kw">and</span> x[<span class="dv">2</span>].GetNumConformers()<span class="op">!=</span><span class="dv">0</span>] <span class="cf">for</span> nrot <span class="kw">in</span> nrots]</span>
+<span id="cb43-21"><a href="#cb43-21" aria-hidden="true" tabindex="-1"></a>bp <span class="op">=</span> ax.boxplot(d,positions <span class="op">=</span> [<span class="dv">3</span><span class="op">*</span>x<span class="op">+</span><span class="fl">.5</span> <span class="cf">for</span> x <span class="kw">in</span> <span class="bu">range</span>(<span class="bu">len</span>(d))])<span class="op">;</span></span>
+<span id="cb43-22"><a href="#cb43-22" aria-hidden="true" tabindex="-1"></a>set_box_color(bp,<span class="st">'c'</span>)</span>
+<span id="cb43-23"><a href="#cb43-23" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb43-24"><a href="#cb43-24" aria-hidden="true" tabindex="-1"></a>d <span class="op">=</span> [[x[<span class="dv">0</span>]<span class="op">/</span>x[<span class="dv">2</span>].GetNumConformers() <span class="cf">for</span> x <span class="kw">in</span> random_etkdg50_res <span class="cf">if</span> x[<span class="op">-</span><span class="dv">1</span>]<span class="op">==</span>nrot <span class="kw">and</span> x[<span class="dv">2</span>].GetNumConformers()<span class="op">!=</span><span class="dv">0</span>] <span class="cf">for</span> nrot <span class="kw">in</span> nrots]</span>
+<span id="cb43-25"><a href="#cb43-25" aria-hidden="true" tabindex="-1"></a>bp <span class="op">=</span> ax.boxplot(d,positions <span class="op">=</span> [<span class="dv">3</span><span class="op">*</span>x<span class="op">+</span><span class="dv">1</span> <span class="cf">for</span> x <span class="kw">in</span> <span class="bu">range</span>(<span class="bu">len</span>(d))])<span class="op">;</span></span>
+<span id="cb43-26"><a href="#cb43-26" aria-hidden="true" tabindex="-1"></a>set_box_color(bp,<span class="st">'b'</span>)</span>
+<span id="cb43-27"><a href="#cb43-27" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb43-28"><a href="#cb43-28" aria-hidden="true" tabindex="-1"></a>d <span class="op">=</span> [[x[<span class="dv">0</span>]<span class="op">/</span>x[<span class="dv">2</span>].GetNumConformers() <span class="cf">for</span> x <span class="kw">in</span> random_etkdg50_rms_res <span class="cf">if</span> x[<span class="op">-</span><span class="dv">1</span>]<span class="op">==</span>nrot <span class="kw">and</span> x[<span class="dv">2</span>].GetNumConformers()<span class="op">!=</span><span class="dv">0</span>] <span class="cf">for</span> nrot <span class="kw">in</span> nrots]</span>
+<span id="cb43-29"><a href="#cb43-29" aria-hidden="true" tabindex="-1"></a>bp <span class="op">=</span> ax.boxplot(d,positions <span class="op">=</span> [<span class="dv">3</span><span class="op">*</span>x<span class="op">+</span><span class="fl">1.5</span> <span class="cf">for</span> x <span class="kw">in</span> <span class="bu">range</span>(<span class="bu">len</span>(d))])<span class="op">;</span></span>
+<span id="cb43-30"><a href="#cb43-30" aria-hidden="true" tabindex="-1"></a>set_box_color(bp,<span class="st">'m'</span>)</span>
+<span id="cb43-31"><a href="#cb43-31" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb43-32"><a href="#cb43-32" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb43-33"><a href="#cb43-33" aria-hidden="true" tabindex="-1"></a><span class="co">#set_axis_style(ax, [str(x) for x in nrots])</span></span>
+<span id="cb43-34"><a href="#cb43-34" aria-hidden="true" tabindex="-1"></a>ticks <span class="op">=</span> [<span class="bu">str</span>(x) <span class="cf">for</span> x <span class="kw">in</span> nrots]</span>
+<span id="cb43-35"><a href="#cb43-35" aria-hidden="true" tabindex="-1"></a>xticks(np.arange(<span class="dv">0</span>, <span class="bu">len</span>(ticks) <span class="op">*</span> <span class="dv">3</span>, <span class="dv">3</span>)<span class="op">+</span><span class="dv">1</span>, ticks)<span class="op">;</span></span>
+<span id="cb43-36"><a href="#cb43-36" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb43-37"><a href="#cb43-37" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb43-38"><a href="#cb43-38" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb43-39"><a href="#cb43-39" aria-hidden="true" tabindex="-1"></a>plot([], c<span class="op">=</span><span class="st">'r'</span>, label<span class="op">=</span><span class="st">'metric'</span>)</span>
+<span id="cb43-40"><a href="#cb43-40" aria-hidden="true" tabindex="-1"></a>plot([], c<span class="op">=</span><span class="st">'c'</span>, label<span class="op">=</span><span class="st">'metric-diverse'</span>)</span>
+<span id="cb43-41"><a href="#cb43-41" aria-hidden="true" tabindex="-1"></a>plot([], c<span class="op">=</span><span class="st">'b'</span>, label<span class="op">=</span><span class="st">'random'</span>)</span>
+<span id="cb43-42"><a href="#cb43-42" aria-hidden="true" tabindex="-1"></a>plot([], c<span class="op">=</span><span class="st">'m'</span>, label<span class="op">=</span><span class="st">'random-diverse'</span>)</span>
+<span id="cb43-43"><a href="#cb43-43" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb43-44"><a href="#cb43-44" aria-hidden="true" tabindex="-1"></a>legend()<span class="op">;</span></span>
+<span id="cb43-45"><a href="#cb43-45" aria-hidden="true" tabindex="-1"></a></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-display">
+<p><img src="2021-01-31-looking-at-random-coordinate-embedding_files/figure-html/cell-33-output-1.png" class="img-fluid"></p>
+</div>
+</div>
+</section>
+</section>
+<section id="look-at-some-of-the-troublesome-structures" class="level1">
+<h1>Look at some of the troublesome structures</h1>
+<p>Which ones couldn’t we generate conformers for?</p>
+<div class="cell" data-execution_count="142">
+<div class="sourceCode cell-code" id="cb44"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb44-1"><a href="#cb44-1" aria-hidden="true" tabindex="-1"></a>no_confs_metric_etkdg50 <span class="op">=</span> <span class="bu">set</span>([i <span class="cf">for</span> i,x <span class="kw">in</span> <span class="bu">enumerate</span>(metric_etkdg50_res) <span class="cf">if</span> x[<span class="dv">2</span>].GetNumConformers()<span class="op">==</span><span class="dv">0</span>])</span>
+<span id="cb44-2"><a href="#cb44-2" aria-hidden="true" tabindex="-1"></a>no_confs_random_etkdg50 <span class="op">=</span> <span class="bu">set</span>([i <span class="cf">for</span> i,x <span class="kw">in</span> <span class="bu">enumerate</span>(metric_etkdg50_res) <span class="cf">if</span> x[<span class="dv">2</span>].GetNumConformers()<span class="op">==</span><span class="dv">0</span>])</span>
+<span id="cb44-3"><a href="#cb44-3" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f'metric: </span><span class="sc">{</span><span class="bu">len</span>(no_confs_metric_etkdg50)<span class="sc">}</span><span class="ss">, random embedding: </span><span class="sc">{</span><span class="bu">len</span>(no_confs_random_etkdg50)<span class="sc">}</span><span class="ss">, overlap: </span><span class="sc">{</span><span class="bu">len</span>(no_confs_metric_etkdg50.union(no_confs_random_etkdg50))<span class="sc">}</span><span class="ss">'</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>metric: 13, random embedding: 13, overlap: 13</code></pre>
+</div>
+</div>
+<div class="cell" data-execution_count="152">
+<div class="sourceCode cell-code" id="cb46"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb46-1"><a href="#cb46-1" aria-hidden="true" tabindex="-1"></a>dms <span class="op">=</span> [Chem.RemoveHs(ms[i]) <span class="cf">for</span> i <span class="kw">in</span> no_confs_metric_etkdg50]</span>
+<span id="cb46-2"><a href="#cb46-2" aria-hidden="true" tabindex="-1"></a>dms <span class="op">=</span> [m <span class="cf">for</span> m <span class="kw">in</span> dms <span class="cf">if</span> m.GetNumAtoms()<span class="op">&lt;</span><span class="dv">75</span>]</span>
+<span id="cb46-3"><a href="#cb46-3" aria-hidden="true" tabindex="-1"></a>Draw.MolsToGridImage(dms,subImgSize<span class="op">=</span>(<span class="dv">300</span>,<span class="dv">250</span>),molsPerRow<span class="op">=</span><span class="dv">3</span>,</span>
+<span id="cb46-4"><a href="#cb46-4" aria-hidden="true" tabindex="-1"></a>                    legends<span class="op">=</span>[m.GetProp(<span class="st">'_Name'</span>) <span class="cf">for</span> m <span class="kw">in</span> dms])</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-display" data-execution_count="152">
+<p><img src="2021-01-31-looking-at-random-coordinate-embedding_files/figure-html/cell-35-output-1.png" class="img-fluid"></p>
+</div>
+</div>
+<div class="cell" data-execution_count="158">
+<div class="sourceCode cell-code" id="cb47"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb47-1"><a href="#cb47-1" aria-hidden="true" tabindex="-1"></a>dms <span class="op">=</span> [Chem.RemoveHs(ms[i]) <span class="cf">for</span> i <span class="kw">in</span> no_confs_metric_etkdg50]</span>
+<span id="cb47-2"><a href="#cb47-2" aria-hidden="true" tabindex="-1"></a>dms <span class="op">=</span> [m <span class="cf">for</span> m <span class="kw">in</span> dms <span class="cf">if</span> m.GetNumAtoms()<span class="op">&gt;=</span><span class="dv">75</span>]</span>
+<span id="cb47-3"><a href="#cb47-3" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> IPython.display <span class="im">import</span> SVG</span>
+<span id="cb47-4"><a href="#cb47-4" aria-hidden="true" tabindex="-1"></a>d2d <span class="op">=</span> Draw.MolDraw2DSVG(<span class="dv">800</span>,<span class="dv">350</span>)</span>
+<span id="cb47-5"><a href="#cb47-5" aria-hidden="true" tabindex="-1"></a>d2d.DrawMolecule(dms[<span class="dv">0</span>])</span>
+<span id="cb47-6"><a href="#cb47-6" aria-hidden="true" tabindex="-1"></a>d2d.FinishDrawing()</span>
+<span id="cb47-7"><a href="#cb47-7" aria-hidden="true" tabindex="-1"></a>SVG(d2d.GetDrawingText())</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-display" data-execution_count="158">
+<p><img src="2021-01-31-looking-at-random-coordinate-embedding_files/figure-html/cell-36-output-1.svg" class="img-fluid"></p>
+</div>
+</div>
+<p>Ok, some of those are quite constrained and have a fair number of chiral centers, so it’s easy to imagine them being hard to embed. Some (like CHEMBL59404) are just peptides though… seems like those should be manageable. Something to look into</p>
+<p>What about the structures which embed but take a really long time?</p>
+<div class="cell" data-execution_count="164">
+<div class="sourceCode cell-code" id="cb48"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb48-1"><a href="#cb48-1" aria-hidden="true" tabindex="-1"></a>slow_metric_etkdg50 <span class="op">=</span> [y <span class="cf">for</span> x,y <span class="kw">in</span> <span class="bu">sorted</span>([(x[<span class="dv">0</span>],i) <span class="cf">for</span> i,x <span class="kw">in</span> <span class="bu">enumerate</span>(metric_etkdg50_res) <span class="cf">if</span> x[<span class="dv">2</span>].GetNumConformers()],reverse<span class="op">=</span><span class="va">True</span>)][:<span class="dv">5</span>]</span>
+<span id="cb48-2"><a href="#cb48-2" aria-hidden="true" tabindex="-1"></a>dms <span class="op">=</span> [Chem.RemoveHs(ms[i]) <span class="cf">for</span> i <span class="kw">in</span> slow_metric_etkdg50]</span>
+<span id="cb48-3"><a href="#cb48-3" aria-hidden="true" tabindex="-1"></a><span class="co">#dms = [m for m in dms if m.GetNumAtoms()&lt;75]</span></span>
+<span id="cb48-4"><a href="#cb48-4" aria-hidden="true" tabindex="-1"></a>Draw.MolsToGridImage(dms,subImgSize<span class="op">=</span>(<span class="dv">300</span>,<span class="dv">250</span>),molsPerRow<span class="op">=</span><span class="dv">3</span>,</span>
+<span id="cb48-5"><a href="#cb48-5" aria-hidden="true" tabindex="-1"></a>                    legends<span class="op">=</span>[m.GetProp(<span class="st">'_Name'</span>) <span class="cf">for</span> m <span class="kw">in</span> dms])</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-display" data-execution_count="164">
+<p><img src="2021-01-31-looking-at-random-coordinate-embedding_files/figure-html/cell-37-output-1.png" class="img-fluid"></p>
+</div>
+</div>
+<div class="cell" data-execution_count="165">
+<div class="sourceCode cell-code" id="cb49"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb49-1"><a href="#cb49-1" aria-hidden="true" tabindex="-1"></a>IPythonConsole.ipython_3d <span class="op">=</span> <span class="va">True</span></span>
+<span id="cb49-2"><a href="#cb49-2" aria-hidden="true" tabindex="-1"></a>metric_etkdg50_res[slow_metric_etkdg50[<span class="dv">0</span>]][<span class="dv">2</span>]</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-display">
+<div id="3dmolviewer_16121036905192542" style="position: relative; width: 400px; height: 400px">
+        <p id="3dmolwarning_16121036905192542" style="background-color:#ffcccc;color:black">You appear to be running in JupyterLab (or JavaScript failed to load for some other reason).  You need to install the 3dmol extension: <br>
+        <tt>jupyter labextension install jupyterlab_3dmol</tt></p>
+        </div>
+<script>
+
+var loadScriptAsync = function(uri){
+  return new Promise((resolve, reject) => {
+    var tag = document.createElement('script');
+    tag.src = uri;
+    tag.async = true;
+    tag.onload = () => {
+      resolve();
+    };
+  var firstScriptTag = document.getElementsByTagName('script')[0];
+  firstScriptTag.parentNode.insertBefore(tag, firstScriptTag);
+});
+};
+
+if(typeof $3Dmolpromise === 'undefined') {
+$3Dmolpromise = null;
+  $3Dmolpromise = loadScriptAsync('https://3dmol.csb.pitt.edu/build/3Dmol.js');
+}
+
+var viewer_16121036905192542 = null;
+var warn = document.getElementById("3dmolwarning_16121036905192542");
+if(warn) {
+    warn.parentNode.removeChild(warn);
+}
+$3Dmolpromise.then(function() {
+viewer_16121036905192542 = $3Dmol.createViewer($("#3dmolviewer_16121036905192542"),{backgroundColor:"white"});
+    viewer_16121036905192542.removeAllModels();
+    viewer_16121036905192542.addModel("CHEMBL2367648\n     RDKit          3D\n\n242255  0  0  0  0  0  0  0  0999 V2000\n  -12.2896   -4.4449   -4.8996 C   0  0  0  0  0  0  0  0  0  0  0  0\n  -12.4478   -2.9692   -5.0783 C   0  0  0  0  0  0  0  0  0  0  0  0\n  -11.3799   -2.1901   -4.6384 O   0  0  0  0  0  0  0  0  0  0  0  0\n  -10.8436   -2.2016   -3.3854 C   0  0  0  0  0  0  0  0  0  0  0  0\n  -11.2709   -2.9981   -2.4942 O   0  0  0  0  0  0  0  0  0  0  0  0\n   -9.7312   -1.2650   -3.0380 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -9.2529   -1.4290   -1.7477 N   0  0  0  0  0  0  0  0  0  0  0  0\n   -8.8126   -1.5869   -0.4818 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -9.6069   -1.6054    0.5615 O   0  0  0  0  0  0  0  0  0  0  0  0\n   -7.3693   -1.7848   -0.0117 C   0  0  1  0  0  0  0  0  0  0  0  0\n   -6.4997   -1.1145   -0.8919 N   0  0  0  0  0  0  0  0  0  0  0  0\n   -5.2606   -1.6056   -1.3013 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -5.1808   -2.7674   -0.8471 O   0  0  0  0  0  0  0  0  0  0  0  0\n   -4.0562   -1.1985   -2.0740 C   0  0  1  0  0  0  0  0  0  0  0  0\n   -3.1639   -0.4050   -1.1880 N   0  0  0  0  0  0  0  0  0  0  0  0\n   -2.9895    0.9821   -1.1428 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -2.6981    1.4494   -2.2737 O   0  0  0  0  0  0  0  0  0  0  0  0\n   -3.0898    1.9510   -0.0206 C   0  0  2  0  0  0  0  0  0  0  0  0\n   -1.9608    2.0261    0.9072 N   0  0  0  0  0  0  0  0  0  0  0  0\n   -1.0580    3.0602    1.0593 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -1.7020    4.2134    1.0041 O   0  0  0  0  0  0  0  0  0  0  0  0\n    0.3620    3.3199    1.2632 C   0  0  2  0  0  0  0  0  0  0  0  0\n    0.9207    4.1929    0.2185 N   0  0  0  0  0  0  0  0  0  0  0  0\n    0.6311    5.3968   -0.2951 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -0.5701    5.4067   -0.8250 O   0  0  0  0  0  0  0  0  0  0  0  0\n    1.2447    6.7451   -0.4706 C   0  0  1  0  0  0  0  0  0  0  0  0\n    2.3100    7.0949    0.4762 N   0  0  0  0  0  0  0  0  0  0  0  0\n    3.6221    7.3711    0.1438 C   0  0  0  0  0  0  0  0  0  0  0  0\n    3.7914    7.0222   -1.1090 O   0  0  0  0  0  0  0  0  0  0  0  0\n    4.8366    7.9082    0.7399 C   0  0  1  0  0  0  0  0  0  0  0  0\n    6.1180    7.2304    0.0908 C   0  0  0  0  0  0  0  0  0  0  0  0\n    6.0190    5.7298    0.3484 C   0  0  0  0  0  0  0  0  0  0  0  0\n    5.5670    4.8663   -0.6087 C   0  0  0  0  0  0  0  0  0  0  0  0\n    5.2825    3.5136   -0.2559 C   0  0  0  0  0  0  0  0  0  0  0  0\n    5.4409    3.0562    0.9874 C   0  0  0  0  0  0  0  0  0  0  0  0\n    5.9087    3.8917    1.9365 C   0  0  0  0  0  0  0  0  0  0  0  0\n    6.3323    3.5100    3.6720 Cl  0  0  0  0  0  0  0  0  0  0  0  0\n    6.2078    5.2602    1.6272 C   0  0  0  0  0  0  0  0  0  0  0  0\n    5.0527    1.6586    1.3101 O   0  0  0  0  0  0  0  0  0  0  0  0\n    3.5876    1.4671    1.2671 C   0  0  0  0  0  0  0  0  0  0  0  0\n    2.6627    2.4256    1.5849 C   0  0  0  0  0  0  0  0  0  0  0  0\n    1.3276    2.1065    1.4283 C   0  0  0  0  0  0  0  0  0  0  0  0\n    0.9948    0.8239    0.9986 C   0  0  0  0  0  0  0  0  0  0  0  0\n    1.9132   -0.1601    0.6829 C   0  0  0  0  0  0  0  0  0  0  0  0\n    3.2398    0.2103    0.8322 C   0  0  0  0  0  0  0  0  0  0  0  0\n    4.2157   -0.7842    0.5187 O   0  0  0  0  0  0  0  0  0  0  0  0\n    4.8438   -0.8377   -0.7548 C   0  0  2  0  0  0  0  0  0  0  0  0\n    3.9008   -1.2308   -1.7171 O   0  0  0  0  0  0  0  0  0  0  0  0\n    4.3428   -1.6169   -2.9324 C   0  0  1  0  0  0  0  0  0  0  0  0\n    4.6853   -0.4308   -3.7960 C   0  0  0  0  0  0  0  0  0  0  0  0\n    5.7003    0.3541   -3.2732 O   0  0  0  0  0  0  0  0  0  0  0  0\n    5.5490   -2.5228   -2.9090 C   0  0  1  0  0  0  0  0  0  0  0  0\n    6.7167   -1.8162   -3.1642 O   0  0  0  0  0  0  0  0  0  0  0  0\n    5.6476   -3.0103   -1.4832 C   0  0  2  0  0  0  0  0  0  0  0  0\n    4.3521   -3.3201   -1.0378 O   0  0  0  0  0  0  0  0  0  0  0  0\n    6.0101   -1.7269   -0.6870 C   0  0  2  0  0  0  0  0  0  0  0  0\n    6.4104   -2.1142    0.6518 N   0  0  0  0  0  0  0  0  0  0  0  0\n    7.7980   -2.3049    0.9451 C   0  0  0  0  0  0  0  0  0  0  0  0\n    8.6137   -2.1115    0.0060 O   0  0  0  0  0  0  0  0  0  0  0  0\n    8.3100   -2.7141    2.2708 C   0  0  0  0  0  0  0  0  0  0  0  0\n    9.7555   -3.1804    2.1719 C   0  0  0  0  0  0  0  0  0  0  0  0\n    9.8677   -4.3872    1.2761 C   0  0  0  0  0  0  0  0  0  0  0  0\n   11.2659   -4.8749    1.1106 C   0  0  0  0  0  0  0  0  0  0  0  0\n   11.9196   -5.2895    2.3837 C   0  0  0  0  0  0  0  0  0  0  0  0\n   11.2072   -6.4259    3.0768 C   0  0  0  0  0  0  0  0  0  0  0  0\n   11.9698   -6.7550    4.3587 C   0  0  0  0  0  0  0  0  0  0  0  0\n   11.2982   -7.8808    5.1026 C   0  0  0  0  0  0  0  0  0  0  0  0\n   13.3823   -7.1687    4.0380 C   0  0  0  0  0  0  0  0  0  0  0  0\n    1.7392   -1.4926    0.2109 O   0  0  0  0  0  0  0  0  0  0  0  0\n    0.5007   -1.8789   -0.4209 C   0  0  0  0  0  0  0  0  0  0  0  0\n    0.2419   -1.3303   -1.6232 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -0.9862   -1.5812   -2.3275 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -1.9331   -2.4136   -1.7639 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -1.6621   -2.9839   -0.5556 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -0.4126   -2.7014    0.1171 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -0.3139   -3.6302    1.6802 Cl  0  0  0  0  0  0  0  0  0  0  0  0\n   -3.3399   -2.5130   -2.4660 C   0  0  1  0  0  0  0  0  0  0  0  0\n   -4.0890   -3.5754   -2.3437 O   0  0  0  0  0  0  0  0  0  0  0  0\n   -4.0019   -4.7972   -2.7646 C   0  0  2  0  0  0  0  0  0  0  0  0\n   -4.0699   -4.7765   -4.2960 O   0  0  0  0  0  0  0  0  0  0  0  0\n   -3.5178   -6.0079   -4.6589 C   0  0  1  0  0  0  0  0  0  0  0  0\n   -2.0358   -5.8679   -5.0285 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -1.5745   -7.1320   -5.3626 O   0  0  0  0  0  0  0  0  0  0  0  0\n   -3.6238   -7.1449   -3.7260 C   0  0  1  0  0  0  0  0  0  0  0  0\n   -2.3792   -7.4961   -3.1228 O   0  0  0  0  0  0  0  0  0  0  0  0\n   -4.6905   -7.0748   -2.6559 C   0  0  2  0  0  0  0  0  0  0  0  0\n   -5.6847   -7.9833   -2.8072 O   0  0  0  0  0  0  0  0  0  0  0  0\n   -5.2254   -5.6729   -2.5453 C   0  0  2  0  0  0  0  0  0  0  0  0\n   -6.1329   -5.4440   -3.6692 N   0  0  0  0  0  0  0  0  0  0  0  0\n   -7.1991   -4.5572   -3.7538 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -8.0117   -4.4053   -4.9957 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -7.5314   -3.8339   -2.8005 O   0  0  0  0  0  0  0  0  0  0  0  0\n    5.1601    9.2923    0.7367 N   0  0  0  0  0  0  0  0  0  0  0  0\n    5.0901   10.2884   -0.1978 C   0  0  0  0  0  0  0  0  0  0  0  0\n    3.8607   10.7351   -0.1472 O   0  0  0  0  0  0  0  0  0  0  0  0\n    5.9900   10.9746   -1.2214 C   0  0  2  0  0  0  0  0  0  0  0  0\n    6.1150   12.3767   -0.8661 N   0  0  0  0  0  0  0  0  0  0  0  0\n    5.2084   10.9224   -2.5228 C   0  0  0  0  0  0  0  0  0  0  0  0\n    4.8730   12.1899   -2.9790 C   0  0  0  0  0  0  0  0  0  0  0  0\n    3.9498   12.4202   -4.0080 C   0  0  0  0  0  0  0  0  0  0  0  0\n    3.3864   11.2912   -4.5398 C   0  0  0  0  0  0  0  0  0  0  0  0\n    2.4550   11.5168   -5.5713 O   0  0  0  0  0  0  0  0  0  0  0  0\n    3.7063   10.0218   -4.0969 C   0  0  0  0  0  0  0  0  0  0  0  0\n    4.6286    9.7875   -3.0979 C   0  0  0  0  0  0  0  0  0  0  0  0\n    2.9369    8.9744   -4.7527 O   0  0  0  0  0  0  0  0  0  0  0  0\n    2.4403    7.9013   -3.8952 C   0  0  0  0  0  0  0  0  0  0  0  0\n    2.5267    6.6716   -4.5063 C   0  0  0  0  0  0  0  0  0  0  0  0\n    2.1585    5.5171   -3.8618 C   0  0  0  0  0  0  0  0  0  0  0  0\n    2.2384    4.2769   -4.4603 O   0  0  0  0  0  0  0  0  0  0  0  0\n    1.7067    5.6835   -2.5753 C   0  0  0  0  0  0  0  0  0  0  0  0\n    1.6008    6.9270   -1.9109 C   0  0  0  0  0  0  0  0  0  0  0  0\n    1.9721    8.0633   -2.6046 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -4.3346    1.6774    0.8517 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -4.9324    2.8512    1.2717 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -6.0762    2.8720    2.0462 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -6.5831    1.6396    2.3656 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -7.7542    1.6550    3.1575 O   0  0  0  0  0  0  0  0  0  0  0  0\n   -6.0194    0.4386    1.9627 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -4.8626    0.4557    1.1936 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -6.8617   -0.7481    2.3229 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -7.1053   -0.9449    3.6810 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -6.5146    0.0043    4.5595 O   0  0  0  0  0  0  0  0  0  0  0  0\n   -6.3608   -0.2292    5.9152 C   0  0  1  0  0  0  0  0  0  0  0  0\n   -7.4737   -0.3136    6.6989 O   0  0  0  0  0  0  0  0  0  0  0  0\n   -7.3083   -1.0711    7.8321 C   0  0  2  0  0  0  0  0  0  0  0  0\n   -8.4347   -0.7664    8.7980 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -8.4645    0.5707    9.1728 O   0  0  0  0  0  0  0  0  0  0  0  0\n   -5.9575   -0.9167    8.4748 C   0  0  1  0  0  0  0  0  0  0  0  0\n   -5.9926   -1.6897    9.6670 O   0  0  0  0  0  0  0  0  0  0  0  0\n   -4.9336   -1.4990    7.5212 C   0  0  1  0  0  0  0  0  0  0  0  0\n   -4.8448   -2.8714    7.8688 O   0  0  0  0  0  0  0  0  0  0  0  0\n   -5.3959   -1.4244    6.1151 C   0  0  2  0  0  0  0  0  0  0  0  0\n   -4.2683   -1.0581    5.3412 O   0  0  0  0  0  0  0  0  0  0  0  0\n   -7.8372   -1.9856    4.1840 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -8.3739   -2.9127    3.3319 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -9.1184   -3.9874    3.8196 O   0  0  0  0  0  0  0  0  0  0  0  0\n   -8.1507   -2.7465    1.9867 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -7.4013   -1.6752    1.4484 C   0  0  0  0  0  0  0  0  0  0  0  0\n  -12.4650   -5.0183   -5.8461 H   0  0  0  0  0  0  0  0  0  0  0  0\n  -11.2977   -4.6802   -4.5039 H   0  0  0  0  0  0  0  0  0  0  0  0\n  -13.0703   -4.7850   -4.1577 H   0  0  0  0  0  0  0  0  0  0  0  0\n  -12.4931   -2.7843   -6.1931 H   0  0  0  0  0  0  0  0  0  0  0  0\n  -13.4459   -2.5963   -4.7113 H   0  0  0  0  0  0  0  0  0  0  0  0\n  -10.0283   -0.2043   -3.2479 H   0  0  0  0  0  0  0  0  0  0  0  0\n   -8.9537   -1.4614   -3.8328 H   0  0  0  0  0  0  0  0  0  0  0  0\n  -10.5240   -1.2186   -1.2906 H   0  0  0  0  0  0  0  0  0  0  0  0\n   -7.2467   -2.9075   -0.3026 H   0  0  0  0  0  0  0  0  0  0  0  0\n   -6.9502   -0.2081   -1.1554 H   0  0  0  0  0  0  0  0  0  0  0  0\n   -4.2203   -0.7079   -3.0338 H   0  0  0  0  0  0  0  0  0  0  0  0\n   -2.6751   -1.1040   -0.5826 H   0  0  0  0  0  0  0  0  0  0  0  0\n   -3.2854    2.9205   -0.4622 H   0  0  0  0  0  0  0  0  0  0  0  0\n   -2.0278    1.1248    1.5042 H   0  0  0  0  0  0  0  0  0  0  0  0\n    0.3635    3.9920    2.1145 H   0  0  0  0  0  0  0  0  0  0  0  0\n    1.7740    3.6257   -0.1775 H   0  0  0  0  0  0  0  0  0  0  0  0\n    0.3697    7.3661   -0.0994 H   0  0  0  0  0  0  0  0  0  0  0  0\n    1.8257    7.0696    1.4390 H   0  0  0  0  0  0  0  0  0  0  0  0\n    4.9969    7.4828    1.8138 H   0  0  0  0  0  0  0  0  0  0  0  0\n    6.1649    7.5833   -0.9470 H   0  0  0  0  0  0  0  0  0  0  0  0\n    7.0094    7.7429    0.4862 H   0  0  0  0  0  0  0  0  0  0  0  0\n    5.3726    4.9955   -1.7282 H   0  0  0  0  0  0  0  0  0  0  0  0\n    4.9724    2.9462   -1.2183 H   0  0  0  0  0  0  0  0  0  0  0  0\n    6.6089    5.7204    2.5761 H   0  0  0  0  0  0  0  0  0  0  0  0\n    3.0360    3.3663    2.1891 H   0  0  0  0  0  0  0  0  0  0  0  0\n   -0.0969    0.4789    1.0110 H   0  0  0  0  0  0  0  0  0  0  0  0\n    5.1243    0.1849   -1.0780 H   0  0  0  0  0  0  0  0  0  0  0  0\n    3.5436   -2.1821   -3.4911 H   0  0  0  0  0  0  0  0  0  0  0  0\n    5.0344   -0.8029   -4.7864 H   0  0  0  0  0  0  0  0  0  0  0  0\n    3.7709    0.1717   -3.9992 H   0  0  0  0  0  0  0  0  0  0  0  0\n    5.4865    1.3063   -3.1779 H   0  0  0  0  0  0  0  0  0  0  0  0\n    5.3957   -3.3646   -3.5748 H   0  0  0  0  0  0  0  0  0  0  0  0\n    7.4686   -2.4738   -3.0413 H   0  0  0  0  0  0  0  0  0  0  0  0\n    6.3697   -3.8005   -1.3066 H   0  0  0  0  0  0  0  0  0  0  0  0\n    4.4465   -3.3726   -0.0325 H   0  0  0  0  0  0  0  0  0  0  0  0\n    6.8929   -1.2902   -1.1959 H   0  0  0  0  0  0  0  0  0  0  0  0\n    5.6914   -2.2694    1.3805 H   0  0  0  0  0  0  0  0  0  0  0  0\n    8.2706   -1.8749    3.0033 H   0  0  0  0  0  0  0  0  0  0  0  0\n    7.7019   -3.5344    2.6585 H   0  0  0  0  0  0  0  0  0  0  0  0\n   10.1212   -3.4165    3.1722 H   0  0  0  0  0  0  0  0  0  0  0  0\n   10.3584   -2.3856    1.6719 H   0  0  0  0  0  0  0  0  0  0  0  0\n    9.4570   -4.1788    0.2797 H   0  0  0  0  0  0  0  0  0  0  0  0\n    9.3067   -5.2166    1.7877 H   0  0  0  0  0  0  0  0  0  0  0  0\n   11.3044   -5.7599    0.4193 H   0  0  0  0  0  0  0  0  0  0  0  0\n   11.9191   -4.1171    0.5958 H   0  0  0  0  0  0  0  0  0  0  0  0\n   12.9828   -5.5527    2.1788 H   0  0  0  0  0  0  0  0  0  0  0  0\n   11.9639   -4.3829    3.0485 H   0  0  0  0  0  0  0  0  0  0  0  0\n   10.1868   -6.1562    3.3681 H   0  0  0  0  0  0  0  0  0  0  0  0\n   11.2588   -7.3163    2.4164 H   0  0  0  0  0  0  0  0  0  0  0  0\n   11.9401   -5.8505    4.9768 H   0  0  0  0  0  0  0  0  0  0  0  0\n   10.2027   -7.8025    5.0675 H   0  0  0  0  0  0  0  0  0  0  0  0\n   11.6574   -8.8804    4.8163 H   0  0  0  0  0  0  0  0  0  0  0  0\n   11.5683   -7.7659    6.1787 H   0  0  0  0  0  0  0  0  0  0  0  0\n   13.8601   -7.6190    4.9246 H   0  0  0  0  0  0  0  0  0  0  0  0\n   13.9862   -6.2694    3.7800 H   0  0  0  0  0  0  0  0  0  0  0  0\n   13.3956   -7.9551    3.2420 H   0  0  0  0  0  0  0  0  0  0  0  0\n    0.8635   -0.6787   -2.3029 H   0  0  0  0  0  0  0  0  0  0  0  0\n   -0.8850   -0.9893   -3.2715 H   0  0  0  0  0  0  0  0  0  0  0  0\n   -2.2503   -3.6831    0.0943 H   0  0  0  0  0  0  0  0  0  0  0  0\n   -3.0486   -2.6398   -3.5659 H   0  0  0  0  0  0  0  0  0  0  0  0\n   -3.0299   -5.2623   -2.7085 H   0  0  0  0  0  0  0  0  0  0  0  0\n   -3.9940   -6.2837   -5.6469 H   0  0  0  0  0  0  0  0  0  0  0  0\n   -1.9608   -5.2387   -5.9190 H   0  0  0  0  0  0  0  0  0  0  0  0\n   -1.4486   -5.4973   -4.1565 H   0  0  0  0  0  0  0  0  0  0  0  0\n   -2.3377   -7.7400   -5.5951 H   0  0  0  0  0  0  0  0  0  0  0  0\n   -3.8710   -8.0783   -4.3173 H   0  0  0  0  0  0  0  0  0  0  0  0\n   -2.4935   -7.5331   -2.1396 H   0  0  0  0  0  0  0  0  0  0  0  0\n   -4.1989   -7.2797   -1.6683 H   0  0  0  0  0  0  0  0  0  0  0  0\n   -5.5078   -8.5855   -3.5614 H   0  0  0  0  0  0  0  0  0  0  0  0\n   -5.6684   -5.3571   -1.6193 H   0  0  0  0  0  0  0  0  0  0  0  0\n   -5.9674   -6.0378   -4.5347 H   0  0  0  0  0  0  0  0  0  0  0  0\n   -7.4424   -4.9394   -5.8098 H   0  0  0  0  0  0  0  0  0  0  0  0\n   -7.9536   -3.3166   -5.3132 H   0  0  0  0  0  0  0  0  0  0  0  0\n   -9.0380   -4.7209   -4.9140 H   0  0  0  0  0  0  0  0  0  0  0  0\n    5.5124    9.5977    1.7100 H   0  0  0  0  0  0  0  0  0  0  0  0\n    6.9696   10.5874   -1.1900 H   0  0  0  0  0  0  0  0  0  0  0  0\n    5.5435   12.5434   -0.0064 H   0  0  0  0  0  0  0  0  0  0  0  0\n    7.0682   12.6897   -0.6760 H   0  0  0  0  0  0  0  0  0  0  0  0\n    5.3021   13.1128   -2.5825 H   0  0  0  0  0  0  0  0  0  0  0  0\n    3.7144   13.4053   -4.3428 H   0  0  0  0  0  0  0  0  0  0  0  0\n    2.0502   10.7258   -6.0490 H   0  0  0  0  0  0  0  0  0  0  0  0\n    5.0183    8.7367   -2.8564 H   0  0  0  0  0  0  0  0  0  0  0  0\n    2.8866    6.5269   -5.5318 H   0  0  0  0  0  0  0  0  0  0  0  0\n    2.5250    4.2051   -5.4476 H   0  0  0  0  0  0  0  0  0  0  0  0\n    1.4110    4.7548   -2.0910 H   0  0  0  0  0  0  0  0  0  0  0  0\n    1.8074    9.0987   -2.1420 H   0  0  0  0  0  0  0  0  0  0  0  0\n   -4.5293    3.8493    1.0148 H   0  0  0  0  0  0  0  0  0  0  0  0\n   -6.5334    3.7934    2.3684 H   0  0  0  0  0  0  0  0  0  0  0  0\n   -8.6034    2.0144    2.7011 H   0  0  0  0  0  0  0  0  0  0  0  0\n   -4.3062   -0.5280    0.9513 H   0  0  0  0  0  0  0  0  0  0  0  0\n   -5.7314    0.6255    6.3211 H   0  0  0  0  0  0  0  0  0  0  0  0\n   -7.3916   -2.1397    7.5395 H   0  0  0  0  0  0  0  0  0  0  0  0\n   -9.3948   -0.9809    8.2753 H   0  0  0  0  0  0  0  0  0  0  0  0\n   -8.4309   -1.4673    9.6780 H   0  0  0  0  0  0  0  0  0  0  0  0\n   -7.5741    1.0067    9.1825 H   0  0  0  0  0  0  0  0  0  0  0  0\n   -5.8050    0.1337    8.7084 H   0  0  0  0  0  0  0  0  0  0  0  0\n   -5.0599   -1.6651   10.0382 H   0  0  0  0  0  0  0  0  0  0  0  0\n   -3.9276   -1.0691    7.6953 H   0  0  0  0  0  0  0  0  0  0  0  0\n   -4.8118   -3.4699    7.1013 H   0  0  0  0  0  0  0  0  0  0  0  0\n   -5.7757   -2.3510    5.6937 H   0  0  0  0  0  0  0  0  0  0  0  0\n   -4.0011   -1.8414    4.8293 H   0  0  0  0  0  0  0  0  0  0  0  0\n   -8.0211   -2.0965    5.2302 H   0  0  0  0  0  0  0  0  0  0  0  0\n  -10.0775   -4.1080    3.5277 H   0  0  0  0  0  0  0  0  0  0  0  0\n   -8.5934   -3.5168    1.3251 H   0  0  0  0  0  0  0  0  0  0  0  0\n  1  2  1  0\n  2  3  1  0\n  3  4  1  0\n  4  5  2  0\n  4  6  1  0\n  6  7  1  0\n  7  8  1  0\n  8  9  2  0\n  8 10  1  0\n 10 11  1  0\n 11 12  1  0\n 12 13  2  0\n 12 14  1  0\n 14 15  1  0\n 15 16  1  0\n 16 17  2  0\n 16 18  1  0\n 18 19  1  0\n 19 20  1  0\n 20 21  2  0\n 20 22  1  0\n 22 23  1  0\n 23 24  1  0\n 24 25  2  0\n 24 26  1  0\n 26 27  1  0\n 27 28  1  0\n 28 29  2  0\n 28 30  1  0\n 30 31  1  0\n 31 32  1  0\n 32 33  2  0\n 33 34  1  0\n 34 35  2  0\n 35 36  1  0\n 36 37  1  0\n 36 38  2  0\n 35 39  1  0\n 39 40  1  0\n 40 41  2  0\n 41 42  1  0\n 42 43  2  0\n 43 44  1  0\n 44 45  2  0\n 45 46  1  0\n 46 47  1  0\n 47 48  1  0\n 48 49  1  0\n 49 50  1  0\n 50 51  1  0\n 49 52  1  0\n 52 53  1  0\n 52 54  1  0\n 54 55  1  0\n 54 56  1  0\n 56 57  1  0\n 57 58  1  0\n 58 59  2  0\n 58 60  1  0\n 60 61  1  0\n 61 62  1  0\n 62 63  1  0\n 63 64  1  0\n 64 65  1  0\n 65 66  1  0\n 66 67  1  0\n 66 68  1  0\n 44 69  1  0\n 69 70  1  0\n 70 71  2  0\n 71 72  1  0\n 72 73  2  0\n 73 74  1  0\n 74 75  2  0\n 75 76  1  0\n 73 77  1  0\n 77 78  1  0\n 78 79  1  0\n 79 80  1  0\n 80 81  1  0\n 81 82  1  0\n 82 83  1  0\n 81 84  1  0\n 84 85  1  0\n 84 86  1  0\n 86 87  1  0\n 86 88  1  0\n 88 89  1  0\n 89 90  1  0\n 90 91  1  0\n 90 92  2  0\n 30 93  1  0\n 93 94  1  0\n 94 95  2  0\n 94 96  1  0\n 96 97  1  0\n 96 98  1  0\n 98 99  2  0\n 99100  1  0\n100101  2  0\n101102  1  0\n101103  1  0\n103104  2  0\n103105  1  0\n105106  1  0\n106107  2  0\n107108  1  0\n108109  1  0\n108110  2  0\n110111  1  0\n111112  2  0\n 18113  1  0\n113114  1  0\n114115  2  0\n115116  1  0\n116117  1  0\n116118  2  0\n118119  1  0\n118120  1  0\n120121  2  0\n121122  1  0\n122123  1  0\n123124  1  0\n124125  1  0\n125126  1  0\n126127  1  0\n125128  1  0\n128129  1  0\n128130  1  0\n130131  1  0\n130132  1  0\n132133  1  0\n121134  1  0\n134135  2  0\n135136  1  0\n135137  1  0\n137138  2  0\n138 10  1  0\n 77 14  1  0\n 88 79  1  0\n104 98  1  0\n112106  1  0\n119113  2  0\n138120  1  0\n 42 22  1  0\n 56 47  1  0\n 75 70  1  0\n132123  1  0\n111 26  1  0\n 38 32  1  0\n 45 40  1  0\n  1139  1  0\n  1140  1  0\n  1141  1  0\n  2142  1  0\n  2143  1  0\n  6144  1  0\n  6145  1  0\n  7146  1  0\n 10147  1  1\n 11148  1  0\n 14149  1  6\n 15150  1  0\n 18151  1  6\n 19152  1  0\n 22153  1  1\n 23154  1  0\n 26155  1  1\n 27156  1  0\n 30157  1  1\n 31158  1  0\n 31159  1  0\n 33160  1  0\n 34161  1  0\n 38162  1  0\n 41163  1  0\n 43164  1  0\n 47165  1  6\n 49166  1  6\n 50167  1  0\n 50168  1  0\n 51169  1  0\n 52170  1  6\n 53171  1  0\n 54172  1  6\n 55173  1  0\n 56174  1  6\n 57175  1  0\n 60176  1  0\n 60177  1  0\n 61178  1  0\n 61179  1  0\n 62180  1  0\n 62181  1  0\n 63182  1  0\n 63183  1  0\n 64184  1  0\n 64185  1  0\n 65186  1  0\n 65187  1  0\n 66188  1  0\n 67189  1  0\n 67190  1  0\n 67191  1  0\n 68192  1  0\n 68193  1  0\n 68194  1  0\n 71195  1  0\n 72196  1  0\n 74197  1  0\n 77198  1  6\n 79199  1  6\n 81200  1  6\n 82201  1  0\n 82202  1  0\n 83203  1  0\n 84204  1  6\n 85205  1  0\n 86206  1  1\n 87207  1  0\n 88208  1  1\n 89209  1  0\n 91210  1  0\n 91211  1  0\n 91212  1  0\n 93213  1  0\n 96214  1  6\n 97215  1  0\n 97216  1  0\n 99217  1  0\n100218  1  0\n102219  1  0\n104220  1  0\n107221  1  0\n109222  1  0\n110223  1  0\n112224  1  0\n114225  1  0\n115226  1  0\n117227  1  0\n119228  1  0\n123229  1  1\n125230  1  6\n126231  1  0\n126232  1  0\n127233  1  0\n128234  1  1\n129235  1  0\n130236  1  6\n131237  1  0\n132238  1  6\n133239  1  0\n134240  1  0\n136241  1  0\n137242  1  0\nM  END\n","sdf");
+    viewer_16121036905192542.setStyle({"stick": {}});
+    viewer_16121036905192542.setBackgroundColor("0xeeeeee");
+    viewer_16121036905192542.zoomTo();
+viewer_16121036905192542.render();
+});
+</script>
+</div>
+<div class="cell-output cell-output-display" data-execution_count="165">
+
+</div>
+</div>
+<div class="cell" data-execution_count="168">
+<div class="sourceCode cell-code" id="cb50"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb50-1"><a href="#cb50-1" aria-hidden="true" tabindex="-1"></a>metric_etkdg50_res[slow_metric_etkdg50[<span class="dv">4</span>]][<span class="dv">2</span>]</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-display">
+<div id="3dmolviewer_16121037884938512" style="position: relative; width: 400px; height: 400px">
+        <p id="3dmolwarning_16121037884938512" style="background-color:#ffcccc;color:black">You appear to be running in JupyterLab (or JavaScript failed to load for some other reason).  You need to install the 3dmol extension: <br>
+        <tt>jupyter labextension install jupyterlab_3dmol</tt></p>
+        </div>
+<script>
+
+var loadScriptAsync = function(uri){
+  return new Promise((resolve, reject) => {
+    var tag = document.createElement('script');
+    tag.src = uri;
+    tag.async = true;
+    tag.onload = () => {
+      resolve();
+    };
+  var firstScriptTag = document.getElementsByTagName('script')[0];
+  firstScriptTag.parentNode.insertBefore(tag, firstScriptTag);
+});
+};
+
+if(typeof $3Dmolpromise === 'undefined') {
+$3Dmolpromise = null;
+  $3Dmolpromise = loadScriptAsync('https://3dmol.csb.pitt.edu/build/3Dmol.js');
+}
+
+var viewer_16121037884938512 = null;
+var warn = document.getElementById("3dmolwarning_16121037884938512");
+if(warn) {
+    warn.parentNode.removeChild(warn);
+}
+$3Dmolpromise.then(function() {
+viewer_16121037884938512 = $3Dmol.createViewer($("#3dmolviewer_16121037884938512"),{backgroundColor:"white"});
+    viewer_16121037884938512.removeAllModels();
+    viewer_16121037884938512.addModel("CHEMBL334658\n     RDKit          3D\n\n128133  0  0  0  0  0  0  0  0999 V2000\n   -2.9191   -0.9047    6.1713 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -2.6881   -1.0990    4.7174 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -2.6940   -2.2729    4.2794 O   0  0  0  0  0  0  0  0  0  0  0  0\n   -2.4685   -0.0664    3.8273 O   0  0  0  0  0  0  0  0  0  0  0  0\n   -2.2466   -0.2623    2.4386 C   0  0  1  0  0  0  0  0  0  0  0  0\n   -3.4332    0.3202    1.7267 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -4.3450    0.6276    2.5122 O   0  0  0  0  0  0  0  0  0  0  0  0\n   -3.8793    0.6538    0.3500 C   0  0  1  0  0  0  0  0  0  0  0  0\n   -4.7850    1.8459    0.4573 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -2.7439    0.8397   -0.6201 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -2.0206    2.0996   -0.4736 C   0  0  2  0  0  0  0  0  0  0  0  0\n   -1.7579    2.7256   -1.6604 O   0  0  0  0  0  0  0  0  0  0  0  0\n   -1.9835    4.0178   -1.8752 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -3.3060    4.6459   -1.7388 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -4.1389    4.7753   -2.8234 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -5.3540    5.3741   -2.7240 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -5.8093    5.8865   -1.5035 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -4.9628    5.7486   -0.4311 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -3.7295    5.1445   -0.5195 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -0.6783    2.0828    0.2549 C   0  0  2  0  0  0  0  0  0  0  0  0\n   -0.2510    3.4111    0.1206 O   0  0  0  0  0  0  0  0  0  0  0  0\n    0.3716    1.2103   -0.2975 C   0  0  0  0  0  0  0  0  0  0  0  0\n    0.7553   -0.0280    0.4446 C   0  0  0  0  0  0  0  0  0  0  0  0\n    2.1099   -0.1127    0.8181 O   0  0  0  0  0  0  0  0  0  0  0  0\n    2.9565   -1.1396    0.4294 C   0  0  0  0  0  0  0  0  0  0  0  0\n    2.4492   -2.0292   -0.2902 O   0  0  0  0  0  0  0  0  0  0  0  0\n    4.3526   -1.1184    0.8759 C   0  0  2  0  0  0  0  0  0  0  0  0\n    4.6387    0.1011    1.4849 O   0  0  0  0  0  0  0  0  0  0  0  0\n    5.3555   -1.3433   -0.2259 C   0  0  1  0  0  0  0  0  0  0  0  0\n    6.7098   -1.3585    0.2704 N   0  0  0  0  0  0  0  0  0  0  0  0\n    7.7835   -0.7168   -0.4190 C   0  0  0  0  0  0  0  0  0  0  0  0\n    7.5514   -0.1254   -1.5025 O   0  0  0  0  0  0  0  0  0  0  0  0\n    9.0782   -0.7169    0.0577 O   0  0  0  0  0  0  0  0  0  0  0  0\n   10.1751   -0.1131   -0.5755 C   0  0  0  0  0  0  0  0  0  0  0  0\n   11.4103   -0.3297    0.3016 C   0  0  0  0  0  0  0  0  0  0  0  0\n    9.9573    1.3564   -0.7582 C   0  0  0  0  0  0  0  0  0  0  0  0\n   10.4730   -0.7695   -1.9164 C   0  0  0  0  0  0  0  0  0  0  0  0\n    5.0947   -2.7534   -0.7106 C   0  0  0  0  0  0  0  0  0  0  0  0\n    5.4894   -3.8306    0.0529 C   0  0  0  0  0  0  0  0  0  0  0  0\n    5.2746   -5.1319   -0.3432 C   0  0  0  0  0  0  0  0  0  0  0  0\n    4.6357   -5.3637   -1.5585 C   0  0  0  0  0  0  0  0  0  0  0  0\n    4.2461   -4.2667   -2.3133 C   0  0  0  0  0  0  0  0  0  0  0  0\n    4.4643   -2.9705   -1.9109 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -0.1428   -0.3645    1.5946 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -0.0496   -1.6574    2.3128 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -1.0832    0.4910    1.9596 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -0.7658    1.9367    1.7564 C   0  0  0  0  0  0  0  0  0  0  0  0\n    0.6458    2.2057    2.2754 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -1.6489    2.8546    2.4829 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -2.9730    0.3548   -2.0334 C   0  0  2  0  0  0  0  0  0  0  0  0\n   -1.8187   -0.2671   -2.4980 O   0  0  0  0  0  0  0  0  0  0  0  0\n   -1.6120   -0.8291   -3.6948 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -0.2998   -1.4769   -4.0828 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -2.5139   -0.8348   -4.5423 O   0  0  0  0  0  0  0  0  0  0  0  0\n   -3.5866    1.2385   -3.0332 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -4.5022    0.2479   -3.4911 O   0  0  0  0  0  0  0  0  0  0  0  0\n   -4.2226   -0.4036   -2.2949 C   0  0  2  0  0  0  0  0  0  0  0  0\n   -5.3624   -0.1479   -1.3611 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -4.7926   -0.5167    0.0048 C   0  0  2  0  0  0  0  0  0  0  0  0\n   -5.8627   -0.4732    0.8768 O   0  0  0  0  0  0  0  0  0  0  0  0\n   -6.1102   -1.6877    1.5272 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -6.3881   -2.6986    0.6377 O   0  0  0  0  0  0  0  0  0  0  0  0\n   -6.6571   -3.9281    1.1472 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -5.4838   -4.4599    1.9282 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -5.7870   -5.7404    2.4366 O   0  0  0  0  0  0  0  0  0  0  0  0\n   -2.6695   -1.8307    6.7128 H   0  0  0  0  0  0  0  0  0  0  0  0\n   -3.9403   -0.5532    6.3870 H   0  0  0  0  0  0  0  0  0  0  0  0\n   -2.1469   -0.1484    6.5057 H   0  0  0  0  0  0  0  0  0  0  0  0\n   -2.2663   -1.3254    2.1930 H   0  0  0  0  0  0  0  0  0  0  0  0\n   -5.8479    1.6099    0.5899 H   0  0  0  0  0  0  0  0  0  0  0  0\n   -4.4084    2.4773    1.2768 H   0  0  0  0  0  0  0  0  0  0  0  0\n   -4.7093    2.4304   -0.4761 H   0  0  0  0  0  0  0  0  0  0  0  0\n   -2.0203    0.0298   -0.2301 H   0  0  0  0  0  0  0  0  0  0  0  0\n   -2.6352    2.8275    0.1242 H   0  0  0  0  0  0  0  0  0  0  0  0\n   -1.1950    4.7139   -1.4426 H   0  0  0  0  0  0  0  0  0  0  0  0\n   -1.7401    4.1705   -3.0015 H   0  0  0  0  0  0  0  0  0  0  0  0\n   -3.8301    4.3858   -3.8100 H   0  0  0  0  0  0  0  0  0  0  0  0\n   -6.0189    5.4747   -3.5992 H   0  0  0  0  0  0  0  0  0  0  0  0\n   -6.7729    6.3567   -1.4443 H   0  0  0  0  0  0  0  0  0  0  0  0\n   -5.2889    6.1413    0.5437 H   0  0  0  0  0  0  0  0  0  0  0  0\n   -3.0882    5.0773    0.3740 H   0  0  0  0  0  0  0  0  0  0  0  0\n    0.6565    3.4974   -0.2069 H   0  0  0  0  0  0  0  0  0  0  0  0\n    1.3726    1.7768   -0.3676 H   0  0  0  0  0  0  0  0  0  0  0  0\n    0.1727    1.0328   -1.3696 H   0  0  0  0  0  0  0  0  0  0  0  0\n    0.5900   -0.9073   -0.2537 H   0  0  0  0  0  0  0  0  0  0  0  0\n    4.5375   -1.8846    1.6925 H   0  0  0  0  0  0  0  0  0  0  0  0\n    3.9805    0.7870    1.1390 H   0  0  0  0  0  0  0  0  0  0  0  0\n    5.2524   -0.6696   -1.0769 H   0  0  0  0  0  0  0  0  0  0  0  0\n    6.9721   -1.8439    1.1723 H   0  0  0  0  0  0  0  0  0  0  0  0\n   12.3277   -0.4120   -0.2978 H   0  0  0  0  0  0  0  0  0  0  0  0\n   11.4779    0.4987    1.0442 H   0  0  0  0  0  0  0  0  0  0  0  0\n   11.2805   -1.2643    0.8491 H   0  0  0  0  0  0  0  0  0  0  0  0\n   10.2742    1.6562   -1.7988 H   0  0  0  0  0  0  0  0  0  0  0  0\n    8.8624    1.6360   -0.7378 H   0  0  0  0  0  0  0  0  0  0  0  0\n   10.4512    1.9798    0.0037 H   0  0  0  0  0  0  0  0  0  0  0  0\n   11.3997   -0.3184   -2.3247 H   0  0  0  0  0  0  0  0  0  0  0  0\n   10.6645   -1.8646   -1.7606 H   0  0  0  0  0  0  0  0  0  0  0  0\n    9.6371   -0.5840   -2.6153 H   0  0  0  0  0  0  0  0  0  0  0  0\n    5.9944   -3.6072    1.0078 H   0  0  0  0  0  0  0  0  0  0  0  0\n    5.5908   -5.9560    0.2716 H   0  0  0  0  0  0  0  0  0  0  0  0\n    4.4359   -6.3709   -1.9330 H   0  0  0  0  0  0  0  0  0  0  0  0\n    3.7447   -4.3960   -3.2656 H   0  0  0  0  0  0  0  0  0  0  0  0\n    4.1601   -2.1122   -2.4988 H   0  0  0  0  0  0  0  0  0  0  0  0\n    1.0165   -1.9813    2.1829 H   0  0  0  0  0  0  0  0  0  0  0  0\n   -0.1845   -1.5872    3.3978 H   0  0  0  0  0  0  0  0  0  0  0  0\n   -0.6356   -2.4615    1.8338 H   0  0  0  0  0  0  0  0  0  0  0  0\n    1.0093    1.3175    2.8707 H   0  0  0  0  0  0  0  0  0  0  0  0\n    1.3416    2.5411    1.5049 H   0  0  0  0  0  0  0  0  0  0  0  0\n    0.6574    3.0230    3.0576 H   0  0  0  0  0  0  0  0  0  0  0  0\n   -2.3463    3.4815    1.9580 H   0  0  0  0  0  0  0  0  0  0  0  0\n   -1.0972    3.5564    3.1899 H   0  0  0  0  0  0  0  0  0  0  0  0\n   -2.2611    2.2386    3.2087 H   0  0  0  0  0  0  0  0  0  0  0  0\n    0.4012   -0.6537   -4.2378 H   0  0  0  0  0  0  0  0  0  0  0  0\n   -0.4150   -2.0923   -4.9844 H   0  0  0  0  0  0  0  0  0  0  0  0\n    0.0633   -2.1152   -3.2599 H   0  0  0  0  0  0  0  0  0  0  0  0\n   -4.2022    2.0708   -2.7323 H   0  0  0  0  0  0  0  0  0  0  0  0\n   -2.9576    1.4939   -3.9320 H   0  0  0  0  0  0  0  0  0  0  0  0\n   -4.0958   -1.5179   -2.4093 H   0  0  0  0  0  0  0  0  0  0  0  0\n   -6.1908   -0.8054   -1.6510 H   0  0  0  0  0  0  0  0  0  0  0  0\n   -5.7263    0.8756   -1.3265 H   0  0  0  0  0  0  0  0  0  0  0  0\n   -4.2685   -1.4875   -0.0329 H   0  0  0  0  0  0  0  0  0  0  0  0\n   -5.3119   -1.9175    2.2591 H   0  0  0  0  0  0  0  0  0  0  0  0\n   -7.0423   -1.5138    2.1336 H   0  0  0  0  0  0  0  0  0  0  0  0\n   -7.5303   -3.9507    1.8391 H   0  0  0  0  0  0  0  0  0  0  0  0\n   -6.9054   -4.6704    0.3546 H   0  0  0  0  0  0  0  0  0  0  0  0\n   -4.5745   -4.5458    1.3173 H   0  0  0  0  0  0  0  0  0  0  0  0\n   -5.3398   -3.7954    2.8296 H   0  0  0  0  0  0  0  0  0  0  0  0\n   -6.7819   -5.9002    2.3641 H   0  0  0  0  0  0  0  0  0  0  0  0\n  1  2  1  0\n  2  3  2  0\n  2  4  1  0\n  4  5  1  0\n  5  6  1  0\n  6  7  2  0\n  6  8  1  0\n  8  9  1  1\n  8 10  1  0\n 10 11  1  0\n 11 12  1  0\n 12 13  1  0\n 13 14  1  0\n 14 15  2  0\n 15 16  1  0\n 16 17  2  0\n 17 18  1  0\n 18 19  2  0\n 11 20  1  0\n 20 21  1  1\n 20 22  1  0\n 22 23  1  0\n 23 24  1  0\n 24 25  1  0\n 25 26  2  0\n 25 27  1  0\n 27 28  1  0\n 27 29  1  0\n 29 30  1  0\n 30 31  1  0\n 31 32  2  0\n 31 33  1  0\n 33 34  1  0\n 34 35  1  0\n 34 36  1  0\n 34 37  1  0\n 29 38  1  0\n 38 39  2  0\n 39 40  1  0\n 40 41  2  0\n 41 42  1  0\n 42 43  2  0\n 23 44  1  0\n 44 45  1  0\n 44 46  2  0\n 46 47  1  0\n 47 48  1  0\n 47 49  1  0\n 10 50  1  0\n 50 51  1  6\n 51 52  1  0\n 52 53  1  0\n 52 54  2  0\n 50 55  1  0\n 55 56  1  0\n 56 57  1  0\n 57 58  1  0\n 58 59  1  0\n 59 60  1  0\n 60 61  1  0\n 61 62  1  0\n 62 63  1  0\n 63 64  1  0\n 64 65  1  0\n 46  5  1  0\n 57 50  1  0\n 59  8  1  0\n 19 14  1  0\n 47 20  1  0\n 43 38  1  0\n  1 66  1  0\n  1 67  1  0\n  1 68  1  0\n  5 69  1  1\n  9 70  1  0\n  9 71  1  0\n  9 72  1  0\n 10 73  1  0\n 11 74  1  1\n 13 75  1  0\n 13 76  1  0\n 15 77  1  0\n 16 78  1  0\n 17 79  1  0\n 18 80  1  0\n 19 81  1  0\n 21 82  1  0\n 22 83  1  0\n 22 84  1  0\n 23 85  1  0\n 27 86  1  1\n 28 87  1  0\n 29 88  1  6\n 30 89  1  0\n 35 90  1  0\n 35 91  1  0\n 35 92  1  0\n 36 93  1  0\n 36 94  1  0\n 36 95  1  0\n 37 96  1  0\n 37 97  1  0\n 37 98  1  0\n 39 99  1  0\n 40100  1  0\n 41101  1  0\n 42102  1  0\n 43103  1  0\n 45104  1  0\n 45105  1  0\n 45106  1  0\n 48107  1  0\n 48108  1  0\n 48109  1  0\n 49110  1  0\n 49111  1  0\n 49112  1  0\n 53113  1  0\n 53114  1  0\n 53115  1  0\n 55116  1  0\n 55117  1  0\n 57118  1  6\n 58119  1  0\n 58120  1  0\n 59121  1  6\n 61122  1  0\n 61123  1  0\n 63124  1  0\n 63125  1  0\n 64126  1  0\n 64127  1  0\n 65128  1  0\nM  END\n","sdf");
+    viewer_16121037884938512.setStyle({"stick": {}});
+    viewer_16121037884938512.setBackgroundColor("0xeeeeee");
+    viewer_16121037884938512.zoomTo();
+viewer_16121037884938512.render();
+});
+</script>
+</div>
+<div class="cell-output cell-output-display" data-execution_count="168">
+
+</div>
+</div>
+
+
+</section>
+
+</main> <!-- /main -->
+<script id="quarto-html-after-body" type="application/javascript">
+window.document.addEventListener("DOMContentLoaded", function (event) {
+  const toggleBodyColorMode = (bsSheetEl) => {
+    const mode = bsSheetEl.getAttribute("data-mode");
+    const bodyEl = window.document.querySelector("body");
+    if (mode === "dark") {
+      bodyEl.classList.add("quarto-dark");
+      bodyEl.classList.remove("quarto-light");
+    } else {
+      bodyEl.classList.add("quarto-light");
+      bodyEl.classList.remove("quarto-dark");
+    }
+  }
+  const toggleBodyColorPrimary = () => {
+    const bsSheetEl = window.document.querySelector("link#quarto-bootstrap");
+    if (bsSheetEl) {
+      toggleBodyColorMode(bsSheetEl);
+    }
+  }
+  toggleBodyColorPrimary();  
+  const icon = "";
+  const anchorJS = new window.AnchorJS();
+  anchorJS.options = {
+    placement: 'right',
+    icon: icon
+  };
+  anchorJS.add('.anchored');
+  const clipboard = new window.ClipboardJS('.code-copy-button', {
+    target: function(trigger) {
+      return trigger.previousElementSibling;
+    }
+  });
+  clipboard.on('success', function(e) {
+    // button target
+    const button = e.trigger;
+    // don't keep focus
+    button.blur();
+    // flash "checked"
+    button.classList.add('code-copy-button-checked');
+    var currentTitle = button.getAttribute("title");
+    button.setAttribute("title", "Copied!");
+    let tooltip;
+    if (window.bootstrap) {
+      button.setAttribute("data-bs-toggle", "tooltip");
+      button.setAttribute("data-bs-placement", "left");
+      button.setAttribute("data-bs-title", "Copied!");
+      tooltip = new bootstrap.Tooltip(button, 
+        { trigger: "manual", 
+          customClass: "code-copy-button-tooltip",
+          offset: [0, -8]});
+      tooltip.show();    
+    }
+    setTimeout(function() {
+      if (tooltip) {
+        tooltip.hide();
+        button.removeAttribute("data-bs-title");
+        button.removeAttribute("data-bs-toggle");
+        button.removeAttribute("data-bs-placement");
+      }
+      button.setAttribute("title", currentTitle);
+      button.classList.remove('code-copy-button-checked');
+    }, 1000);
+    // clear code selection
+    e.clearSelection();
+  });
+  function tippyHover(el, contentFn) {
+    const config = {
+      allowHTML: true,
+      content: contentFn,
+      maxWidth: 500,
+      delay: 100,
+      arrow: false,
+      appendTo: function(el) {
+          return el.parentElement;
+      },
+      interactive: true,
+      interactiveBorder: 10,
+      theme: 'quarto',
+      placement: 'bottom-start'
+    };
+    window.tippy(el, config); 
+  }
+  const noterefs = window.document.querySelectorAll('a[role="doc-noteref"]');
+  for (var i=0; i<noterefs.length; i++) {
+    const ref = noterefs[i];
+    tippyHover(ref, function() {
+      // use id or data attribute instead here
+      let href = ref.getAttribute('data-footnote-href') || ref.getAttribute('href');
+      try { href = new URL(href).hash; } catch {}
+      const id = href.replace(/^#\/?/, "");
+      const note = window.document.getElementById(id);
+      return note.innerHTML;
+    });
+  }
+  const findCites = (el) => {
+    const parentEl = el.parentElement;
+    if (parentEl) {
+      const cites = parentEl.dataset.cites;
+      if (cites) {
+        return {
+          el,
+          cites: cites.split(' ')
+        };
+      } else {
+        return findCites(el.parentElement)
+      }
+    } else {
+      return undefined;
+    }
+  };
+  var bibliorefs = window.document.querySelectorAll('a[role="doc-biblioref"]');
+  for (var i=0; i<bibliorefs.length; i++) {
+    const ref = bibliorefs[i];
+    const citeInfo = findCites(ref);
+    if (citeInfo) {
+      tippyHover(citeInfo.el, function() {
+        var popup = window.document.createElement('div');
+        citeInfo.cites.forEach(function(cite) {
+          var citeDiv = window.document.createElement('div');
+          citeDiv.classList.add('hanging-indent');
+          citeDiv.classList.add('csl-entry');
+          var biblioDiv = window.document.getElementById('ref-' + cite);
+          if (biblioDiv) {
+            citeDiv.innerHTML = biblioDiv.innerHTML;
+          }
+          popup.appendChild(citeDiv);
+        });
+        return popup.innerHTML;
+      });
+    }
+  }
+});
+</script>
+</div> <!-- /content -->
+
+
+
+</body></html>

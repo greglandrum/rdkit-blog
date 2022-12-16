@@ -1,0 +1,1034 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en"><head>
+
+<meta charset="utf-8">
+<meta name="generator" content="quarto-1.2.269">
+
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+
+<meta name="dcterms.date" content="2021-07-06">
+<meta name="description" content="How many features do we find?">
+
+<title>RDKit blog - Looking at the number of bits set by different fingerprints</title>
+<style>
+code{white-space: pre-wrap;}
+span.smallcaps{font-variant: small-caps;}
+div.columns{display: flex; gap: min(4vw, 1.5em);}
+div.column{flex: auto; overflow-x: auto;}
+div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+ul.task-list{list-style: none;}
+ul.task-list li input[type="checkbox"] {
+  width: 0.8em;
+  margin: 0 0.8em 0.2em -1.6em;
+  vertical-align: middle;
+}
+pre > code.sourceCode { white-space: pre; position: relative; }
+pre > code.sourceCode > span { display: inline-block; line-height: 1.25; }
+pre > code.sourceCode > span:empty { height: 1.2em; }
+.sourceCode { overflow: visible; }
+code.sourceCode > span { color: inherit; text-decoration: inherit; }
+div.sourceCode { margin: 1em 0; }
+pre.sourceCode { margin: 0; }
+@media screen {
+div.sourceCode { overflow: auto; }
+}
+@media print {
+pre > code.sourceCode { white-space: pre-wrap; }
+pre > code.sourceCode > span { text-indent: -5em; padding-left: 5em; }
+}
+pre.numberSource code
+  { counter-reset: source-line 0; }
+pre.numberSource code > span
+  { position: relative; left: -4em; counter-increment: source-line; }
+pre.numberSource code > span > a:first-child::before
+  { content: counter(source-line);
+    position: relative; left: -1em; text-align: right; vertical-align: baseline;
+    border: none; display: inline-block;
+    -webkit-touch-callout: none; -webkit-user-select: none;
+    -khtml-user-select: none; -moz-user-select: none;
+    -ms-user-select: none; user-select: none;
+    padding: 0 4px; width: 4em;
+    color: #aaaaaa;
+  }
+pre.numberSource { margin-left: 3em; border-left: 1px solid #aaaaaa;  padding-left: 4px; }
+div.sourceCode
+  {   }
+@media screen {
+pre > code.sourceCode > span > a:first-child::before { text-decoration: underline; }
+}
+code span.al { color: #ff0000; font-weight: bold; } /* Alert */
+code span.an { color: #60a0b0; font-weight: bold; font-style: italic; } /* Annotation */
+code span.at { color: #7d9029; } /* Attribute */
+code span.bn { color: #40a070; } /* BaseN */
+code span.bu { color: #008000; } /* BuiltIn */
+code span.cf { color: #007020; font-weight: bold; } /* ControlFlow */
+code span.ch { color: #4070a0; } /* Char */
+code span.cn { color: #880000; } /* Constant */
+code span.co { color: #60a0b0; font-style: italic; } /* Comment */
+code span.cv { color: #60a0b0; font-weight: bold; font-style: italic; } /* CommentVar */
+code span.do { color: #ba2121; font-style: italic; } /* Documentation */
+code span.dt { color: #902000; } /* DataType */
+code span.dv { color: #40a070; } /* DecVal */
+code span.er { color: #ff0000; font-weight: bold; } /* Error */
+code span.ex { } /* Extension */
+code span.fl { color: #40a070; } /* Float */
+code span.fu { color: #06287e; } /* Function */
+code span.im { color: #008000; font-weight: bold; } /* Import */
+code span.in { color: #60a0b0; font-weight: bold; font-style: italic; } /* Information */
+code span.kw { color: #007020; font-weight: bold; } /* Keyword */
+code span.op { color: #666666; } /* Operator */
+code span.ot { color: #007020; } /* Other */
+code span.pp { color: #bc7a00; } /* Preprocessor */
+code span.sc { color: #4070a0; } /* SpecialChar */
+code span.ss { color: #bb6688; } /* SpecialString */
+code span.st { color: #4070a0; } /* String */
+code span.va { color: #19177c; } /* Variable */
+code span.vs { color: #4070a0; } /* VerbatimString */
+code span.wa { color: #60a0b0; font-weight: bold; font-style: italic; } /* Warning */
+</style>
+
+
+<script src="../site_libs/quarto-nav/quarto-nav.js"></script>
+<script src="../site_libs/quarto-nav/headroom.min.js"></script>
+<script src="../site_libs/clipboard/clipboard.min.js"></script>
+<script src="../site_libs/quarto-search/autocomplete.umd.js"></script>
+<script src="../site_libs/quarto-search/fuse.min.js"></script>
+<script src="../site_libs/quarto-search/quarto-search.js"></script>
+<meta name="quarto:offset" content="../">
+<script src="../site_libs/quarto-html/quarto.js"></script>
+<script src="../site_libs/quarto-html/popper.min.js"></script>
+<script src="../site_libs/quarto-html/tippy.umd.min.js"></script>
+<script src="../site_libs/quarto-html/anchor.min.js"></script>
+<link href="../site_libs/quarto-html/tippy.css" rel="stylesheet">
+<link href="../site_libs/quarto-html/quarto-syntax-highlighting.css" rel="stylesheet" id="quarto-text-highlighting-styles">
+<script src="../site_libs/bootstrap/bootstrap.min.js"></script>
+<link href="../site_libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
+<link href="../site_libs/bootstrap/bootstrap.min.css" rel="stylesheet" id="quarto-bootstrap" data-mode="light">
+<script id="quarto-search-options" type="application/json">{
+  "location": "navbar",
+  "copy-button": false,
+  "collapse-after": 3,
+  "panel-placement": "end",
+  "type": "overlay",
+  "limit": 20,
+  "language": {
+    "search-no-results-text": "No results",
+    "search-matching-documents-text": "matching documents",
+    "search-copy-link-title": "Copy link to search",
+    "search-hide-matches-text": "Hide additional matches",
+    "search-more-match-text": "more match in this document",
+    "search-more-matches-text": "more matches in this document",
+    "search-clear-button-title": "Clear",
+    "search-detached-cancel-button-title": "Cancel",
+    "search-submit-button-title": "Submit"
+  }
+}</script>
+
+
+<link rel="stylesheet" href="../styles.css">
+</head>
+
+<body class="nav-fixed">
+
+<div id="quarto-search-results"></div>
+  <header id="quarto-header" class="headroom fixed-top">
+    <nav class="navbar navbar-expand-lg navbar-dark ">
+      <div class="navbar-container container-fluid">
+      <div class="navbar-brand-container">
+    <a class="navbar-brand" href="../index.html">
+    <span class="navbar-title">RDKit blog</span>
+    </a>
+  </div>
+          <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarCollapse" aria-controls="navbarCollapse" aria-expanded="false" aria-label="Toggle navigation" onclick="if (window.quartoToggleHeadroom) { window.quartoToggleHeadroom(); }">
+  <span class="navbar-toggler-icon"></span>
+</button>
+          <div class="collapse navbar-collapse" id="navbarCollapse">
+            <ul class="navbar-nav navbar-nav-scroll ms-auto">
+  <li class="nav-item">
+    <a class="nav-link" href="../about.html">
+ <span class="menu-text">RDKit experiments, tips, and tutorials</span></a>
+  </li>  
+  <li class="nav-item compact">
+    <a class="nav-link" href="https://github.com/rdkit/rdkit"><i class="bi bi-github" role="img">
+</i> 
+ <span class="menu-text"></span></a>
+  </li>  
+  <li class="nav-item compact">
+    <a class="nav-link" href="https://twitter.com/rdkit_org"><i class="bi bi-twitter" role="img">
+</i> 
+ <span class="menu-text"></span></a>
+  </li>  
+</ul>
+              <div id="quarto-search" class="" title="Search"></div>
+          </div> <!-- /navcollapse -->
+      </div> <!-- /container-fluid -->
+    </nav>
+</header>
+<!-- content -->
+<div id="quarto-content" class="quarto-container page-columns page-rows-contents page-layout-article page-navbar">
+<!-- sidebar -->
+<!-- margin-sidebar -->
+    <div id="quarto-margin-sidebar" class="sidebar margin-sidebar">
+        <nav id="TOC" role="doc-toc" class="toc-active">
+    <h2 id="toc-title">On this page</h2>
+   
+  <ul>
+  <li><a href="#convergence" id="toc-convergence" class="nav-link active" data-scroll-target="#convergence">Convergence</a></li>
+  </ul>
+</nav>
+    </div>
+<!-- main -->
+<main class="content" id="quarto-document-content">
+
+<header id="title-block-header" class="quarto-title-block default">
+<div class="quarto-title">
+<h1 class="title">Looking at the number of bits set by different fingerprints</h1>
+  <div class="quarto-categories">
+    <div class="quarto-category">fingerprints</div>
+    <div class="quarto-category">reference</div>
+  </div>
+  </div>
+
+<div>
+  <div class="description">
+    How many features do we find?
+  </div>
+</div>
+
+
+<div class="quarto-title-meta">
+
+    
+    <div>
+    <div class="quarto-title-meta-heading">Published</div>
+    <div class="quarto-title-meta-contents">
+      <p class="date">July 6, 2021</p>
+    </div>
+  </div>
+  
+    
+  </div>
+  
+
+</header>
+
+<p>This is an updated version of a post. The original version of the notebook can be <a href="https://github.com/greglandrum/rdkit_blog/blob/eae1643d2ad4788f9f1942ea681e9c001931e418/notebooks/Bits%20Set%20By%20Fingerprint%20Type.ipynb">found in github</a>.</p>
+<p>I’ve done a number of posts looking at Morgan fingerprint statistics before, including:</p>
+<ul>
+<li><a href="https://rdkit.blogspot.ch/2014/02/colliding-bits.html">The number of collisions in Morgan fingerprints</a>.</li>
+<li><a href="https://rdkit.blogspot.ch/2016/02/morgan-fingerprint-bit-statistics.html">Morgan fingerprint stats</a></li>
+<li><a href="https://rdkit.blogspot.com/2016/02/colliding-bits-iii.html">Collisions in Morgan fingerprints revisited</a></li>
+</ul>
+<p>I have done similar analysis for other fingerprint types, but it looks like I didn’t post that (at least I can’t find it if I did). It’s useful to do this because, as we’ll see, the different fingerprint types have <em>very</em> different numbers of bits set for typical molecules.</p>
+<p>Here’s the summary of the mean and standard deviation of the number of bits set, from an analysis of 5 million molecules with less than 50 heavy atoms extracted from ZINC:</p>
+<table class="table">
+<thead>
+<tr class="header">
+<th>Fingerprint</th>
+<th>Type</th>
+<th>Mean num_bits</th>
+<th>SD num_bits</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>Morgan1</td>
+<td>sparse</td>
+<td>29.4</td>
+<td>5.6</td>
+</tr>
+<tr class="even">
+<td>Morgan2</td>
+<td>sparse</td>
+<td>48.7</td>
+<td>9.6</td>
+</tr>
+<tr class="odd">
+<td>Morgan3</td>
+<td>sparse</td>
+<td>66.8</td>
+<td>13.8</td>
+</tr>
+<tr class="even">
+<td>FeatMorgan1</td>
+<td>sparse</td>
+<td>20.1</td>
+<td>3.9</td>
+</tr>
+<tr class="odd">
+<td>FeatMorgan2</td>
+<td>sparse</td>
+<td>38.1</td>
+<td>7.7</td>
+</tr>
+<tr class="even">
+<td>FeatMorgan3</td>
+<td>sparse</td>
+<td>56.0</td>
+<td>11.8</td>
+</tr>
+<tr class="odd">
+<td>RDKit5</td>
+<td>bitvect</td>
+<td>363</td>
+<td>122</td>
+</tr>
+<tr class="even">
+<td>RDKit6</td>
+<td>bitvect</td>
+<td>621</td>
+<td>233</td>
+</tr>
+<tr class="odd">
+<td>RDKit7</td>
+<td>bitvect</td>
+<td>993</td>
+<td>406</td>
+</tr>
+<tr class="even">
+<td>pattern</td>
+<td>bitvect</td>
+<td>446</td>
+<td>122</td>
+</tr>
+<tr class="odd">
+<td>avalon</td>
+<td>bitvect</td>
+<td>280</td>
+<td>130</td>
+</tr>
+<tr class="even">
+<td>atom pairs</td>
+<td>sparse</td>
+<td>167</td>
+<td>56</td>
+</tr>
+<tr class="odd">
+<td>TT</td>
+<td>sparse</td>
+<td>33.4</td>
+<td>9.8</td>
+</tr>
+<tr class="even">
+<td>atom pairs</td>
+<td>bitvect</td>
+<td>267</td>
+<td>90</td>
+</tr>
+<tr class="odd">
+<td>TT</td>
+<td>bitvect</td>
+<td>47.2</td>
+<td>12.0</td>
+</tr>
+</tbody>
+</table>
+<p>The bit vector fingerprints were all 4096 bits long.</p>
+<div class="cell" data-execution_count="1">
+<div class="sourceCode cell-code" id="cb1"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> rdkit <span class="im">import</span> Chem,DataStructs</span>
+<span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> time,random,gzip,pickle,copy</span>
+<span id="cb1-3"><a href="#cb1-3" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> numpy <span class="im">as</span> np</span>
+<span id="cb1-4"><a href="#cb1-4" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> collections <span class="im">import</span> Counter,defaultdict</span>
+<span id="cb1-5"><a href="#cb1-5" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> rdkit.Chem <span class="im">import</span> Draw</span>
+<span id="cb1-6"><a href="#cb1-6" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> rdkit.Chem <span class="im">import</span> rdMolDescriptors</span>
+<span id="cb1-7"><a href="#cb1-7" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> rdkit.Avalon <span class="im">import</span> pyAvalonTools</span>
+<span id="cb1-8"><a href="#cb1-8" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> rdkit.Chem.Draw <span class="im">import</span> IPythonConsole</span>
+<span id="cb1-9"><a href="#cb1-9" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> rdkit <span class="im">import</span> DataStructs</span>
+<span id="cb1-10"><a href="#cb1-10" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> rdkit <span class="im">import</span> rdBase</span>
+<span id="cb1-11"><a href="#cb1-11" aria-hidden="true" tabindex="-1"></a><span class="op">%</span>pylab inline</span>
+<span id="cb1-12"><a href="#cb1-12" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-13"><a href="#cb1-13" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(rdBase.rdkitVersion)</span>
+<span id="cb1-14"><a href="#cb1-14" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> time</span>
+<span id="cb1-15"><a href="#cb1-15" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(time.asctime())</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>Populating the interactive namespace from numpy and matplotlib
+2021.09.1pre
+Tue Jul  6 04:58:28 2021</code></pre>
+</div>
+<div class="cell-output cell-output-stderr">
+<pre><code>/home/glandrum/miniconda3/lib/python3.7/site-packages/IPython/core/magics/pylab.py:160: UserWarning: pylab import has clobbered these variables: ['copy', 'random']
+`%matplotlib` prevents importing * from pylab and numpy
+  "\n`%matplotlib` prevents importing * from pylab and numpy"</code></pre>
+</div>
+</div>
+<div class="cell" data-execution_count="2">
+<div class="sourceCode cell-code" id="cb4"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a><span class="cf">try</span>:</span>
+<span id="cb4-2"><a href="#cb4-2" aria-hidden="true" tabindex="-1"></a>    <span class="im">import</span> ipyparallel <span class="im">as</span> ipp</span>
+<span id="cb4-3"><a href="#cb4-3" aria-hidden="true" tabindex="-1"></a>    rc <span class="op">=</span> ipp.Client()</span>
+<span id="cb4-4"><a href="#cb4-4" aria-hidden="true" tabindex="-1"></a>    dview <span class="op">=</span> rc[:]</span>
+<span id="cb4-5"><a href="#cb4-5" aria-hidden="true" tabindex="-1"></a>    dview.execute(<span class="st">'from rdkit import Chem'</span>)</span>
+<span id="cb4-6"><a href="#cb4-6" aria-hidden="true" tabindex="-1"></a>    dview.execute(<span class="st">'from rdkit import Descriptors'</span>)</span>
+<span id="cb4-7"><a href="#cb4-7" aria-hidden="true" tabindex="-1"></a>    dview.execute(<span class="st">'from rdkit.Chem import rdMolDescriptors'</span>)</span>
+<span id="cb4-8"><a href="#cb4-8" aria-hidden="true" tabindex="-1"></a>    dview.execute(<span class="st">'from rdkit.Avalon import pyAvalonTools'</span>)</span>
+<span id="cb4-9"><a href="#cb4-9" aria-hidden="true" tabindex="-1"></a><span class="cf">except</span>:</span>
+<span id="cb4-10"><a href="#cb4-10" aria-hidden="true" tabindex="-1"></a>    <span class="bu">print</span>(<span class="st">"could not use ipyparallel"</span>)</span>
+<span id="cb4-11"><a href="#cb4-11" aria-hidden="true" tabindex="-1"></a>    dview <span class="op">=</span> <span class="va">None</span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+<p>For test data I’ll use the same 16 million ZINC compounds I used in the <a href="https://rdkit.blogspot.ch/2016/02/morgan-fingerprint-bit-statistics.html">bit statistics post</a>.</p>
+<div class="cell" data-execution_count="3">
+<div class="sourceCode cell-code" id="cb5"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a>filen<span class="op">=</span><span class="st">'/scratch/RDKit_git/LocalData/Zinc/zinc_all_clean.pkl.gz'</span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+<p>Loop over the molecules, skip anything with more than 50 atoms, and build fingerprints for all the others.</p>
+<p>The fingerprints I generate for this analysis are: - Sparse Morgan with radii 1, 2, and 3 - Sparse FeatureMorgan with radii 1, 2, and 3 - RDKit BitVect with maxPath 5, 6, and 7 - Pattern BitVect - Avalon BitVect - Sparse Atom Pairs - Sparse Topological Torsions - Atom Pair BitVect - Topological Torsion BitVect</p>
+<p>All of the BitVect fingerprints are 4096 bits long</p>
+<div class="cell" data-execution_count="4">
+<div class="sourceCode cell-code" id="cb6"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb6-1"><a href="#cb6-1" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> copy</span>
+<span id="cb6-2"><a href="#cb6-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb6-3"><a href="#cb6-3" aria-hidden="true" tabindex="-1"></a>historyf <span class="op">=</span> gzip.<span class="bu">open</span>(<span class="st">'../data/fp_bit_counts.history.pkl.gz'</span>,<span class="st">'wb+'</span>)</span>
+<span id="cb6-4"><a href="#cb6-4" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb6-5"><a href="#cb6-5" aria-hidden="true" tabindex="-1"></a>counts<span class="op">=</span>defaultdict(Counter)</span>
+<span id="cb6-6"><a href="#cb6-6" aria-hidden="true" tabindex="-1"></a>t1 <span class="op">=</span> time.time()</span>
+<span id="cb6-7"><a href="#cb6-7" aria-hidden="true" tabindex="-1"></a><span class="cf">with</span> gzip.<span class="bu">open</span>(filen,<span class="st">'rb'</span>) <span class="im">as</span> inf:</span>
+<span id="cb6-8"><a href="#cb6-8" aria-hidden="true" tabindex="-1"></a>    i <span class="op">=</span> <span class="dv">0</span></span>
+<span id="cb6-9"><a href="#cb6-9" aria-hidden="true" tabindex="-1"></a>    ms <span class="op">=</span> []</span>
+<span id="cb6-10"><a href="#cb6-10" aria-hidden="true" tabindex="-1"></a>    <span class="cf">while</span> <span class="dv">1</span>:</span>
+<span id="cb6-11"><a href="#cb6-11" aria-hidden="true" tabindex="-1"></a>        <span class="cf">try</span>:</span>
+<span id="cb6-12"><a href="#cb6-12" aria-hidden="true" tabindex="-1"></a>            m,nm <span class="op">=</span> pickle.load(inf)</span>
+<span id="cb6-13"><a href="#cb6-13" aria-hidden="true" tabindex="-1"></a>        <span class="cf">except</span> <span class="pp">EOFError</span>:</span>
+<span id="cb6-14"><a href="#cb6-14" aria-hidden="true" tabindex="-1"></a>            <span class="cf">break</span></span>
+<span id="cb6-15"><a href="#cb6-15" aria-hidden="true" tabindex="-1"></a>        <span class="cf">if</span> <span class="kw">not</span> m <span class="kw">or</span> m.GetNumHeavyAtoms()<span class="op">&gt;</span><span class="dv">50</span>: <span class="cf">continue</span></span>
+<span id="cb6-16"><a href="#cb6-16" aria-hidden="true" tabindex="-1"></a>        ms.append(m)</span>
+<span id="cb6-17"><a href="#cb6-17" aria-hidden="true" tabindex="-1"></a>        i<span class="op">+=</span><span class="dv">1</span></span>
+<span id="cb6-18"><a href="#cb6-18" aria-hidden="true" tabindex="-1"></a>        <span class="cf">if</span> <span class="bu">len</span>(ms)<span class="op">&gt;=</span><span class="dv">10000</span>:</span>
+<span id="cb6-19"><a href="#cb6-19" aria-hidden="true" tabindex="-1"></a>            <span class="cf">for</span> v <span class="kw">in</span> <span class="dv">1</span>,<span class="dv">2</span>,<span class="dv">3</span>:</span>
+<span id="cb6-20"><a href="#cb6-20" aria-hidden="true" tabindex="-1"></a>                cnts <span class="op">=</span> dview.map_sync(<span class="kw">lambda</span> x,v<span class="op">=</span>v:<span class="bu">len</span>(rdMolDescriptors.GetMorganFingerprint(x,v).GetNonzeroElements()),</span>
+<span id="cb6-21"><a href="#cb6-21" aria-hidden="true" tabindex="-1"></a>                                     ms)</span>
+<span id="cb6-22"><a href="#cb6-22" aria-hidden="true" tabindex="-1"></a>                <span class="cf">for</span> obc <span class="kw">in</span> cnts:</span>
+<span id="cb6-23"><a href="#cb6-23" aria-hidden="true" tabindex="-1"></a>                    counts[(<span class="st">'Morgan'</span>,v)][obc]<span class="op">+=</span><span class="dv">1</span></span>
+<span id="cb6-24"><a href="#cb6-24" aria-hidden="true" tabindex="-1"></a>            <span class="cf">for</span> v <span class="kw">in</span> <span class="dv">1</span>,<span class="dv">2</span>,<span class="dv">3</span>:</span>
+<span id="cb6-25"><a href="#cb6-25" aria-hidden="true" tabindex="-1"></a>                cnts <span class="op">=</span> dview.map_sync(<span class="kw">lambda</span> x,v<span class="op">=</span>v:<span class="bu">len</span>(rdMolDescriptors.GetMorganFingerprint(x,v,useFeatures<span class="op">=</span><span class="va">True</span>).GetNonzeroElements()),</span>
+<span id="cb6-26"><a href="#cb6-26" aria-hidden="true" tabindex="-1"></a>                                     ms)</span>
+<span id="cb6-27"><a href="#cb6-27" aria-hidden="true" tabindex="-1"></a>                <span class="cf">for</span> obc <span class="kw">in</span> cnts:</span>
+<span id="cb6-28"><a href="#cb6-28" aria-hidden="true" tabindex="-1"></a>                    counts[(<span class="st">'FeatMorgan'</span>,v)][obc]<span class="op">+=</span><span class="dv">1</span></span>
+<span id="cb6-29"><a href="#cb6-29" aria-hidden="true" tabindex="-1"></a>            <span class="cf">for</span> v <span class="kw">in</span> <span class="dv">5</span>,<span class="dv">6</span>,<span class="dv">7</span>:</span>
+<span id="cb6-30"><a href="#cb6-30" aria-hidden="true" tabindex="-1"></a>                cnts <span class="op">=</span> dview.map_sync(<span class="kw">lambda</span> x,v<span class="op">=</span>v:Chem.RDKFingerprint(x,maxPath<span class="op">=</span>v,fpSize<span class="op">=</span><span class="dv">4096</span>).GetNumOnBits(),</span>
+<span id="cb6-31"><a href="#cb6-31" aria-hidden="true" tabindex="-1"></a>                                      ms)</span>
+<span id="cb6-32"><a href="#cb6-32" aria-hidden="true" tabindex="-1"></a>                <span class="cf">for</span> obc <span class="kw">in</span> cnts:</span>
+<span id="cb6-33"><a href="#cb6-33" aria-hidden="true" tabindex="-1"></a>                    counts[(<span class="st">'RDKit'</span>,v)][obc]<span class="op">+=</span><span class="dv">1</span></span>
+<span id="cb6-34"><a href="#cb6-34" aria-hidden="true" tabindex="-1"></a>            cnts <span class="op">=</span> dview.map_sync(<span class="kw">lambda</span> x:Chem.PatternFingerprint(x,fpSize<span class="op">=</span><span class="dv">4096</span>).GetNumOnBits(),</span>
+<span id="cb6-35"><a href="#cb6-35" aria-hidden="true" tabindex="-1"></a>                                  ms)</span>
+<span id="cb6-36"><a href="#cb6-36" aria-hidden="true" tabindex="-1"></a>            <span class="cf">for</span> obc <span class="kw">in</span> cnts:</span>
+<span id="cb6-37"><a href="#cb6-37" aria-hidden="true" tabindex="-1"></a>                counts[(<span class="st">'pattern'</span>,<span class="op">-</span><span class="dv">1</span>)][obc]<span class="op">+=</span><span class="dv">1</span></span>
+<span id="cb6-38"><a href="#cb6-38" aria-hidden="true" tabindex="-1"></a>            cnts <span class="op">=</span> dview.map_sync(<span class="kw">lambda</span> x:pyAvalonTools.GetAvalonFP(x,nBits<span class="op">=</span><span class="dv">4096</span>).GetNumOnBits(),</span>
+<span id="cb6-39"><a href="#cb6-39" aria-hidden="true" tabindex="-1"></a>                                  ms)</span>
+<span id="cb6-40"><a href="#cb6-40" aria-hidden="true" tabindex="-1"></a>            <span class="cf">for</span> obc <span class="kw">in</span> cnts:</span>
+<span id="cb6-41"><a href="#cb6-41" aria-hidden="true" tabindex="-1"></a>                counts[(<span class="st">'avalon'</span>,<span class="op">-</span><span class="dv">1</span>)][obc]<span class="op">+=</span><span class="dv">1</span></span>
+<span id="cb6-42"><a href="#cb6-42" aria-hidden="true" tabindex="-1"></a>            cnts <span class="op">=</span> dview.map_sync(<span class="kw">lambda</span> x:<span class="bu">len</span>(rdMolDescriptors.GetAtomPairFingerprint(x).GetNonzeroElements()),</span>
+<span id="cb6-43"><a href="#cb6-43" aria-hidden="true" tabindex="-1"></a>                                  ms)</span>
+<span id="cb6-44"><a href="#cb6-44" aria-hidden="true" tabindex="-1"></a>            <span class="cf">for</span> obc <span class="kw">in</span> cnts:</span>
+<span id="cb6-45"><a href="#cb6-45" aria-hidden="true" tabindex="-1"></a>                counts[(<span class="st">'ap-counts'</span>,<span class="op">-</span><span class="dv">1</span>)][obc]<span class="op">+=</span><span class="dv">1</span></span>
+<span id="cb6-46"><a href="#cb6-46" aria-hidden="true" tabindex="-1"></a>            cnts <span class="op">=</span> dview.map_sync(<span class="kw">lambda</span> x:<span class="bu">len</span>(rdMolDescriptors.GetTopologicalTorsionFingerprint(x).GetNonzeroElements()),</span>
+<span id="cb6-47"><a href="#cb6-47" aria-hidden="true" tabindex="-1"></a>                                  ms)</span>
+<span id="cb6-48"><a href="#cb6-48" aria-hidden="true" tabindex="-1"></a>            <span class="cf">for</span> obc <span class="kw">in</span> cnts:</span>
+<span id="cb6-49"><a href="#cb6-49" aria-hidden="true" tabindex="-1"></a>                counts[(<span class="st">'tt-counts'</span>,<span class="op">-</span><span class="dv">1</span>)][obc]<span class="op">+=</span><span class="dv">1</span></span>
+<span id="cb6-50"><a href="#cb6-50" aria-hidden="true" tabindex="-1"></a>            cnts <span class="op">=</span> dview.map_sync(<span class="kw">lambda</span> x:rdMolDescriptors.GetHashedAtomPairFingerprintAsBitVect(x,nBits<span class="op">=</span><span class="dv">4096</span>).GetNumOnBits(),</span>
+<span id="cb6-51"><a href="#cb6-51" aria-hidden="true" tabindex="-1"></a>                                  ms)</span>
+<span id="cb6-52"><a href="#cb6-52" aria-hidden="true" tabindex="-1"></a>            <span class="cf">for</span> obc <span class="kw">in</span> cnts:</span>
+<span id="cb6-53"><a href="#cb6-53" aria-hidden="true" tabindex="-1"></a>                counts[(<span class="st">'ap-bv'</span>,<span class="op">-</span><span class="dv">1</span>)][obc]<span class="op">+=</span><span class="dv">1</span></span>
+<span id="cb6-54"><a href="#cb6-54" aria-hidden="true" tabindex="-1"></a>            cnts <span class="op">=</span> dview.map_sync(<span class="kw">lambda</span> x:rdMolDescriptors.GetHashedTopologicalTorsionFingerprintAsBitVect(x,nBits<span class="op">=</span><span class="dv">4096</span>).GetNumOnBits(),</span>
+<span id="cb6-55"><a href="#cb6-55" aria-hidden="true" tabindex="-1"></a>                                  ms)</span>
+<span id="cb6-56"><a href="#cb6-56" aria-hidden="true" tabindex="-1"></a>            <span class="cf">for</span> obc <span class="kw">in</span> cnts:</span>
+<span id="cb6-57"><a href="#cb6-57" aria-hidden="true" tabindex="-1"></a>                counts[(<span class="st">'tt-bv'</span>,<span class="op">-</span><span class="dv">1</span>)][obc]<span class="op">+=</span><span class="dv">1</span></span>
+<span id="cb6-58"><a href="#cb6-58" aria-hidden="true" tabindex="-1"></a>            ms <span class="op">=</span> []</span>
+<span id="cb6-59"><a href="#cb6-59" aria-hidden="true" tabindex="-1"></a>            </span>
+<span id="cb6-60"><a href="#cb6-60" aria-hidden="true" tabindex="-1"></a>        <span class="cf">if</span> <span class="kw">not</span> i<span class="op">%</span><span class="dv">50000</span>:</span>
+<span id="cb6-61"><a href="#cb6-61" aria-hidden="true" tabindex="-1"></a>            t2 <span class="op">=</span> time.time()</span>
+<span id="cb6-62"><a href="#cb6-62" aria-hidden="true" tabindex="-1"></a>            <span class="bu">print</span>(<span class="st">"Done </span><span class="sc">%d</span><span class="st"> in </span><span class="sc">%.2f</span><span class="st"> sec"</span><span class="op">%</span>(i,t2<span class="op">-</span>t1))</span>
+<span id="cb6-63"><a href="#cb6-63" aria-hidden="true" tabindex="-1"></a>        <span class="cf">if</span> <span class="kw">not</span> i<span class="op">%</span><span class="dv">500000</span>:</span>
+<span id="cb6-64"><a href="#cb6-64" aria-hidden="true" tabindex="-1"></a>            pickle.dump(<span class="bu">dict</span>(counts),historyf)</span>
+<span id="cb6-65"><a href="#cb6-65" aria-hidden="true" tabindex="-1"></a>        <span class="cf">if</span> i<span class="op">&gt;=</span><span class="dv">5000000</span>:</span>
+<span id="cb6-66"><a href="#cb6-66" aria-hidden="true" tabindex="-1"></a>            <span class="cf">break</span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>Done 50000 in 38.63 sec
+Done 100000 in 77.02 sec
+Done 150000 in 115.17 sec
+Done 200000 in 163.61 sec
+Done 250000 in 215.39 sec
+Done 300000 in 267.96 sec
+Done 350000 in 319.74 sec
+Done 400000 in 373.11 sec
+Done 450000 in 415.37 sec
+Done 500000 in 468.50 sec
+Done 550000 in 526.23 sec
+Done 600000 in 570.65 sec
+Done 650000 in 622.83 sec
+Done 700000 in 674.11 sec
+Done 750000 in 724.71 sec
+Done 800000 in 775.76 sec
+Done 850000 in 823.44 sec
+Done 900000 in 873.37 sec
+Done 950000 in 922.91 sec
+Done 1000000 in 971.03 sec
+Done 1050000 in 1019.84 sec
+Done 1100000 in 1068.24 sec
+Done 1150000 in 1116.11 sec
+Done 1200000 in 1164.39 sec
+Done 1250000 in 1211.31 sec
+Done 1300000 in 1255.67 sec
+Done 1350000 in 1306.25 sec
+Done 1400000 in 1356.04 sec
+Done 1450000 in 1402.95 sec
+Done 1500000 in 1453.38 sec
+Done 1550000 in 1500.31 sec
+Done 1600000 in 1546.90 sec
+Done 1650000 in 1593.48 sec
+Done 1700000 in 1640.38 sec
+Done 1750000 in 1696.32 sec
+Done 1800000 in 1750.83 sec
+Done 1850000 in 1810.42 sec
+Done 1900000 in 1868.12 sec
+Done 1950000 in 1926.07 sec
+Done 2000000 in 1983.37 sec
+Done 2050000 in 2043.56 sec
+Done 2100000 in 2102.81 sec
+Done 2150000 in 2160.67 sec
+Done 2200000 in 2218.30 sec
+Done 2250000 in 2272.73 sec
+Done 2300000 in 2323.77 sec
+Done 2350000 in 2375.39 sec
+Done 2400000 in 2427.04 sec
+Done 2450000 in 2481.36 sec
+Done 2500000 in 2536.57 sec
+Done 2550000 in 2591.71 sec
+Done 2600000 in 2644.06 sec
+Done 2650000 in 2698.32 sec
+Done 2700000 in 2752.86 sec
+Done 2750000 in 2805.41 sec
+Done 2800000 in 2856.95 sec
+Done 2850000 in 2909.60 sec
+Done 2900000 in 2965.05 sec
+Done 2950000 in 3021.72 sec
+Done 3000000 in 3073.35 sec
+Done 3050000 in 3127.90 sec
+Done 3100000 in 3177.67 sec
+Done 3150000 in 3234.92 sec
+Done 3200000 in 3288.20 sec
+Done 3250000 in 3341.28 sec
+Done 3300000 in 3393.97 sec
+Done 3350000 in 3446.92 sec
+Done 3400000 in 3499.45 sec
+Done 3450000 in 3549.88 sec
+Done 3500000 in 3601.67 sec
+Done 3550000 in 3653.41 sec
+Done 3600000 in 3705.95 sec
+Done 3650000 in 3759.37 sec
+Done 3700000 in 3810.11 sec
+Done 3750000 in 3861.68 sec
+Done 3800000 in 3912.28 sec
+Done 3850000 in 3965.28 sec
+Done 3900000 in 4022.67 sec
+Done 3950000 in 4077.32 sec
+Done 4000000 in 4129.91 sec
+Done 4050000 in 4185.33 sec
+Done 4100000 in 4240.67 sec
+Done 4150000 in 4287.86 sec
+Done 4200000 in 4340.04 sec
+Done 4250000 in 4391.57 sec
+Done 4300000 in 4443.67 sec
+Done 4350000 in 4493.96 sec
+Done 4400000 in 4545.53 sec
+Done 4450000 in 4592.16 sec
+Done 4500000 in 4640.05 sec
+Done 4550000 in 4687.30 sec
+Done 4600000 in 4733.79 sec
+Done 4650000 in 4780.85 sec
+Done 4700000 in 4828.29 sec
+Done 4750000 in 4878.40 sec
+Done 4800000 in 4927.55 sec
+Done 4850000 in 4984.36 sec
+Done 4900000 in 5042.20 sec
+Done 4950000 in 5101.82 sec
+Done 5000000 in 5154.32 sec</code></pre>
+</div>
+</div>
+<div class="cell" data-execution_count="5">
+<div class="sourceCode cell-code" id="cb8"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb8-1"><a href="#cb8-1" aria-hidden="true" tabindex="-1"></a>pickle.dump(<span class="bu">dict</span>(counts),gzip.<span class="bu">open</span>(<span class="st">'../data/fp_bit_counts.pkl.gz'</span>,<span class="st">'wb+'</span>))</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+<p>Now plot the distributions of the number of bits set</p>
+<div class="cell" data-execution_count="6">
+<div class="sourceCode cell-code" id="cb9"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb9-1"><a href="#cb9-1" aria-hidden="true" tabindex="-1"></a>morgan_ks <span class="op">=</span> [x <span class="cf">for</span> x <span class="kw">in</span> counts.keys() <span class="cf">if</span> x[<span class="dv">0</span>] <span class="op">==</span><span class="st">'Morgan'</span>]</span>
+<span id="cb9-2"><a href="#cb9-2" aria-hidden="true" tabindex="-1"></a>featmorgan_ks <span class="op">=</span> [x <span class="cf">for</span> x <span class="kw">in</span> counts.keys() <span class="cf">if</span> x[<span class="dv">0</span>] <span class="op">==</span><span class="st">'FeatMorgan'</span>]</span>
+<span id="cb9-3"><a href="#cb9-3" aria-hidden="true" tabindex="-1"></a>rdkit_ks <span class="op">=</span> [x <span class="cf">for</span> x <span class="kw">in</span> counts.keys() <span class="cf">if</span> x[<span class="dv">0</span>] <span class="op">==</span> <span class="st">'RDKit'</span>]</span>
+<span id="cb9-4"><a href="#cb9-4" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-5"><a href="#cb9-5" aria-hidden="true" tabindex="-1"></a>figure(figsize<span class="op">=</span>(<span class="dv">15</span>,<span class="dv">15</span>))</span>
+<span id="cb9-6"><a href="#cb9-6" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-7"><a href="#cb9-7" aria-hidden="true" tabindex="-1"></a>pidx<span class="op">=</span><span class="dv">1</span></span>
+<span id="cb9-8"><a href="#cb9-8" aria-hidden="true" tabindex="-1"></a>subplot(<span class="dv">3</span>,<span class="dv">3</span>,pidx)</span>
+<span id="cb9-9"><a href="#cb9-9" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> n,r <span class="kw">in</span> morgan_ks:</span>
+<span id="cb9-10"><a href="#cb9-10" aria-hidden="true" tabindex="-1"></a>    cnts <span class="op">=</span> <span class="bu">sorted</span>(counts[(n,r)].items())</span>
+<span id="cb9-11"><a href="#cb9-11" aria-hidden="true" tabindex="-1"></a>    </span>
+<span id="cb9-12"><a href="#cb9-12" aria-hidden="true" tabindex="-1"></a>    plot([x <span class="cf">for</span> x,y <span class="kw">in</span> cnts],[y <span class="cf">for</span> x,y <span class="kw">in</span> cnts],label<span class="op">=</span></span>
+<span id="cb9-13"><a href="#cb9-13" aria-hidden="true" tabindex="-1"></a>        <span class="ss">f"r=</span><span class="sc">{</span>r<span class="sc">}</span><span class="ss">"</span>)</span>
+<span id="cb9-14"><a href="#cb9-14" aria-hidden="true" tabindex="-1"></a>_<span class="op">=</span>title(<span class="st">"Morgan"</span>)</span>
+<span id="cb9-15"><a href="#cb9-15" aria-hidden="true" tabindex="-1"></a>_<span class="op">=</span>xlabel(<span class="st">"num bits set"</span>)</span>
+<span id="cb9-16"><a href="#cb9-16" aria-hidden="true" tabindex="-1"></a>_<span class="op">=</span>ylabel(<span class="st">"count"</span>)</span>
+<span id="cb9-17"><a href="#cb9-17" aria-hidden="true" tabindex="-1"></a>_<span class="op">=</span>legend()</span>
+<span id="cb9-18"><a href="#cb9-18" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-19"><a href="#cb9-19" aria-hidden="true" tabindex="-1"></a>pidx<span class="op">=</span><span class="dv">2</span></span>
+<span id="cb9-20"><a href="#cb9-20" aria-hidden="true" tabindex="-1"></a>subplot(<span class="dv">3</span>,<span class="dv">3</span>,pidx)</span>
+<span id="cb9-21"><a href="#cb9-21" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> n,r <span class="kw">in</span> featmorgan_ks:</span>
+<span id="cb9-22"><a href="#cb9-22" aria-hidden="true" tabindex="-1"></a>    cnts <span class="op">=</span> <span class="bu">sorted</span>(counts[(n,r)].items())</span>
+<span id="cb9-23"><a href="#cb9-23" aria-hidden="true" tabindex="-1"></a>    </span>
+<span id="cb9-24"><a href="#cb9-24" aria-hidden="true" tabindex="-1"></a>    plot([x <span class="cf">for</span> x,y <span class="kw">in</span> cnts],[y <span class="cf">for</span> x,y <span class="kw">in</span> cnts],label<span class="op">=</span></span>
+<span id="cb9-25"><a href="#cb9-25" aria-hidden="true" tabindex="-1"></a>        <span class="ss">f"r=</span><span class="sc">{</span>r<span class="sc">}</span><span class="ss">"</span>)</span>
+<span id="cb9-26"><a href="#cb9-26" aria-hidden="true" tabindex="-1"></a>_<span class="op">=</span>title(<span class="st">"FeatMorgan"</span>)</span>
+<span id="cb9-27"><a href="#cb9-27" aria-hidden="true" tabindex="-1"></a>_<span class="op">=</span>xlabel(<span class="st">"num bits set"</span>)</span>
+<span id="cb9-28"><a href="#cb9-28" aria-hidden="true" tabindex="-1"></a>_<span class="op">=</span>ylabel(<span class="st">"count"</span>)</span>
+<span id="cb9-29"><a href="#cb9-29" aria-hidden="true" tabindex="-1"></a>_<span class="op">=</span>legend()</span>
+<span id="cb9-30"><a href="#cb9-30" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-31"><a href="#cb9-31" aria-hidden="true" tabindex="-1"></a>pidx<span class="op">=</span><span class="dv">3</span></span>
+<span id="cb9-32"><a href="#cb9-32" aria-hidden="true" tabindex="-1"></a>subplot(<span class="dv">3</span>,<span class="dv">3</span>,pidx)</span>
+<span id="cb9-33"><a href="#cb9-33" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> n,r <span class="kw">in</span> rdkit_ks:</span>
+<span id="cb9-34"><a href="#cb9-34" aria-hidden="true" tabindex="-1"></a>    cnts <span class="op">=</span> <span class="bu">sorted</span>(counts[(n,r)].items())</span>
+<span id="cb9-35"><a href="#cb9-35" aria-hidden="true" tabindex="-1"></a>    </span>
+<span id="cb9-36"><a href="#cb9-36" aria-hidden="true" tabindex="-1"></a>    plot([x <span class="cf">for</span> x,y <span class="kw">in</span> cnts],[y <span class="cf">for</span> x,y <span class="kw">in</span> cnts],label<span class="op">=</span></span>
+<span id="cb9-37"><a href="#cb9-37" aria-hidden="true" tabindex="-1"></a>        <span class="ss">f"r=</span><span class="sc">{</span>r<span class="sc">}</span><span class="ss">"</span>)</span>
+<span id="cb9-38"><a href="#cb9-38" aria-hidden="true" tabindex="-1"></a>_<span class="op">=</span>title(<span class="st">"RDKit"</span>)</span>
+<span id="cb9-39"><a href="#cb9-39" aria-hidden="true" tabindex="-1"></a>_<span class="op">=</span>xlabel(<span class="st">"num bits set"</span>)</span>
+<span id="cb9-40"><a href="#cb9-40" aria-hidden="true" tabindex="-1"></a>_<span class="op">=</span>ylabel(<span class="st">"count"</span>)</span>
+<span id="cb9-41"><a href="#cb9-41" aria-hidden="true" tabindex="-1"></a>_<span class="op">=</span>legend()</span>
+<span id="cb9-42"><a href="#cb9-42" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-43"><a href="#cb9-43" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> k <span class="kw">in</span> counts.keys():</span>
+<span id="cb9-44"><a href="#cb9-44" aria-hidden="true" tabindex="-1"></a>    <span class="cf">if</span> k[<span class="dv">0</span>] <span class="kw">in</span> (<span class="st">'Morgan'</span>,<span class="st">'FeatMorgan'</span>,<span class="st">'RDKit'</span>):</span>
+<span id="cb9-45"><a href="#cb9-45" aria-hidden="true" tabindex="-1"></a>        <span class="cf">continue</span></span>
+<span id="cb9-46"><a href="#cb9-46" aria-hidden="true" tabindex="-1"></a>    pidx<span class="op">+=</span><span class="dv">1</span></span>
+<span id="cb9-47"><a href="#cb9-47" aria-hidden="true" tabindex="-1"></a>    subplot(<span class="dv">3</span>,<span class="dv">3</span>,pidx)</span>
+<span id="cb9-48"><a href="#cb9-48" aria-hidden="true" tabindex="-1"></a>    cnts <span class="op">=</span> <span class="bu">sorted</span>(counts[k].items())</span>
+<span id="cb9-49"><a href="#cb9-49" aria-hidden="true" tabindex="-1"></a>    plot([x <span class="cf">for</span> x,y <span class="kw">in</span> cnts],[y <span class="cf">for</span> x,y <span class="kw">in</span> cnts])</span>
+<span id="cb9-50"><a href="#cb9-50" aria-hidden="true" tabindex="-1"></a>    _<span class="op">=</span>title(k[<span class="dv">0</span>])</span>
+<span id="cb9-51"><a href="#cb9-51" aria-hidden="true" tabindex="-1"></a>    _<span class="op">=</span>xlabel(<span class="st">"num bits set"</span>)</span>
+<span id="cb9-52"><a href="#cb9-52" aria-hidden="true" tabindex="-1"></a>    _<span class="op">=</span>ylabel(<span class="st">"count"</span>)</span>
+<span id="cb9-53"><a href="#cb9-53" aria-hidden="true" tabindex="-1"></a>   </span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-display">
+<p><img src="2021-07-06-number-of-fp-bits-set_files/figure-html/cell-7-output-1.png" class="img-fluid"></p>
+</div>
+</div>
+<p>The avalon FP curve has an interesting shape</p>
+<div class="cell" data-execution_count="7">
+<div class="sourceCode cell-code" id="cb10"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb10-1"><a href="#cb10-1" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> k,cnts <span class="kw">in</span> counts.items():</span>
+<span id="cb10-2"><a href="#cb10-2" aria-hidden="true" tabindex="-1"></a>    accum <span class="op">=</span> <span class="dv">0</span></span>
+<span id="cb10-3"><a href="#cb10-3" aria-hidden="true" tabindex="-1"></a>    denom <span class="op">=</span> <span class="dv">0</span></span>
+<span id="cb10-4"><a href="#cb10-4" aria-hidden="true" tabindex="-1"></a>    <span class="cf">for</span> cnt,num <span class="kw">in</span> cnts.items():</span>
+<span id="cb10-5"><a href="#cb10-5" aria-hidden="true" tabindex="-1"></a>        accum <span class="op">+=</span> cnt<span class="op">*</span>num</span>
+<span id="cb10-6"><a href="#cb10-6" aria-hidden="true" tabindex="-1"></a>        denom <span class="op">+=</span> num</span>
+<span id="cb10-7"><a href="#cb10-7" aria-hidden="true" tabindex="-1"></a>    mean <span class="op">=</span> accum<span class="op">/</span>denom</span>
+<span id="cb10-8"><a href="#cb10-8" aria-hidden="true" tabindex="-1"></a>    dev <span class="op">=</span> <span class="dv">0</span></span>
+<span id="cb10-9"><a href="#cb10-9" aria-hidden="true" tabindex="-1"></a>    <span class="cf">for</span> cnt,num <span class="kw">in</span> cnts.items():</span>
+<span id="cb10-10"><a href="#cb10-10" aria-hidden="true" tabindex="-1"></a>        dev <span class="op">+=</span> num<span class="op">*</span>(cnt<span class="op">-</span>mean)<span class="op">**</span><span class="dv">2</span></span>
+<span id="cb10-11"><a href="#cb10-11" aria-hidden="true" tabindex="-1"></a>    dev <span class="op">/=</span> (denom<span class="op">-</span><span class="dv">1</span>)</span>
+<span id="cb10-12"><a href="#cb10-12" aria-hidden="true" tabindex="-1"></a>    dev <span class="op">=</span> dev<span class="op">**</span><span class="fl">0.5</span></span>
+<span id="cb10-13"><a href="#cb10-13" aria-hidden="true" tabindex="-1"></a>    label <span class="op">=</span> k[<span class="dv">0</span>]</span>
+<span id="cb10-14"><a href="#cb10-14" aria-hidden="true" tabindex="-1"></a>    <span class="cf">if</span> k[<span class="dv">1</span>]<span class="op">!=-</span><span class="dv">1</span>:</span>
+<span id="cb10-15"><a href="#cb10-15" aria-hidden="true" tabindex="-1"></a>        label <span class="op">+=</span> <span class="bu">str</span>(k[<span class="dv">1</span>])</span>
+<span id="cb10-16"><a href="#cb10-16" aria-hidden="true" tabindex="-1"></a>        </span>
+<span id="cb10-17"><a href="#cb10-17" aria-hidden="true" tabindex="-1"></a>    <span class="bu">print</span>(label,<span class="st">'</span><span class="ch">\t</span><span class="sc">%.1f</span><span class="st">'</span><span class="op">%</span>mean,<span class="st">'</span><span class="sc">%.1f</span><span class="st">'</span><span class="op">%</span>dev)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>Morgan1     29.4 5.6
+Morgan2     48.7 9.6
+Morgan3     66.8 13.8
+FeatMorgan1     20.1 3.9
+FeatMorgan2     38.1 7.7
+FeatMorgan3     56.0 11.8
+RDKit5  363.3 122.5
+RDKit6  621.7 233.2
+RDKit7  993.6 406.3
+pattern     445.5 122.5
+avalon  279.8 129.9
+ap-counts   166.6 56.3
+tt-counts   33.4 9.8
+ap-bv   267.3 90.0
+tt-bv   47.2 12.0</code></pre>
+</div>
+</div>
+<section id="convergence" class="level1">
+<h1>Convergence</h1>
+<p>I did 5 million examples, which took a while (about 1.5 hours with 6 worker processes on my PC). Could I have analyzed less and gotten to the same results? Did the means converge? If so, how quickly?</p>
+<div class="cell" data-execution_count="8">
+<div class="sourceCode cell-code" id="cb12"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb12-1"><a href="#cb12-1" aria-hidden="true" tabindex="-1"></a>historyf <span class="op">=</span> gzip.<span class="bu">open</span>(<span class="st">'../data/fp_bit_counts.history.pkl.gz'</span>,<span class="st">'rb'</span>)</span>
+<span id="cb12-2"><a href="#cb12-2" aria-hidden="true" tabindex="-1"></a>means <span class="op">=</span> defaultdict(<span class="bu">list</span>)</span>
+<span id="cb12-3"><a href="#cb12-3" aria-hidden="true" tabindex="-1"></a>devs <span class="op">=</span> defaultdict(<span class="bu">list</span>)</span>
+<span id="cb12-4"><a href="#cb12-4" aria-hidden="true" tabindex="-1"></a>nmols <span class="op">=</span> []</span>
+<span id="cb12-5"><a href="#cb12-5" aria-hidden="true" tabindex="-1"></a><span class="cf">while</span> <span class="dv">1</span>:</span>
+<span id="cb12-6"><a href="#cb12-6" aria-hidden="true" tabindex="-1"></a>    <span class="cf">try</span>:</span>
+<span id="cb12-7"><a href="#cb12-7" aria-hidden="true" tabindex="-1"></a>        lcounts <span class="op">=</span> pickle.load(historyf)</span>
+<span id="cb12-8"><a href="#cb12-8" aria-hidden="true" tabindex="-1"></a>    <span class="cf">except</span> <span class="pp">EOFError</span>:</span>
+<span id="cb12-9"><a href="#cb12-9" aria-hidden="true" tabindex="-1"></a>        <span class="cf">break</span></span>
+<span id="cb12-10"><a href="#cb12-10" aria-hidden="true" tabindex="-1"></a>    <span class="cf">for</span> k,cnts <span class="kw">in</span> lcounts.items():</span>
+<span id="cb12-11"><a href="#cb12-11" aria-hidden="true" tabindex="-1"></a>        accum <span class="op">=</span> <span class="dv">0</span></span>
+<span id="cb12-12"><a href="#cb12-12" aria-hidden="true" tabindex="-1"></a>        denom <span class="op">=</span> <span class="dv">0</span></span>
+<span id="cb12-13"><a href="#cb12-13" aria-hidden="true" tabindex="-1"></a>        <span class="cf">for</span> cnt,num <span class="kw">in</span> cnts.items():</span>
+<span id="cb12-14"><a href="#cb12-14" aria-hidden="true" tabindex="-1"></a>            accum <span class="op">+=</span> cnt<span class="op">*</span>num</span>
+<span id="cb12-15"><a href="#cb12-15" aria-hidden="true" tabindex="-1"></a>            denom <span class="op">+=</span> num</span>
+<span id="cb12-16"><a href="#cb12-16" aria-hidden="true" tabindex="-1"></a>        mean <span class="op">=</span> accum<span class="op">/</span>denom</span>
+<span id="cb12-17"><a href="#cb12-17" aria-hidden="true" tabindex="-1"></a>        dev <span class="op">=</span> <span class="dv">0</span></span>
+<span id="cb12-18"><a href="#cb12-18" aria-hidden="true" tabindex="-1"></a>        <span class="cf">for</span> cnt,num <span class="kw">in</span> cnts.items():</span>
+<span id="cb12-19"><a href="#cb12-19" aria-hidden="true" tabindex="-1"></a>            dev <span class="op">+=</span> num<span class="op">*</span>(cnt<span class="op">-</span>mean)<span class="op">**</span><span class="dv">2</span></span>
+<span id="cb12-20"><a href="#cb12-20" aria-hidden="true" tabindex="-1"></a>        dev <span class="op">/=</span> (denom<span class="op">-</span><span class="dv">1</span>)</span>
+<span id="cb12-21"><a href="#cb12-21" aria-hidden="true" tabindex="-1"></a>        dev <span class="op">=</span> dev<span class="op">**</span><span class="fl">0.5</span></span>
+<span id="cb12-22"><a href="#cb12-22" aria-hidden="true" tabindex="-1"></a>        </span>
+<span id="cb12-23"><a href="#cb12-23" aria-hidden="true" tabindex="-1"></a>        <span class="cf">if</span> denom <span class="kw">not</span> <span class="kw">in</span> nmols:</span>
+<span id="cb12-24"><a href="#cb12-24" aria-hidden="true" tabindex="-1"></a>            nmols.append(denom)</span>
+<span id="cb12-25"><a href="#cb12-25" aria-hidden="true" tabindex="-1"></a>        means[k].append(mean)</span>
+<span id="cb12-26"><a href="#cb12-26" aria-hidden="true" tabindex="-1"></a>        devs[k].append(dev)</span>
+<span id="cb12-27"><a href="#cb12-27" aria-hidden="true" tabindex="-1"></a>        label <span class="op">=</span> k[<span class="dv">0</span>]</span>
+<span id="cb12-28"><a href="#cb12-28" aria-hidden="true" tabindex="-1"></a>        <span class="cf">if</span> k[<span class="dv">1</span>]<span class="op">!=-</span><span class="dv">1</span>:</span>
+<span id="cb12-29"><a href="#cb12-29" aria-hidden="true" tabindex="-1"></a>            label <span class="op">+=</span> <span class="bu">str</span>(k[<span class="dv">1</span>])</span>
+<span id="cb12-30"><a href="#cb12-30" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb12-31"><a href="#cb12-31" aria-hidden="true" tabindex="-1"></a>        <span class="bu">print</span>(denom,label,<span class="st">'</span><span class="ch">\t</span><span class="sc">%.1f</span><span class="st">'</span><span class="op">%</span>mean,<span class="st">'</span><span class="sc">%.1f</span><span class="st">'</span><span class="op">%</span>dev)    </span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>500000 Morgan1  26.0 6.2
+500000 Morgan2  42.8 10.7
+500000 Morgan3  58.7 15.5
+500000 FeatMorgan1  18.2 4.3
+500000 FeatMorgan2  33.8 8.5
+500000 FeatMorgan3  49.5 13.2
+500000 RDKit5   324.6 133.9
+500000 RDKit6   560.8 256.2
+500000 RDKit7   902.9 445.7
+500000 pattern  408.8 133.9
+500000 avalon   241.8 133.8
+500000 ap-counts    133.3 57.6
+500000 tt-counts    28.6 10.2
+500000 ap-bv    219.5 93.6
+500000 tt-bv    41.9 12.9
+1000000 Morgan1     27.1 6.1
+1000000 Morgan2     44.6 10.5
+1000000 Morgan3     61.2 15.2
+1000000 FeatMorgan1     18.9 4.2
+1000000 FeatMorgan2     35.2 8.4
+1000000 FeatMorgan3     51.6 13.0
+1000000 RDKit5  340.7 133.9
+1000000 RDKit6  588.9 257.4
+1000000 RDKit7  948.5 449.9
+1000000 pattern     425.2 136.0
+1000000 avalon  257.7 136.7
+1000000 ap-counts   143.7 57.7
+1000000 tt-counts   30.1 10.1
+1000000 ap-bv   234.4 92.8
+1000000 tt-bv   43.6 12.9
+1500000 Morgan1     27.3 5.8
+1500000 Morgan2     45.0 9.9
+1500000 Morgan3     61.7 14.3
+1500000 FeatMorgan1     19.0 4.1
+1500000 FeatMorgan2     35.5 8.0
+1500000 FeatMorgan3     52.0 12.3
+1500000 RDKit5  340.3 127.8
+1500000 RDKit6  587.1 246.2
+1500000 RDKit7  944.8 432.0
+1500000 pattern     424.0 129.4
+1500000 avalon  260.5 133.7
+1500000 ap-counts   145.1 54.8
+1500000 tt-counts   30.5 9.8
+1500000 ap-bv   234.9 87.3
+1500000 tt-bv   43.7 12.3
+2000000 Morgan1     28.0 5.7
+2000000 Morgan2     46.2 9.8
+2000000 Morgan3     63.4 14.1
+2000000 FeatMorgan1     19.4 4.0
+2000000 FeatMorgan2     36.3 7.9
+2000000 FeatMorgan3     53.3 12.1
+2000000 RDKit5  350.7 126.6
+2000000 RDKit6  603.5 243.1
+2000000 RDKit7  969.0 425.8
+2000000 pattern     433.3 128.0
+2000000 avalon  269.5 133.1
+2000000 ap-counts   152.4 55.5
+2000000 tt-counts   31.5 9.8
+2000000 ap-bv   245.8 88.2
+2000000 tt-bv   45.0 12.2
+2500000 Morgan1     28.7 5.8
+2500000 Morgan2     47.5 9.8
+2500000 Morgan3     65.3 14.2
+2500000 FeatMorgan1     19.7 4.0
+2500000 FeatMorgan2     37.2 7.9
+2500000 FeatMorgan3     54.7 12.1
+2500000 RDKit5  361.5 126.3
+2500000 RDKit6  621.2 241.1
+2500000 RDKit7  996.0 420.5
+2500000 pattern     443.2 126.4
+2500000 avalon  278.4 132.6
+2500000 ap-counts   160.1 56.9
+2500000 tt-counts   32.6 9.9
+2500000 ap-bv   257.9 90.2
+2500000 tt-bv   46.3 12.2
+3000000 Morgan1     29.1 5.7
+3000000 Morgan2     48.1 9.8
+3000000 Morgan3     66.1 14.1
+3000000 FeatMorgan1     19.9 3.9
+3000000 FeatMorgan2     37.6 7.8
+3000000 FeatMorgan3     55.3 12.0
+3000000 RDKit5  364.5 124.5
+3000000 RDKit6  625.3 237.2
+3000000 RDKit7  1001.4 413.2
+3000000 pattern     446.5 124.1
+3000000 avalon  280.5 131.5
+3000000 ap-counts   163.7 57.0
+3000000 tt-counts   33.1 9.8
+3000000 ap-bv   263.5 90.5
+3000000 tt-bv   46.9 12.1
+3500000 Morgan1     29.2 5.7
+3500000 Morgan2     48.3 9.7
+3500000 Morgan3     66.4 14.0
+3500000 FeatMorgan1     19.9 3.9
+3500000 FeatMorgan2     37.7 7.8
+3500000 FeatMorgan3     55.6 11.9
+3500000 RDKit5  365.3 123.8
+3500000 RDKit6  626.7 236.0
+3500000 RDKit7  1003.7 411.3
+3500000 pattern     448.4 123.3
+3500000 avalon  280.3 131.1
+3500000 ap-counts   165.1 56.7
+3500000 tt-counts   33.3 9.8
+3500000 ap-bv   265.9 90.1
+3500000 tt-bv   47.2 12.1
+4000000 Morgan1     29.4 5.7
+4000000 Morgan2     48.6 9.8
+4000000 Morgan3     66.7 14.1
+4000000 FeatMorgan1     20.0 3.9
+4000000 FeatMorgan2     38.0 7.8
+4000000 FeatMorgan3     55.9 12.0
+4000000 RDKit5  365.2 124.1
+4000000 RDKit6  627.1 236.6
+4000000 RDKit7  1005.0 412.4
+4000000 pattern     448.6 124.0
+4000000 avalon  281.4 131.3
+4000000 ap-counts   165.7 56.9
+4000000 tt-counts   33.4 9.9
+4000000 ap-bv   266.8 90.6
+4000000 tt-bv   47.3 12.2
+4500000 Morgan1     29.4 5.6
+4500000 Morgan2     48.7 9.6
+4500000 Morgan3     66.8 13.9
+4500000 FeatMorgan1     20.1 3.9
+4500000 FeatMorgan2     38.0 7.7
+4500000 FeatMorgan3     55.9 11.8
+4500000 RDKit5  364.3 123.1
+4500000 RDKit6  624.4 234.6
+4500000 RDKit7  999.1 408.8
+4500000 pattern     447.0 122.7
+4500000 avalon  280.7 130.6
+4500000 ap-counts   166.3 56.4
+4500000 tt-counts   33.4 9.8
+4500000 ap-bv   267.3 89.9
+4500000 tt-bv   47.3 12.1
+5000000 Morgan1     29.4 5.6
+5000000 Morgan2     48.7 9.6
+5000000 Morgan3     66.8 13.8
+5000000 FeatMorgan1     20.1 3.9
+5000000 FeatMorgan2     38.1 7.7
+5000000 FeatMorgan3     56.0 11.8
+5000000 RDKit5  363.3 122.5
+5000000 RDKit6  621.7 233.2
+5000000 RDKit7  993.6 406.3
+5000000 pattern     445.5 122.5
+5000000 avalon  279.8 129.9
+5000000 ap-counts   166.6 56.3
+5000000 tt-counts   33.4 9.8
+5000000 ap-bv   267.3 90.0
+5000000 tt-bv   47.2 12.0</code></pre>
+</div>
+</div>
+<p>Let’s look at those graphically:</p>
+<div class="cell" data-execution_count="9">
+<div class="sourceCode cell-code" id="cb14"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb14-1"><a href="#cb14-1" aria-hidden="true" tabindex="-1"></a>morgan_ks <span class="op">=</span> [x <span class="cf">for</span> x <span class="kw">in</span> counts.keys() <span class="cf">if</span> x[<span class="dv">0</span>] <span class="op">==</span><span class="st">'Morgan'</span>]</span>
+<span id="cb14-2"><a href="#cb14-2" aria-hidden="true" tabindex="-1"></a>featmorgan_ks <span class="op">=</span> [x <span class="cf">for</span> x <span class="kw">in</span> counts.keys() <span class="cf">if</span> x[<span class="dv">0</span>] <span class="op">==</span><span class="st">'FeatMorgan'</span>]</span>
+<span id="cb14-3"><a href="#cb14-3" aria-hidden="true" tabindex="-1"></a>rdkit_ks <span class="op">=</span> [x <span class="cf">for</span> x <span class="kw">in</span> counts.keys() <span class="cf">if</span> x[<span class="dv">0</span>] <span class="op">==</span> <span class="st">'RDKit'</span>]</span>
+<span id="cb14-4"><a href="#cb14-4" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb14-5"><a href="#cb14-5" aria-hidden="true" tabindex="-1"></a>figure(figsize<span class="op">=</span>(<span class="dv">15</span>,<span class="dv">15</span>))</span>
+<span id="cb14-6"><a href="#cb14-6" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb14-7"><a href="#cb14-7" aria-hidden="true" tabindex="-1"></a>nmols2 <span class="op">=</span> [x<span class="op">/</span><span class="dv">1000000</span> <span class="cf">for</span> x <span class="kw">in</span> nmols]</span>
+<span id="cb14-8"><a href="#cb14-8" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb14-9"><a href="#cb14-9" aria-hidden="true" tabindex="-1"></a>pidx<span class="op">=</span><span class="dv">1</span></span>
+<span id="cb14-10"><a href="#cb14-10" aria-hidden="true" tabindex="-1"></a>subplot(<span class="dv">3</span>,<span class="dv">3</span>,pidx)</span>
+<span id="cb14-11"><a href="#cb14-11" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> n,r <span class="kw">in</span> morgan_ks:</span>
+<span id="cb14-12"><a href="#cb14-12" aria-hidden="true" tabindex="-1"></a>    lmeans <span class="op">=</span> means[(n,r)]</span>
+<span id="cb14-13"><a href="#cb14-13" aria-hidden="true" tabindex="-1"></a>    ldevs <span class="op">=</span> devs[(n,r)]</span>
+<span id="cb14-14"><a href="#cb14-14" aria-hidden="true" tabindex="-1"></a>    errorbar(nmols2,lmeans,yerr<span class="op">=</span>ldevs,capsize<span class="op">=</span><span class="dv">3</span>)</span>
+<span id="cb14-15"><a href="#cb14-15" aria-hidden="true" tabindex="-1"></a>    </span>
+<span id="cb14-16"><a href="#cb14-16" aria-hidden="true" tabindex="-1"></a>_<span class="op">=</span>title(<span class="st">"Morgan"</span>)</span>
+<span id="cb14-17"><a href="#cb14-17" aria-hidden="true" tabindex="-1"></a>_<span class="op">=</span>xlabel(<span class="st">"num mols (millions)"</span>)</span>
+<span id="cb14-18"><a href="#cb14-18" aria-hidden="true" tabindex="-1"></a>_<span class="op">=</span>ylabel(<span class="st">"count"</span>)</span>
+<span id="cb14-19"><a href="#cb14-19" aria-hidden="true" tabindex="-1"></a><span class="co">#_=legend()</span></span>
+<span id="cb14-20"><a href="#cb14-20" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb14-21"><a href="#cb14-21" aria-hidden="true" tabindex="-1"></a>pidx<span class="op">=</span><span class="dv">2</span></span>
+<span id="cb14-22"><a href="#cb14-22" aria-hidden="true" tabindex="-1"></a>subplot(<span class="dv">3</span>,<span class="dv">3</span>,pidx)</span>
+<span id="cb14-23"><a href="#cb14-23" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> n,r <span class="kw">in</span> featmorgan_ks:</span>
+<span id="cb14-24"><a href="#cb14-24" aria-hidden="true" tabindex="-1"></a>    lmeans <span class="op">=</span> means[(n,r)]</span>
+<span id="cb14-25"><a href="#cb14-25" aria-hidden="true" tabindex="-1"></a>    ldevs <span class="op">=</span> devs[(n,r)]</span>
+<span id="cb14-26"><a href="#cb14-26" aria-hidden="true" tabindex="-1"></a>    errorbar(nmols2,lmeans,yerr<span class="op">=</span>ldevs,capsize<span class="op">=</span><span class="dv">3</span>)</span>
+<span id="cb14-27"><a href="#cb14-27" aria-hidden="true" tabindex="-1"></a>_<span class="op">=</span>title(<span class="st">"FeatMorgan"</span>)</span>
+<span id="cb14-28"><a href="#cb14-28" aria-hidden="true" tabindex="-1"></a>_<span class="op">=</span>xlabel(<span class="st">"num mols (millions)"</span>)</span>
+<span id="cb14-29"><a href="#cb14-29" aria-hidden="true" tabindex="-1"></a>_<span class="op">=</span>ylabel(<span class="st">"count"</span>)</span>
+<span id="cb14-30"><a href="#cb14-30" aria-hidden="true" tabindex="-1"></a><span class="co">#_=legend()</span></span>
+<span id="cb14-31"><a href="#cb14-31" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb14-32"><a href="#cb14-32" aria-hidden="true" tabindex="-1"></a>pidx<span class="op">=</span><span class="dv">3</span></span>
+<span id="cb14-33"><a href="#cb14-33" aria-hidden="true" tabindex="-1"></a>subplot(<span class="dv">3</span>,<span class="dv">3</span>,pidx)</span>
+<span id="cb14-34"><a href="#cb14-34" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> n,r <span class="kw">in</span> rdkit_ks:</span>
+<span id="cb14-35"><a href="#cb14-35" aria-hidden="true" tabindex="-1"></a>    lmeans <span class="op">=</span> means[(n,r)]</span>
+<span id="cb14-36"><a href="#cb14-36" aria-hidden="true" tabindex="-1"></a>    ldevs <span class="op">=</span> devs[(n,r)]</span>
+<span id="cb14-37"><a href="#cb14-37" aria-hidden="true" tabindex="-1"></a>    errorbar(nmols2,lmeans,yerr<span class="op">=</span>ldevs,capsize<span class="op">=</span><span class="dv">3</span>)</span>
+<span id="cb14-38"><a href="#cb14-38" aria-hidden="true" tabindex="-1"></a>_<span class="op">=</span>title(<span class="st">"RDKit"</span>)</span>
+<span id="cb14-39"><a href="#cb14-39" aria-hidden="true" tabindex="-1"></a>_<span class="op">=</span>xlabel(<span class="st">"num mols (millions)"</span>)</span>
+<span id="cb14-40"><a href="#cb14-40" aria-hidden="true" tabindex="-1"></a>_<span class="op">=</span>ylabel(<span class="st">"count"</span>)</span>
+<span id="cb14-41"><a href="#cb14-41" aria-hidden="true" tabindex="-1"></a><span class="co">#_=legend()</span></span>
+<span id="cb14-42"><a href="#cb14-42" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb14-43"><a href="#cb14-43" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> k <span class="kw">in</span> counts.keys():</span>
+<span id="cb14-44"><a href="#cb14-44" aria-hidden="true" tabindex="-1"></a>    <span class="cf">if</span> k[<span class="dv">0</span>] <span class="kw">in</span> (<span class="st">'Morgan'</span>,<span class="st">'FeatMorgan'</span>,<span class="st">'RDKit'</span>):</span>
+<span id="cb14-45"><a href="#cb14-45" aria-hidden="true" tabindex="-1"></a>        <span class="cf">continue</span></span>
+<span id="cb14-46"><a href="#cb14-46" aria-hidden="true" tabindex="-1"></a>    pidx<span class="op">+=</span><span class="dv">1</span></span>
+<span id="cb14-47"><a href="#cb14-47" aria-hidden="true" tabindex="-1"></a>    subplot(<span class="dv">3</span>,<span class="dv">3</span>,pidx)</span>
+<span id="cb14-48"><a href="#cb14-48" aria-hidden="true" tabindex="-1"></a>    lmeans <span class="op">=</span> means[k]</span>
+<span id="cb14-49"><a href="#cb14-49" aria-hidden="true" tabindex="-1"></a>    ldevs <span class="op">=</span> devs[k]</span>
+<span id="cb14-50"><a href="#cb14-50" aria-hidden="true" tabindex="-1"></a>    errorbar(nmols2,lmeans,yerr<span class="op">=</span>ldevs,capsize<span class="op">=</span><span class="dv">3</span>)</span>
+<span id="cb14-51"><a href="#cb14-51" aria-hidden="true" tabindex="-1"></a>    _<span class="op">=</span>title(k[<span class="dv">0</span>])</span>
+<span id="cb14-52"><a href="#cb14-52" aria-hidden="true" tabindex="-1"></a>    _<span class="op">=</span>xlabel(<span class="st">"num mols (millions)"</span>)</span>
+<span id="cb14-53"><a href="#cb14-53" aria-hidden="true" tabindex="-1"></a>    _<span class="op">=</span>ylabel(<span class="st">"count"</span>)</span>
+<span id="cb14-54"><a href="#cb14-54" aria-hidden="true" tabindex="-1"></a>   </span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-display">
+<p><img src="2021-07-06-number-of-fp-bits-set_files/figure-html/cell-10-output-1.png" class="img-fluid"></p>
+</div>
+</div>
+<p>Looks like we would have been fine with 3 million molecules.</p>
+
+
+</section>
+
+</main> <!-- /main -->
+<script id="quarto-html-after-body" type="application/javascript">
+window.document.addEventListener("DOMContentLoaded", function (event) {
+  const toggleBodyColorMode = (bsSheetEl) => {
+    const mode = bsSheetEl.getAttribute("data-mode");
+    const bodyEl = window.document.querySelector("body");
+    if (mode === "dark") {
+      bodyEl.classList.add("quarto-dark");
+      bodyEl.classList.remove("quarto-light");
+    } else {
+      bodyEl.classList.add("quarto-light");
+      bodyEl.classList.remove("quarto-dark");
+    }
+  }
+  const toggleBodyColorPrimary = () => {
+    const bsSheetEl = window.document.querySelector("link#quarto-bootstrap");
+    if (bsSheetEl) {
+      toggleBodyColorMode(bsSheetEl);
+    }
+  }
+  toggleBodyColorPrimary();  
+  const icon = "";
+  const anchorJS = new window.AnchorJS();
+  anchorJS.options = {
+    placement: 'right',
+    icon: icon
+  };
+  anchorJS.add('.anchored');
+  const clipboard = new window.ClipboardJS('.code-copy-button', {
+    target: function(trigger) {
+      return trigger.previousElementSibling;
+    }
+  });
+  clipboard.on('success', function(e) {
+    // button target
+    const button = e.trigger;
+    // don't keep focus
+    button.blur();
+    // flash "checked"
+    button.classList.add('code-copy-button-checked');
+    var currentTitle = button.getAttribute("title");
+    button.setAttribute("title", "Copied!");
+    let tooltip;
+    if (window.bootstrap) {
+      button.setAttribute("data-bs-toggle", "tooltip");
+      button.setAttribute("data-bs-placement", "left");
+      button.setAttribute("data-bs-title", "Copied!");
+      tooltip = new bootstrap.Tooltip(button, 
+        { trigger: "manual", 
+          customClass: "code-copy-button-tooltip",
+          offset: [0, -8]});
+      tooltip.show();    
+    }
+    setTimeout(function() {
+      if (tooltip) {
+        tooltip.hide();
+        button.removeAttribute("data-bs-title");
+        button.removeAttribute("data-bs-toggle");
+        button.removeAttribute("data-bs-placement");
+      }
+      button.setAttribute("title", currentTitle);
+      button.classList.remove('code-copy-button-checked');
+    }, 1000);
+    // clear code selection
+    e.clearSelection();
+  });
+  function tippyHover(el, contentFn) {
+    const config = {
+      allowHTML: true,
+      content: contentFn,
+      maxWidth: 500,
+      delay: 100,
+      arrow: false,
+      appendTo: function(el) {
+          return el.parentElement;
+      },
+      interactive: true,
+      interactiveBorder: 10,
+      theme: 'quarto',
+      placement: 'bottom-start'
+    };
+    window.tippy(el, config); 
+  }
+  const noterefs = window.document.querySelectorAll('a[role="doc-noteref"]');
+  for (var i=0; i<noterefs.length; i++) {
+    const ref = noterefs[i];
+    tippyHover(ref, function() {
+      // use id or data attribute instead here
+      let href = ref.getAttribute('data-footnote-href') || ref.getAttribute('href');
+      try { href = new URL(href).hash; } catch {}
+      const id = href.replace(/^#\/?/, "");
+      const note = window.document.getElementById(id);
+      return note.innerHTML;
+    });
+  }
+  const findCites = (el) => {
+    const parentEl = el.parentElement;
+    if (parentEl) {
+      const cites = parentEl.dataset.cites;
+      if (cites) {
+        return {
+          el,
+          cites: cites.split(' ')
+        };
+      } else {
+        return findCites(el.parentElement)
+      }
+    } else {
+      return undefined;
+    }
+  };
+  var bibliorefs = window.document.querySelectorAll('a[role="doc-biblioref"]');
+  for (var i=0; i<bibliorefs.length; i++) {
+    const ref = bibliorefs[i];
+    const citeInfo = findCites(ref);
+    if (citeInfo) {
+      tippyHover(citeInfo.el, function() {
+        var popup = window.document.createElement('div');
+        citeInfo.cites.forEach(function(cite) {
+          var citeDiv = window.document.createElement('div');
+          citeDiv.classList.add('hanging-indent');
+          citeDiv.classList.add('csl-entry');
+          var biblioDiv = window.document.getElementById('ref-' + cite);
+          if (biblioDiv) {
+            citeDiv.innerHTML = biblioDiv.innerHTML;
+          }
+          popup.appendChild(citeDiv);
+        });
+        return popup.innerHTML;
+      });
+    }
+  }
+});
+</script>
+</div> <!-- /content -->
+
+
+
+</body></html>
