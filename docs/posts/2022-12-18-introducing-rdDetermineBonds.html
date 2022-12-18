@@ -1,0 +1,1125 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en"><head>
+
+<meta charset="utf-8">
+<meta name="generator" content="quarto-1.2.269">
+
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+
+<meta name="dcterms.date" content="2022-12-18">
+<meta name="description" content="Assigning bonds from 3D coordinates">
+
+<title>RDKit blog - Introducing rdDetermineBonds</title>
+<style>
+code{white-space: pre-wrap;}
+span.smallcaps{font-variant: small-caps;}
+div.columns{display: flex; gap: min(4vw, 1.5em);}
+div.column{flex: auto; overflow-x: auto;}
+div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+ul.task-list{list-style: none;}
+ul.task-list li input[type="checkbox"] {
+  width: 0.8em;
+  margin: 0 0.8em 0.2em -1.6em;
+  vertical-align: middle;
+}
+pre > code.sourceCode { white-space: pre; position: relative; }
+pre > code.sourceCode > span { display: inline-block; line-height: 1.25; }
+pre > code.sourceCode > span:empty { height: 1.2em; }
+.sourceCode { overflow: visible; }
+code.sourceCode > span { color: inherit; text-decoration: inherit; }
+div.sourceCode { margin: 1em 0; }
+pre.sourceCode { margin: 0; }
+@media screen {
+div.sourceCode { overflow: auto; }
+}
+@media print {
+pre > code.sourceCode { white-space: pre-wrap; }
+pre > code.sourceCode > span { text-indent: -5em; padding-left: 5em; }
+}
+pre.numberSource code
+  { counter-reset: source-line 0; }
+pre.numberSource code > span
+  { position: relative; left: -4em; counter-increment: source-line; }
+pre.numberSource code > span > a:first-child::before
+  { content: counter(source-line);
+    position: relative; left: -1em; text-align: right; vertical-align: baseline;
+    border: none; display: inline-block;
+    -webkit-touch-callout: none; -webkit-user-select: none;
+    -khtml-user-select: none; -moz-user-select: none;
+    -ms-user-select: none; user-select: none;
+    padding: 0 4px; width: 4em;
+    color: #aaaaaa;
+  }
+pre.numberSource { margin-left: 3em; border-left: 1px solid #aaaaaa;  padding-left: 4px; }
+div.sourceCode
+  {   }
+@media screen {
+pre > code.sourceCode > span > a:first-child::before { text-decoration: underline; }
+}
+code span.al { color: #ff0000; font-weight: bold; } /* Alert */
+code span.an { color: #60a0b0; font-weight: bold; font-style: italic; } /* Annotation */
+code span.at { color: #7d9029; } /* Attribute */
+code span.bn { color: #40a070; } /* BaseN */
+code span.bu { color: #008000; } /* BuiltIn */
+code span.cf { color: #007020; font-weight: bold; } /* ControlFlow */
+code span.ch { color: #4070a0; } /* Char */
+code span.cn { color: #880000; } /* Constant */
+code span.co { color: #60a0b0; font-style: italic; } /* Comment */
+code span.cv { color: #60a0b0; font-weight: bold; font-style: italic; } /* CommentVar */
+code span.do { color: #ba2121; font-style: italic; } /* Documentation */
+code span.dt { color: #902000; } /* DataType */
+code span.dv { color: #40a070; } /* DecVal */
+code span.er { color: #ff0000; font-weight: bold; } /* Error */
+code span.ex { } /* Extension */
+code span.fl { color: #40a070; } /* Float */
+code span.fu { color: #06287e; } /* Function */
+code span.im { color: #008000; font-weight: bold; } /* Import */
+code span.in { color: #60a0b0; font-weight: bold; font-style: italic; } /* Information */
+code span.kw { color: #007020; font-weight: bold; } /* Keyword */
+code span.op { color: #666666; } /* Operator */
+code span.ot { color: #007020; } /* Other */
+code span.pp { color: #bc7a00; } /* Preprocessor */
+code span.sc { color: #4070a0; } /* SpecialChar */
+code span.ss { color: #bb6688; } /* SpecialString */
+code span.st { color: #4070a0; } /* String */
+code span.va { color: #19177c; } /* Variable */
+code span.vs { color: #4070a0; } /* VerbatimString */
+code span.wa { color: #60a0b0; font-weight: bold; font-style: italic; } /* Warning */
+</style>
+
+
+<script src="../site_libs/quarto-nav/quarto-nav.js"></script>
+<script src="../site_libs/quarto-nav/headroom.min.js"></script>
+<script src="../site_libs/clipboard/clipboard.min.js"></script>
+<script src="../site_libs/quarto-search/autocomplete.umd.js"></script>
+<script src="../site_libs/quarto-search/fuse.min.js"></script>
+<script src="../site_libs/quarto-search/quarto-search.js"></script>
+<meta name="quarto:offset" content="../">
+<link href="../posts/icons/favicon.ico" rel="icon">
+<script src="../site_libs/quarto-html/quarto.js"></script>
+<script src="../site_libs/quarto-html/popper.min.js"></script>
+<script src="../site_libs/quarto-html/tippy.umd.min.js"></script>
+<script src="../site_libs/quarto-html/anchor.min.js"></script>
+<link href="../site_libs/quarto-html/tippy.css" rel="stylesheet">
+<link href="../site_libs/quarto-html/quarto-syntax-highlighting.css" rel="stylesheet" class="quarto-color-scheme" id="quarto-text-highlighting-styles">
+<link href="../site_libs/quarto-html/quarto-syntax-highlighting-dark.css" rel="prefetch" class="quarto-color-scheme quarto-color-alternate" id="quarto-text-highlighting-styles">
+<script src="../site_libs/bootstrap/bootstrap.min.js"></script>
+<link href="../site_libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
+<link href="../site_libs/bootstrap/bootstrap.min.css" rel="stylesheet" class="quarto-color-scheme" id="quarto-bootstrap" data-mode="light">
+<link href="../site_libs/bootstrap/bootstrap-dark.min.css" rel="prefetch" class="quarto-color-scheme quarto-color-alternate" id="quarto-bootstrap" data-mode="dark">
+<script id="quarto-search-options" type="application/json">{
+  "location": "navbar",
+  "copy-button": false,
+  "collapse-after": 3,
+  "panel-placement": "end",
+  "type": "overlay",
+  "limit": 20,
+  "language": {
+    "search-no-results-text": "No results",
+    "search-matching-documents-text": "matching documents",
+    "search-copy-link-title": "Copy link to search",
+    "search-hide-matches-text": "Hide additional matches",
+    "search-more-match-text": "more match in this document",
+    "search-more-matches-text": "more matches in this document",
+    "search-clear-button-title": "Clear",
+    "search-detached-cancel-button-title": "Cancel",
+    "search-submit-button-title": "Submit"
+  }
+}</script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.6/require.min.js" integrity="sha512-c3Nl8+7g4LMSTdrm621y7kf9v3SDPnhxLNhcjFJbKECVnmZHTdo+IRO05sNLTH/D3vA6u1X32ehoLC7WFVdheg==" crossorigin="anonymous"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.5.1/jquery.min.js" integrity="sha512-bLT0Qm9VnAYZDflyKcBaQ2gg0hSYNQrJ8RilYldYQ1FxQYoCLtUjuuRuZo+fjqhx/qtq/1itJ0C2ejDxltZVFg==" crossorigin="anonymous"></script>
+<script type="application/javascript">define('jquery', [],function() {return window.jQuery;})</script>
+
+
+<link rel="stylesheet" href="../styles.css">
+</head>
+
+<body class="nav-fixed">
+
+<div id="quarto-search-results"></div>
+  <header id="quarto-header" class="headroom fixed-top">
+    <nav class="navbar navbar-expand-lg navbar-dark ">
+      <div class="navbar-container container-fluid">
+      <div class="navbar-brand-container">
+    <a class="navbar-brand" href="../index.html">
+    <span class="navbar-title">RDKit blog</span>
+    </a>
+  </div>
+          <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarCollapse" aria-controls="navbarCollapse" aria-expanded="false" aria-label="Toggle navigation" onclick="if (window.quartoToggleHeadroom) { window.quartoToggleHeadroom(); }">
+  <span class="navbar-toggler-icon"></span>
+</button>
+          <div class="collapse navbar-collapse" id="navbarCollapse">
+            <ul class="navbar-nav navbar-nav-scroll ms-auto">
+  <li class="nav-item">
+    <a class="nav-link" href="../about.html">
+ <span class="menu-text">RDKit experiments, tips, and tutorials</span></a>
+  </li>  
+  <li class="nav-item compact">
+    <a class="nav-link" href="https://github.com/rdkit/rdkit"><i class="bi bi-github" role="img">
+</i> 
+ <span class="menu-text"></span></a>
+  </li>  
+  <li class="nav-item compact">
+    <a class="nav-link" href="https://twitter.com/rdkit_org"><i class="bi bi-twitter" role="img">
+</i> 
+ <span class="menu-text"></span></a>
+  </li>  
+</ul>
+              <div class="quarto-toggle-container">
+                  <a href="" class="quarto-color-scheme-toggle nav-link" onclick="window.quartoToggleColorScheme(); return false;" title="Toggle dark mode"><i class="bi"></i></a>
+              </div>
+              <div id="quarto-search" class="" title="Search"></div>
+          </div> <!-- /navcollapse -->
+      </div> <!-- /container-fluid -->
+    </nav>
+</header>
+<!-- content -->
+<div id="quarto-content" class="quarto-container page-columns page-rows-contents page-layout-article page-navbar">
+<!-- sidebar -->
+<!-- margin-sidebar -->
+    <div id="quarto-margin-sidebar" class="sidebar margin-sidebar">
+        <nav id="TOC" role="doc-toc" class="toc-active">
+    <h2 id="toc-title">On this page</h2>
+   
+  <ul>
+  <li><a href="#using-rddeterminebonds" id="toc-using-rddeterminebonds" class="nav-link active" data-scroll-target="#using-rddeterminebonds">Using rdDetermineBonds</a></li>
+  <li><a href="#testing-the-functionality-on-a-bunch-of-molecules" id="toc-testing-the-functionality-on-a-bunch-of-molecules" class="nav-link" data-scroll-target="#testing-the-functionality-on-a-bunch-of-molecules">Testing the functionality on a bunch of molecules</a></li>
+  <li><a href="#benchmarking-the-code" id="toc-benchmarking-the-code" class="nav-link" data-scroll-target="#benchmarking-the-code">Benchmarking the code</a></li>
+  </ul>
+</nav>
+    </div>
+<!-- main -->
+<main class="content" id="quarto-document-content">
+
+<header id="title-block-header" class="quarto-title-block default">
+<div class="quarto-title">
+<h1 class="title">Introducing rdDetermineBonds</h1>
+  <div class="quarto-categories">
+    <div class="quarto-category">tutorial</div>
+    <div class="quarto-category">3d</div>
+  </div>
+  </div>
+
+<div>
+  <div class="description">
+    Assigning bonds from 3D coordinates
+  </div>
+</div>
+
+
+<div class="quarto-title-meta">
+
+    
+    <div>
+    <div class="quarto-title-meta-heading">Published</div>
+    <div class="quarto-title-meta-contents">
+      <p class="date">December 18, 2022</p>
+    </div>
+  </div>
+  
+    
+  </div>
+  
+
+</header>
+
+<p>One of the problems with using the results from quantum chemical calculations with the RDKit is that typical QM output formats just include atoms and their positions: since the calculations don’t need bond orders, they don’t show up in the output. The problem of assigning correct bond orders to the atoms in a molecule based solely on atomic positions (and the overall charge on the molecule) is a non-trivial one, and we’ve never had a good answer in the RDKit.</p>
+<p>A few years ago Jan Jensen and his group published <code>xyz2mol</code>, an open-source, RDKit-based solution to this problem written in Python: https://github.com/jensengroup/xyz2mol. During this year’s Google Summer of Code, Sreya Gogineni, did a C++ port of the Python code and integrated it into the RDKit core for the 2022.09 release. Here’s the <a href="https://summerofcode.withgoogle.com/programs/2022/projects/ugO4HoEX">project description</a> and here’s Sreya’s <a href="https://github.com/rdkit/rdkit/pull/5557">“final report”</a> which is also the PR where we merged her changes into the RDKit core.</p>
+<p>This post was originally just going to be a quick introduction to how to use that code. However, since I was having fun with it, I went ahead and did some testing on a bunch of 3D structures from QM9.</p>
+<div class="cell" data-executetime="{&quot;end_time&quot;:&quot;2022-12-18T06:40:39.336147Z&quot;,&quot;start_time&quot;:&quot;2022-12-18T06:40:39.250244Z&quot;}" data-execution_count="1">
+<div class="sourceCode cell-code" id="cb1"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> rdkit <span class="im">import</span> Chem</span>
+<span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> rdkit.Chem <span class="im">import</span> Draw</span>
+<span id="cb1-3"><a href="#cb1-3" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> rdkit.Chem.Draw <span class="im">import</span> IPythonConsole</span>
+<span id="cb1-4"><a href="#cb1-4" aria-hidden="true" tabindex="-1"></a>IPythonConsole.ipython_3d <span class="op">=</span> <span class="va">True</span></span>
+<span id="cb1-5"><a href="#cb1-5" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> rdkit</span>
+<span id="cb1-6"><a href="#cb1-6" aria-hidden="true" tabindex="-1"></a>rdkit.__version__</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-display" data-execution_count="1">
+<pre><code>'2022.09.1'</code></pre>
+</div>
+</div>
+<section id="using-rddeterminebonds" class="level1">
+<h1>Using rdDetermineBonds</h1>
+<p>To get some testing files, I downloaded some structures from the <a href="https://figshare.com/collections/Quantum_chemistry_structures_and_properties_of_134_kilo_molecules/978904">QM9 dataset</a>. Here’s what those look like:</p>
+<div class="cell" data-executetime="{&quot;end_time&quot;:&quot;2022-12-18T06:40:39.446374Z&quot;,&quot;start_time&quot;:&quot;2022-12-18T06:40:39.337014Z&quot;}" data-scrolled="true" data-execution_count="2">
+<div class="sourceCode cell-code" id="cb3"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a><span class="op">!</span>cat ..<span class="op">/</span>data<span class="op">/</span>dsgdb9nsd_107313.xyz</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>19
+gdb 107313  2.67642 1.59305 1.14971 3.3443  81.12   -0.2359 -0.0506 0.1853  1106.1507   0.159794    -385.918216 -385.909962 -385.909018 -385.950934 31.892  
+C    0.0645055554    1.4843171326    0.3723315122   -0.379845
+C   -0.001915467     0.0516984051   -0.1729357038   -0.277772
+C   -1.4001624807   -0.5304376801   -0.1487075838    0.233551
+C   -1.9909553844   -1.0379429662    1.1601625215   -0.307513
+C   -1.7182271444   -1.9962888369    0.0152208454   -0.158294
+C   -2.905416575    -2.2627721735   -0.8489696604   -0.065615
+C   -3.3347497536   -1.1525477782   -1.4661914556   -0.191532
+C   -2.4353480328   -0.0114763902   -1.1388331005    0.336742
+O   -2.4853518918    1.1093228549   -1.595794586    -0.340877
+H    1.0876615149    1.8699729825    0.3263064541    0.106173
+H   -0.5836533924    2.142053447    -0.2101812431    0.152698
+H   -0.2626541721    1.5210712578    1.4170099662    0.108877
+H    0.3710335675    0.0343653078   -1.2041622283    0.107526
+H    0.662791197    -0.6008609283    0.4071642198    0.091428
+H   -1.3142481944   -1.0584396879    2.0096409673    0.122076
+H   -3.0252533013   -0.8199288984    1.4038330438    0.125348
+H   -0.9412329872   -2.7436632889    0.1278385726    0.101319
+H   -3.37329736 -3.2394582332   -0.9072563749    0.118603
+H   -4.2004762777   -1.0463782959   -2.1061677066    0.117109
+88.1998 132.6788    204.3282    214.9254    283.2151    320.8425    354.2003    451.4683    471.7609    631.475 661.0085    735.6532    750.9738    778.4916    839.8756    849.5692    876.8931    897.9162    967.6602    980.1789    992.0568    1026.4327   1049.1839   1072.0692   1075.099    1111.0662   1128.3577   1138.5104   1233.4573   1265.5356   1338.63 1352.428    1365.7919   1389.2764   1408.176    1477.5353   1487.9659   1495.4859   1514.6888   1630.2685   1799.8365   3021.0204   3038.158    3057.8354   3101.9102   3122.4464   3138.2864   3177.3129   3193.7776   3214.9261   3232.806
+CCC12CC1C=CC2=O CC[C@]12C[C@H]1C=CC2=O  
+InChI=1S/C8H10O/c1-2-8-5-6(8)3-4-7(8)9/h3-4,6H,2,5H2,1H3    InChI=1S/C8H10O/c1-2-8-5-6(8)3-4-7(8)9/h3-4,6H,2,5H2,1H3/t6-,8+/m1/s1</code></pre>
+</div>
+</div>
+<p>Sreya also added an XYZ file format parser to the RDKit, but these files include a bunch of additional information that we need to strip out. Here’s the code for that:</p>
+<div class="cell" data-executetime="{&quot;end_time&quot;:&quot;2022-12-18T06:40:39.465614Z&quot;,&quot;start_time&quot;:&quot;2022-12-18T06:40:39.452498Z&quot;}" data-execution_count="3">
+<div class="sourceCode cell-code" id="cb5"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a><span class="co"># the XYZ files from QM9 aren't really XYZ... clean them up:</span></span>
+<span id="cb5-2"><a href="#cb5-2" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> cleanup_qm9_xyz(fname):</span>
+<span id="cb5-3"><a href="#cb5-3" aria-hidden="true" tabindex="-1"></a>    ind <span class="op">=</span> <span class="bu">open</span>(fname).readlines()</span>
+<span id="cb5-4"><a href="#cb5-4" aria-hidden="true" tabindex="-1"></a>    nAts <span class="op">=</span> <span class="bu">int</span>(ind[<span class="dv">0</span>])</span>
+<span id="cb5-5"><a href="#cb5-5" aria-hidden="true" tabindex="-1"></a>    <span class="co"># There are two smiles in the data: the one from GDB and the one assigned from the</span></span>
+<span id="cb5-6"><a href="#cb5-6" aria-hidden="true" tabindex="-1"></a>    <span class="co"># 3D coordinates in the QM9 paper using OpenBabel (I think).</span></span>
+<span id="cb5-7"><a href="#cb5-7" aria-hidden="true" tabindex="-1"></a>    gdb_smi,relax_smi <span class="op">=</span> ind[<span class="op">-</span><span class="dv">2</span>].split()[:<span class="dv">2</span>]</span>
+<span id="cb5-8"><a href="#cb5-8" aria-hidden="true" tabindex="-1"></a>    ind[<span class="dv">1</span>] <span class="op">=</span> <span class="st">'</span><span class="ch">\n</span><span class="st">'</span></span>
+<span id="cb5-9"><a href="#cb5-9" aria-hidden="true" tabindex="-1"></a>    ind <span class="op">=</span> ind[:nAts<span class="op">+</span><span class="dv">2</span>]</span>
+<span id="cb5-10"><a href="#cb5-10" aria-hidden="true" tabindex="-1"></a>    <span class="cf">for</span> i <span class="kw">in</span> <span class="bu">range</span>(<span class="dv">2</span>,nAts<span class="op">+</span><span class="dv">2</span>):</span>
+<span id="cb5-11"><a href="#cb5-11" aria-hidden="true" tabindex="-1"></a>        l <span class="op">=</span> ind[i]</span>
+<span id="cb5-12"><a href="#cb5-12" aria-hidden="true" tabindex="-1"></a>        l <span class="op">=</span> l.split(<span class="st">'</span><span class="ch">\t</span><span class="st">'</span>)</span>
+<span id="cb5-13"><a href="#cb5-13" aria-hidden="true" tabindex="-1"></a>        l.pop(<span class="op">-</span><span class="dv">1</span>)</span>
+<span id="cb5-14"><a href="#cb5-14" aria-hidden="true" tabindex="-1"></a>        ind[i] <span class="op">=</span> <span class="st">'</span><span class="ch">\t</span><span class="st">'</span>.join(l)<span class="op">+</span><span class="st">'</span><span class="ch">\n</span><span class="st">'</span></span>
+<span id="cb5-15"><a href="#cb5-15" aria-hidden="true" tabindex="-1"></a>    ind <span class="op">=</span> <span class="st">''</span>.join(ind)</span>
+<span id="cb5-16"><a href="#cb5-16" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> ind,gdb_smi,relax_smi</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+<div class="cell" data-executetime="{&quot;end_time&quot;:&quot;2022-12-18T06:40:39.547937Z&quot;,&quot;start_time&quot;:&quot;2022-12-18T06:40:39.470993Z&quot;}" data-execution_count="4">
+<div class="sourceCode cell-code" id="cb6"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb6-1"><a href="#cb6-1" aria-hidden="true" tabindex="-1"></a>ind,gdb_smi,relax_smi <span class="op">=</span> cleanup_qm9_xyz(<span class="st">'../data/dsgdb9nsd_107313.xyz'</span>)</span>
+<span id="cb6-2"><a href="#cb6-2" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(ind)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>19
+
+C    0.0645055554    1.4843171326    0.3723315122
+C   -0.001915467     0.0516984051   -0.1729357038
+C   -1.4001624807   -0.5304376801   -0.1487075838
+C   -1.9909553844   -1.0379429662    1.1601625215
+C   -1.7182271444   -1.9962888369    0.0152208454
+C   -2.905416575    -2.2627721735   -0.8489696604
+C   -3.3347497536   -1.1525477782   -1.4661914556
+C   -2.4353480328   -0.0114763902   -1.1388331005
+O   -2.4853518918    1.1093228549   -1.595794586
+H    1.0876615149    1.8699729825    0.3263064541
+H   -0.5836533924    2.142053447    -0.2101812431
+H   -0.2626541721    1.5210712578    1.4170099662
+H    0.3710335675    0.0343653078   -1.2041622283
+H    0.662791197    -0.6008609283    0.4071642198
+H   -1.3142481944   -1.0584396879    2.0096409673
+H   -3.0252533013   -0.8199288984    1.4038330438
+H   -0.9412329872   -2.7436632889    0.1278385726
+H   -3.37329736 -3.2394582332   -0.9072563749
+H   -4.2004762777   -1.0463782959   -2.1061677066
+</code></pre>
+</div>
+</div>
+<p>And now we can construct a molecule:</p>
+<div class="cell" data-executetime="{&quot;end_time&quot;:&quot;2022-12-18T06:40:39.622861Z&quot;,&quot;start_time&quot;:&quot;2022-12-18T06:40:39.552852Z&quot;}" data-execution_count="5">
+<div class="sourceCode cell-code" id="cb8"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb8-1"><a href="#cb8-1" aria-hidden="true" tabindex="-1"></a>raw_mol <span class="op">=</span> Chem.MolFromXYZBlock(ind)</span>
+<span id="cb8-2"><a href="#cb8-2" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(raw_mol.GetNumAtoms(),raw_mol.GetNumBonds())</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>19 0</code></pre>
+</div>
+</div>
+<div class="cell" data-executetime="{&quot;end_time&quot;:&quot;2022-12-18T06:40:39.692056Z&quot;,&quot;start_time&quot;:&quot;2022-12-18T06:40:39.625322Z&quot;}" data-execution_count="6">
+<div class="sourceCode cell-code" id="cb10"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb10-1"><a href="#cb10-1" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> py3Dmol</span>
+<span id="cb10-2"><a href="#cb10-2" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> draw_with_spheres(mol):</span>
+<span id="cb10-3"><a href="#cb10-3" aria-hidden="true" tabindex="-1"></a>    v <span class="op">=</span> py3Dmol.view(width<span class="op">=</span><span class="dv">300</span>,height<span class="op">=</span><span class="dv">300</span>)</span>
+<span id="cb10-4"><a href="#cb10-4" aria-hidden="true" tabindex="-1"></a>    IPythonConsole.addMolToView(mol,v)</span>
+<span id="cb10-5"><a href="#cb10-5" aria-hidden="true" tabindex="-1"></a>    v.zoomTo()</span>
+<span id="cb10-6"><a href="#cb10-6" aria-hidden="true" tabindex="-1"></a>    v.setStyle({<span class="st">'sphere'</span>:{<span class="st">'radius'</span>:<span class="fl">0.3</span>},<span class="st">'stick'</span>:{<span class="st">'radius'</span>:<span class="fl">0.2</span>}})<span class="op">;</span></span>
+<span id="cb10-7"><a href="#cb10-7" aria-hidden="true" tabindex="-1"></a>    v.show()</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+<div class="cell" data-executetime="{&quot;end_time&quot;:&quot;2022-12-18T06:40:39.774814Z&quot;,&quot;start_time&quot;:&quot;2022-12-18T06:40:39.693887Z&quot;}" data-execution_count="7">
+<div class="sourceCode cell-code" id="cb11"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb11-1"><a href="#cb11-1" aria-hidden="true" tabindex="-1"></a>draw_with_spheres(raw_mol)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-display">
+<div id="3dmolviewer_16713456397690604" style="position: relative; width: 300px; height: 300px">
+        <p id="3dmolwarning_16713456397690604" style="background-color:#ffcccc;color:black">You appear to be running in JupyterLab (or JavaScript failed to load for some other reason).  You need to install the 3dmol extension: <br>
+        <tt>jupyter labextension install jupyterlab_3dmol</tt></p>
+        </div>
+<script>
+
+var loadScriptAsync = function(uri){
+  return new Promise((resolve, reject) => {
+    var tag = document.createElement('script');
+    tag.src = uri;
+    tag.async = true;
+    tag.onload = () => {
+      resolve();
+    };
+  var firstScriptTag = document.getElementsByTagName('script')[0];
+  firstScriptTag.parentNode.insertBefore(tag, firstScriptTag);
+});
+};
+
+if(typeof $3Dmolpromise === 'undefined') {
+$3Dmolpromise = null;
+  $3Dmolpromise = loadScriptAsync('https://3dmol.org/build/3Dmol.js');
+}
+
+var viewer_16713456397690604 = null;
+var warn = document.getElementById("3dmolwarning_16713456397690604");
+if(warn) {
+    warn.parentNode.removeChild(warn);
+}
+$3Dmolpromise.then(function() {
+viewer_16713456397690604 = $3Dmol.createViewer($("#3dmolviewer_16713456397690604"),{backgroundColor:"white"});
+viewer_16713456397690604.zoomTo();
+    viewer_16713456397690604.addModel("\n     RDKit          3D\n\n 19  0  0  0  0  0  0  0  0  0999 V2000\n    0.0645    1.4843    0.3723 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -0.0019    0.0517   -0.1729 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -1.4002   -0.5304   -0.1487 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -1.9910   -1.0379    1.1602 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -1.7182   -1.9963    0.0152 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -2.9054   -2.2628   -0.8490 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -3.3347   -1.1525   -1.4662 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -2.4353   -0.0115   -1.1388 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -2.4854    1.1093   -1.5958 O   0  0  0  0  0  0  0  0  0  0  0  0\n    1.0877    1.8700    0.3263 H   0  0  0  0  0  0  0  0  0  0  0  0\n   -0.5837    2.1421   -0.2102 H   0  0  0  0  0  0  0  0  0  0  0  0\n   -0.2627    1.5211    1.4170 H   0  0  0  0  0  0  0  0  0  0  0  0\n    0.3710    0.0344   -1.2042 H   0  0  0  0  0  0  0  0  0  0  0  0\n    0.6628   -0.6009    0.4072 H   0  0  0  0  0  0  0  0  0  0  0  0\n   -1.3142   -1.0584    2.0096 H   0  0  0  0  0  0  0  0  0  0  0  0\n   -3.0253   -0.8199    1.4038 H   0  0  0  0  0  0  0  0  0  0  0  0\n   -0.9412   -2.7437    0.1278 H   0  0  0  0  0  0  0  0  0  0  0  0\n   -3.3733   -3.2395   -0.9073 H   0  0  0  0  0  0  0  0  0  0  0  0\n   -4.2005   -1.0464   -2.1062 H   0  0  0  0  0  0  0  0  0  0  0  0\nM  END\n","sdf");
+    viewer_16713456397690604.setStyle({"stick": {}});
+    viewer_16713456397690604.zoomTo();
+    viewer_16713456397690604.setStyle({"sphere": {"radius": 0.3}, "stick": {"radius": 0.2}});
+viewer_16713456397690604.render();
+});
+</script>
+</div>
+</div>
+<p>Of course that doesn’t yet have bonds. Let’s fix that.</p>
+<p>Start with <code>rdDetermineBonds.DetermineConnectivity()</code>, this uses distances between atoms to determine where there should be bonds, but does not attempt to figure out bond orders.</p>
+<div class="cell" data-executetime="{&quot;end_time&quot;:&quot;2022-12-18T06:40:39.851095Z&quot;,&quot;start_time&quot;:&quot;2022-12-18T06:40:39.783941Z&quot;}" data-execution_count="8">
+<div class="sourceCode cell-code" id="cb12"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb12-1"><a href="#cb12-1" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> rdkit.Chem <span class="im">import</span> rdDetermineBonds</span>
+<span id="cb12-2"><a href="#cb12-2" aria-hidden="true" tabindex="-1"></a>conn_mol <span class="op">=</span> Chem.Mol(raw_mol)</span>
+<span id="cb12-3"><a href="#cb12-3" aria-hidden="true" tabindex="-1"></a>rdDetermineBonds.DetermineConnectivity(conn_mol)</span>
+<span id="cb12-4"><a href="#cb12-4" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb12-5"><a href="#cb12-5" aria-hidden="true" tabindex="-1"></a>draw_with_spheres(conn_mol)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-display">
+<div id="3dmolviewer_16713456398471613" style="position: relative; width: 300px; height: 300px">
+        <p id="3dmolwarning_16713456398471613" style="background-color:#ffcccc;color:black">You appear to be running in JupyterLab (or JavaScript failed to load for some other reason).  You need to install the 3dmol extension: <br>
+        <tt>jupyter labextension install jupyterlab_3dmol</tt></p>
+        </div>
+<script>
+
+var loadScriptAsync = function(uri){
+  return new Promise((resolve, reject) => {
+    var tag = document.createElement('script');
+    tag.src = uri;
+    tag.async = true;
+    tag.onload = () => {
+      resolve();
+    };
+  var firstScriptTag = document.getElementsByTagName('script')[0];
+  firstScriptTag.parentNode.insertBefore(tag, firstScriptTag);
+});
+};
+
+if(typeof $3Dmolpromise === 'undefined') {
+$3Dmolpromise = null;
+  $3Dmolpromise = loadScriptAsync('https://3dmol.org/build/3Dmol.js');
+}
+
+var viewer_16713456398471613 = null;
+var warn = document.getElementById("3dmolwarning_16713456398471613");
+if(warn) {
+    warn.parentNode.removeChild(warn);
+}
+$3Dmolpromise.then(function() {
+viewer_16713456398471613 = $3Dmol.createViewer($("#3dmolviewer_16713456398471613"),{backgroundColor:"white"});
+viewer_16713456398471613.zoomTo();
+    viewer_16713456398471613.addModel("\n     RDKit          3D\n\n 19 20  0  0  0  0  0  0  0  0999 V2000\n    0.0645    1.4843    0.3723 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -0.0019    0.0517   -0.1729 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -1.4002   -0.5304   -0.1487 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -1.9910   -1.0379    1.1602 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -1.7182   -1.9963    0.0152 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -2.9054   -2.2628   -0.8490 C   0  0  0  0  0  3  0  0  0  0  0  0\n   -3.3347   -1.1525   -1.4662 C   0  0  0  0  0  3  0  0  0  0  0  0\n   -2.4353   -0.0115   -1.1388 C   0  0  0  0  0  3  0  0  0  0  0  0\n   -2.4854    1.1093   -1.5958 O   0  0  0  0  0  1  0  0  0  0  0  0\n    1.0877    1.8700    0.3263 H   0  0  0  0  0  0  0  0  0  0  0  0\n   -0.5837    2.1421   -0.2102 H   0  0  0  0  0  0  0  0  0  0  0  0\n   -0.2627    1.5211    1.4170 H   0  0  0  0  0  0  0  0  0  0  0  0\n    0.3710    0.0344   -1.2042 H   0  0  0  0  0  0  0  0  0  0  0  0\n    0.6628   -0.6009    0.4072 H   0  0  0  0  0  0  0  0  0  0  0  0\n   -1.3142   -1.0584    2.0096 H   0  0  0  0  0  0  0  0  0  0  0  0\n   -3.0253   -0.8199    1.4038 H   0  0  0  0  0  0  0  0  0  0  0  0\n   -0.9412   -2.7437    0.1278 H   0  0  0  0  0  0  0  0  0  0  0  0\n   -3.3733   -3.2395   -0.9073 H   0  0  0  0  0  0  0  0  0  0  0  0\n   -4.2005   -1.0464   -2.1062 H   0  0  0  0  0  0  0  0  0  0  0  0\n  1  2  1  0\n  1 10  1  0\n  1 11  1  0\n  1 12  1  0\n  2  3  1  0\n  2 13  1  0\n  2 14  1  0\n  3  4  1  0\n  3  5  1  0\n  3  8  1  0\n  4  5  1  0\n  4 15  1  0\n  4 16  1  0\n  5  6  1  0\n  5 17  1  0\n  6  7  1  0\n  6 18  1  0\n  7  8  1  0\n  7 19  1  0\n  8  9  1  0\nM  END\n","sdf");
+    viewer_16713456398471613.setStyle({"stick": {}});
+    viewer_16713456398471613.zoomTo();
+    viewer_16713456398471613.setStyle({"sphere": {"radius": 0.3}, "stick": {"radius": 0.2}});
+viewer_16713456398471613.render();
+});
+</script>
+</div>
+</div>
+<p>Now we can use <code>rdDetermineBonds.DetermineBondOrders()</code> to figure out what the bond orders should be.</p>
+<p>This requires the overall charge on the molecule (the default value of the charge is zero, so it’s not technically necessary to provide it here, but we do so to be clear):</p>
+<div class="cell" data-executetime="{&quot;end_time&quot;:&quot;2022-12-18T06:40:39.957369Z&quot;,&quot;start_time&quot;:&quot;2022-12-18T06:40:39.853149Z&quot;}" data-execution_count="9">
+<div class="sourceCode cell-code" id="cb13"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb13-1"><a href="#cb13-1" aria-hidden="true" tabindex="-1"></a>rdDetermineBonds.DetermineBondOrders(conn_mol,charge<span class="op">=</span><span class="dv">0</span>)</span>
+<span id="cb13-2"><a href="#cb13-2" aria-hidden="true" tabindex="-1"></a>draw_with_spheres(conn_mol)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-display">
+<div id="3dmolviewer_16713456399519362" style="position: relative; width: 300px; height: 300px">
+        <p id="3dmolwarning_16713456399519362" style="background-color:#ffcccc;color:black">You appear to be running in JupyterLab (or JavaScript failed to load for some other reason).  You need to install the 3dmol extension: <br>
+        <tt>jupyter labextension install jupyterlab_3dmol</tt></p>
+        </div>
+<script>
+
+var loadScriptAsync = function(uri){
+  return new Promise((resolve, reject) => {
+    var tag = document.createElement('script');
+    tag.src = uri;
+    tag.async = true;
+    tag.onload = () => {
+      resolve();
+    };
+  var firstScriptTag = document.getElementsByTagName('script')[0];
+  firstScriptTag.parentNode.insertBefore(tag, firstScriptTag);
+});
+};
+
+if(typeof $3Dmolpromise === 'undefined') {
+$3Dmolpromise = null;
+  $3Dmolpromise = loadScriptAsync('https://3dmol.org/build/3Dmol.js');
+}
+
+var viewer_16713456399519362 = null;
+var warn = document.getElementById("3dmolwarning_16713456399519362");
+if(warn) {
+    warn.parentNode.removeChild(warn);
+}
+$3Dmolpromise.then(function() {
+viewer_16713456399519362 = $3Dmol.createViewer($("#3dmolviewer_16713456399519362"),{backgroundColor:"white"});
+viewer_16713456399519362.zoomTo();
+    viewer_16713456399519362.addModel("\n     RDKit          3D\n\n 19 20  0  0  0  0  0  0  0  0999 V2000\n    0.0645    1.4843    0.3723 C   0  0  1  0  0  0  0  0  0  0  0  0\n   -0.0019    0.0517   -0.1729 C   0  0  1  0  0  0  0  0  0  0  0  0\n   -1.4002   -0.5304   -0.1487 C   0  0  2  0  0  0  0  0  0  0  0  0\n   -1.9910   -1.0379    1.1602 C   0  0  1  0  0  0  0  0  0  0  0  0\n   -1.7182   -1.9963    0.0152 C   0  0  1  0  0  0  0  0  0  0  0  0\n   -2.9054   -2.2628   -0.8490 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -3.3347   -1.1525   -1.4662 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -2.4353   -0.0115   -1.1388 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -2.4854    1.1093   -1.5958 O   0  0  0  0  0  0  0  0  0  0  0  0\n    1.0877    1.8700    0.3263 H   0  0  0  0  0  0  0  0  0  0  0  0\n   -0.5837    2.1421   -0.2102 H   0  0  0  0  0  0  0  0  0  0  0  0\n   -0.2627    1.5211    1.4170 H   0  0  0  0  0  0  0  0  0  0  0  0\n    0.3710    0.0344   -1.2042 H   0  0  0  0  0  0  0  0  0  0  0  0\n    0.6628   -0.6009    0.4072 H   0  0  0  0  0  0  0  0  0  0  0  0\n   -1.3142   -1.0584    2.0096 H   0  0  0  0  0  0  0  0  0  0  0  0\n   -3.0253   -0.8199    1.4038 H   0  0  0  0  0  0  0  0  0  0  0  0\n   -0.9412   -2.7437    0.1278 H   0  0  0  0  0  0  0  0  0  0  0  0\n   -3.3733   -3.2395   -0.9073 H   0  0  0  0  0  0  0  0  0  0  0  0\n   -4.2005   -1.0464   -2.1062 H   0  0  0  0  0  0  0  0  0  0  0  0\n  1  2  1  0\n  1 10  1  1\n  1 11  1  0\n  1 12  1  0\n  2  3  1  0\n  2 13  1  6\n  2 14  1  0\n  3  4  1  0\n  3  5  1  0\n  3  8  1  6\n  4  5  1  0\n  4 15  1  1\n  4 16  1  0\n  5  6  1  0\n  5 17  1  1\n  6  7  2  0\n  6 18  1  0\n  7  8  1  0\n  7 19  1  0\n  8  9  2  0\nM  END\n","sdf");
+    viewer_16713456399519362.setStyle({"stick": {}});
+    viewer_16713456399519362.zoomTo();
+    viewer_16713456399519362.setStyle({"sphere": {"radius": 0.3}, "stick": {"radius": 0.2}});
+viewer_16713456399519362.render();
+});
+</script>
+</div>
+</div>
+<p>We can do both steps in a single call. This is the easiest way to use the code if you just want to look at the final bond orders:</p>
+<div class="cell" data-executetime="{&quot;end_time&quot;:&quot;2022-12-18T06:40:40.049649Z&quot;,&quot;start_time&quot;:&quot;2022-12-18T06:40:39.962007Z&quot;}" data-execution_count="10">
+<div class="sourceCode cell-code" id="cb14"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb14-1"><a href="#cb14-1" aria-hidden="true" tabindex="-1"></a>conn_mol <span class="op">=</span> Chem.Mol(raw_mol)</span>
+<span id="cb14-2"><a href="#cb14-2" aria-hidden="true" tabindex="-1"></a>rdDetermineBonds.DetermineBonds(conn_mol,charge<span class="op">=</span><span class="dv">0</span>)</span>
+<span id="cb14-3"><a href="#cb14-3" aria-hidden="true" tabindex="-1"></a>draw_with_spheres(conn_mol)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-display">
+<div id="3dmolviewer_1671345640045727" style="position: relative; width: 300px; height: 300px">
+        <p id="3dmolwarning_1671345640045727" style="background-color:#ffcccc;color:black">You appear to be running in JupyterLab (or JavaScript failed to load for some other reason).  You need to install the 3dmol extension: <br>
+        <tt>jupyter labextension install jupyterlab_3dmol</tt></p>
+        </div>
+<script>
+
+var loadScriptAsync = function(uri){
+  return new Promise((resolve, reject) => {
+    var tag = document.createElement('script');
+    tag.src = uri;
+    tag.async = true;
+    tag.onload = () => {
+      resolve();
+    };
+  var firstScriptTag = document.getElementsByTagName('script')[0];
+  firstScriptTag.parentNode.insertBefore(tag, firstScriptTag);
+});
+};
+
+if(typeof $3Dmolpromise === 'undefined') {
+$3Dmolpromise = null;
+  $3Dmolpromise = loadScriptAsync('https://3dmol.org/build/3Dmol.js');
+}
+
+var viewer_1671345640045727 = null;
+var warn = document.getElementById("3dmolwarning_1671345640045727");
+if(warn) {
+    warn.parentNode.removeChild(warn);
+}
+$3Dmolpromise.then(function() {
+viewer_1671345640045727 = $3Dmol.createViewer($("#3dmolviewer_1671345640045727"),{backgroundColor:"white"});
+viewer_1671345640045727.zoomTo();
+    viewer_1671345640045727.addModel("\n     RDKit          3D\n\n 19 20  0  0  0  0  0  0  0  0999 V2000\n    0.0645    1.4843    0.3723 C   0  0  1  0  0  0  0  0  0  0  0  0\n   -0.0019    0.0517   -0.1729 C   0  0  1  0  0  0  0  0  0  0  0  0\n   -1.4002   -0.5304   -0.1487 C   0  0  2  0  0  0  0  0  0  0  0  0\n   -1.9910   -1.0379    1.1602 C   0  0  1  0  0  0  0  0  0  0  0  0\n   -1.7182   -1.9963    0.0152 C   0  0  1  0  0  0  0  0  0  0  0  0\n   -2.9054   -2.2628   -0.8490 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -3.3347   -1.1525   -1.4662 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -2.4353   -0.0115   -1.1388 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -2.4854    1.1093   -1.5958 O   0  0  0  0  0  0  0  0  0  0  0  0\n    1.0877    1.8700    0.3263 H   0  0  0  0  0  0  0  0  0  0  0  0\n   -0.5837    2.1421   -0.2102 H   0  0  0  0  0  0  0  0  0  0  0  0\n   -0.2627    1.5211    1.4170 H   0  0  0  0  0  0  0  0  0  0  0  0\n    0.3710    0.0344   -1.2042 H   0  0  0  0  0  0  0  0  0  0  0  0\n    0.6628   -0.6009    0.4072 H   0  0  0  0  0  0  0  0  0  0  0  0\n   -1.3142   -1.0584    2.0096 H   0  0  0  0  0  0  0  0  0  0  0  0\n   -3.0253   -0.8199    1.4038 H   0  0  0  0  0  0  0  0  0  0  0  0\n   -0.9412   -2.7437    0.1278 H   0  0  0  0  0  0  0  0  0  0  0  0\n   -3.3733   -3.2395   -0.9073 H   0  0  0  0  0  0  0  0  0  0  0  0\n   -4.2005   -1.0464   -2.1062 H   0  0  0  0  0  0  0  0  0  0  0  0\n  1  2  1  0\n  1 10  1  1\n  1 11  1  0\n  1 12  1  0\n  2  3  1  0\n  2 13  1  6\n  2 14  1  0\n  3  4  1  0\n  3  5  1  0\n  3  8  1  6\n  4  5  1  0\n  4 15  1  1\n  4 16  1  0\n  5  6  1  0\n  5 17  1  1\n  6  7  2  0\n  6 18  1  0\n  7  8  1  0\n  7 19  1  0\n  8  9  2  0\nM  END\n","sdf");
+    viewer_1671345640045727.setStyle({"stick": {}});
+    viewer_1671345640045727.zoomTo();
+    viewer_1671345640045727.setStyle({"sphere": {"radius": 0.3}, "stick": {"radius": 0.2}});
+viewer_1671345640045727.render();
+});
+</script>
+</div>
+</div>
+<p>See if the SMILES we got agrees with the what QM9 says it should be:</p>
+<div class="cell" data-executetime="{&quot;end_time&quot;:&quot;2022-12-18T06:40:40.123401Z&quot;,&quot;start_time&quot;:&quot;2022-12-18T06:40:40.051965Z&quot;}" data-execution_count="11">
+<div class="sourceCode cell-code" id="cb15"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb15-1"><a href="#cb15-1" aria-hidden="true" tabindex="-1"></a>cm <span class="op">=</span> Chem.RemoveHs(conn_mol)</span>
+<span id="cb15-2"><a href="#cb15-2" aria-hidden="true" tabindex="-1"></a>osmi <span class="op">=</span> Chem.MolToSmiles(cm)</span>
+<span id="cb15-3"><a href="#cb15-3" aria-hidden="true" tabindex="-1"></a>smi <span class="op">=</span> Chem.CanonSmiles(relax_smi)</span>
+<span id="cb15-4"><a href="#cb15-4" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(osmi,smi)</span>
+<span id="cb15-5"><a href="#cb15-5" aria-hidden="true" tabindex="-1"></a>osmi<span class="op">==</span>smi</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>CC[C@]12C[C@H]1C=CC2=O CC[C@]12C[C@H]1C=CC2=O</code></pre>
+</div>
+<div class="cell-output cell-output-display" data-execution_count="11">
+<pre><code>True</code></pre>
+</div>
+</div>
+<p>Yep… that’s all good.</p>
+<p>Let’s do another example:</p>
+<div class="cell" data-executetime="{&quot;end_time&quot;:&quot;2022-12-18T06:40:40.193888Z&quot;,&quot;start_time&quot;:&quot;2022-12-18T06:40:40.124116Z&quot;}" data-execution_count="12">
+<div class="sourceCode cell-code" id="cb18"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb18-1"><a href="#cb18-1" aria-hidden="true" tabindex="-1"></a>ind,gdb_smi,relax_smi <span class="op">=</span> cleanup_qm9_xyz(<span class="st">'../data/dsgdb9nsd_127185.xyz'</span>)</span>
+<span id="cb18-2"><a href="#cb18-2" aria-hidden="true" tabindex="-1"></a>raw_mol <span class="op">=</span> Chem.MolFromXYZBlock(ind)</span>
+<span id="cb18-3"><a href="#cb18-3" aria-hidden="true" tabindex="-1"></a>conn_mol <span class="op">=</span> Chem.Mol(raw_mol)</span>
+<span id="cb18-4"><a href="#cb18-4" aria-hidden="true" tabindex="-1"></a>rdDetermineBonds.DetermineBonds(conn_mol,charge<span class="op">=</span><span class="dv">0</span>)</span>
+<span id="cb18-5"><a href="#cb18-5" aria-hidden="true" tabindex="-1"></a>conn_mol</span>
+<span id="cb18-6"><a href="#cb18-6" aria-hidden="true" tabindex="-1"></a>draw_with_spheres(conn_mol)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-display">
+<div id="3dmolviewer_16713456401917276" style="position: relative; width: 300px; height: 300px">
+        <p id="3dmolwarning_16713456401917276" style="background-color:#ffcccc;color:black">You appear to be running in JupyterLab (or JavaScript failed to load for some other reason).  You need to install the 3dmol extension: <br>
+        <tt>jupyter labextension install jupyterlab_3dmol</tt></p>
+        </div>
+<script>
+
+var loadScriptAsync = function(uri){
+  return new Promise((resolve, reject) => {
+    var tag = document.createElement('script');
+    tag.src = uri;
+    tag.async = true;
+    tag.onload = () => {
+      resolve();
+    };
+  var firstScriptTag = document.getElementsByTagName('script')[0];
+  firstScriptTag.parentNode.insertBefore(tag, firstScriptTag);
+});
+};
+
+if(typeof $3Dmolpromise === 'undefined') {
+$3Dmolpromise = null;
+  $3Dmolpromise = loadScriptAsync('https://3dmol.org/build/3Dmol.js');
+}
+
+var viewer_16713456401917276 = null;
+var warn = document.getElementById("3dmolwarning_16713456401917276");
+if(warn) {
+    warn.parentNode.removeChild(warn);
+}
+$3Dmolpromise.then(function() {
+viewer_16713456401917276 = $3Dmol.createViewer($("#3dmolviewer_16713456401917276"),{backgroundColor:"white"});
+viewer_16713456401917276.zoomTo();
+    viewer_16713456401917276.addModel("\n     RDKit          3D\n\n 15 15  0  0  0  0  0  0  0  0999 V2000\n    0.0344    1.4639   -0.0145 C   0  0  1  0  0  0  0  0  0  0  0  0\n   -0.0019    0.0063   -0.0044 N   0  0  0  0  0  0  0  0  0  0  0  0\n   -0.0458   -0.6642    1.2086 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -0.0565   -0.1090    2.2824 O   0  0  0  0  0  0  0  0  0  0  0  0\n    0.0084   -0.6842   -1.2118 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -0.0233   -2.0014   -1.2649 N   0  0  0  0  0  0  0  0  0  0  0  0\n   -0.0002   -2.3144   -2.6220 O   0  0  0  0  0  0  0  0  0  0  0  0\n    0.0441   -1.1838   -3.3314 C   0  0  0  0  0  0  0  0  0  0  0  0\n    0.0526   -0.1011   -2.5153 C   0  0  0  0  0  0  0  0  0  0  0  0\n    0.9467    1.8282   -0.4975 H   0  0  0  0  0  0  0  0  0  0  0  0\n   -0.8359    1.8722   -0.5382 H   0  0  0  0  0  0  0  0  0  0  0  0\n    0.0187    1.7900    1.0244 H   0  0  0  0  0  0  0  0  0  0  0  0\n   -0.0699   -1.7554    1.0775 H   0  0  0  0  0  0  0  0  0  0  0  0\n    0.0656   -1.2996   -4.4040 H   0  0  0  0  0  0  0  0  0  0  0  0\n    0.0848    0.9382   -2.7902 H   0  0  0  0  0  0  0  0  0  0  0  0\n  1  2  1  0\n  1 10  1  6\n  1 11  1  0\n  1 12  1  0\n  2  3  1  0\n  2  5  1  0\n  3  4  2  0\n  3 13  1  0\n  5  6  2  0\n  5  9  1  0\n  6  7  1  0\n  7  8  1  0\n  8  9  2  0\n  8 14  1  0\n  9 15  1  0\nM  END\n","sdf");
+    viewer_16713456401917276.setStyle({"stick": {}});
+    viewer_16713456401917276.zoomTo();
+    viewer_16713456401917276.setStyle({"sphere": {"radius": 0.3}, "stick": {"radius": 0.2}});
+viewer_16713456401917276.render();
+});
+</script>
+</div>
+</div>
+<p>Again, make sure we got it right:</p>
+<div class="cell" data-executetime="{&quot;end_time&quot;:&quot;2022-12-18T06:40:40.272552Z&quot;,&quot;start_time&quot;:&quot;2022-12-18T06:40:40.195534Z&quot;}" data-execution_count="13">
+<div class="sourceCode cell-code" id="cb19"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb19-1"><a href="#cb19-1" aria-hidden="true" tabindex="-1"></a>cm <span class="op">=</span> Chem.RemoveHs(conn_mol)</span>
+<span id="cb19-2"><a href="#cb19-2" aria-hidden="true" tabindex="-1"></a>osmi <span class="op">=</span> Chem.MolToSmiles(cm)</span>
+<span id="cb19-3"><a href="#cb19-3" aria-hidden="true" tabindex="-1"></a>smi <span class="op">=</span> Chem.CanonSmiles(relax_smi)</span>
+<span id="cb19-4"><a href="#cb19-4" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(osmi,smi)</span>
+<span id="cb19-5"><a href="#cb19-5" aria-hidden="true" tabindex="-1"></a>osmi<span class="op">==</span>smi</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>CN(C=O)c1ccon1 CN(C=O)c1ccon1</code></pre>
+</div>
+<div class="cell-output cell-output-display" data-execution_count="13">
+<pre><code>True</code></pre>
+</div>
+</div>
+<p>Since this method needs the Hs to be there, it unfortunately won’t be useful in assigning bond orders to the ligands from PDB structures… ah well.</p>
+</section>
+<section id="testing-the-functionality-on-a-bunch-of-molecules" class="level1">
+<h1>Testing the functionality on a bunch of molecules</h1>
+<p>Here’s a little test to see how well the new functionality does on a randomly selected subset of <a href="https://figshare.com/collections/Quantum_chemistry_structures_and_properties_of_134_kilo_molecules/978904">QM9</a>.</p>
+<p>Start by getting 10K random files from my local copy of QM9 (these, for obvious reasons, aren’t in the gitub repo for this notebook) and preprocessing them:</p>
+<div class="cell" data-executetime="{&quot;end_time&quot;:&quot;2022-12-18T06:40:40.575532Z&quot;,&quot;start_time&quot;:&quot;2022-12-18T06:40:40.274106Z&quot;}" data-execution_count="14">
+<div class="sourceCode cell-code" id="cb22"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb22-1"><a href="#cb22-1" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> glob</span>
+<span id="cb22-2"><a href="#cb22-2" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> random</span>
+<span id="cb22-3"><a href="#cb22-3" aria-hidden="true" tabindex="-1"></a>random.seed(<span class="bn">0xf00d</span>)</span>
+<span id="cb22-4"><a href="#cb22-4" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb22-5"><a href="#cb22-5" aria-hidden="true" tabindex="-1"></a>fns <span class="op">=</span> <span class="bu">list</span>(glob.glob(<span class="st">'/local/QM9/*.xyz'</span>))</span>
+<span id="cb22-6"><a href="#cb22-6" aria-hidden="true" tabindex="-1"></a>random.shuffle(fns)</span>
+<span id="cb22-7"><a href="#cb22-7" aria-hidden="true" tabindex="-1"></a>fns <span class="op">=</span> fns[:<span class="dv">10000</span>]</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+<div class="cell" data-executetime="{&quot;end_time&quot;:&quot;2022-12-18T06:40:40.828592Z&quot;,&quot;start_time&quot;:&quot;2022-12-18T06:40:40.578524Z&quot;}" data-execution_count="15">
+<div class="sourceCode cell-code" id="cb23"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb23-1"><a href="#cb23-1" aria-hidden="true" tabindex="-1"></a>qm9_data <span class="op">=</span> []</span>
+<span id="cb23-2"><a href="#cb23-2" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> fn <span class="kw">in</span> fns:</span>
+<span id="cb23-3"><a href="#cb23-3" aria-hidden="true" tabindex="-1"></a>    d,gdb_smi,relax_smi <span class="op">=</span> cleanup_qm9_xyz(fn)</span>
+<span id="cb23-4"><a href="#cb23-4" aria-hidden="true" tabindex="-1"></a>    qm9_data.append((fn,d,gdb_smi,relax_smi))</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+<p>I believe that QM9 doesn’t have double bond stereo indicated in the SMILES, verify that:</p>
+<div class="cell" data-executetime="{&quot;end_time&quot;:&quot;2022-12-18T06:40:40.834201Z&quot;,&quot;start_time&quot;:&quot;2022-12-18T06:40:40.829559Z&quot;}" data-execution_count="16">
+<div class="sourceCode cell-code" id="cb24"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb24-1"><a href="#cb24-1" aria-hidden="true" tabindex="-1"></a>has_dbl_bond_stereo<span class="op">=</span>[]</span>
+<span id="cb24-2"><a href="#cb24-2" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> tpl <span class="kw">in</span> qm9_data:</span>
+<span id="cb24-3"><a href="#cb24-3" aria-hidden="true" tabindex="-1"></a>    smi <span class="op">=</span> tpl[<span class="op">-</span><span class="dv">1</span>]</span>
+<span id="cb24-4"><a href="#cb24-4" aria-hidden="true" tabindex="-1"></a>    <span class="cf">if</span> smi.find(<span class="st">'/'</span>) <span class="op">!=</span> <span class="op">-</span><span class="dv">1</span> <span class="kw">or</span> smi.find(<span class="st">'</span><span class="ch">\\</span><span class="st">'</span>) <span class="op">!=</span> <span class="op">-</span><span class="dv">1</span>:</span>
+<span id="cb24-5"><a href="#cb24-5" aria-hidden="true" tabindex="-1"></a>        <span class="bu">print</span>(tpl)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+<p>Here’s the testing code.</p>
+<p>For each molecule we have two SMILES to compare to: 1. <code>gdb_smi</code>: the SMILES from GDB that the QM9 authors used as input 2. <code>relax_smi</code>: the SMILES generated by OpenBabel(?) from the optimized structure.</p>
+<p>We’ll start by seeing if we match <code>relax_smi</code> and, if that fails, compare to <code>gdb_smi</code>.</p>
+<div class="cell" data-executetime="{&quot;end_time&quot;:&quot;2022-12-18T06:40:44.477276Z&quot;,&quot;start_time&quot;:&quot;2022-12-18T06:40:40.835150Z&quot;}" data-scrolled="true" data-execution_count="17">
+<div class="sourceCode cell-code" id="cb25"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb25-1"><a href="#cb25-1" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> rdkit <span class="im">import</span> RDLogger</span>
+<span id="cb25-2"><a href="#cb25-2" aria-hidden="true" tabindex="-1"></a>RDLogger.DisableLog(<span class="st">'rdApp.*'</span>)</span>
+<span id="cb25-3"><a href="#cb25-3" aria-hidden="true" tabindex="-1"></a>relax_fails <span class="op">=</span> []</span>
+<span id="cb25-4"><a href="#cb25-4" aria-hidden="true" tabindex="-1"></a>gdb_fails <span class="op">=</span> []</span>
+<span id="cb25-5"><a href="#cb25-5" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> fn,ind,gdb_smi,relax_smi <span class="kw">in</span> qm9_data:</span>
+<span id="cb25-6"><a href="#cb25-6" aria-hidden="true" tabindex="-1"></a>    <span class="co"># the RDKit can't parse some of the SMILES from QM9... skip those mols</span></span>
+<span id="cb25-7"><a href="#cb25-7" aria-hidden="true" tabindex="-1"></a>    <span class="cf">try</span>:</span>
+<span id="cb25-8"><a href="#cb25-8" aria-hidden="true" tabindex="-1"></a>        smi <span class="op">=</span> Chem.CanonSmiles(relax_smi)</span>
+<span id="cb25-9"><a href="#cb25-9" aria-hidden="true" tabindex="-1"></a>    <span class="cf">except</span>:</span>
+<span id="cb25-10"><a href="#cb25-10" aria-hidden="true" tabindex="-1"></a>        <span class="cf">continue</span></span>
+<span id="cb25-11"><a href="#cb25-11" aria-hidden="true" tabindex="-1"></a>    mol <span class="op">=</span> Chem.MolFromXYZBlock(ind)</span>
+<span id="cb25-12"><a href="#cb25-12" aria-hidden="true" tabindex="-1"></a>    <span class="cf">if</span> mol <span class="kw">is</span> <span class="va">None</span>:</span>
+<span id="cb25-13"><a href="#cb25-13" aria-hidden="true" tabindex="-1"></a>        <span class="bu">print</span>(<span class="ss">f'Could not parse </span><span class="sc">{</span>fn<span class="sc">}</span><span class="ss">'</span>)</span>
+<span id="cb25-14"><a href="#cb25-14" aria-hidden="true" tabindex="-1"></a>        <span class="cf">continue</span></span>
+<span id="cb25-15"><a href="#cb25-15" aria-hidden="true" tabindex="-1"></a>    rdDetermineBonds.DetermineBonds(mol,charge<span class="op">=</span><span class="dv">0</span>)</span>
+<span id="cb25-16"><a href="#cb25-16" aria-hidden="true" tabindex="-1"></a>    <span class="co"># remove double bond stereo:</span></span>
+<span id="cb25-17"><a href="#cb25-17" aria-hidden="true" tabindex="-1"></a>    <span class="cf">for</span> bond <span class="kw">in</span> mol.GetBonds():</span>
+<span id="cb25-18"><a href="#cb25-18" aria-hidden="true" tabindex="-1"></a>        <span class="cf">if</span> bond.GetBondType() <span class="op">==</span> Chem.BondType.DOUBLE:</span>
+<span id="cb25-19"><a href="#cb25-19" aria-hidden="true" tabindex="-1"></a>            bond.SetStereo(Chem.BondStereo.STEREONONE)</span>
+<span id="cb25-20"><a href="#cb25-20" aria-hidden="true" tabindex="-1"></a>        <span class="cf">elif</span> bond.GetBondType() <span class="op">==</span> Chem.BondType.SINGLE:</span>
+<span id="cb25-21"><a href="#cb25-21" aria-hidden="true" tabindex="-1"></a>            bond.SetBondDir(Chem.BondDir.NONE)</span>
+<span id="cb25-22"><a href="#cb25-22" aria-hidden="true" tabindex="-1"></a>    osmi <span class="op">=</span> Chem.MolToSmiles(Chem.RemoveAllHs(mol))</span>
+<span id="cb25-23"><a href="#cb25-23" aria-hidden="true" tabindex="-1"></a>    <span class="co"># compare to relax_smi:</span></span>
+<span id="cb25-24"><a href="#cb25-24" aria-hidden="true" tabindex="-1"></a>    <span class="cf">if</span> smi<span class="op">!=</span>osmi:</span>
+<span id="cb25-25"><a href="#cb25-25" aria-hidden="true" tabindex="-1"></a>        relax_fails.append((fn,smi,osmi))</span>
+<span id="cb25-26"><a href="#cb25-26" aria-hidden="true" tabindex="-1"></a>        <span class="co"># that failed, so next we are going to compare to gdb_smi;</span></span>
+<span id="cb25-27"><a href="#cb25-27" aria-hidden="true" tabindex="-1"></a>        <span class="cf">try</span>:</span>
+<span id="cb25-28"><a href="#cb25-28" aria-hidden="true" tabindex="-1"></a>            smi <span class="op">=</span> Chem.CanonSmiles(gdb_smi)</span>
+<span id="cb25-29"><a href="#cb25-29" aria-hidden="true" tabindex="-1"></a>        <span class="cf">except</span>:</span>
+<span id="cb25-30"><a href="#cb25-30" aria-hidden="true" tabindex="-1"></a>            <span class="cf">continue</span></span>
+<span id="cb25-31"><a href="#cb25-31" aria-hidden="true" tabindex="-1"></a>        <span class="co"># the GDB smiles don't have any stereo at all, so get rid of atomic stereo</span></span>
+<span id="cb25-32"><a href="#cb25-32" aria-hidden="true" tabindex="-1"></a>        <span class="cf">for</span> atom <span class="kw">in</span> mol.GetAtoms():</span>
+<span id="cb25-33"><a href="#cb25-33" aria-hidden="true" tabindex="-1"></a>            atom.SetChiralTag(Chem.ChiralType.CHI_UNSPECIFIED)</span>
+<span id="cb25-34"><a href="#cb25-34" aria-hidden="true" tabindex="-1"></a>        osmi <span class="op">=</span> Chem.MolToSmiles(Chem.RemoveAllHs(mol))</span>
+<span id="cb25-35"><a href="#cb25-35" aria-hidden="true" tabindex="-1"></a>        <span class="cf">if</span> smi <span class="op">!=</span> osmi:</span>
+<span id="cb25-36"><a href="#cb25-36" aria-hidden="true" tabindex="-1"></a>            gdb_fails.append((fn,smi,osmi))</span>
+<span id="cb25-37"><a href="#cb25-37" aria-hidden="true" tabindex="-1"></a>RDLogger.EnableLog(<span class="st">'rdApp.*'</span>)</span>
+<span id="cb25-38"><a href="#cb25-38" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb25-39"><a href="#cb25-39" aria-hidden="true" tabindex="-1"></a><span class="bu">len</span>(relax_fails),<span class="bu">len</span>(gdb_fails)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>Could not parse /local/QM9/dsgdb9nsd_112773.xyz
+Could not parse /local/QM9/dsgdb9nsd_071817.xyz
+Could not parse /local/QM9/dsgdb9nsd_024513.xyz
+Could not parse /local/QM9/dsgdb9nsd_057755.xyz
+Could not parse /local/QM9/dsgdb9nsd_005005.xyz
+Could not parse /local/QM9/dsgdb9nsd_132540.xyz
+Could not parse /local/QM9/dsgdb9nsd_002091.xyz
+Could not parse /local/QM9/dsgdb9nsd_025366.xyz
+Could not parse /local/QM9/dsgdb9nsd_104557.xyz</code></pre>
+</div>
+<div class="cell-output cell-output-display" data-execution_count="17">
+<pre><code>(909, 27)</code></pre>
+</div>
+</div>
+<div class="cell" data-executetime="{&quot;end_time&quot;:&quot;2022-12-18T06:40:44.480944Z&quot;,&quot;start_time&quot;:&quot;2022-12-18T06:40:44.478243Z&quot;}" data-execution_count="18">
+<div class="sourceCode cell-code" id="cb28"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb28-1"><a href="#cb28-1" aria-hidden="true" tabindex="-1"></a>relax_fails[<span class="dv">0</span>]</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-display" data-execution_count="18">
+<pre><code>('/local/QM9/dsgdb9nsd_130414.xyz', '[NH][C]1C=NOC(CN)=N1', 'N=c1cnoc(CN)n1')</code></pre>
+</div>
+</div>
+<div class="cell" data-executetime="{&quot;end_time&quot;:&quot;2022-12-18T06:40:44.678134Z&quot;,&quot;start_time&quot;:&quot;2022-12-18T06:40:44.482006Z&quot;}" data-execution_count="19">
+<div class="sourceCode cell-code" id="cb30"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb30-1"><a href="#cb30-1" aria-hidden="true" tabindex="-1"></a>gdb_fails[<span class="dv">0</span>]</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-display" data-execution_count="19">
+<pre><code>('/local/QM9/dsgdb9nsd_130861.xyz', 'O=Cc1cc(=O)nno1', 'N#N.O=C=CC(=O)C=O')</code></pre>
+</div>
+</div>
+<p>Let’s start by looking at some of the failures based on <code>relax_smi</code>.</p>
+<p>In the output we have pairs of molecules where the first is constructed from <code>relax_smi</code> and the second is what we perceived</p>
+<div class="cell" data-executetime="{&quot;end_time&quot;:&quot;2022-12-18T06:40:44.913265Z&quot;,&quot;start_time&quot;:&quot;2022-12-18T06:40:44.681548Z&quot;}" data-execution_count="20">
+<div class="sourceCode cell-code" id="cb32"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb32-1"><a href="#cb32-1" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> os</span>
+<span id="cb32-2"><a href="#cb32-2" aria-hidden="true" tabindex="-1"></a>failmols <span class="op">=</span> []</span>
+<span id="cb32-3"><a href="#cb32-3" aria-hidden="true" tabindex="-1"></a>nms <span class="op">=</span> []</span>
+<span id="cb32-4"><a href="#cb32-4" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> fn,ismi,osmi <span class="kw">in</span> relax_fails:</span>
+<span id="cb32-5"><a href="#cb32-5" aria-hidden="true" tabindex="-1"></a>    im <span class="op">=</span> Chem.MolFromSmiles(ismi)</span>
+<span id="cb32-6"><a href="#cb32-6" aria-hidden="true" tabindex="-1"></a>    om <span class="op">=</span> Chem.MolFromSmiles(osmi)</span>
+<span id="cb32-7"><a href="#cb32-7" aria-hidden="true" tabindex="-1"></a>    failmols.append(im)</span>
+<span id="cb32-8"><a href="#cb32-8" aria-hidden="true" tabindex="-1"></a>    failmols.append(om)</span>
+<span id="cb32-9"><a href="#cb32-9" aria-hidden="true" tabindex="-1"></a>    nms.append(<span class="ss">f'</span><span class="sc">{</span>os<span class="sc">.</span>path<span class="sc">.</span>basename(fn)<span class="sc">}</span><span class="ss"> relax_smi'</span>)</span>
+<span id="cb32-10"><a href="#cb32-10" aria-hidden="true" tabindex="-1"></a>    nms.append(<span class="st">'rdkit_smi'</span>)</span>
+<span id="cb32-11"><a href="#cb32-11" aria-hidden="true" tabindex="-1"></a>Draw.MolsToGridImage(failmols[:<span class="dv">20</span>],molsPerRow<span class="op">=</span><span class="dv">4</span>,legends<span class="op">=</span>nms)        </span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-display" data-execution_count="20">
+<p><img src="2022-12-18-introducing-rdDetermineBonds_files/figure-html/cell-21-output-1.png" class="img-fluid"></p>
+</div>
+</div>
+<p>Those seem to be cases where we’ve assigned a multiple bond while the SMILES in the publication has a single bond with radicals on either side.</p>
+<p>What about some of the 27 cases where we haven’t reproduced the input GDB SMILES?</p>
+<div class="cell" data-executetime="{&quot;end_time&quot;:&quot;2022-12-18T06:40:44.974390Z&quot;,&quot;start_time&quot;:&quot;2022-12-18T06:40:44.914068Z&quot;}" data-execution_count="21">
+<div class="sourceCode cell-code" id="cb33"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb33-1"><a href="#cb33-1" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> os</span>
+<span id="cb33-2"><a href="#cb33-2" aria-hidden="true" tabindex="-1"></a>failmols <span class="op">=</span> []</span>
+<span id="cb33-3"><a href="#cb33-3" aria-hidden="true" tabindex="-1"></a>nms <span class="op">=</span> []</span>
+<span id="cb33-4"><a href="#cb33-4" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> fn,ismi,osmi <span class="kw">in</span> gdb_fails:</span>
+<span id="cb33-5"><a href="#cb33-5" aria-hidden="true" tabindex="-1"></a>    im <span class="op">=</span> Chem.MolFromSmiles(ismi)</span>
+<span id="cb33-6"><a href="#cb33-6" aria-hidden="true" tabindex="-1"></a>    om <span class="op">=</span> Chem.MolFromSmiles(osmi)</span>
+<span id="cb33-7"><a href="#cb33-7" aria-hidden="true" tabindex="-1"></a>    failmols.append(im)</span>
+<span id="cb33-8"><a href="#cb33-8" aria-hidden="true" tabindex="-1"></a>    failmols.append(om)</span>
+<span id="cb33-9"><a href="#cb33-9" aria-hidden="true" tabindex="-1"></a>    nms.append(<span class="ss">f'</span><span class="sc">{</span>os<span class="sc">.</span>path<span class="sc">.</span>basename(fn)<span class="sc">}</span><span class="ss"> relax_smi'</span>)</span>
+<span id="cb33-10"><a href="#cb33-10" aria-hidden="true" tabindex="-1"></a>    nms.append(<span class="st">'rdkit_smi'</span>)</span>
+<span id="cb33-11"><a href="#cb33-11" aria-hidden="true" tabindex="-1"></a>Draw.MolsToGridImage(failmols[:<span class="dv">20</span>],molsPerRow<span class="op">=</span><span class="dv">4</span>,legends<span class="op">=</span>nms)        </span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-display" data-execution_count="21">
+<p><img src="2022-12-18-introducing-rdDetermineBonds_files/figure-html/cell-22-output-1.png" class="img-fluid"></p>
+</div>
+</div>
+<p>Let’s look at a couple of those:</p>
+<div class="cell" data-executetime="{&quot;end_time&quot;:&quot;2022-12-18T06:40:45.092015Z&quot;,&quot;start_time&quot;:&quot;2022-12-18T06:40:44.975201Z&quot;}" data-execution_count="22">
+<div class="sourceCode cell-code" id="cb34"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb34-1"><a href="#cb34-1" aria-hidden="true" tabindex="-1"></a>ind,gdb_smi,relax_smi <span class="op">=</span> cleanup_qm9_xyz(<span class="st">'/local/QM9/dsgdb9nsd_129106.xyz'</span>)</span>
+<span id="cb34-2"><a href="#cb34-2" aria-hidden="true" tabindex="-1"></a>raw_mol <span class="op">=</span> Chem.MolFromXYZBlock(ind)</span>
+<span id="cb34-3"><a href="#cb34-3" aria-hidden="true" tabindex="-1"></a>conn_mol <span class="op">=</span> Chem.Mol(raw_mol)</span>
+<span id="cb34-4"><a href="#cb34-4" aria-hidden="true" tabindex="-1"></a>rdDetermineBonds.DetermineBonds(conn_mol,charge<span class="op">=</span><span class="dv">0</span>)</span>
+<span id="cb34-5"><a href="#cb34-5" aria-hidden="true" tabindex="-1"></a>conn_mol</span>
+<span id="cb34-6"><a href="#cb34-6" aria-hidden="true" tabindex="-1"></a>draw_with_spheres(conn_mol)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-display">
+<div id="3dmolviewer_1671345645087176" style="position: relative; width: 300px; height: 300px">
+        <p id="3dmolwarning_1671345645087176" style="background-color:#ffcccc;color:black">You appear to be running in JupyterLab (or JavaScript failed to load for some other reason).  You need to install the 3dmol extension: <br>
+        <tt>jupyter labextension install jupyterlab_3dmol</tt></p>
+        </div>
+<script>
+
+var loadScriptAsync = function(uri){
+  return new Promise((resolve, reject) => {
+    var tag = document.createElement('script');
+    tag.src = uri;
+    tag.async = true;
+    tag.onload = () => {
+      resolve();
+    };
+  var firstScriptTag = document.getElementsByTagName('script')[0];
+  firstScriptTag.parentNode.insertBefore(tag, firstScriptTag);
+});
+};
+
+if(typeof $3Dmolpromise === 'undefined') {
+$3Dmolpromise = null;
+  $3Dmolpromise = loadScriptAsync('https://3dmol.org/build/3Dmol.js');
+}
+
+var viewer_1671345645087176 = null;
+var warn = document.getElementById("3dmolwarning_1671345645087176");
+if(warn) {
+    warn.parentNode.removeChild(warn);
+}
+$3Dmolpromise.then(function() {
+viewer_1671345645087176 = $3Dmol.createViewer($("#3dmolviewer_1671345645087176"),{backgroundColor:"white"});
+viewer_1671345645087176.zoomTo();
+    viewer_1671345645087176.addModel("\n     RDKit          3D\n\n 13 13  0  0  0  0  0  0  0  0999 V2000\n   -0.2255    1.2316    0.0079 N   0  0  0  0  0  0  0  0  0  0  0  0\n    0.0078   -0.0141    0.0005 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -1.1022   -1.0658    0.0002 C   0  0  1  0  0  0  0  0  0  0  0  0\n   -0.3126   -2.3488   -0.0099 C   0  0  0  0  0  0  0  0  0  0  0  0\n    1.1315   -2.0942   -0.0152 C   0  0  0  0  0  0  0  0  0  0  0  0\n    1.2211   -0.6943   -0.0085 N   0  0  0  0  0  0  0  0  0  0  0  0\n    2.0653   -2.8598   -0.0233 O   0  0  0  0  0  1  0  0  0  0  0  0\n   -1.2073   -4.6066   -0.0174 N   0  0  0  0  0  0  0  0  0  0  0  0\n   -0.7951   -3.5497   -0.0138 N   0  0  0  0  0  4  0  0  0  0  0  0\n    0.6338    1.7832    0.0068 H   0  0  0  0  0  0  0  0  0  0  0  0\n   -1.7315   -0.9387    0.8869 H   0  0  0  0  0  0  0  0  0  0  0  0\n   -1.7394   -0.9298   -0.8796 H   0  0  0  0  0  0  0  0  0  0  0  0\n    2.1220   -0.2408   -0.0104 H   0  0  0  0  0  0  0  0  0  0  0  0\n  1  2  2  0\n  1 10  1  0\n  2  3  1  0\n  2  6  1  0\n  3  4  1  0\n  3 11  1  1\n  3 12  1  0\n  4  5  2  0\n  4  9  1  0\n  5  6  1  0\n  5  7  1  0\n  6 13  1  0\n  8  9  3  0\nM  CHG  2   7  -1   9   1\nM  END\n","sdf");
+    viewer_1671345645087176.setStyle({"stick": {}});
+    viewer_1671345645087176.zoomTo();
+    viewer_1671345645087176.setStyle({"sphere": {"radius": 0.3}, "stick": {"radius": 0.2}});
+viewer_1671345645087176.render();
+});
+</script>
+</div>
+</div>
+<div class="cell" data-executetime="{&quot;end_time&quot;:&quot;2022-12-18T06:40:45.177975Z&quot;,&quot;start_time&quot;:&quot;2022-12-18T06:40:45.099458Z&quot;}" data-execution_count="23">
+<div class="sourceCode cell-code" id="cb35"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb35-1"><a href="#cb35-1" aria-hidden="true" tabindex="-1"></a>ind,gdb_smi,relax_smi <span class="op">=</span> cleanup_qm9_xyz(<span class="st">'/local/QM9/dsgdb9nsd_133855.xyz'</span>)</span>
+<span id="cb35-2"><a href="#cb35-2" aria-hidden="true" tabindex="-1"></a>raw_mol <span class="op">=</span> Chem.MolFromXYZBlock(ind)</span>
+<span id="cb35-3"><a href="#cb35-3" aria-hidden="true" tabindex="-1"></a>conn_mol <span class="op">=</span> Chem.Mol(raw_mol)</span>
+<span id="cb35-4"><a href="#cb35-4" aria-hidden="true" tabindex="-1"></a>rdDetermineBonds.DetermineBonds(conn_mol,charge<span class="op">=</span><span class="dv">0</span>)</span>
+<span id="cb35-5"><a href="#cb35-5" aria-hidden="true" tabindex="-1"></a>conn_mol</span>
+<span id="cb35-6"><a href="#cb35-6" aria-hidden="true" tabindex="-1"></a>draw_with_spheres(conn_mol)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-display">
+<div id="3dmolviewer_16713456451761575" style="position: relative; width: 300px; height: 300px">
+        <p id="3dmolwarning_16713456451761575" style="background-color:#ffcccc;color:black">You appear to be running in JupyterLab (or JavaScript failed to load for some other reason).  You need to install the 3dmol extension: <br>
+        <tt>jupyter labextension install jupyterlab_3dmol</tt></p>
+        </div>
+<script>
+
+var loadScriptAsync = function(uri){
+  return new Promise((resolve, reject) => {
+    var tag = document.createElement('script');
+    tag.src = uri;
+    tag.async = true;
+    tag.onload = () => {
+      resolve();
+    };
+  var firstScriptTag = document.getElementsByTagName('script')[0];
+  firstScriptTag.parentNode.insertBefore(tag, firstScriptTag);
+});
+};
+
+if(typeof $3Dmolpromise === 'undefined') {
+$3Dmolpromise = null;
+  $3Dmolpromise = loadScriptAsync('https://3dmol.org/build/3Dmol.js');
+}
+
+var viewer_16713456451761575 = null;
+var warn = document.getElementById("3dmolwarning_16713456451761575");
+if(warn) {
+    warn.parentNode.removeChild(warn);
+}
+$3Dmolpromise.then(function() {
+viewer_16713456451761575 = $3Dmol.createViewer($("#3dmolviewer_16713456451761575"),{backgroundColor:"white"});
+viewer_16713456451761575.zoomTo();
+    viewer_16713456451761575.addModel("\n     RDKit          3D\n\n 17 18  0  0  0  0  0  0  0  0999 V2000\n    1.0375   -0.1058   -1.0380 C   0  0  2  0  0  0  0  0  0  0  0  0\n    2.4805    0.2357   -0.9937 C   0  0  0  0  0  0  0  0  0  0  0  0\n    3.8209   -2.0692    1.2656 O   0  0  0  0  0  0  0  0  0  0  0  0\n    4.3213   -1.2872    0.5052 C   0  0  0  0  0  0  0  0  0  0  0  0\n    5.7490   -0.6642    0.6310 C   0  0  2  0  0  0  0  0  0  0  0  0\n    5.5766    0.7022   -0.0251 C   0  0  0  0  0  0  0  0  0  0  0  0\n    4.4627    0.6912   -0.7624 C   0  0  0  0  0  0  0  0  0  0  0  0\n    3.2147    1.3641   -1.1603 C   0  0  0  0  0  0  0  0  0  0  0  0\n    3.7348   -0.6357   -0.7551 C   0  0  2  0  0  0  0  0  0  0  0  0\n    0.4240    0.7686   -1.2722 H   0  0  0  0  0  0  0  0  0  0  0  0\n    0.7061   -0.5180   -0.0773 H   0  0  0  0  0  0  0  0  0  0  0  0\n    0.8418   -0.8788   -1.7919 H   0  0  0  0  0  0  0  0  0  0  0  0\n    6.4957   -1.3176    0.1566 H   0  0  0  0  0  0  0  0  0  0  0  0\n    6.0221   -0.5977    1.6894 H   0  0  0  0  0  0  0  0  0  0  0  0\n    6.1728    1.5644    0.2492 H   0  0  0  0  0  0  0  0  0  0  0  0\n    2.9555    2.3914   -1.3836 H   0  0  0  0  0  0  0  0  0  0  0  0\n    3.9589   -1.2883   -1.6104 H   0  0  0  0  0  0  0  0  0  0  0  0\n  1  2  1  0\n  1 10  1  6\n  1 11  1  0\n  1 12  1  0\n  2  8  2  0\n  2  9  1  0\n  3  4  2  0\n  4  5  1  0\n  4  9  1  0\n  5  6  1  0\n  5 13  1  6\n  5 14  1  0\n  6  7  2  0\n  6 15  1  0\n  7  8  1  0\n  7  9  1  0\n  8 16  1  0\n  9 17  1  6\nM  END\n","sdf");
+    viewer_16713456451761575.setStyle({"stick": {}});
+    viewer_16713456451761575.zoomTo();
+    viewer_16713456451761575.setStyle({"sphere": {"radius": 0.3}, "stick": {"radius": 0.2}});
+viewer_16713456451761575.render();
+});
+</script>
+</div>
+</div>
+<p>Those are clearly cases where the QM optimization has yielded a completely different structure from what they started with.</p>
+<p>I’m sure we’ll end up finding (and fixing) issues once more people start using the code, but I think these results show that the new functionality in <code>rdDetermineBonds</code> works quite well!</p>
+</section>
+<section id="benchmarking-the-code" class="level1">
+<h1>Benchmarking the code</h1>
+<p>The last question I had, and I will definitely stop after this, is how long it takes to run the code. Let’s check that.</p>
+<p>I just want to time <code>DetermineBonds()</code> part, so let’s construct the molecules in advance:</p>
+<div class="cell" data-executetime="{&quot;end_time&quot;:&quot;2022-12-18T06:40:45.446017Z&quot;,&quot;start_time&quot;:&quot;2022-12-18T06:40:45.179115Z&quot;}" data-execution_count="24">
+<div class="sourceCode cell-code" id="cb36"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb36-1"><a href="#cb36-1" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> rdkit <span class="im">import</span> rdBase</span>
+<span id="cb36-2"><a href="#cb36-2" aria-hidden="true" tabindex="-1"></a><span class="cf">with</span> rdBase.BlockLogs():</span>
+<span id="cb36-3"><a href="#cb36-3" aria-hidden="true" tabindex="-1"></a>    tmols <span class="op">=</span> []</span>
+<span id="cb36-4"><a href="#cb36-4" aria-hidden="true" tabindex="-1"></a>    <span class="cf">for</span> fn,ind,gdb_smi,relax_smi <span class="kw">in</span> qm9_data:</span>
+<span id="cb36-5"><a href="#cb36-5" aria-hidden="true" tabindex="-1"></a>        <span class="co"># the RDKit can't parse some of the SMILES from QM9... skip those</span></span>
+<span id="cb36-6"><a href="#cb36-6" aria-hidden="true" tabindex="-1"></a>        mol <span class="op">=</span> Chem.MolFromXYZBlock(ind)</span>
+<span id="cb36-7"><a href="#cb36-7" aria-hidden="true" tabindex="-1"></a>        <span class="cf">if</span> mol <span class="kw">is</span> <span class="va">None</span>:</span>
+<span id="cb36-8"><a href="#cb36-8" aria-hidden="true" tabindex="-1"></a>            <span class="cf">continue</span></span>
+<span id="cb36-9"><a href="#cb36-9" aria-hidden="true" tabindex="-1"></a>        tmols.append(mol)</span>
+<span id="cb36-10"><a href="#cb36-10" aria-hidden="true" tabindex="-1"></a><span class="bu">len</span>(tmols)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-display" data-execution_count="24">
+<pre><code>9991</code></pre>
+</div>
+</div>
+<div class="cell" data-executetime="{&quot;end_time&quot;:&quot;2022-12-18T06:40:50.623429Z&quot;,&quot;start_time&quot;:&quot;2022-12-18T06:40:45.446902Z&quot;}" data-execution_count="25">
+<div class="sourceCode cell-code" id="cb38"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb38-1"><a href="#cb38-1" aria-hidden="true" tabindex="-1"></a><span class="op">%</span>timeit [rdDetermineBonds.DetermineBonds(m,charge<span class="op">=</span><span class="dv">0</span>) <span class="cf">for</span> m <span class="kw">in</span> tmols]</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>646 ms ± 2.95 ms per loop (mean ± std. dev. of 7 runs, 1 loop each)</code></pre>
+</div>
+</div>
+<p>We can do almost 10K molecules in 646 ms, that’s about 65 μs per molecule. So running <code>DetermineBonds()</code> shouldn’t be a bottleneck in any workflows. :-)</p>
+
+
+</section>
+
+</main> <!-- /main -->
+<script id="quarto-html-after-body" type="application/javascript">
+window.document.addEventListener("DOMContentLoaded", function (event) {
+  const toggleBodyColorMode = (bsSheetEl) => {
+    const mode = bsSheetEl.getAttribute("data-mode");
+    const bodyEl = window.document.querySelector("body");
+    if (mode === "dark") {
+      bodyEl.classList.add("quarto-dark");
+      bodyEl.classList.remove("quarto-light");
+    } else {
+      bodyEl.classList.add("quarto-light");
+      bodyEl.classList.remove("quarto-dark");
+    }
+  }
+  const toggleBodyColorPrimary = () => {
+    const bsSheetEl = window.document.querySelector("link#quarto-bootstrap");
+    if (bsSheetEl) {
+      toggleBodyColorMode(bsSheetEl);
+    }
+  }
+  toggleBodyColorPrimary();  
+  const disableStylesheet = (stylesheets) => {
+    for (let i=0; i < stylesheets.length; i++) {
+      const stylesheet = stylesheets[i];
+      stylesheet.rel = 'prefetch';
+    }
+  }
+  const enableStylesheet = (stylesheets) => {
+    for (let i=0; i < stylesheets.length; i++) {
+      const stylesheet = stylesheets[i];
+      stylesheet.rel = 'stylesheet';
+    }
+  }
+  const manageTransitions = (selector, allowTransitions) => {
+    const els = window.document.querySelectorAll(selector);
+    for (let i=0; i < els.length; i++) {
+      const el = els[i];
+      if (allowTransitions) {
+        el.classList.remove('notransition');
+      } else {
+        el.classList.add('notransition');
+      }
+    }
+  }
+  const toggleColorMode = (alternate) => {
+    // Switch the stylesheets
+    const alternateStylesheets = window.document.querySelectorAll('link.quarto-color-scheme.quarto-color-alternate');
+    manageTransitions('#quarto-margin-sidebar .nav-link', false);
+    if (alternate) {
+      enableStylesheet(alternateStylesheets);
+      for (const sheetNode of alternateStylesheets) {
+        if (sheetNode.id === "quarto-bootstrap") {
+          toggleBodyColorMode(sheetNode);
+        }
+      }
+    } else {
+      disableStylesheet(alternateStylesheets);
+      toggleBodyColorPrimary();
+    }
+    manageTransitions('#quarto-margin-sidebar .nav-link', true);
+    // Switch the toggles
+    const toggles = window.document.querySelectorAll('.quarto-color-scheme-toggle');
+    for (let i=0; i < toggles.length; i++) {
+      const toggle = toggles[i];
+      if (toggle) {
+        if (alternate) {
+          toggle.classList.add("alternate");     
+        } else {
+          toggle.classList.remove("alternate");
+        }
+      }
+    }
+    // Hack to workaround the fact that safari doesn't
+    // properly recolor the scrollbar when toggling (#1455)
+    if (navigator.userAgent.indexOf('Safari') > 0 && navigator.userAgent.indexOf('Chrome') == -1) {
+      manageTransitions("body", false);
+      window.scrollTo(0, 1);
+      setTimeout(() => {
+        window.scrollTo(0, 0);
+        manageTransitions("body", true);
+      }, 40);  
+    }
+  }
+  const isFileUrl = () => { 
+    return window.location.protocol === 'file:';
+  }
+  const hasAlternateSentinel = () => {  
+    let styleSentinel = getColorSchemeSentinel();
+    if (styleSentinel !== null) {
+      return styleSentinel === "alternate";
+    } else {
+      return false;
+    }
+  }
+  const setStyleSentinel = (alternate) => {
+    const value = alternate ? "alternate" : "default";
+    if (!isFileUrl()) {
+      window.localStorage.setItem("quarto-color-scheme", value);
+    } else {
+      localAlternateSentinel = value;
+    }
+  }
+  const getColorSchemeSentinel = () => {
+    if (!isFileUrl()) {
+      const storageValue = window.localStorage.getItem("quarto-color-scheme");
+      return storageValue != null ? storageValue : localAlternateSentinel;
+    } else {
+      return localAlternateSentinel;
+    }
+  }
+  let localAlternateSentinel = 'default';
+  // Dark / light mode switch
+  window.quartoToggleColorScheme = () => {
+    // Read the current dark / light value 
+    let toAlternate = !hasAlternateSentinel();
+    toggleColorMode(toAlternate);
+    setStyleSentinel(toAlternate);
+  };
+  // Ensure there is a toggle, if there isn't float one in the top right
+  if (window.document.querySelector('.quarto-color-scheme-toggle') === null) {
+    const a = window.document.createElement('a');
+    a.classList.add('top-right');
+    a.classList.add('quarto-color-scheme-toggle');
+    a.href = "";
+    a.onclick = function() { try { window.quartoToggleColorScheme(); } catch {} return false; };
+    const i = window.document.createElement("i");
+    i.classList.add('bi');
+    a.appendChild(i);
+    window.document.body.appendChild(a);
+  }
+  // Switch to dark mode if need be
+  if (hasAlternateSentinel()) {
+    toggleColorMode(true);
+  } else {
+    toggleColorMode(false);
+  }
+  const icon = "";
+  const anchorJS = new window.AnchorJS();
+  anchorJS.options = {
+    placement: 'right',
+    icon: icon
+  };
+  anchorJS.add('.anchored');
+  const clipboard = new window.ClipboardJS('.code-copy-button', {
+    target: function(trigger) {
+      return trigger.previousElementSibling;
+    }
+  });
+  clipboard.on('success', function(e) {
+    // button target
+    const button = e.trigger;
+    // don't keep focus
+    button.blur();
+    // flash "checked"
+    button.classList.add('code-copy-button-checked');
+    var currentTitle = button.getAttribute("title");
+    button.setAttribute("title", "Copied!");
+    let tooltip;
+    if (window.bootstrap) {
+      button.setAttribute("data-bs-toggle", "tooltip");
+      button.setAttribute("data-bs-placement", "left");
+      button.setAttribute("data-bs-title", "Copied!");
+      tooltip = new bootstrap.Tooltip(button, 
+        { trigger: "manual", 
+          customClass: "code-copy-button-tooltip",
+          offset: [0, -8]});
+      tooltip.show();    
+    }
+    setTimeout(function() {
+      if (tooltip) {
+        tooltip.hide();
+        button.removeAttribute("data-bs-title");
+        button.removeAttribute("data-bs-toggle");
+        button.removeAttribute("data-bs-placement");
+      }
+      button.setAttribute("title", currentTitle);
+      button.classList.remove('code-copy-button-checked');
+    }, 1000);
+    // clear code selection
+    e.clearSelection();
+  });
+  function tippyHover(el, contentFn) {
+    const config = {
+      allowHTML: true,
+      content: contentFn,
+      maxWidth: 500,
+      delay: 100,
+      arrow: false,
+      appendTo: function(el) {
+          return el.parentElement;
+      },
+      interactive: true,
+      interactiveBorder: 10,
+      theme: 'quarto',
+      placement: 'bottom-start'
+    };
+    window.tippy(el, config); 
+  }
+  const noterefs = window.document.querySelectorAll('a[role="doc-noteref"]');
+  for (var i=0; i<noterefs.length; i++) {
+    const ref = noterefs[i];
+    tippyHover(ref, function() {
+      // use id or data attribute instead here
+      let href = ref.getAttribute('data-footnote-href') || ref.getAttribute('href');
+      try { href = new URL(href).hash; } catch {}
+      const id = href.replace(/^#\/?/, "");
+      const note = window.document.getElementById(id);
+      return note.innerHTML;
+    });
+  }
+  const findCites = (el) => {
+    const parentEl = el.parentElement;
+    if (parentEl) {
+      const cites = parentEl.dataset.cites;
+      if (cites) {
+        return {
+          el,
+          cites: cites.split(' ')
+        };
+      } else {
+        return findCites(el.parentElement)
+      }
+    } else {
+      return undefined;
+    }
+  };
+  var bibliorefs = window.document.querySelectorAll('a[role="doc-biblioref"]');
+  for (var i=0; i<bibliorefs.length; i++) {
+    const ref = bibliorefs[i];
+    const citeInfo = findCites(ref);
+    if (citeInfo) {
+      tippyHover(citeInfo.el, function() {
+        var popup = window.document.createElement('div');
+        citeInfo.cites.forEach(function(cite) {
+          var citeDiv = window.document.createElement('div');
+          citeDiv.classList.add('hanging-indent');
+          citeDiv.classList.add('csl-entry');
+          var biblioDiv = window.document.getElementById('ref-' + cite);
+          if (biblioDiv) {
+            citeDiv.innerHTML = biblioDiv.innerHTML;
+          }
+          popup.appendChild(citeDiv);
+        });
+        return popup.innerHTML;
+      });
+    }
+  }
+});
+</script>
+<script src="https://utteranc.es/client.js" repo="greglandrum/rdkit-blog" issue-term="pathname" theme="github-light" crossorigin="anonymous" async="">
+</script>
+</div> <!-- /content -->
+
+
+
+</body></html>
