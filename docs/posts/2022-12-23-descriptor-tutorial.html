@@ -1,0 +1,946 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en"><head>
+
+<meta charset="utf-8">
+<meta name="generator" content="quarto-1.2.269">
+
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+
+<meta name="dcterms.date" content="2022-12-23">
+<meta name="description" content="This will eventually be in the docs">
+
+<title>RDKit blog - Descriptor calculation tutorial</title>
+<style>
+code{white-space: pre-wrap;}
+span.smallcaps{font-variant: small-caps;}
+div.columns{display: flex; gap: min(4vw, 1.5em);}
+div.column{flex: auto; overflow-x: auto;}
+div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+ul.task-list{list-style: none;}
+ul.task-list li input[type="checkbox"] {
+  width: 0.8em;
+  margin: 0 0.8em 0.2em -1.6em;
+  vertical-align: middle;
+}
+pre > code.sourceCode { white-space: pre; position: relative; }
+pre > code.sourceCode > span { display: inline-block; line-height: 1.25; }
+pre > code.sourceCode > span:empty { height: 1.2em; }
+.sourceCode { overflow: visible; }
+code.sourceCode > span { color: inherit; text-decoration: inherit; }
+div.sourceCode { margin: 1em 0; }
+pre.sourceCode { margin: 0; }
+@media screen {
+div.sourceCode { overflow: auto; }
+}
+@media print {
+pre > code.sourceCode { white-space: pre-wrap; }
+pre > code.sourceCode > span { text-indent: -5em; padding-left: 5em; }
+}
+pre.numberSource code
+  { counter-reset: source-line 0; }
+pre.numberSource code > span
+  { position: relative; left: -4em; counter-increment: source-line; }
+pre.numberSource code > span > a:first-child::before
+  { content: counter(source-line);
+    position: relative; left: -1em; text-align: right; vertical-align: baseline;
+    border: none; display: inline-block;
+    -webkit-touch-callout: none; -webkit-user-select: none;
+    -khtml-user-select: none; -moz-user-select: none;
+    -ms-user-select: none; user-select: none;
+    padding: 0 4px; width: 4em;
+    color: #aaaaaa;
+  }
+pre.numberSource { margin-left: 3em; border-left: 1px solid #aaaaaa;  padding-left: 4px; }
+div.sourceCode
+  {   }
+@media screen {
+pre > code.sourceCode > span > a:first-child::before { text-decoration: underline; }
+}
+code span.al { color: #ff0000; font-weight: bold; } /* Alert */
+code span.an { color: #60a0b0; font-weight: bold; font-style: italic; } /* Annotation */
+code span.at { color: #7d9029; } /* Attribute */
+code span.bn { color: #40a070; } /* BaseN */
+code span.bu { color: #008000; } /* BuiltIn */
+code span.cf { color: #007020; font-weight: bold; } /* ControlFlow */
+code span.ch { color: #4070a0; } /* Char */
+code span.cn { color: #880000; } /* Constant */
+code span.co { color: #60a0b0; font-style: italic; } /* Comment */
+code span.cv { color: #60a0b0; font-weight: bold; font-style: italic; } /* CommentVar */
+code span.do { color: #ba2121; font-style: italic; } /* Documentation */
+code span.dt { color: #902000; } /* DataType */
+code span.dv { color: #40a070; } /* DecVal */
+code span.er { color: #ff0000; font-weight: bold; } /* Error */
+code span.ex { } /* Extension */
+code span.fl { color: #40a070; } /* Float */
+code span.fu { color: #06287e; } /* Function */
+code span.im { color: #008000; font-weight: bold; } /* Import */
+code span.in { color: #60a0b0; font-weight: bold; font-style: italic; } /* Information */
+code span.kw { color: #007020; font-weight: bold; } /* Keyword */
+code span.op { color: #666666; } /* Operator */
+code span.ot { color: #007020; } /* Other */
+code span.pp { color: #bc7a00; } /* Preprocessor */
+code span.sc { color: #4070a0; } /* SpecialChar */
+code span.ss { color: #bb6688; } /* SpecialString */
+code span.st { color: #4070a0; } /* String */
+code span.va { color: #19177c; } /* Variable */
+code span.vs { color: #4070a0; } /* VerbatimString */
+code span.wa { color: #60a0b0; font-weight: bold; font-style: italic; } /* Warning */
+</style>
+
+
+<script src="../site_libs/quarto-nav/quarto-nav.js"></script>
+<script src="../site_libs/quarto-nav/headroom.min.js"></script>
+<script src="../site_libs/clipboard/clipboard.min.js"></script>
+<script src="../site_libs/quarto-search/autocomplete.umd.js"></script>
+<script src="../site_libs/quarto-search/fuse.min.js"></script>
+<script src="../site_libs/quarto-search/quarto-search.js"></script>
+<meta name="quarto:offset" content="../">
+<link href="../posts/icons/favicon.ico" rel="icon">
+<script src="../site_libs/quarto-html/quarto.js"></script>
+<script src="../site_libs/quarto-html/popper.min.js"></script>
+<script src="../site_libs/quarto-html/tippy.umd.min.js"></script>
+<script src="../site_libs/quarto-html/anchor.min.js"></script>
+<link href="../site_libs/quarto-html/tippy.css" rel="stylesheet">
+<link href="../site_libs/quarto-html/quarto-syntax-highlighting.css" rel="stylesheet" class="quarto-color-scheme" id="quarto-text-highlighting-styles">
+<link href="../site_libs/quarto-html/quarto-syntax-highlighting-dark.css" rel="prefetch" class="quarto-color-scheme quarto-color-alternate" id="quarto-text-highlighting-styles">
+<script src="../site_libs/bootstrap/bootstrap.min.js"></script>
+<link href="../site_libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
+<link href="../site_libs/bootstrap/bootstrap.min.css" rel="stylesheet" class="quarto-color-scheme" id="quarto-bootstrap" data-mode="light">
+<link href="../site_libs/bootstrap/bootstrap-dark.min.css" rel="prefetch" class="quarto-color-scheme quarto-color-alternate" id="quarto-bootstrap" data-mode="dark">
+<script id="quarto-search-options" type="application/json">{
+  "location": "navbar",
+  "copy-button": false,
+  "collapse-after": 3,
+  "panel-placement": "end",
+  "type": "overlay",
+  "limit": 20,
+  "language": {
+    "search-no-results-text": "No results",
+    "search-matching-documents-text": "matching documents",
+    "search-copy-link-title": "Copy link to search",
+    "search-hide-matches-text": "Hide additional matches",
+    "search-more-match-text": "more match in this document",
+    "search-more-matches-text": "more matches in this document",
+    "search-clear-button-title": "Clear",
+    "search-detached-cancel-button-title": "Cancel",
+    "search-submit-button-title": "Submit"
+  }
+}</script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.6/require.min.js" integrity="sha512-c3Nl8+7g4LMSTdrm621y7kf9v3SDPnhxLNhcjFJbKECVnmZHTdo+IRO05sNLTH/D3vA6u1X32ehoLC7WFVdheg==" crossorigin="anonymous"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.5.1/jquery.min.js" integrity="sha512-bLT0Qm9VnAYZDflyKcBaQ2gg0hSYNQrJ8RilYldYQ1FxQYoCLtUjuuRuZo+fjqhx/qtq/1itJ0C2ejDxltZVFg==" crossorigin="anonymous"></script>
+<script type="application/javascript">define('jquery', [],function() {return window.jQuery;})</script>
+
+
+<link rel="stylesheet" href="../styles.css">
+</head>
+
+<body class="nav-fixed">
+
+<div id="quarto-search-results"></div>
+  <header id="quarto-header" class="headroom fixed-top">
+    <nav class="navbar navbar-expand-lg navbar-dark ">
+      <div class="navbar-container container-fluid">
+      <div class="navbar-brand-container">
+    <a class="navbar-brand" href="../index.html">
+    <span class="navbar-title">RDKit blog</span>
+    </a>
+  </div>
+          <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarCollapse" aria-controls="navbarCollapse" aria-expanded="false" aria-label="Toggle navigation" onclick="if (window.quartoToggleHeadroom) { window.quartoToggleHeadroom(); }">
+  <span class="navbar-toggler-icon"></span>
+</button>
+          <div class="collapse navbar-collapse" id="navbarCollapse">
+            <ul class="navbar-nav navbar-nav-scroll ms-auto">
+  <li class="nav-item">
+    <a class="nav-link" href="../about.html">
+ <span class="menu-text">RDKit experiments, tips, and tutorials</span></a>
+  </li>  
+  <li class="nav-item compact">
+    <a class="nav-link" href="https://github.com/rdkit/rdkit"><i class="bi bi-github" role="img">
+</i> 
+ <span class="menu-text"></span></a>
+  </li>  
+  <li class="nav-item compact">
+    <a class="nav-link" href="https://twitter.com/rdkit_org"><i class="bi bi-twitter" role="img">
+</i> 
+ <span class="menu-text"></span></a>
+  </li>  
+</ul>
+              <div class="quarto-toggle-container">
+                  <a href="" class="quarto-color-scheme-toggle nav-link" onclick="window.quartoToggleColorScheme(); return false;" title="Toggle dark mode"><i class="bi"></i></a>
+              </div>
+              <div id="quarto-search" class="" title="Search"></div>
+          </div> <!-- /navcollapse -->
+      </div> <!-- /container-fluid -->
+    </nav>
+</header>
+<!-- content -->
+<div id="quarto-content" class="quarto-container page-columns page-rows-contents page-layout-article page-navbar">
+<!-- sidebar -->
+<!-- margin-sidebar -->
+    <div id="quarto-margin-sidebar" class="sidebar margin-sidebar">
+        
+    </div>
+<!-- main -->
+<main class="content" id="quarto-document-content">
+
+<header id="title-block-header" class="quarto-title-block default">
+<div class="quarto-title">
+<h1 class="title">Descriptor calculation tutorial</h1>
+  <div class="quarto-categories">
+    <div class="quarto-category">tutorial</div>
+    <div class="quarto-category">descriptors</div>
+  </div>
+  </div>
+
+<div>
+  <div class="description">
+    This will eventually be in the docs
+  </div>
+</div>
+
+
+<div class="quarto-title-meta">
+
+    
+    <div>
+    <div class="quarto-title-meta-heading">Published</div>
+    <div class="quarto-title-meta-contents">
+      <p class="date">December 23, 2022</p>
+    </div>
+  </div>
+  
+    
+  </div>
+  
+
+</header>
+
+<p>A <a href="https://aus.social/@polymerreaction/109543412170217264">question asked on Mastodon</a> made me realize that we don’t have a tutorial anywhere on descriptor calculation. Here’s a first pass at doing that. This will eventually end up in the RDKit documentation</p>
+<p>Start by doing the usual imports</p>
+<div class="cell" data-executetime="{&quot;end_time&quot;:&quot;2022-12-20T05:18:53.601332Z&quot;,&quot;start_time&quot;:&quot;2022-12-20T05:18:53.477333Z&quot;}" data-execution_count="1">
+<div class="sourceCode cell-code" id="cb1"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> rdkit <span class="im">import</span> Chem</span>
+<span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> rdkit</span>
+<span id="cb1-3"><a href="#cb1-3" aria-hidden="true" tabindex="-1"></a>rdkit.__version__</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-display" data-execution_count="1">
+<pre><code>'2022.09.1'</code></pre>
+</div>
+</div>
+<p>A test molecule:</p>
+<div class="cell" data-executetime="{&quot;end_time&quot;:&quot;2022-12-20T05:18:54.571085Z&quot;,&quot;start_time&quot;:&quot;2022-12-20T05:18:54.561585Z&quot;}" data-execution_count="2">
+<div class="sourceCode cell-code" id="cb3"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a>doravirine <span class="op">=</span> Chem.MolFromSmiles(<span class="st">'Cn1c(n[nH]c1=O)Cn2ccc(c(c2=O)Oc3cc(cc(c3)Cl)C#N)C(F)(F)F'</span>)</span>
+<span id="cb3-2"><a href="#cb3-2" aria-hidden="true" tabindex="-1"></a>doravirine</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-display" data-execution_count="2">
+<p><img src="2022-12-23-descriptor-tutorial_files/figure-html/cell-3-output-1.png" class="img-fluid"></p>
+</div>
+</div>
+<p>The <code>Descriptors</code> module has a list of the available descriptors. The list is made of (name, function) 2-tuples:</p>
+<div class="cell" data-executetime="{&quot;end_time&quot;:&quot;2022-12-20T05:18:55.586164Z&quot;,&quot;start_time&quot;:&quot;2022-12-20T05:18:55.574240Z&quot;}" data-execution_count="3">
+<div class="sourceCode cell-code" id="cb4"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> rdkit.Chem <span class="im">import</span> Descriptors</span>
+<span id="cb4-2"><a href="#cb4-2" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="bu">len</span>(Descriptors._descList))</span>
+<span id="cb4-3"><a href="#cb4-3" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(Descriptors._descList[:<span class="dv">5</span>])</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>208
+[('MaxEStateIndex', &lt;function MaxEStateIndex at 0x7fe4a4f2d1f0&gt;), ('MinEStateIndex', &lt;function MinEStateIndex at 0x7fe4a4f2d280&gt;), ('MaxAbsEStateIndex', &lt;function MaxAbsEStateIndex at 0x7fe4a4f2d310&gt;), ('MinAbsEStateIndex', &lt;function MinAbsEStateIndex at 0x7fe4a4f2d3a0&gt;), ('qed', &lt;function qed at 0x7fe4a4e2e3a0&gt;)]</code></pre>
+</div>
+</div>
+<p>We can use those functions to directly calculate the corresponding descriptor. So, for example, the value of <code>MaxEStateIndex</code> for doravirine is:</p>
+<div class="cell" data-executetime="{&quot;end_time&quot;:&quot;2022-12-20T05:19:00.014047Z&quot;,&quot;start_time&quot;:&quot;2022-12-20T05:19:00.001327Z&quot;}" data-execution_count="4">
+<div class="sourceCode cell-code" id="cb6"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb6-1"><a href="#cb6-1" aria-hidden="true" tabindex="-1"></a>Descriptors._descList[<span class="dv">0</span>][<span class="dv">1</span>](doravirine)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-display" data-execution_count="4">
+<pre><code>13.412553309006833</code></pre>
+</div>
+</div>
+<p>As an aside, if we just want a few named descriptors, it’s a lot clearer (and easier to write the code!) if we call the individual descriptor functions directly:</p>
+<div class="cell" data-executetime="{&quot;end_time&quot;:&quot;2022-12-20T05:19:01.156995Z&quot;,&quot;start_time&quot;:&quot;2022-12-20T05:19:01.145963Z&quot;}" data-execution_count="5">
+<div class="sourceCode cell-code" id="cb8"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb8-1"><a href="#cb8-1" aria-hidden="true" tabindex="-1"></a>Descriptors.MaxEStateIndex(doravirine)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-display" data-execution_count="5">
+<pre><code>13.412553309006833</code></pre>
+</div>
+</div>
+<p>Often we want to calculate all the descriptors. As of the 2022.09 release of the rdkit there’s no real convenience function for descriptor calculation, so let’s create one:</p>
+<div class="cell" data-executetime="{&quot;end_time&quot;:&quot;2022-12-20T05:19:02.305280Z&quot;,&quot;start_time&quot;:&quot;2022-12-20T05:19:02.302703Z&quot;}" data-execution_count="6">
+<div class="sourceCode cell-code" id="cb10"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb10-1"><a href="#cb10-1" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> getMolDescriptors(mol, missingVal<span class="op">=</span><span class="va">None</span>):</span>
+<span id="cb10-2"><a href="#cb10-2" aria-hidden="true" tabindex="-1"></a>    <span class="co">''' calculate the full list of descriptors for a molecule</span></span>
+<span id="cb10-3"><a href="#cb10-3" aria-hidden="true" tabindex="-1"></a><span class="co">    </span></span>
+<span id="cb10-4"><a href="#cb10-4" aria-hidden="true" tabindex="-1"></a><span class="co">        missingVal is used if the descriptor cannot be calculated</span></span>
+<span id="cb10-5"><a href="#cb10-5" aria-hidden="true" tabindex="-1"></a><span class="co">    '''</span></span>
+<span id="cb10-6"><a href="#cb10-6" aria-hidden="true" tabindex="-1"></a>    res <span class="op">=</span> {}</span>
+<span id="cb10-7"><a href="#cb10-7" aria-hidden="true" tabindex="-1"></a>    <span class="cf">for</span> nm,fn <span class="kw">in</span> Descriptors._descList:</span>
+<span id="cb10-8"><a href="#cb10-8" aria-hidden="true" tabindex="-1"></a>        <span class="co"># some of the descriptor fucntions can throw errors if they fail, catch those here:</span></span>
+<span id="cb10-9"><a href="#cb10-9" aria-hidden="true" tabindex="-1"></a>        <span class="cf">try</span>:</span>
+<span id="cb10-10"><a href="#cb10-10" aria-hidden="true" tabindex="-1"></a>            val <span class="op">=</span> fn(mol)</span>
+<span id="cb10-11"><a href="#cb10-11" aria-hidden="true" tabindex="-1"></a>        <span class="cf">except</span>:</span>
+<span id="cb10-12"><a href="#cb10-12" aria-hidden="true" tabindex="-1"></a>            <span class="co"># print the error message:</span></span>
+<span id="cb10-13"><a href="#cb10-13" aria-hidden="true" tabindex="-1"></a>            <span class="im">import</span> traceback</span>
+<span id="cb10-14"><a href="#cb10-14" aria-hidden="true" tabindex="-1"></a>            traceback.print_exc()</span>
+<span id="cb10-15"><a href="#cb10-15" aria-hidden="true" tabindex="-1"></a>            <span class="co"># and set the descriptor value to whatever missingVal is</span></span>
+<span id="cb10-16"><a href="#cb10-16" aria-hidden="true" tabindex="-1"></a>            val <span class="op">=</span> missingVal</span>
+<span id="cb10-17"><a href="#cb10-17" aria-hidden="true" tabindex="-1"></a>        res[nm] <span class="op">=</span> val</span>
+<span id="cb10-18"><a href="#cb10-18" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> res</span>
+<span id="cb10-19"><a href="#cb10-19" aria-hidden="true" tabindex="-1"></a>        </span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+<div class="cell" data-executetime="{&quot;end_time&quot;:&quot;2022-12-20T05:19:03.356076Z&quot;,&quot;start_time&quot;:&quot;2022-12-20T05:19:03.319709Z&quot;}" data-execution_count="7">
+<div class="sourceCode cell-code" id="cb11"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb11-1"><a href="#cb11-1" aria-hidden="true" tabindex="-1"></a>getMolDescriptors(doravirine)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-display" data-execution_count="7">
+<pre><code>{'MaxEStateIndex': 13.412553309006833,
+ 'MinEStateIndex': -4.871620672188628,
+ 'MaxAbsEStateIndex': 13.412553309006833,
+ 'MinAbsEStateIndex': 0.045220418860841605,
+ 'qed': 0.6914051268589834,
+ 'MolWt': 425.754,
+ 'HeavyAtomMolWt': 414.66600000000005,
+ 'ExactMolWt': 425.050251552,
+ 'NumValenceElectrons': 150,
+ 'NumRadicalElectrons': 0,
+ 'MaxPartialCharge': 0.4197525104273902,
+ 'MinPartialCharge': -0.45079941098947357,
+ 'MaxAbsPartialCharge': 0.45079941098947357,
+ 'MinAbsPartialCharge': 0.4197525104273902,
+ 'FpDensityMorgan1': 1.3103448275862069,
+ 'FpDensityMorgan2': 2.0344827586206895,
+ 'FpDensityMorgan3': 2.6206896551724137,
+ 'BCUT2D_MWHI': 35.495691906445956,
+ 'BCUT2D_MWLOW': 10.182401353178228,
+ 'BCUT2D_CHGHI': 2.363442602497932,
+ 'BCUT2D_CHGLO': -2.1532454345808123,
+ 'BCUT2D_LOGPHI': 2.362094239067197,
+ 'BCUT2D_LOGPLOW': -2.2620565247489415,
+ 'BCUT2D_MRHI': 6.30376236817795,
+ 'BCUT2D_MRLOW': -0.13831572005086737,
+ 'BalabanJ': 2.1143058157682066,
+ 'BertzCT': 1236.821427505276,
+ 'Chi0': 21.344570503761737,
+ 'Chi0n': 14.619315272563007,
+ 'Chi0v': 15.375244218581463,
+ 'Chi1': 13.595574016164479,
+ 'Chi1n': 7.8933192308003095,
+ 'Chi1v': 8.271283703809537,
+ 'Chi2n': 5.882827756329733,
+ 'Chi2v': 6.319263536801718,
+ 'Chi3n': 3.9307609940961763,
+ 'Chi3v': 4.148978884332168,
+ 'Chi4n': 2.4772835642835087,
+ 'Chi4v': 2.7023697348309867,
+ 'HallKierAlpha': -3.519999999999999,
+ 'Ipc': 2291995.915536308,
+ 'Kappa1': 20.220355828454835,
+ 'Kappa2': 7.4789147435283585,
+ 'Kappa3': 4.168020338062062,
+ 'LabuteASA': 164.8909024413842,
+ 'PEOE_VSA1': 9.303962601591405,
+ 'PEOE_VSA10': 11.3129633249809,
+ 'PEOE_VSA11': 5.824404497999927,
+ 'PEOE_VSA12': 5.749511833283905,
+ 'PEOE_VSA13': 5.559266895052007,
+ 'PEOE_VSA14': 11.86604191564695,
+ 'PEOE_VSA2': 9.361636831863176,
+ 'PEOE_VSA3': 9.893218992372859,
+ 'PEOE_VSA4': 23.531818506063985,
+ 'PEOE_VSA5': 0.0,
+ 'PEOE_VSA6': 11.600939890232516,
+ 'PEOE_VSA7': 24.26546827384644,
+ 'PEOE_VSA8': 18.267148868031594,
+ 'PEOE_VSA9': 18.177429210401844,
+ 'SMR_VSA1': 17.908108096824506,
+ 'SMR_VSA10': 11.600939890232516,
+ 'SMR_VSA2': 5.261891554738487,
+ 'SMR_VSA3': 19.331562912184786,
+ 'SMR_VSA4': 7.04767198267719,
+ 'SMR_VSA5': 12.72105492335605,
+ 'SMR_VSA6': 0.0,
+ 'SMR_VSA7': 73.27433730199388,
+ 'SMR_VSA8': 0.0,
+ 'SMR_VSA9': 17.568244979360085,
+ 'SlogP_VSA1': 15.98587324705553,
+ 'SlogP_VSA10': 13.171245143024459,
+ 'SlogP_VSA11': 11.49902366656781,
+ 'SlogP_VSA12': 11.600939890232516,
+ 'SlogP_VSA2': 19.331562912184786,
+ 'SlogP_VSA3': 19.76872690603324,
+ 'SlogP_VSA4': 11.33111286753076,
+ 'SlogP_VSA5': 16.95130748139392,
+ 'SlogP_VSA6': 40.05138621360316,
+ 'SlogP_VSA7': 5.022633313741326,
+ 'SlogP_VSA8': 0.0,
+ 'SlogP_VSA9': 0.0,
+ 'TPSA': 105.70000000000002,
+ 'EState_VSA1': 28.738272135679853,
+ 'EState_VSA10': 22.760319511168106,
+ 'EState_VSA11': 0.0,
+ 'EState_VSA2': 28.704757542634727,
+ 'EState_VSA3': 6.06636706846161,
+ 'EState_VSA4': 21.397409935657397,
+ 'EState_VSA5': 19.18040611960041,
+ 'EState_VSA6': 6.069221312792274,
+ 'EState_VSA7': 0.0,
+ 'EState_VSA8': 10.197363616602075,
+ 'EState_VSA9': 21.599694398771053,
+ 'VSA_EState1': 47.48050639865553,
+ 'VSA_EState10': 5.842061004535676,
+ 'VSA_EState2': 24.16343117595945,
+ 'VSA_EState3': 14.921853617262808,
+ 'VSA_EState4': -2.8980189732872814,
+ 'VSA_EState5': -1.0781549918202147,
+ 'VSA_EState6': 6.092225491490601,
+ 'VSA_EState7': -3.945179835565914,
+ 'VSA_EState8': -0.2762282865821226,
+ 'VSA_EState9': 1.3919488437959202,
+ 'FractionCSP3': 0.17647058823529413,
+ 'HeavyAtomCount': 29,
+ 'NHOHCount': 1,
+ 'NOCount': 8,
+ 'NumAliphaticCarbocycles': 0,
+ 'NumAliphaticHeterocycles': 0,
+ 'NumAliphaticRings': 0,
+ 'NumAromaticCarbocycles': 1,
+ 'NumAromaticHeterocycles': 2,
+ 'NumAromaticRings': 3,
+ 'NumHAcceptors': 7,
+ 'NumHDonors': 1,
+ 'NumHeteroatoms': 12,
+ 'NumRotatableBonds': 4,
+ 'NumSaturatedCarbocycles': 0,
+ 'NumSaturatedHeterocycles': 0,
+ 'NumSaturatedRings': 0,
+ 'RingCount': 3,
+ 'MolLogP': 2.65458,
+ 'MolMR': 94.87570000000002,
+ 'fr_Al_COO': 0,
+ 'fr_Al_OH': 0,
+ 'fr_Al_OH_noTert': 0,
+ 'fr_ArN': 0,
+ 'fr_Ar_COO': 0,
+ 'fr_Ar_N': 4,
+ 'fr_Ar_NH': 1,
+ 'fr_Ar_OH': 0,
+ 'fr_COO': 0,
+ 'fr_COO2': 0,
+ 'fr_C_O': 0,
+ 'fr_C_O_noCOO': 0,
+ 'fr_C_S': 0,
+ 'fr_HOCCN': 0,
+ 'fr_Imine': 0,
+ 'fr_NH0': 4,
+ 'fr_NH1': 1,
+ 'fr_NH2': 0,
+ 'fr_N_O': 0,
+ 'fr_Ndealkylation1': 0,
+ 'fr_Ndealkylation2': 0,
+ 'fr_Nhpyrrole': 1,
+ 'fr_SH': 0,
+ 'fr_aldehyde': 0,
+ 'fr_alkyl_carbamate': 0,
+ 'fr_alkyl_halide': 3,
+ 'fr_allylic_oxid': 0,
+ 'fr_amide': 0,
+ 'fr_amidine': 0,
+ 'fr_aniline': 0,
+ 'fr_aryl_methyl': 0,
+ 'fr_azide': 0,
+ 'fr_azo': 0,
+ 'fr_barbitur': 0,
+ 'fr_benzene': 1,
+ 'fr_benzodiazepine': 0,
+ 'fr_bicyclic': 0,
+ 'fr_diazo': 0,
+ 'fr_dihydropyridine': 0,
+ 'fr_epoxide': 0,
+ 'fr_ester': 0,
+ 'fr_ether': 1,
+ 'fr_furan': 0,
+ 'fr_guanido': 0,
+ 'fr_halogen': 4,
+ 'fr_hdrzine': 0,
+ 'fr_hdrzone': 0,
+ 'fr_imidazole': 0,
+ 'fr_imide': 0,
+ 'fr_isocyan': 0,
+ 'fr_isothiocyan': 0,
+ 'fr_ketone': 0,
+ 'fr_ketone_Topliss': 0,
+ 'fr_lactam': 0,
+ 'fr_lactone': 0,
+ 'fr_methoxy': 0,
+ 'fr_morpholine': 0,
+ 'fr_nitrile': 1,
+ 'fr_nitro': 0,
+ 'fr_nitro_arom': 0,
+ 'fr_nitro_arom_nonortho': 0,
+ 'fr_nitroso': 0,
+ 'fr_oxazole': 0,
+ 'fr_oxime': 0,
+ 'fr_para_hydroxylation': 0,
+ 'fr_phenol': 0,
+ 'fr_phenol_noOrthoHbond': 0,
+ 'fr_phos_acid': 0,
+ 'fr_phos_ester': 0,
+ 'fr_piperdine': 0,
+ 'fr_piperzine': 0,
+ 'fr_priamide': 0,
+ 'fr_prisulfonamd': 0,
+ 'fr_pyridine': 1,
+ 'fr_quatN': 0,
+ 'fr_sulfide': 0,
+ 'fr_sulfonamd': 0,
+ 'fr_sulfone': 0,
+ 'fr_term_acetylene': 0,
+ 'fr_tetrazole': 0,
+ 'fr_thiazole': 0,
+ 'fr_thiocyan': 0,
+ 'fr_thiophene': 0,
+ 'fr_unbrch_alkane': 0,
+ 'fr_urea': 0}</code></pre>
+</div>
+</div>
+<p>Suppose I want to generate the full set of descriptors for a bunch of molecules…</p>
+<div class="cell" data-executetime="{&quot;end_time&quot;:&quot;2022-12-20T05:19:07.446239Z&quot;,&quot;start_time&quot;:&quot;2022-12-20T05:19:07.335355Z&quot;}" data-execution_count="8">
+<div class="sourceCode cell-code" id="cb13"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb13-1"><a href="#cb13-1" aria-hidden="true" tabindex="-1"></a><span class="op">!</span>head ..<span class="op">/</span>data<span class="op">/</span>herg_data.txt</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>canonical_smiles molregno activity_id standard_value standard_units
+N[C@@H]([C@@H]1CC[C@H](CC1)NS(=O)(=O)c2ccc(F)cc2F)C(=O)N3CC[C@H](F)C3 29272 671631 49000 nM
+N[C@@H](C1CCCCC1)C(=O)N2CCSC2 29758 674222 28000 nM
+N[C@@H]([C@@H]1CC[C@H](CC1)NC(=O)c2ccc(F)c(F)c2)C(=O)N3CCSC3 29449 675583 5900 nM
+N[C@@H]([C@@H]1CC[C@H](CC1)NS(=O)(=O)c2ccc(F)cc2F)C(=O)N3CCCC3 29244 675588 35000 nM
+N[C@@H]([C@@H]1CC[C@H](CC1)NS(=O)(=O)c2ccc(OC(F)(F)F)cc2)C(=O)N3CC[C@@H](F)C3 29265 679299 6000 nM
+N[C@@H]([C@@H]1CC[C@H](CC1)NS(=O)(=O)c2ccc(F)cc2F)C(=O)N3CC[C@@H](F)C3 29253 679302 52000 nM
+N[C@@H]([C@@H]1CC[C@H](CC1)NC(=O)c2ccc(F)c(F)c2)C(=O)N3CCCC3 29482 683566 29000 nM
+N[C@@H]([C@@H]1CC[C@H](CC1)NC(=O)c2ccccc2C(F)(F)F)C(=O)N3CCSC3 29340 685042 39000 nM
+N[C@@H]([C@@H]1CC[C@H](CC1)NC(=O)OCc2ccccc2)C(=O)N3CC[C@@H](F)C3 29213 685047 43000 nM</code></pre>
+</div>
+</div>
+<p>We can read in all the molecules using a “Supplier” object, there’s more about this <a href="https://www.rdkit.org/docs/GettingStartedInPython.html#reading-sets-of-molecules">in the documentation</a></p>
+<div class="cell" data-executetime="{&quot;end_time&quot;:&quot;2022-12-20T05:19:08.934866Z&quot;,&quot;start_time&quot;:&quot;2022-12-20T05:19:08.767216Z&quot;}" data-execution_count="9">
+<div class="sourceCode cell-code" id="cb15"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb15-1"><a href="#cb15-1" aria-hidden="true" tabindex="-1"></a>suppl <span class="op">=</span> Chem.SmilesMolSupplier(<span class="st">'../data/herg_data.txt'</span>)</span>
+<span id="cb15-2"><a href="#cb15-2" aria-hidden="true" tabindex="-1"></a>mols <span class="op">=</span> [m <span class="cf">for</span> m <span class="kw">in</span> suppl]</span>
+<span id="cb15-3"><a href="#cb15-3" aria-hidden="true" tabindex="-1"></a><span class="bu">len</span>(mols)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-display" data-execution_count="9">
+<pre><code>1090</code></pre>
+</div>
+</div>
+<p>Now calculate the descriptors. This takes a bit (10-20 seconds on my machine) for the ~1100 molecules I read in.</p>
+<div class="cell" data-executetime="{&quot;end_time&quot;:&quot;2022-12-20T05:19:18.220827Z&quot;,&quot;start_time&quot;:&quot;2022-12-20T05:19:09.896088Z&quot;}" data-execution_count="10">
+<div class="sourceCode cell-code" id="cb17"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb17-1"><a href="#cb17-1" aria-hidden="true" tabindex="-1"></a>allDescrs <span class="op">=</span> [getMolDescriptors(m) <span class="cf">for</span> m <span class="kw">in</span> mols]</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+<p>The problem here is that we have a list of dictionaries… that’s not useful for most things. Let’s convert it to a pandas dataframe:</p>
+<div class="cell" data-executetime="{&quot;end_time&quot;:&quot;2022-12-20T05:19:18.393439Z&quot;,&quot;start_time&quot;:&quot;2022-12-20T05:19:18.221859Z&quot;}" data-execution_count="11">
+<div class="sourceCode cell-code" id="cb18"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb18-1"><a href="#cb18-1" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> pandas <span class="im">as</span> pd</span>
+<span id="cb18-2"><a href="#cb18-2" aria-hidden="true" tabindex="-1"></a>df <span class="op">=</span> pd.DataFrame(allDescrs)</span>
+<span id="cb18-3"><a href="#cb18-3" aria-hidden="true" tabindex="-1"></a>df.head()</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-display" data-execution_count="11">
+
+<div>
+
+<table class="dataframe table table-sm table-striped">
+  <thead>
+    <tr>
+      <th></th>
+      <th>MaxEStateIndex</th>
+      <th>MinEStateIndex</th>
+      <th>MaxAbsEStateIndex</th>
+      <th>MinAbsEStateIndex</th>
+      <th>qed</th>
+      <th>MolWt</th>
+      <th>HeavyAtomMolWt</th>
+      <th>ExactMolWt</th>
+      <th>NumValenceElectrons</th>
+      <th>NumRadicalElectrons</th>
+      <th>...</th>
+      <th>fr_sulfide</th>
+      <th>fr_sulfonamd</th>
+      <th>fr_sulfone</th>
+      <th>fr_term_acetylene</th>
+      <th>fr_tetrazole</th>
+      <th>fr_thiazole</th>
+      <th>fr_thiocyan</th>
+      <th>fr_thiophene</th>
+      <th>fr_unbrch_alkane</th>
+      <th>fr_urea</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <th>0</th>
+      <td>13.787943</td>
+      <td>-4.120373</td>
+      <td>13.787943</td>
+      <td>0.074317</td>
+      <td>0.759946</td>
+      <td>419.469</td>
+      <td>395.277</td>
+      <td>419.149047</td>
+      <td>156</td>
+      <td>0</td>
+      <td>...</td>
+      <td>0</td>
+      <td>1</td>
+      <td>0</td>
+      <td>0</td>
+      <td>0</td>
+      <td>0</td>
+      <td>0</td>
+      <td>0</td>
+      <td>0</td>
+      <td>0</td>
+    </tr>
+    <tr>
+      <th>1</th>
+      <td>12.032152</td>
+      <td>-0.232407</td>
+      <td>12.032152</td>
+      <td>0.186944</td>
+      <td>0.777429</td>
+      <td>228.361</td>
+      <td>208.201</td>
+      <td>228.129634</td>
+      <td>86</td>
+      <td>0</td>
+      <td>...</td>
+      <td>1</td>
+      <td>0</td>
+      <td>0</td>
+      <td>0</td>
+      <td>0</td>
+      <td>0</td>
+      <td>0</td>
+      <td>0</td>
+      <td>0</td>
+      <td>0</td>
+    </tr>
+    <tr>
+      <th>2</th>
+      <td>13.255664</td>
+      <td>-1.036185</td>
+      <td>13.255664</td>
+      <td>0.017845</td>
+      <td>0.835147</td>
+      <td>383.464</td>
+      <td>360.280</td>
+      <td>383.147904</td>
+      <td>142</td>
+      <td>0</td>
+      <td>...</td>
+      <td>1</td>
+      <td>0</td>
+      <td>0</td>
+      <td>0</td>
+      <td>0</td>
+      <td>0</td>
+      <td>0</td>
+      <td>0</td>
+      <td>0</td>
+      <td>0</td>
+    </tr>
+    <tr>
+      <th>3</th>
+      <td>13.787093</td>
+      <td>-4.072560</td>
+      <td>13.787093</td>
+      <td>0.015196</td>
+      <td>0.786287</td>
+      <td>401.479</td>
+      <td>376.279</td>
+      <td>401.158469</td>
+      <td>150</td>
+      <td>0</td>
+      <td>...</td>
+      <td>0</td>
+      <td>1</td>
+      <td>0</td>
+      <td>0</td>
+      <td>0</td>
+      <td>0</td>
+      <td>0</td>
+      <td>0</td>
+      <td>0</td>
+      <td>0</td>
+    </tr>
+    <tr>
+      <th>4</th>
+      <td>13.326286</td>
+      <td>-4.859254</td>
+      <td>13.326286</td>
+      <td>0.063966</td>
+      <td>0.625645</td>
+      <td>467.485</td>
+      <td>442.285</td>
+      <td>467.150190</td>
+      <td>174</td>
+      <td>0</td>
+      <td>...</td>
+      <td>0</td>
+      <td>1</td>
+      <td>0</td>
+      <td>0</td>
+      <td>0</td>
+      <td>0</td>
+      <td>0</td>
+      <td>0</td>
+      <td>0</td>
+      <td>0</td>
+    </tr>
+  </tbody>
+</table>
+<p>5 rows × 208 columns</p>
+</div>
+</div>
+</div>
+<p>And now we have something that we could use to build models, filter, etc.</p>
+
+
+
+</main> <!-- /main -->
+<script id="quarto-html-after-body" type="application/javascript">
+window.document.addEventListener("DOMContentLoaded", function (event) {
+  const toggleBodyColorMode = (bsSheetEl) => {
+    const mode = bsSheetEl.getAttribute("data-mode");
+    const bodyEl = window.document.querySelector("body");
+    if (mode === "dark") {
+      bodyEl.classList.add("quarto-dark");
+      bodyEl.classList.remove("quarto-light");
+    } else {
+      bodyEl.classList.add("quarto-light");
+      bodyEl.classList.remove("quarto-dark");
+    }
+  }
+  const toggleBodyColorPrimary = () => {
+    const bsSheetEl = window.document.querySelector("link#quarto-bootstrap");
+    if (bsSheetEl) {
+      toggleBodyColorMode(bsSheetEl);
+    }
+  }
+  toggleBodyColorPrimary();  
+  const disableStylesheet = (stylesheets) => {
+    for (let i=0; i < stylesheets.length; i++) {
+      const stylesheet = stylesheets[i];
+      stylesheet.rel = 'prefetch';
+    }
+  }
+  const enableStylesheet = (stylesheets) => {
+    for (let i=0; i < stylesheets.length; i++) {
+      const stylesheet = stylesheets[i];
+      stylesheet.rel = 'stylesheet';
+    }
+  }
+  const manageTransitions = (selector, allowTransitions) => {
+    const els = window.document.querySelectorAll(selector);
+    for (let i=0; i < els.length; i++) {
+      const el = els[i];
+      if (allowTransitions) {
+        el.classList.remove('notransition');
+      } else {
+        el.classList.add('notransition');
+      }
+    }
+  }
+  const toggleColorMode = (alternate) => {
+    // Switch the stylesheets
+    const alternateStylesheets = window.document.querySelectorAll('link.quarto-color-scheme.quarto-color-alternate');
+    manageTransitions('#quarto-margin-sidebar .nav-link', false);
+    if (alternate) {
+      enableStylesheet(alternateStylesheets);
+      for (const sheetNode of alternateStylesheets) {
+        if (sheetNode.id === "quarto-bootstrap") {
+          toggleBodyColorMode(sheetNode);
+        }
+      }
+    } else {
+      disableStylesheet(alternateStylesheets);
+      toggleBodyColorPrimary();
+    }
+    manageTransitions('#quarto-margin-sidebar .nav-link', true);
+    // Switch the toggles
+    const toggles = window.document.querySelectorAll('.quarto-color-scheme-toggle');
+    for (let i=0; i < toggles.length; i++) {
+      const toggle = toggles[i];
+      if (toggle) {
+        if (alternate) {
+          toggle.classList.add("alternate");     
+        } else {
+          toggle.classList.remove("alternate");
+        }
+      }
+    }
+    // Hack to workaround the fact that safari doesn't
+    // properly recolor the scrollbar when toggling (#1455)
+    if (navigator.userAgent.indexOf('Safari') > 0 && navigator.userAgent.indexOf('Chrome') == -1) {
+      manageTransitions("body", false);
+      window.scrollTo(0, 1);
+      setTimeout(() => {
+        window.scrollTo(0, 0);
+        manageTransitions("body", true);
+      }, 40);  
+    }
+  }
+  const isFileUrl = () => { 
+    return window.location.protocol === 'file:';
+  }
+  const hasAlternateSentinel = () => {  
+    let styleSentinel = getColorSchemeSentinel();
+    if (styleSentinel !== null) {
+      return styleSentinel === "alternate";
+    } else {
+      return false;
+    }
+  }
+  const setStyleSentinel = (alternate) => {
+    const value = alternate ? "alternate" : "default";
+    if (!isFileUrl()) {
+      window.localStorage.setItem("quarto-color-scheme", value);
+    } else {
+      localAlternateSentinel = value;
+    }
+  }
+  const getColorSchemeSentinel = () => {
+    if (!isFileUrl()) {
+      const storageValue = window.localStorage.getItem("quarto-color-scheme");
+      return storageValue != null ? storageValue : localAlternateSentinel;
+    } else {
+      return localAlternateSentinel;
+    }
+  }
+  let localAlternateSentinel = 'default';
+  // Dark / light mode switch
+  window.quartoToggleColorScheme = () => {
+    // Read the current dark / light value 
+    let toAlternate = !hasAlternateSentinel();
+    toggleColorMode(toAlternate);
+    setStyleSentinel(toAlternate);
+  };
+  // Ensure there is a toggle, if there isn't float one in the top right
+  if (window.document.querySelector('.quarto-color-scheme-toggle') === null) {
+    const a = window.document.createElement('a');
+    a.classList.add('top-right');
+    a.classList.add('quarto-color-scheme-toggle');
+    a.href = "";
+    a.onclick = function() { try { window.quartoToggleColorScheme(); } catch {} return false; };
+    const i = window.document.createElement("i");
+    i.classList.add('bi');
+    a.appendChild(i);
+    window.document.body.appendChild(a);
+  }
+  // Switch to dark mode if need be
+  if (hasAlternateSentinel()) {
+    toggleColorMode(true);
+  } else {
+    toggleColorMode(false);
+  }
+  const icon = "";
+  const anchorJS = new window.AnchorJS();
+  anchorJS.options = {
+    placement: 'right',
+    icon: icon
+  };
+  anchorJS.add('.anchored');
+  const clipboard = new window.ClipboardJS('.code-copy-button', {
+    target: function(trigger) {
+      return trigger.previousElementSibling;
+    }
+  });
+  clipboard.on('success', function(e) {
+    // button target
+    const button = e.trigger;
+    // don't keep focus
+    button.blur();
+    // flash "checked"
+    button.classList.add('code-copy-button-checked');
+    var currentTitle = button.getAttribute("title");
+    button.setAttribute("title", "Copied!");
+    let tooltip;
+    if (window.bootstrap) {
+      button.setAttribute("data-bs-toggle", "tooltip");
+      button.setAttribute("data-bs-placement", "left");
+      button.setAttribute("data-bs-title", "Copied!");
+      tooltip = new bootstrap.Tooltip(button, 
+        { trigger: "manual", 
+          customClass: "code-copy-button-tooltip",
+          offset: [0, -8]});
+      tooltip.show();    
+    }
+    setTimeout(function() {
+      if (tooltip) {
+        tooltip.hide();
+        button.removeAttribute("data-bs-title");
+        button.removeAttribute("data-bs-toggle");
+        button.removeAttribute("data-bs-placement");
+      }
+      button.setAttribute("title", currentTitle);
+      button.classList.remove('code-copy-button-checked');
+    }, 1000);
+    // clear code selection
+    e.clearSelection();
+  });
+  function tippyHover(el, contentFn) {
+    const config = {
+      allowHTML: true,
+      content: contentFn,
+      maxWidth: 500,
+      delay: 100,
+      arrow: false,
+      appendTo: function(el) {
+          return el.parentElement;
+      },
+      interactive: true,
+      interactiveBorder: 10,
+      theme: 'quarto',
+      placement: 'bottom-start'
+    };
+    window.tippy(el, config); 
+  }
+  const noterefs = window.document.querySelectorAll('a[role="doc-noteref"]');
+  for (var i=0; i<noterefs.length; i++) {
+    const ref = noterefs[i];
+    tippyHover(ref, function() {
+      // use id or data attribute instead here
+      let href = ref.getAttribute('data-footnote-href') || ref.getAttribute('href');
+      try { href = new URL(href).hash; } catch {}
+      const id = href.replace(/^#\/?/, "");
+      const note = window.document.getElementById(id);
+      return note.innerHTML;
+    });
+  }
+  const findCites = (el) => {
+    const parentEl = el.parentElement;
+    if (parentEl) {
+      const cites = parentEl.dataset.cites;
+      if (cites) {
+        return {
+          el,
+          cites: cites.split(' ')
+        };
+      } else {
+        return findCites(el.parentElement)
+      }
+    } else {
+      return undefined;
+    }
+  };
+  var bibliorefs = window.document.querySelectorAll('a[role="doc-biblioref"]');
+  for (var i=0; i<bibliorefs.length; i++) {
+    const ref = bibliorefs[i];
+    const citeInfo = findCites(ref);
+    if (citeInfo) {
+      tippyHover(citeInfo.el, function() {
+        var popup = window.document.createElement('div');
+        citeInfo.cites.forEach(function(cite) {
+          var citeDiv = window.document.createElement('div');
+          citeDiv.classList.add('hanging-indent');
+          citeDiv.classList.add('csl-entry');
+          var biblioDiv = window.document.getElementById('ref-' + cite);
+          if (biblioDiv) {
+            citeDiv.innerHTML = biblioDiv.innerHTML;
+          }
+          popup.appendChild(citeDiv);
+        });
+        return popup.innerHTML;
+      });
+    }
+  }
+});
+</script>
+<script src="https://utteranc.es/client.js" repo="greglandrum/rdkit-blog" issue-term="pathname" theme="github-light" crossorigin="anonymous" async="">
+</script>
+</div> <!-- /content -->
+
+
+
+</body></html>
