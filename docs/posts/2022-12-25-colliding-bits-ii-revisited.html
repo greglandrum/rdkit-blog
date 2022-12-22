@@ -1,0 +1,2183 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en"><head>
+
+<meta charset="utf-8">
+<meta name="generator" content="quarto-1.2.280">
+
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+
+<meta name="dcterms.date" content="2022-12-25">
+<meta name="description" content="The impact of bit collisions on machine-learning performance">
+
+<title>RDKit blog - Colliding bits II, revisited</title>
+<style>
+code{white-space: pre-wrap;}
+span.smallcaps{font-variant: small-caps;}
+div.columns{display: flex; gap: min(4vw, 1.5em);}
+div.column{flex: auto; overflow-x: auto;}
+div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+ul.task-list{list-style: none;}
+ul.task-list li input[type="checkbox"] {
+  width: 0.8em;
+  margin: 0 0.8em 0.2em -1.6em;
+  vertical-align: middle;
+}
+pre > code.sourceCode { white-space: pre; position: relative; }
+pre > code.sourceCode > span { display: inline-block; line-height: 1.25; }
+pre > code.sourceCode > span:empty { height: 1.2em; }
+.sourceCode { overflow: visible; }
+code.sourceCode > span { color: inherit; text-decoration: inherit; }
+div.sourceCode { margin: 1em 0; }
+pre.sourceCode { margin: 0; }
+@media screen {
+div.sourceCode { overflow: auto; }
+}
+@media print {
+pre > code.sourceCode { white-space: pre-wrap; }
+pre > code.sourceCode > span { text-indent: -5em; padding-left: 5em; }
+}
+pre.numberSource code
+  { counter-reset: source-line 0; }
+pre.numberSource code > span
+  { position: relative; left: -4em; counter-increment: source-line; }
+pre.numberSource code > span > a:first-child::before
+  { content: counter(source-line);
+    position: relative; left: -1em; text-align: right; vertical-align: baseline;
+    border: none; display: inline-block;
+    -webkit-touch-callout: none; -webkit-user-select: none;
+    -khtml-user-select: none; -moz-user-select: none;
+    -ms-user-select: none; user-select: none;
+    padding: 0 4px; width: 4em;
+    color: #aaaaaa;
+  }
+pre.numberSource { margin-left: 3em; border-left: 1px solid #aaaaaa;  padding-left: 4px; }
+div.sourceCode
+  {   }
+@media screen {
+pre > code.sourceCode > span > a:first-child::before { text-decoration: underline; }
+}
+code span.al { color: #ff0000; font-weight: bold; } /* Alert */
+code span.an { color: #60a0b0; font-weight: bold; font-style: italic; } /* Annotation */
+code span.at { color: #7d9029; } /* Attribute */
+code span.bn { color: #40a070; } /* BaseN */
+code span.bu { color: #008000; } /* BuiltIn */
+code span.cf { color: #007020; font-weight: bold; } /* ControlFlow */
+code span.ch { color: #4070a0; } /* Char */
+code span.cn { color: #880000; } /* Constant */
+code span.co { color: #60a0b0; font-style: italic; } /* Comment */
+code span.cv { color: #60a0b0; font-weight: bold; font-style: italic; } /* CommentVar */
+code span.do { color: #ba2121; font-style: italic; } /* Documentation */
+code span.dt { color: #902000; } /* DataType */
+code span.dv { color: #40a070; } /* DecVal */
+code span.er { color: #ff0000; font-weight: bold; } /* Error */
+code span.ex { } /* Extension */
+code span.fl { color: #40a070; } /* Float */
+code span.fu { color: #06287e; } /* Function */
+code span.im { color: #008000; font-weight: bold; } /* Import */
+code span.in { color: #60a0b0; font-weight: bold; font-style: italic; } /* Information */
+code span.kw { color: #007020; font-weight: bold; } /* Keyword */
+code span.op { color: #666666; } /* Operator */
+code span.ot { color: #007020; } /* Other */
+code span.pp { color: #bc7a00; } /* Preprocessor */
+code span.sc { color: #4070a0; } /* SpecialChar */
+code span.ss { color: #bb6688; } /* SpecialString */
+code span.st { color: #4070a0; } /* String */
+code span.va { color: #19177c; } /* Variable */
+code span.vs { color: #4070a0; } /* VerbatimString */
+code span.wa { color: #60a0b0; font-weight: bold; font-style: italic; } /* Warning */
+</style>
+
+
+<script src="../site_libs/quarto-nav/quarto-nav.js"></script>
+<script src="../site_libs/quarto-nav/headroom.min.js"></script>
+<script src="../site_libs/clipboard/clipboard.min.js"></script>
+<script src="../site_libs/quarto-search/autocomplete.umd.js"></script>
+<script src="../site_libs/quarto-search/fuse.min.js"></script>
+<script src="../site_libs/quarto-search/quarto-search.js"></script>
+<meta name="quarto:offset" content="../">
+<link href="../posts/icons/favicon.ico" rel="icon">
+<script src="../site_libs/quarto-html/quarto.js"></script>
+<script src="../site_libs/quarto-html/popper.min.js"></script>
+<script src="../site_libs/quarto-html/tippy.umd.min.js"></script>
+<script src="../site_libs/quarto-html/anchor.min.js"></script>
+<link href="../site_libs/quarto-html/tippy.css" rel="stylesheet">
+<link href="../site_libs/quarto-html/quarto-syntax-highlighting.css" rel="stylesheet" class="quarto-color-scheme" id="quarto-text-highlighting-styles">
+<link href="../site_libs/quarto-html/quarto-syntax-highlighting-dark.css" rel="prefetch" class="quarto-color-scheme quarto-color-alternate" id="quarto-text-highlighting-styles">
+<script src="../site_libs/bootstrap/bootstrap.min.js"></script>
+<link href="../site_libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
+<link href="../site_libs/bootstrap/bootstrap.min.css" rel="stylesheet" class="quarto-color-scheme" id="quarto-bootstrap" data-mode="light">
+<link href="../site_libs/bootstrap/bootstrap-dark.min.css" rel="prefetch" class="quarto-color-scheme quarto-color-alternate" id="quarto-bootstrap" data-mode="dark">
+<script id="quarto-search-options" type="application/json">{
+  "location": "navbar",
+  "copy-button": false,
+  "collapse-after": 3,
+  "panel-placement": "end",
+  "type": "overlay",
+  "limit": 20,
+  "language": {
+    "search-no-results-text": "No results",
+    "search-matching-documents-text": "matching documents",
+    "search-copy-link-title": "Copy link to search",
+    "search-hide-matches-text": "Hide additional matches",
+    "search-more-match-text": "more match in this document",
+    "search-more-matches-text": "more matches in this document",
+    "search-clear-button-title": "Clear",
+    "search-detached-cancel-button-title": "Cancel",
+    "search-submit-button-title": "Submit"
+  }
+}</script>
+
+
+<link rel="stylesheet" href="../styles.css">
+</head>
+
+<body class="nav-fixed">
+
+<div id="quarto-search-results"></div>
+  <header id="quarto-header" class="headroom fixed-top">
+    <nav class="navbar navbar-expand-lg navbar-dark ">
+      <div class="navbar-container container-fluid">
+      <div class="navbar-brand-container">
+    <a class="navbar-brand" href="../index.html">
+    <span class="navbar-title">RDKit blog</span>
+    </a>
+  </div>
+          <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarCollapse" aria-controls="navbarCollapse" aria-expanded="false" aria-label="Toggle navigation" onclick="if (window.quartoToggleHeadroom) { window.quartoToggleHeadroom(); }">
+  <span class="navbar-toggler-icon"></span>
+</button>
+          <div class="collapse navbar-collapse" id="navbarCollapse">
+            <ul class="navbar-nav navbar-nav-scroll ms-auto">
+  <li class="nav-item">
+    <a class="nav-link" href="../about.html">
+ <span class="menu-text">RDKit experiments, tips, and tutorials</span></a>
+  </li>  
+  <li class="nav-item compact">
+    <a class="nav-link" href="https://github.com/rdkit/rdkit"><i class="bi bi-github" role="img">
+</i> 
+ <span class="menu-text"></span></a>
+  </li>  
+  <li class="nav-item compact">
+    <a class="nav-link" href="https://twitter.com/rdkit_org"><i class="bi bi-twitter" role="img">
+</i> 
+ <span class="menu-text"></span></a>
+  </li>  
+</ul>
+              <div class="quarto-toggle-container">
+                  <a href="" class="quarto-color-scheme-toggle nav-link" onclick="window.quartoToggleColorScheme(); return false;" title="Toggle dark mode"><i class="bi"></i></a>
+              </div>
+              <div id="quarto-search" class="" title="Search"></div>
+          </div> <!-- /navcollapse -->
+      </div> <!-- /container-fluid -->
+    </nav>
+</header>
+<!-- content -->
+<div id="quarto-content" class="quarto-container page-columns page-rows-contents page-layout-article page-navbar">
+<!-- sidebar -->
+<!-- margin-sidebar -->
+    <div id="quarto-margin-sidebar" class="sidebar margin-sidebar">
+        <nav id="TOC" role="doc-toc" class="toc-active">
+    <h2 id="toc-title">On this page</h2>
+   
+  <ul>
+  <li><a href="#impact-of-bit-collisions-on-learning-performance" id="toc-impact-of-bit-collisions-on-learning-performance" class="nav-link active" data-scroll-target="#impact-of-bit-collisions-on-learning-performance">Impact of bit collisions on learning performance</a></li>
+  <li><a href="#datasets-ii-results-from-the-benchmarking-platform" id="toc-datasets-ii-results-from-the-benchmarking-platform" class="nav-link" data-scroll-target="#datasets-ii-results-from-the-benchmarking-platform">Datasets II results from the benchmarking platform</a></li>
+  <li><a href="#detailed-view-of-the-results-for-a-particular-method" id="toc-detailed-view-of-the-results-for-a-particular-method" class="nav-link" data-scroll-target="#detailed-view-of-the-results-for-a-particular-method">Detailed view of the results for a particular method</a></li>
+  <li><a href="#more-direct-comparisons" id="toc-more-direct-comparisons" class="nav-link" data-scroll-target="#more-direct-comparisons">More direct comparisons</a>
+  <ul class="collapse">
+  <li><a href="#logistic-regression" id="toc-logistic-regression" class="nav-link" data-scroll-target="#logistic-regression">Logistic regression</a></li>
+  <li><a href="#balanced-random-forests" id="toc-balanced-random-forests" class="nav-link" data-scroll-target="#balanced-random-forests">Balanced random forests</a></li>
+  <li><a href="#random-forests" id="toc-random-forests" class="nav-link" data-scroll-target="#random-forests">Random forests</a></li>
+  <li><a href="#xgboost" id="toc-xgboost" class="nav-link" data-scroll-target="#xgboost">XGBoost</a></li>
+  <li><a href="#laplacian-naive-bayes" id="toc-laplacian-naive-bayes" class="nav-link" data-scroll-target="#laplacian-naive-bayes">Laplacian Naive Bayes</a></li>
+  <li><a href="#naive-bayes" id="toc-naive-bayes" class="nav-link" data-scroll-target="#naive-bayes">Naive Bayes</a></li>
+  </ul></li>
+  <li><a href="#look-at-morgan-3" id="toc-look-at-morgan-3" class="nav-link" data-scroll-target="#look-at-morgan-3">Look at morgan 3</a></li>
+  <li><a href="#look-at-rdk5" id="toc-look-at-rdk5" class="nav-link" data-scroll-target="#look-at-rdk5">Look at RDK5</a></li>
+  <li><a href="#are-there-statistically-significant-differences" id="toc-are-there-statistically-significant-differences" class="nav-link" data-scroll-target="#are-there-statistically-significant-differences">Are there statistically significant differences?</a>
+  <ul class="collapse">
+  <li><a href="#auc" id="toc-auc" class="nav-link" data-scroll-target="#auc">AUC</a></li>
+  <li><a href="#auprc" id="toc-auprc" class="nav-link" data-scroll-target="#auprc">AUPRC</a></li>
+  <li><a href="#ef1" id="toc-ef1" class="nav-link" data-scroll-target="#ef1">EF1</a></li>
+  <li><a href="#ef5" id="toc-ef5" class="nav-link" data-scroll-target="#ef5">EF5</a></li>
+  </ul></li>
+  </ul>
+</nav>
+    </div>
+<!-- main -->
+<main class="content" id="quarto-document-content">
+
+<header id="title-block-header" class="quarto-title-block default">
+<div class="quarto-title">
+<h1 class="title">Colliding bits II, revisited</h1>
+  <div class="quarto-categories">
+    <div class="quarto-category">reference</div>
+    <div class="quarto-category">fingerprints</div>
+  </div>
+  </div>
+
+<div>
+  <div class="description">
+    The impact of bit collisions on machine-learning performance
+  </div>
+</div>
+
+
+<div class="quarto-title-meta">
+
+    
+    <div>
+    <div class="quarto-title-meta-heading">Published</div>
+    <div class="quarto-title-meta-contents">
+      <p class="date">December 25, 2022</p>
+    </div>
+  </div>
+  
+    
+  </div>
+  
+
+</header>
+
+<section id="impact-of-bit-collisions-on-learning-performance" class="level1">
+<h1>Impact of bit collisions on learning performance</h1>
+<p><strong>Note</strong>: This is a significantly revised version of an <a href="https://rdkit.blogspot.com/2014/03/colliding-bits-ii.html">earlier post</a>.</p>
+<p>In an <a href="http://rdkit.blogspot.ch/2014/02/colliding-bits.html">earlier post</a> I looked at the minimal impact bit collisions in the RDKit’s Morgan fingerprints has on calculated similarity between molecules. This time I’m going to look at the impact of fingerprint size (as a surrogate for number of collisions) on the performance of machine-learning algorithms.</p>
+<p>I will use Datasets II from our <a href="https://pubs.acs.org/doi/abs/10.1021/ci400466r">model fusion</a> paper to do the analysis. I’ve looked at these datasets, which are available as part of the <a href="https://github.com/rdkit/benchmarking_platform">benchmarkng platform</a> in some detail in an <a href="https://rdkit.blogspot.ch/2014/02/more-on-datasets-ii.html">earlier post</a>.</p>
+<p>While working on this post I updated the benchmarking platform to work with Python 3 (the paper was a long time ago!) and added a few additional learning methods and one additional evaluation metric. Those will be merged back to the github repo soon (probably by the time this blog post actually appears), in the meantime it’s <a href="https://github.com/greglandrum/benchmarking_platform/tree/update_to_modern_py">here</a> (if that branch is missing, it indicates that the code is already merged to the main repo).</p>
+<p>The fingerprints examined here: 1. MFP2: Morgan fingerprint, radius = 2 2. MFP3: Morgan fingerprint, radius = 3 3. RDK5: RDKit fingerprint, max path length = 5 4. HashAP: atom pairs, using <a href="https://www.rdkit.org/docs/RDKit_Book.html#atom-pair-and-topological-torsion-fingerprints">count simulation</a> 5. HashTT: topological torsions, <a href="https://www.rdkit.org/docs/RDKit_Book.html#atom-pair-and-topological-torsion-fingerprints">using count simulation</a></p>
+<p>The benchmarking platform is pre-configured to support a short (1K) and long (16K) form of the fingerprints, so that part was easy.</p>
+<p>The learning algorithms: 1. LR: logistic regression, sklearn implementation 2. LMNB: Laplacian Naive Bayes, <a href="https://github.com/rdkit/lmnb">NIBR implementation</a> 3. NB: Naive Bayes, sklearn implementation. Note that something went wrong with these calculations, so they won’t be included in any summaries. 4. RF: random forest, sklearn implementation 5. BRF: balanced random forest, <a href="https://imbalanced-learn.org/stable/references/generated/imblearn.ensemble.BalancedRandomForestClassifier.html">imbalanced-learn implementation</a> 6. XGB: extreme gradient boosting, <a href="https://xgboost.readthedocs.io/en/stable/python/python_intro.html">XGBoost implementation</a></p>
+<p>Here’s a summary of the results using AUC as a metric (there’s a giant table at the bottom with the other metrics). The <code>result</code> column indicates whether the AUC value for the short fingerprint is usually less than (<code>lt</code>), the same as <code>same</code>, or greater than (<code>gt</code>) the AUC value for the long fingerprint. The <code>P</code> column provides the P value for the difference (assessed using scipy’s <a href="https://docs.scipy.org/doc/scipy/reference/generated/scipy.stats.wilcoxon.html">Wilcoxon signed-rank test</a>. The <code>delt</code> column has the median difference between the short-fingerprint AUC and long-fingerprint AUC. The <code>pct_delt</code> column indicates the median percentage change in AUC relative to the short-fingerprint AUC.</p>
+<table class="table">
+<thead>
+<tr class="header">
+<th>alg</th>
+<th>fp</th>
+<th>metric</th>
+<th>result</th>
+<th>P</th>
+<th>delt</th>
+<th>pct_delt</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>lr</td>
+<td>mfp2</td>
+<td>AUC</td>
+<td>lt</td>
+<td>8.68e-51</td>
+<td>-0.011</td>
+<td>-0.0142</td>
+</tr>
+<tr class="even">
+<td>lr</td>
+<td>mfp3</td>
+<td>AUC</td>
+<td>lt</td>
+<td>2.6e-64</td>
+<td>-0.019</td>
+<td>-0.0243</td>
+</tr>
+<tr class="odd">
+<td>lr</td>
+<td>rdk5</td>
+<td>AUC</td>
+<td>lt</td>
+<td>2.09e-24</td>
+<td>-0.011</td>
+<td>-0.0143</td>
+</tr>
+<tr class="even">
+<td>lr</td>
+<td>hashap</td>
+<td>AUC</td>
+<td>lt</td>
+<td>8.77e-37</td>
+<td>-0.026</td>
+<td>-0.0325</td>
+</tr>
+<tr class="odd">
+<td>lr</td>
+<td>hashtt</td>
+<td>AUC</td>
+<td>lt</td>
+<td>8.02e-54</td>
+<td>-0.022</td>
+<td>-0.0294</td>
+</tr>
+<tr class="even">
+<td>lmnb</td>
+<td>mfp2</td>
+<td>AUC</td>
+<td>lt</td>
+<td>3.2e-104</td>
+<td>-0.042</td>
+<td>-0.0573</td>
+</tr>
+<tr class="odd">
+<td>lmnb</td>
+<td>mfp3</td>
+<td>AUC</td>
+<td>lt</td>
+<td>6.05e-107</td>
+<td>-0.077</td>
+<td>-0.109</td>
+</tr>
+<tr class="even">
+<td>lmnb</td>
+<td>rdk5</td>
+<td>AUC</td>
+<td>lt</td>
+<td>4.32e-60</td>
+<td>-0.071</td>
+<td>-0.193</td>
+</tr>
+<tr class="odd">
+<td>lmnb</td>
+<td>hashap</td>
+<td>AUC</td>
+<td>gt</td>
+<td>1.67e-18</td>
+<td>0.031</td>
+<td>0.0494</td>
+</tr>
+<tr class="even">
+<td>lmnb</td>
+<td>hashtt</td>
+<td>AUC</td>
+<td>lt</td>
+<td>7.52e-105</td>
+<td>-0.051</td>
+<td>-0.0767</td>
+</tr>
+<tr class="odd">
+<td>rf</td>
+<td>mfp2</td>
+<td>AUC</td>
+<td>lt</td>
+<td>1.45e-102</td>
+<td>-0.087</td>
+<td>-0.132</td>
+</tr>
+<tr class="even">
+<td>rf</td>
+<td>mfp3</td>
+<td>AUC</td>
+<td>lt</td>
+<td>2.23e-92</td>
+<td>-0.074</td>
+<td>-0.115</td>
+</tr>
+<tr class="odd">
+<td>rf</td>
+<td>rdk5</td>
+<td>AUC</td>
+<td>gt</td>
+<td>4.27e-11</td>
+<td>0.015</td>
+<td>0.0212</td>
+</tr>
+<tr class="even">
+<td>rf</td>
+<td>hashap</td>
+<td>AUC</td>
+<td>same</td>
+<td>0.00227</td>
+<td>0.0036</td>
+<td>0.00503</td>
+</tr>
+<tr class="odd">
+<td>rf</td>
+<td>hashtt</td>
+<td>AUC</td>
+<td>lt</td>
+<td>1.25e-63</td>
+<td>-0.046</td>
+<td>-0.0677</td>
+</tr>
+<tr class="even">
+<td>brf</td>
+<td>mfp2</td>
+<td>AUC</td>
+<td>lt</td>
+<td>6.61e-37</td>
+<td>-0.024</td>
+<td>-0.0304</td>
+</tr>
+<tr class="odd">
+<td>brf</td>
+<td>mfp3</td>
+<td>AUC</td>
+<td>lt</td>
+<td>9.25e-40</td>
+<td>-0.031</td>
+<td>-0.04</td>
+</tr>
+<tr class="even">
+<td>brf</td>
+<td>rdk5</td>
+<td>AUC</td>
+<td>gt</td>
+<td>2.77e-09</td>
+<td>0.01</td>
+<td>0.0131</td>
+</tr>
+<tr class="odd">
+<td>brf</td>
+<td>hashap</td>
+<td>AUC</td>
+<td>gt</td>
+<td>5.32e-07</td>
+<td>0.011</td>
+<td>0.0152</td>
+</tr>
+<tr class="even">
+<td>brf</td>
+<td>hashtt</td>
+<td>AUC</td>
+<td>lt</td>
+<td>8.45e-29</td>
+<td>-0.027</td>
+<td>-0.0362</td>
+</tr>
+<tr class="odd">
+<td>xgb</td>
+<td>mfp2</td>
+<td>AUC</td>
+<td>same</td>
+<td>0.831</td>
+<td>0.00097</td>
+<td>0.00109</td>
+</tr>
+<tr class="even">
+<td>xgb</td>
+<td>mfp3</td>
+<td>AUC</td>
+<td>same</td>
+<td>0.00162</td>
+<td>-0.0051</td>
+<td>-0.00719</td>
+</tr>
+<tr class="odd">
+<td>xgb</td>
+<td>rdk5</td>
+<td>AUC</td>
+<td>gt</td>
+<td>1.36e-07</td>
+<td>0.012</td>
+<td>0.0157</td>
+</tr>
+<tr class="even">
+<td>xgb</td>
+<td>hashap</td>
+<td>AUC</td>
+<td>gt</td>
+<td>1.49e-20</td>
+<td>0.027</td>
+<td>0.0358</td>
+</tr>
+<tr class="odd">
+<td>xgb</td>
+<td>hashtt</td>
+<td>AUC</td>
+<td>same</td>
+<td>0.0265</td>
+<td>-0.0043</td>
+<td>-0.00645</td>
+</tr>
+</tbody>
+</table>
+<p>The TL;DR from this: for most methods and fingerprints you can get a small, but real improvement in model performance (as measured by AUC) by using the longer fingerprints. There are a few cases, e.g.&nbsp;LMNB+rdk5 and RF+mfp2, where the model built with the longer fingerprint is &gt;10% better. Exceptions to the general rule, which it could be interesting to investigate more deeply, include: - The <code>rdk5</code> and <code>hashap</code> fingerprints: for this use case it looks like the additional information in the longer fingerprints tends to degrade performance. The “simpler” learning algorithms - <code>lr</code> and <code>lmnb</code> - either don’t show this effect or show it less… a strong suggestion that the problem is overfitting. - XGB doesn’t show improved performance for the longer fingerprint with any of the methods.</p>
+<p>Note that we’ve only looked at one type of data set here - training on reasonably homogeneous active molecules and then testing with diverse actives - so the results could well be different for models built/tested on things like screening data (where both the training and test sets are chemically diverse).</p>
+<div class="cell" data-executetime="{&quot;end_time&quot;:&quot;2022-12-19T03:39:07.046372Z&quot;,&quot;start_time&quot;:&quot;2022-12-19T03:39:06.204264Z&quot;}" data-scrolled="true" data-execution_count="1">
+<div class="sourceCode cell-code" id="cb1"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> rdkit <span class="im">import</span> Chem</span>
+<span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> rdkit.Chem <span class="im">import</span> rdFingerprintGenerator</span>
+<span id="cb1-3"><a href="#cb1-3" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> numpy <span class="im">as</span> np</span>
+<span id="cb1-4"><a href="#cb1-4" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-5"><a href="#cb1-5" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> rdkit</span>
+<span id="cb1-6"><a href="#cb1-6" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(rdkit.__version__)</span>
+<span id="cb1-7"><a href="#cb1-7" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> time</span>
+<span id="cb1-8"><a href="#cb1-8" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(time.asctime())</span>
+<span id="cb1-9"><a href="#cb1-9" aria-hidden="true" tabindex="-1"></a><span class="op">%</span>pylab inline</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>2022.09.1
+Mon Dec 19 20:00:39 2022
+%pylab is deprecated, use %matplotlib inline and import the required libraries.
+Populating the interactive namespace from numpy and matplotlib</code></pre>
+</div>
+</div>
+</section>
+<section id="datasets-ii-results-from-the-benchmarking-platform" class="level1">
+<h1>Datasets II results from the benchmarking platform</h1>
+<p>Read in the results from running the benchmarking platform:</p>
+<div class="cell" data-executetime="{&quot;end_time&quot;:&quot;2022-12-19T03:39:17.460575Z&quot;,&quot;start_time&quot;:&quot;2022-12-19T03:39:17.125083Z&quot;}" data-execution_count="2">
+<div class="sourceCode cell-code" id="cb3"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> collections <span class="im">import</span> defaultdict</span>
+<span id="cb3-2"><a href="#cb3-2" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> glob</span>
+<span id="cb3-3"><a href="#cb3-3" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> pickle</span>
+<span id="cb3-4"><a href="#cb3-4" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> gzip</span>
+<span id="cb3-5"><a href="#cb3-5" aria-hidden="true" tabindex="-1"></a>alld <span class="op">=</span> {}</span>
+<span id="cb3-6"><a href="#cb3-6" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> fn <span class="kw">in</span> glob.glob(<span class="st">'../data/bp_results/dsII_validation/ChEMBL/*.pkl.gz'</span>):</span>
+<span id="cb3-7"><a href="#cb3-7" aria-hidden="true" tabindex="-1"></a>    <span class="cf">with</span> gzip.<span class="bu">open</span>(fn,<span class="st">'rb'</span>) <span class="im">as</span> inf:</span>
+<span id="cb3-8"><a href="#cb3-8" aria-hidden="true" tabindex="-1"></a>        d <span class="op">=</span> pickle.load(inf)</span>
+<span id="cb3-9"><a href="#cb3-9" aria-hidden="true" tabindex="-1"></a>    fn <span class="op">=</span> fn.split(<span class="st">'_'</span>)[<span class="op">-</span><span class="dv">1</span>].split(<span class="st">'.'</span>)[<span class="dv">0</span>]</span>
+<span id="cb3-10"><a href="#cb3-10" aria-hidden="true" tabindex="-1"></a>    alld[fn]<span class="op">=</span>d</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+<div class="cell" data-executetime="{&quot;end_time&quot;:&quot;2022-12-19T03:39:18.031428Z&quot;,&quot;start_time&quot;:&quot;2022-12-19T03:39:18.016760Z&quot;}" data-execution_count="3">
+<div class="sourceCode cell-code" id="cb4"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a>alld.keys()</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-display" data-execution_count="3">
+<pre><code>dict_keys(['100', '10188', '10193', '10260', '10280', '10434', '107', '108', '10980', '11140', '11365', '114', '11489', '11534', '11575', '11631', '121', '12209', '12252', '126', '12952', '130', '13001', '15', '165', '17045', '19905', '25', '259', '43', '51', '61', '65', '72', '87', '90', '93'])</code></pre>
+</div>
+</div>
+<p>These are the evaluation metrics we’ll use: AUC, EF1, EF5, and AUPRC (area onder the precision-recall curve). Note that you have to be careful comparing EF1, EF5, and AUPRC across data sets with different active/inactive ratios, but that doesn’t affect us here since we only compare values within a given data set.</p>
+<div class="cell" data-executetime="{&quot;end_time&quot;:&quot;2022-12-19T03:39:19.903016Z&quot;,&quot;start_time&quot;:&quot;2022-12-19T03:39:19.901303Z&quot;}" data-execution_count="44">
+<div class="sourceCode cell-code" id="cb6"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb6-1"><a href="#cb6-1" aria-hidden="true" tabindex="-1"></a>metrics <span class="op">=</span> (<span class="st">'AUC'</span>,<span class="st">'AUPRC'</span>,<span class="st">'EF1'</span>,<span class="st">'EF5'</span>,)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+</section>
+<section id="detailed-view-of-the-results-for-a-particular-method" class="level1">
+<h1>Detailed view of the results for a particular method</h1>
+<p>Start by reproducing some of the plots we used last time, though we’ll quickly switch to a view which is better suited to doing comparisons.</p>
+<p>We’ll just show the plots for logistic regression:</p>
+<div class="cell" data-executetime="{&quot;end_time&quot;:&quot;2022-12-19T03:39:22.534613Z&quot;,&quot;start_time&quot;:&quot;2022-12-19T03:39:22.489868Z&quot;}" data-execution_count="45">
+<div class="sourceCode cell-code" id="cb7"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb7-1"><a href="#cb7-1" aria-hidden="true" tabindex="-1"></a>means<span class="op">=</span>defaultdict(<span class="bu">dict</span>)</span>
+<span id="cb7-2"><a href="#cb7-2" aria-hidden="true" tabindex="-1"></a>medians<span class="op">=</span>defaultdict(<span class="bu">dict</span>)</span>
+<span id="cb7-3"><a href="#cb7-3" aria-hidden="true" tabindex="-1"></a>delts<span class="op">=</span>defaultdict(<span class="bu">dict</span>)</span>
+<span id="cb7-4"><a href="#cb7-4" aria-hidden="true" tabindex="-1"></a>fdelts<span class="op">=</span>defaultdict(<span class="bu">dict</span>)</span>
+<span id="cb7-5"><a href="#cb7-5" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> assay,d <span class="kw">in</span> alld.items():</span>
+<span id="cb7-6"><a href="#cb7-6" aria-hidden="true" tabindex="-1"></a>    <span class="cf">for</span> metric <span class="kw">in</span> metrics:</span>
+<span id="cb7-7"><a href="#cb7-7" aria-hidden="true" tabindex="-1"></a>        v1 <span class="op">=</span> np.array([x[<span class="dv">0</span>] <span class="cf">for</span> x <span class="kw">in</span> d[metric][<span class="st">'lr_mfp2'</span>]])</span>
+<span id="cb7-8"><a href="#cb7-8" aria-hidden="true" tabindex="-1"></a>        v2 <span class="op">=</span> np.array([x[<span class="dv">0</span>] <span class="cf">for</span> x <span class="kw">in</span> d[metric][<span class="st">'lr_lmfp2'</span>]])</span>
+<span id="cb7-9"><a href="#cb7-9" aria-hidden="true" tabindex="-1"></a>        delt<span class="op">=</span>v2<span class="op">-</span>v1</span>
+<span id="cb7-10"><a href="#cb7-10" aria-hidden="true" tabindex="-1"></a>        means[assay][metric] <span class="op">=</span> (np.mean(v1),np.mean(v2))</span>
+<span id="cb7-11"><a href="#cb7-11" aria-hidden="true" tabindex="-1"></a>        medians[assay][metric] <span class="op">=</span> (np.median(v1),np.median(v2))</span>
+<span id="cb7-12"><a href="#cb7-12" aria-hidden="true" tabindex="-1"></a>        delts[assay][metric] <span class="op">=</span> (np.mean(delt),np.<span class="bu">min</span>(delt),np.<span class="bu">max</span>(delt))</span>
+<span id="cb7-13"><a href="#cb7-13" aria-hidden="true" tabindex="-1"></a>        fdelts[assay][metric] <span class="op">=</span> delt</span>
+<span id="cb7-14"><a href="#cb7-14" aria-hidden="true" tabindex="-1"></a>     </span>
+<span id="cb7-15"><a href="#cb7-15" aria-hidden="true" tabindex="-1"></a>                  </span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+<p>Look at the mean values of the metrics across the different targets.</p>
+<div class="cell" data-executetime="{&quot;end_time&quot;:&quot;2022-12-19T03:39:27.416281Z&quot;,&quot;start_time&quot;:&quot;2022-12-19T03:39:26.682234Z&quot;}" data-execution_count="46">
+<div class="sourceCode cell-code" id="cb8"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb8-1"><a href="#cb8-1" aria-hidden="true" tabindex="-1"></a>figsize(<span class="dv">16</span>,<span class="dv">4</span><span class="op">*</span><span class="bu">len</span>(metrics))</span>
+<span id="cb8-2"><a href="#cb8-2" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> i,metric <span class="kw">in</span> <span class="bu">enumerate</span>(metrics):</span>
+<span id="cb8-3"><a href="#cb8-3" aria-hidden="true" tabindex="-1"></a>    subplot(<span class="bu">len</span>(metrics),<span class="dv">1</span>,i<span class="op">+</span><span class="dv">1</span>)</span>
+<span id="cb8-4"><a href="#cb8-4" aria-hidden="true" tabindex="-1"></a>    plot([x[metric][<span class="dv">0</span>] <span class="cf">for</span> x <span class="kw">in</span> medians.values()],c<span class="op">=</span><span class="st">'b'</span>,label<span class="op">=</span><span class="st">'mfp2'</span>)</span>
+<span id="cb8-5"><a href="#cb8-5" aria-hidden="true" tabindex="-1"></a>    plot([x[metric][<span class="dv">1</span>] <span class="cf">for</span> x <span class="kw">in</span> medians.values()],c<span class="op">=</span><span class="st">'r'</span>,label<span class="op">=</span><span class="st">'lmfp2'</span>)</span>
+<span id="cb8-6"><a href="#cb8-6" aria-hidden="true" tabindex="-1"></a>    title(metric)</span>
+<span id="cb8-7"><a href="#cb8-7" aria-hidden="true" tabindex="-1"></a>    legend()</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-display">
+<p><img src="2022-12-25-colliding-bits-ii-revisited_files/figure-html/cell-7-output-1.png" class="img-fluid"></p>
+</div>
+</div>
+<p>With LR, at least, the longer fingerprints (red lines) are, on average, slightly better with each metric.</p>
+<p>Using the means here, which are calculated across multiple datasets (papers) per target isn’t the most accurate way to view the results, it’s more accurate to look at the deltas.</p>
+<p>The same behavior is observed in the deltas, though the min delta curves do show that there are times that the longer fingerprints are sligthly worse:</p>
+<div class="cell" data-executetime="{&quot;end_time&quot;:&quot;2022-12-19T03:39:30.663800Z&quot;,&quot;start_time&quot;:&quot;2022-12-19T03:39:29.658546Z&quot;}" data-execution_count="47">
+<div class="sourceCode cell-code" id="cb9"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb9-1"><a href="#cb9-1" aria-hidden="true" tabindex="-1"></a>figsize(<span class="dv">16</span>,<span class="dv">4</span><span class="op">*</span><span class="bu">len</span>(metrics))</span>
+<span id="cb9-2"><a href="#cb9-2" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> i,metric <span class="kw">in</span> <span class="bu">enumerate</span>(metrics):</span>
+<span id="cb9-3"><a href="#cb9-3" aria-hidden="true" tabindex="-1"></a>    subplot(<span class="bu">len</span>(metrics),<span class="dv">1</span>,i<span class="op">+</span><span class="dv">1</span>)</span>
+<span id="cb9-4"><a href="#cb9-4" aria-hidden="true" tabindex="-1"></a>    plot([x[metric][<span class="dv">0</span>] <span class="cf">for</span> x <span class="kw">in</span> delts.values()],c<span class="op">=</span><span class="st">'b'</span>)</span>
+<span id="cb9-5"><a href="#cb9-5" aria-hidden="true" tabindex="-1"></a>    plot([x[metric][<span class="dv">1</span>] <span class="cf">for</span> x <span class="kw">in</span> delts.values()],c<span class="op">=</span><span class="st">'r'</span>)</span>
+<span id="cb9-6"><a href="#cb9-6" aria-hidden="true" tabindex="-1"></a>    plot([x[metric][<span class="dv">2</span>] <span class="cf">for</span> x <span class="kw">in</span> delts.values()],c<span class="op">=</span><span class="st">'r'</span>)</span>
+<span id="cb9-7"><a href="#cb9-7" aria-hidden="true" tabindex="-1"></a>    plot((<span class="dv">0</span>,<span class="dv">36</span>),(<span class="dv">0</span>,<span class="dv">0</span>),<span class="st">'k'</span>)</span>
+<span id="cb9-8"><a href="#cb9-8" aria-hidden="true" tabindex="-1"></a>    title(<span class="ss">f'$\Delta$ </span><span class="sc">{</span>metric<span class="sc">}</span><span class="ss">'</span>)</span>
+<span id="cb9-9"><a href="#cb9-9" aria-hidden="true" tabindex="-1"></a></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-display">
+<p><img src="2022-12-25-colliding-bits-ii-revisited_files/figure-html/cell-8-output-1.png" class="img-fluid"></p>
+</div>
+</div>
+<p>That’s a bit clearer in a box plot for the deltas:</p>
+<div class="cell" data-executetime="{&quot;end_time&quot;:&quot;2022-12-19T03:39:34.974533Z&quot;,&quot;start_time&quot;:&quot;2022-12-19T03:39:33.474584Z&quot;}" data-execution_count="48">
+<div class="sourceCode cell-code" id="cb10"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb10-1"><a href="#cb10-1" aria-hidden="true" tabindex="-1"></a>figsize(<span class="dv">16</span>,<span class="dv">4</span><span class="op">*</span><span class="bu">len</span>(metrics))</span>
+<span id="cb10-2"><a href="#cb10-2" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> i,metric <span class="kw">in</span> <span class="bu">enumerate</span>(metrics):</span>
+<span id="cb10-3"><a href="#cb10-3" aria-hidden="true" tabindex="-1"></a>    subplot(<span class="bu">len</span>(metrics),<span class="dv">1</span>,i<span class="op">+</span><span class="dv">1</span>)</span>
+<span id="cb10-4"><a href="#cb10-4" aria-hidden="true" tabindex="-1"></a>    _<span class="op">=</span>boxplot([x[metric] <span class="cf">for</span> x <span class="kw">in</span> fdelts.values()])</span>
+<span id="cb10-5"><a href="#cb10-5" aria-hidden="true" tabindex="-1"></a>    _<span class="op">=</span>plot((<span class="dv">0</span>,<span class="dv">38</span>),(<span class="dv">0</span>,<span class="dv">0</span>),c<span class="op">=</span><span class="st">'k'</span>,linestyle<span class="op">=</span><span class="st">'--'</span>)</span>
+<span id="cb10-6"><a href="#cb10-6" aria-hidden="true" tabindex="-1"></a>    title(<span class="ss">f'$\Delta$ </span><span class="sc">{</span>metric<span class="sc">}</span><span class="ss">'</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-display">
+<p><img src="2022-12-25-colliding-bits-ii-revisited_files/figure-html/cell-9-output-1.png" class="img-fluid"></p>
+</div>
+</div>
+</section>
+<section id="more-direct-comparisons" class="level1">
+<h1>More direct comparisons</h1>
+<p>Rather than doing a bunch more of the box and whisker plots showing the results broken down by dataset, let’s look at direct comparisions of the results for the various learning methods. We can do this because we know what all the method+fp combinations were trained/tested using the same data splits.</p>
+<div class="cell" data-execution_count="61">
+<div class="sourceCode cell-code" id="cb11"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb11-1"><a href="#cb11-1" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> do_scatter_plots(k1,k2,alld<span class="op">=</span>alld,metrics<span class="op">=</span>metrics):</span>
+<span id="cb11-2"><a href="#cb11-2" aria-hidden="true" tabindex="-1"></a>    delts <span class="op">=</span> defaultdict(<span class="bu">list</span>)</span>
+<span id="cb11-3"><a href="#cb11-3" aria-hidden="true" tabindex="-1"></a>    v1s <span class="op">=</span> defaultdict(<span class="bu">list</span>)</span>
+<span id="cb11-4"><a href="#cb11-4" aria-hidden="true" tabindex="-1"></a>    v2s <span class="op">=</span> defaultdict(<span class="bu">list</span>)</span>
+<span id="cb11-5"><a href="#cb11-5" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb11-6"><a href="#cb11-6" aria-hidden="true" tabindex="-1"></a>    <span class="cf">for</span> assay,d <span class="kw">in</span> alld.items():</span>
+<span id="cb11-7"><a href="#cb11-7" aria-hidden="true" tabindex="-1"></a>        <span class="cf">for</span> metric <span class="kw">in</span> metrics:</span>
+<span id="cb11-8"><a href="#cb11-8" aria-hidden="true" tabindex="-1"></a>            v1 <span class="op">=</span> np.array([x[<span class="dv">0</span>] <span class="cf">for</span> x <span class="kw">in</span> d[metric][k1]])</span>
+<span id="cb11-9"><a href="#cb11-9" aria-hidden="true" tabindex="-1"></a>            v2 <span class="op">=</span> np.array([x[<span class="dv">0</span>] <span class="cf">for</span> x <span class="kw">in</span> d[metric][k2]])</span>
+<span id="cb11-10"><a href="#cb11-10" aria-hidden="true" tabindex="-1"></a>            delt<span class="op">=</span>v2<span class="op">-</span>v1</span>
+<span id="cb11-11"><a href="#cb11-11" aria-hidden="true" tabindex="-1"></a>            delts[metric].extend(delt)</span>
+<span id="cb11-12"><a href="#cb11-12" aria-hidden="true" tabindex="-1"></a>            v1s[metric].extend(v1)</span>
+<span id="cb11-13"><a href="#cb11-13" aria-hidden="true" tabindex="-1"></a>            v2s[metric].extend(v2)</span>
+<span id="cb11-14"><a href="#cb11-14" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb11-15"><a href="#cb11-15" aria-hidden="true" tabindex="-1"></a>    nmetrics <span class="op">=</span> <span class="bu">len</span>(metrics)        </span>
+<span id="cb11-16"><a href="#cb11-16" aria-hidden="true" tabindex="-1"></a>    nrows <span class="op">=</span> nmetrics<span class="op">//</span><span class="dv">2</span> <span class="op">+</span> nmetrics<span class="op">%</span><span class="dv">2</span></span>
+<span id="cb11-17"><a href="#cb11-17" aria-hidden="true" tabindex="-1"></a>    ncols <span class="op">=</span> <span class="dv">2</span></span>
+<span id="cb11-18"><a href="#cb11-18" aria-hidden="true" tabindex="-1"></a>    figsize(ncols<span class="op">*</span><span class="dv">4</span>,nrows<span class="op">*</span><span class="dv">4</span>)</span>
+<span id="cb11-19"><a href="#cb11-19" aria-hidden="true" tabindex="-1"></a>    <span class="cf">for</span> i,metric <span class="kw">in</span> <span class="bu">enumerate</span>(metrics):</span>
+<span id="cb11-20"><a href="#cb11-20" aria-hidden="true" tabindex="-1"></a>        subplot(nrows,ncols,i<span class="op">+</span><span class="dv">1</span>)</span>
+<span id="cb11-21"><a href="#cb11-21" aria-hidden="true" tabindex="-1"></a>        scatter(v1s[metric],v2s[metric],marker<span class="op">=</span><span class="st">'.'</span>)<span class="op">;</span></span>
+<span id="cb11-22"><a href="#cb11-22" aria-hidden="true" tabindex="-1"></a>        xmin,xmax <span class="op">=</span> xlim()</span>
+<span id="cb11-23"><a href="#cb11-23" aria-hidden="true" tabindex="-1"></a>        ymin,ymax <span class="op">=</span> ylim()</span>
+<span id="cb11-24"><a href="#cb11-24" aria-hidden="true" tabindex="-1"></a>        vmin <span class="op">=</span> <span class="bu">min</span>(xmin,ymin)</span>
+<span id="cb11-25"><a href="#cb11-25" aria-hidden="true" tabindex="-1"></a>        vmax <span class="op">=</span> <span class="bu">max</span>(xmax,ymax)</span>
+<span id="cb11-26"><a href="#cb11-26" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb11-27"><a href="#cb11-27" aria-hidden="true" tabindex="-1"></a>        plot((vmin,vmax),(vmin,vmax),<span class="st">'k-'</span>)<span class="op">;</span></span>
+<span id="cb11-28"><a href="#cb11-28" aria-hidden="true" tabindex="-1"></a>        xlabel(k1)</span>
+<span id="cb11-29"><a href="#cb11-29" aria-hidden="true" tabindex="-1"></a>        ylabel(k2)</span>
+<span id="cb11-30"><a href="#cb11-30" aria-hidden="true" tabindex="-1"></a>        tight_layout()</span>
+<span id="cb11-31"><a href="#cb11-31" aria-hidden="true" tabindex="-1"></a>        title(metric)<span class="op">;</span>    </span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+<section id="logistic-regression" class="level2">
+<h2 class="anchored" data-anchor-id="logistic-regression">Logistic regression</h2>
+<div class="cell" data-execution_count="63">
+<div class="sourceCode cell-code" id="cb12"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb12-1"><a href="#cb12-1" aria-hidden="true" tabindex="-1"></a>do_scatter_plots(<span class="st">'lr_mfp2'</span>,<span class="st">'lr_lmfp2'</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-display">
+<p><img src="2022-12-25-colliding-bits-ii-revisited_files/figure-html/cell-11-output-1.png" class="img-fluid"></p>
+</div>
+</div>
+</section>
+<section id="balanced-random-forests" class="level2">
+<h2 class="anchored" data-anchor-id="balanced-random-forests">Balanced random forests</h2>
+<div class="cell" data-execution_count="64">
+<div class="sourceCode cell-code" id="cb13"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb13-1"><a href="#cb13-1" aria-hidden="true" tabindex="-1"></a>do_scatter_plots(<span class="st">'brf_mfp2'</span>,<span class="st">'brf_lmfp2'</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-display">
+<p><img src="2022-12-25-colliding-bits-ii-revisited_files/figure-html/cell-12-output-1.png" class="img-fluid"></p>
+</div>
+</div>
+</section>
+<section id="random-forests" class="level2">
+<h2 class="anchored" data-anchor-id="random-forests">Random forests</h2>
+<div class="cell" data-execution_count="65">
+<div class="sourceCode cell-code" id="cb14"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb14-1"><a href="#cb14-1" aria-hidden="true" tabindex="-1"></a>do_scatter_plots(<span class="st">'rf_mfp2'</span>,<span class="st">'rf_lmfp2'</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-display">
+<p><img src="2022-12-25-colliding-bits-ii-revisited_files/figure-html/cell-13-output-1.png" class="img-fluid"></p>
+</div>
+</div>
+</section>
+<section id="xgboost" class="level2">
+<h2 class="anchored" data-anchor-id="xgboost">XGBoost</h2>
+<div class="cell" data-execution_count="68">
+<div class="sourceCode cell-code" id="cb15"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb15-1"><a href="#cb15-1" aria-hidden="true" tabindex="-1"></a>do_scatter_plots(<span class="st">'xgb_mfp2'</span>,<span class="st">'xgb_lmfp2'</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-display">
+<p><img src="2022-12-25-colliding-bits-ii-revisited_files/figure-html/cell-14-output-1.png" class="img-fluid"></p>
+</div>
+</div>
+</section>
+<section id="laplacian-naive-bayes" class="level2">
+<h2 class="anchored" data-anchor-id="laplacian-naive-bayes">Laplacian Naive Bayes</h2>
+<div class="cell" data-execution_count="67">
+<div class="sourceCode cell-code" id="cb16"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb16-1"><a href="#cb16-1" aria-hidden="true" tabindex="-1"></a>do_scatter_plots(<span class="st">'lmnb_mfp2_2'</span>,<span class="st">'lmnb_lmfp2_2'</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-display">
+<p><img src="2022-12-25-colliding-bits-ii-revisited_files/figure-html/cell-15-output-1.png" class="img-fluid"></p>
+</div>
+</div>
+</section>
+<section id="naive-bayes" class="level2">
+<h2 class="anchored" data-anchor-id="naive-bayes">Naive Bayes</h2>
+<div class="cell" data-execution_count="66">
+<div class="sourceCode cell-code" id="cb17"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb17-1"><a href="#cb17-1" aria-hidden="true" tabindex="-1"></a>do_scatter_plots(<span class="st">'nb_mfp2'</span>,<span class="st">'nb_lmfp2'</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-display">
+<p><img src="2022-12-25-colliding-bits-ii-revisited_files/figure-html/cell-16-output-1.png" class="img-fluid"></p>
+</div>
+</div>
+<p>Something isn’t right with the NB results… I need to look into that</p>
+</section>
+</section>
+<section id="look-at-morgan-3" class="level1">
+<h1>Look at morgan 3</h1>
+<p>This increases the number of set bits</p>
+<div class="cell" data-execution_count="70">
+<div class="sourceCode cell-code" id="cb18"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb18-1"><a href="#cb18-1" aria-hidden="true" tabindex="-1"></a>do_scatter_plots(<span class="st">'lr_mfp3'</span>,<span class="st">'lr_lmfp3'</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-display">
+<p><img src="2022-12-25-colliding-bits-ii-revisited_files/figure-html/cell-17-output-1.png" class="img-fluid"></p>
+</div>
+</div>
+<div class="cell" data-execution_count="71">
+<div class="sourceCode cell-code" id="cb19"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb19-1"><a href="#cb19-1" aria-hidden="true" tabindex="-1"></a>do_scatter_plots(<span class="st">'brf_mfp3'</span>,<span class="st">'brf_lmfp3'</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-display">
+<p><img src="2022-12-25-colliding-bits-ii-revisited_files/figure-html/cell-18-output-1.png" class="img-fluid"></p>
+</div>
+</div>
+<div class="cell" data-execution_count="72">
+<div class="sourceCode cell-code" id="cb20"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb20-1"><a href="#cb20-1" aria-hidden="true" tabindex="-1"></a>do_scatter_plots(<span class="st">'rf_mfp3'</span>,<span class="st">'rf_lmfp3'</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-display">
+<p><img src="2022-12-25-colliding-bits-ii-revisited_files/figure-html/cell-19-output-1.png" class="img-fluid"></p>
+</div>
+</div>
+<div class="cell" data-execution_count="73">
+<div class="sourceCode cell-code" id="cb21"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb21-1"><a href="#cb21-1" aria-hidden="true" tabindex="-1"></a>do_scatter_plots(<span class="st">'xgb_mfp3'</span>,<span class="st">'xgb_lmfp3'</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-display">
+<p><img src="2022-12-25-colliding-bits-ii-revisited_files/figure-html/cell-20-output-1.png" class="img-fluid"></p>
+</div>
+</div>
+<div class="cell" data-execution_count="75">
+<div class="sourceCode cell-code" id="cb22"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb22-1"><a href="#cb22-1" aria-hidden="true" tabindex="-1"></a>do_scatter_plots(<span class="st">'lmnb_mfp3_2'</span>,<span class="st">'lmnb_lmfp3_2'</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-display">
+<p><img src="2022-12-25-colliding-bits-ii-revisited_files/figure-html/cell-21-output-1.png" class="img-fluid"></p>
+</div>
+</div>
+</section>
+<section id="look-at-rdk5" class="level1">
+<h1>Look at RDK5</h1>
+<p>Now we really have a lot of set bits</p>
+<div class="cell" data-execution_count="77">
+<div class="sourceCode cell-code" id="cb23"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb23-1"><a href="#cb23-1" aria-hidden="true" tabindex="-1"></a>do_scatter_plots(<span class="st">'lr_rdk5'</span>,<span class="st">'lr_lrdk5'</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-display">
+<p><img src="2022-12-25-colliding-bits-ii-revisited_files/figure-html/cell-22-output-1.png" class="img-fluid"></p>
+</div>
+</div>
+<div class="cell" data-execution_count="78">
+<div class="sourceCode cell-code" id="cb24"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb24-1"><a href="#cb24-1" aria-hidden="true" tabindex="-1"></a>do_scatter_plots(<span class="st">'brf_rdk5'</span>,<span class="st">'brf_lrdk5'</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-display">
+<p><img src="2022-12-25-colliding-bits-ii-revisited_files/figure-html/cell-23-output-1.png" class="img-fluid"></p>
+</div>
+</div>
+<div class="cell" data-execution_count="80">
+<div class="sourceCode cell-code" id="cb25"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb25-1"><a href="#cb25-1" aria-hidden="true" tabindex="-1"></a>do_scatter_plots(<span class="st">'rf_rdk5'</span>,<span class="st">'rf_lrdk5'</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-display">
+<p><img src="2022-12-25-colliding-bits-ii-revisited_files/figure-html/cell-24-output-1.png" class="img-fluid"></p>
+</div>
+</div>
+<div class="cell" data-execution_count="81">
+<div class="sourceCode cell-code" id="cb26"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb26-1"><a href="#cb26-1" aria-hidden="true" tabindex="-1"></a>do_scatter_plots(<span class="st">'xgb_rdk5'</span>,<span class="st">'xgb_lrdk5'</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-display">
+<p><img src="2022-12-25-colliding-bits-ii-revisited_files/figure-html/cell-25-output-1.png" class="img-fluid"></p>
+</div>
+</div>
+<div class="cell" data-execution_count="82">
+<div class="sourceCode cell-code" id="cb27"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb27-1"><a href="#cb27-1" aria-hidden="true" tabindex="-1"></a>do_scatter_plots(<span class="st">'lmnb_rdk5_2'</span>,<span class="st">'lmnb_lrdk5_2'</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-display">
+<p><img src="2022-12-25-colliding-bits-ii-revisited_files/figure-html/cell-26-output-1.png" class="img-fluid"></p>
+</div>
+</div>
+<p>Again, some of those enrichment plots look suspicious and should be looked into</p>
+</section>
+<section id="are-there-statistically-significant-differences" class="level1">
+<h1>Are there statistically significant differences?</h1>
+<p>Use the Wilcoxon signed-rank test to detect whether or not the differences we saw in the plots are statistically significant. We’ll do this for every method and fingerprint and make a table.</p>
+<div class="cell" data-execution_count="84">
+<div class="sourceCode cell-code" id="cb28"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb28-1"><a href="#cb28-1" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> scipy <span class="im">import</span> stats</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+<div class="cell" data-execution_count="128">
+<div class="sourceCode cell-code" id="cb29"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb29-1"><a href="#cb29-1" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> do_significance(alg,fp,tableOutput<span class="op">=</span><span class="va">False</span>,showHeader<span class="op">=</span><span class="va">False</span>,pthresh<span class="op">=</span><span class="fl">0.001</span>,alld<span class="op">=</span>alld,metrics<span class="op">=</span>metrics):</span>
+<span id="cb29-2"><a href="#cb29-2" aria-hidden="true" tabindex="-1"></a>    k1 <span class="op">=</span> <span class="ss">f'</span><span class="sc">{</span>alg<span class="sc">}</span><span class="ss">_</span><span class="sc">{</span>fp<span class="sc">}</span><span class="ss">'</span></span>
+<span id="cb29-3"><a href="#cb29-3" aria-hidden="true" tabindex="-1"></a>    k2 <span class="op">=</span> <span class="ss">f'</span><span class="sc">{</span>alg<span class="sc">}</span><span class="ss">_l</span><span class="sc">{</span>fp<span class="sc">}</span><span class="ss">'</span></span>
+<span id="cb29-4"><a href="#cb29-4" aria-hidden="true" tabindex="-1"></a>    <span class="cf">if</span> alg <span class="op">==</span> <span class="st">'lmnb'</span>:</span>
+<span id="cb29-5"><a href="#cb29-5" aria-hidden="true" tabindex="-1"></a>        k1 <span class="op">+=</span> <span class="st">'_2'</span></span>
+<span id="cb29-6"><a href="#cb29-6" aria-hidden="true" tabindex="-1"></a>        k2 <span class="op">+=</span> <span class="st">'_2'</span></span>
+<span id="cb29-7"><a href="#cb29-7" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb29-8"><a href="#cb29-8" aria-hidden="true" tabindex="-1"></a>    </span>
+<span id="cb29-9"><a href="#cb29-9" aria-hidden="true" tabindex="-1"></a>    v1s <span class="op">=</span> defaultdict(<span class="bu">list</span>)</span>
+<span id="cb29-10"><a href="#cb29-10" aria-hidden="true" tabindex="-1"></a>    v2s <span class="op">=</span> defaultdict(<span class="bu">list</span>)</span>
+<span id="cb29-11"><a href="#cb29-11" aria-hidden="true" tabindex="-1"></a>    delts <span class="op">=</span> defaultdict(<span class="bu">list</span>)</span>
+<span id="cb29-12"><a href="#cb29-12" aria-hidden="true" tabindex="-1"></a>    pct_delts <span class="op">=</span> defaultdict(<span class="bu">list</span>)</span>
+<span id="cb29-13"><a href="#cb29-13" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb29-14"><a href="#cb29-14" aria-hidden="true" tabindex="-1"></a>    <span class="cf">if</span> tableOutput <span class="kw">and</span> showHeader:</span>
+<span id="cb29-15"><a href="#cb29-15" aria-hidden="true" tabindex="-1"></a>        row <span class="op">=</span> (<span class="st">'alg'</span>,<span class="st">'fp'</span>,<span class="st">'metric'</span>,<span class="st">'result'</span>,<span class="st">'P'</span>,<span class="st">'delt'</span>,<span class="st">'pct_delt'</span>)</span>
+<span id="cb29-16"><a href="#cb29-16" aria-hidden="true" tabindex="-1"></a>        divider <span class="op">=</span> [<span class="st">'-'</span><span class="op">*</span><span class="bu">len</span>(k) <span class="cf">for</span> k <span class="kw">in</span> row]</span>
+<span id="cb29-17"><a href="#cb29-17" aria-hidden="true" tabindex="-1"></a>        <span class="bu">print</span>(<span class="st">'| '</span><span class="op">+</span><span class="st">' | '</span>.join(row)<span class="op">+</span><span class="st">' |'</span>)</span>
+<span id="cb29-18"><a href="#cb29-18" aria-hidden="true" tabindex="-1"></a>        <span class="bu">print</span>(<span class="st">'| '</span><span class="op">+</span><span class="st">' | '</span>.join(divider)<span class="op">+</span><span class="st">' |'</span>)</span>
+<span id="cb29-19"><a href="#cb29-19" aria-hidden="true" tabindex="-1"></a>        </span>
+<span id="cb29-20"><a href="#cb29-20" aria-hidden="true" tabindex="-1"></a>        </span>
+<span id="cb29-21"><a href="#cb29-21" aria-hidden="true" tabindex="-1"></a>    <span class="cf">for</span> assay,d <span class="kw">in</span> alld.items():</span>
+<span id="cb29-22"><a href="#cb29-22" aria-hidden="true" tabindex="-1"></a>        <span class="cf">for</span> metric <span class="kw">in</span> metrics:</span>
+<span id="cb29-23"><a href="#cb29-23" aria-hidden="true" tabindex="-1"></a>            v1 <span class="op">=</span> np.array([x[<span class="dv">0</span>] <span class="cf">for</span> x <span class="kw">in</span> d[metric][k1]])</span>
+<span id="cb29-24"><a href="#cb29-24" aria-hidden="true" tabindex="-1"></a>            v2 <span class="op">=</span> np.array([x[<span class="dv">0</span>] <span class="cf">for</span> x <span class="kw">in</span> d[metric][k2]])</span>
+<span id="cb29-25"><a href="#cb29-25" aria-hidden="true" tabindex="-1"></a>            v1s[metric].extend(v1)</span>
+<span id="cb29-26"><a href="#cb29-26" aria-hidden="true" tabindex="-1"></a>            v2s[metric].extend(v2)</span>
+<span id="cb29-27"><a href="#cb29-27" aria-hidden="true" tabindex="-1"></a>            delt <span class="op">=</span> v1<span class="op">-</span>v2</span>
+<span id="cb29-28"><a href="#cb29-28" aria-hidden="true" tabindex="-1"></a>            delts[metric].extend(delt)</span>
+<span id="cb29-29"><a href="#cb29-29" aria-hidden="true" tabindex="-1"></a>            pct_delts[metric].extend(delt<span class="op">/</span>v1)</span>
+<span id="cb29-30"><a href="#cb29-30" aria-hidden="true" tabindex="-1"></a>    <span class="cf">for</span> metric <span class="kw">in</span> metrics:</span>
+<span id="cb29-31"><a href="#cb29-31" aria-hidden="true" tabindex="-1"></a>        w2s <span class="op">=</span> stats.wilcoxon(v1s[metric],v2s[metric],alternative<span class="op">=</span><span class="st">'two-sided'</span>).pvalue</span>
+<span id="cb29-32"><a href="#cb29-32" aria-hidden="true" tabindex="-1"></a>        wlt <span class="op">=</span> stats.wilcoxon(v1s[metric],v2s[metric],alternative<span class="op">=</span><span class="st">'less'</span>).pvalue</span>
+<span id="cb29-33"><a href="#cb29-33" aria-hidden="true" tabindex="-1"></a>        wgt <span class="op">=</span> stats.wilcoxon(v1s[metric],v2s[metric],alternative<span class="op">=</span><span class="st">'greater'</span>).pvalue</span>
+<span id="cb29-34"><a href="#cb29-34" aria-hidden="true" tabindex="-1"></a>        result <span class="op">=</span> <span class="st">'same'</span></span>
+<span id="cb29-35"><a href="#cb29-35" aria-hidden="true" tabindex="-1"></a>        which <span class="op">=</span> w2s</span>
+<span id="cb29-36"><a href="#cb29-36" aria-hidden="true" tabindex="-1"></a>        <span class="cf">if</span> w2s <span class="op">&lt;</span> pthresh:</span>
+<span id="cb29-37"><a href="#cb29-37" aria-hidden="true" tabindex="-1"></a>            <span class="cf">if</span> wlt <span class="op">&lt;</span> pthresh:</span>
+<span id="cb29-38"><a href="#cb29-38" aria-hidden="true" tabindex="-1"></a>                result <span class="op">=</span> <span class="st">'lt'</span></span>
+<span id="cb29-39"><a href="#cb29-39" aria-hidden="true" tabindex="-1"></a>                which <span class="op">=</span> wlt</span>
+<span id="cb29-40"><a href="#cb29-40" aria-hidden="true" tabindex="-1"></a>            <span class="cf">elif</span> wgt <span class="op">&lt;</span> pthresh:</span>
+<span id="cb29-41"><a href="#cb29-41" aria-hidden="true" tabindex="-1"></a>                result <span class="op">=</span> <span class="st">'gt'</span></span>
+<span id="cb29-42"><a href="#cb29-42" aria-hidden="true" tabindex="-1"></a>                which <span class="op">=</span> wgt</span>
+<span id="cb29-43"><a href="#cb29-43" aria-hidden="true" tabindex="-1"></a>        row <span class="op">=</span> (alg,fp,metric,result,<span class="ss">f'</span><span class="sc">{</span>which<span class="sc">:.3g}</span><span class="ss">'</span>,<span class="ss">f'</span><span class="sc">{</span>np<span class="sc">.</span>median(delts[metric])<span class="sc">:.2g}</span><span class="ss">'</span>,<span class="ss">f'</span><span class="sc">{</span>np<span class="sc">.</span>median(pct_delts[metric])<span class="sc">:.3g}</span><span class="ss">'</span>)</span>
+<span id="cb29-44"><a href="#cb29-44" aria-hidden="true" tabindex="-1"></a>        <span class="cf">if</span> <span class="kw">not</span> tableOutput:</span>
+<span id="cb29-45"><a href="#cb29-45" aria-hidden="true" tabindex="-1"></a>            <span class="bu">print</span>(<span class="st">' '</span>.join(row))</span>
+<span id="cb29-46"><a href="#cb29-46" aria-hidden="true" tabindex="-1"></a>        <span class="cf">else</span>:</span>
+<span id="cb29-47"><a href="#cb29-47" aria-hidden="true" tabindex="-1"></a>            <span class="bu">print</span>(<span class="st">'| '</span><span class="op">+</span><span class="st">' | '</span>.join(row)<span class="op">+</span><span class="st">' |'</span>)</span>
+<span id="cb29-48"><a href="#cb29-48" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb29-49"><a href="#cb29-49" aria-hidden="true" tabindex="-1"></a><span class="co"># we skip 'nb' here since there's clearly something bogus with the results</span></span>
+<span id="cb29-50"><a href="#cb29-50" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> metric <span class="kw">in</span> metrics:</span>
+<span id="cb29-51"><a href="#cb29-51" aria-hidden="true" tabindex="-1"></a>    <span class="bu">print</span>(<span class="ss">f'## </span><span class="sc">{</span>metric<span class="sc">}</span><span class="ss">'</span>)</span>
+<span id="cb29-52"><a href="#cb29-52" aria-hidden="true" tabindex="-1"></a>    <span class="cf">for</span> i,alg <span class="kw">in</span> <span class="bu">enumerate</span>((<span class="st">'lr'</span>,<span class="st">'lmnb'</span>,<span class="st">'rf'</span>,<span class="st">'brf'</span>,<span class="st">'xgb'</span>)):</span>
+<span id="cb29-53"><a href="#cb29-53" aria-hidden="true" tabindex="-1"></a>        <span class="cf">for</span> j,fp <span class="kw">in</span> <span class="bu">enumerate</span>((<span class="st">'mfp2'</span>,<span class="st">'mfp3'</span>,<span class="st">'rdk5'</span>,<span class="st">'hashap'</span>,<span class="st">'hashtt'</span>)):</span>
+<span id="cb29-54"><a href="#cb29-54" aria-hidden="true" tabindex="-1"></a>            do_significance(alg,fp,tableOutput<span class="op">=</span><span class="va">True</span>,showHeader<span class="op">=</span>(<span class="kw">not</span> i <span class="op">+</span> j),metrics<span class="op">=</span>(metric,))</span>
+<span id="cb29-55"><a href="#cb29-55" aria-hidden="true" tabindex="-1"></a>    <span class="bu">print</span>(<span class="st">'</span><span class="ch">\n\n</span><span class="st">'</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>## AUC
+| alg | fp | metric | result | P | delt | pct_delt |
+| --- | -- | ------ | ------ | - | ---- | -------- |
+| lr | mfp2 | AUC | lt | 8.68e-51 | -0.011 | -0.0142 |
+| lr | mfp3 | AUC | lt | 2.6e-64 | -0.019 | -0.0243 |
+| lr | rdk5 | AUC | lt | 2.09e-24 | -0.011 | -0.0143 |
+| lr | hashap | AUC | lt | 8.77e-37 | -0.026 | -0.0325 |
+| lr | hashtt | AUC | lt | 8.02e-54 | -0.022 | -0.0294 |
+| lmnb | mfp2 | AUC | lt | 3.2e-104 | -0.042 | -0.0573 |
+| lmnb | mfp3 | AUC | lt | 6.05e-107 | -0.077 | -0.109 |
+| lmnb | rdk5 | AUC | lt | 4.32e-60 | -0.071 | -0.193 |
+| lmnb | hashap | AUC | gt | 1.67e-18 | 0.031 | 0.0494 |
+| lmnb | hashtt | AUC | lt | 7.52e-105 | -0.051 | -0.0767 |
+| rf | mfp2 | AUC | lt | 1.45e-102 | -0.087 | -0.132 |
+| rf | mfp3 | AUC | lt | 2.23e-92 | -0.074 | -0.115 |
+| rf | rdk5 | AUC | gt | 4.27e-11 | 0.015 | 0.0212 |
+| rf | hashap | AUC | same | 0.00227 | 0.0036 | 0.00503 |
+| rf | hashtt | AUC | lt | 1.25e-63 | -0.046 | -0.0677 |
+| brf | mfp2 | AUC | lt | 6.61e-37 | -0.024 | -0.0304 |
+| brf | mfp3 | AUC | lt | 9.25e-40 | -0.031 | -0.04 |
+| brf | rdk5 | AUC | gt | 2.77e-09 | 0.01 | 0.0131 |
+| brf | hashap | AUC | gt | 5.32e-07 | 0.011 | 0.0152 |
+| brf | hashtt | AUC | lt | 8.45e-29 | -0.027 | -0.0362 |
+| xgb | mfp2 | AUC | same | 0.831 | 0.00097 | 0.00109 |
+| xgb | mfp3 | AUC | same | 0.00162 | -0.0051 | -0.00719 |
+| xgb | rdk5 | AUC | gt | 1.36e-07 | 0.012 | 0.0157 |
+| xgb | hashap | AUC | gt | 1.49e-20 | 0.027 | 0.0358 |
+| xgb | hashtt | AUC | same | 0.0265 | -0.0043 | -0.00645 |
+
+
+
+## AUPRC
+| alg | fp | metric | result | P | delt | pct_delt |
+| --- | -- | ------ | ------ | - | ---- | -------- |
+| lr | mfp2 | AUPRC | lt | 9.58e-55 | -0.0079 | -0.0535 |
+| lr | mfp3 | AUPRC | lt | 1.72e-71 | -0.011 | -0.0758 |
+| lr | rdk5 | AUPRC | lt | 2.93e-38 | -0.0042 | -0.0508 |
+| lr | hashap | AUPRC | lt | 1.11e-13 | -0.01 | -0.0857 |
+| lr | hashtt | AUPRC | lt | 2.33e-60 | -0.0091 | -0.102 |
+| lmnb | mfp2 | AUPRC | lt | 9.34e-31 | -0.009 | -0.101 |
+| lmnb | mfp3 | AUPRC | lt | 5.43e-27 | -0.0099 | -0.135 |
+| lmnb | rdk5 | AUPRC | gt | 0.000113 | 0.00025 | 0.00953 |
+| lmnb | hashap | AUPRC | lt | 1.02e-18 | -0.0052 | -0.114 |
+| lmnb | hashtt | AUPRC | lt | 2.39e-17 | -0.0039 | -0.0839 |
+| rf | mfp2 | AUPRC | lt | 3.24e-46 | -0.017 | -0.174 |
+| rf | mfp3 | AUPRC | lt | 3.09e-59 | -0.019 | -0.211 |
+| rf | rdk5 | AUPRC | same | 0.41 | 1.1e-05 | 0.000428 |
+| rf | hashap | AUPRC | gt | 2.54e-05 | 0.011 | 0.1 |
+| rf | hashtt | AUPRC | lt | 8.39e-42 | -0.011 | -0.14 |
+| brf | mfp2 | AUPRC | lt | 1.41e-22 | -0.0086 | -0.0915 |
+| brf | mfp3 | AUPRC | lt | 4.72e-35 | -0.012 | -0.119 |
+| brf | rdk5 | AUPRC | same | 0.455 | -0.00027 | -0.00484 |
+| brf | hashap | AUPRC | gt | 0.00023 | 0.0058 | 0.0642 |
+| brf | hashtt | AUPRC | lt | 3.38e-26 | -0.0075 | -0.121 |
+| xgb | mfp2 | AUPRC | lt | 1.34e-12 | -0.0044 | -0.0558 |
+| xgb | mfp3 | AUPRC | lt | 1.74e-25 | -0.0088 | -0.113 |
+| xgb | rdk5 | AUPRC | lt | 1.32e-08 | -0.0034 | -0.0545 |
+| xgb | hashap | AUPRC | same | 0.221 | 0.008 | 0.0872 |
+| xgb | hashtt | AUPRC | lt | 1.07e-13 | -0.0044 | -0.0792 |
+
+
+
+## EF1
+| alg | fp | metric | result | P | delt | pct_delt |
+| --- | -- | ------ | ------ | - | ---- | -------- |
+| lr | mfp2 | EF1 | lt | 4.4e-23 | -1 | -0.0357 |
+| lr | mfp3 | EF1 | lt | 1.24e-36 | -1 | -0.0625 |
+| lr | rdk5 | EF1 | lt | 7.74e-16 | 0 | 0 |
+| lr | hashap | EF1 | lt | 3.05e-06 | -1 | -0.0556 |
+| lr | hashtt | EF1 | lt | 5.74e-36 | -1 | -0.0833 |
+| lmnb | mfp2 | EF1 | lt | 2.32e-74 | -3 | -0.167 |
+| lmnb | mfp3 | EF1 | lt | 9.4e-69 | -3 | -0.25 |
+| lmnb | rdk5 | EF1 | gt | 1.97e-58 | 4 | nan |
+| lmnb | hashap | EF1 | same | 0.147 | -1 | nan |
+| lmnb | hashtt | EF1 | lt | 5.42e-48 | -2 | -0.2 |
+| rf | mfp2 | EF1 | lt | 4.12e-11 | -1 | -0.0706 |
+| rf | mfp3 | EF1 | lt | 1.94e-14 | -1 | -0.0833 |
+| rf | rdk5 | EF1 | same | 0.0619 | 0 | 0 |
+| rf | hashap | EF1 | gt | 3.15e-06 | 2 | 0.1 |
+| rf | hashtt | EF1 | lt | 1.33e-09 | -1 | -0.0476 |
+| brf | mfp2 | EF1 | lt | 2.84e-09 | -1 | -0.0421 |
+| brf | mfp3 | EF1 | lt | 4.46e-13 | -1 | -0.0769 |
+| brf | rdk5 | EF1 | same | 0.301 | 0 | nan |
+| brf | hashap | EF1 | gt | 9.93e-09 | 1 | 0.0779 |
+| brf | hashtt | EF1 | lt | 7.97e-14 | -1 | -0.0871 |
+| xgb | mfp2 | EF1 | lt | 1.06e-14 | -1 | -0.075 |
+| xgb | mfp3 | EF1 | lt | 2.22e-17 | -1 | -0.0625 |
+| xgb | rdk5 | EF1 | lt | 4.54e-09 | -1 | nan |
+| xgb | hashap | EF1 | same | 0.335 | 1 | 0.0769 |
+| xgb | hashtt | EF1 | lt | 6.27e-09 | 0 | 0 |
+
+
+
+## EF5
+| alg | fp | metric | result | P | delt | pct_delt |
+| --- | -- | ------ | ------ | - | ---- | -------- |
+| lr | mfp2 | EF5 | lt | 4.32e-23 | -0.2 | -0.0357 |
+| lr | mfp3 | EF5 | lt | 3.64e-38 | -0.4 | -0.0559 |
+| lr | rdk5 | EF5 | lt | 8.96e-26 | -0.2 | -0.0469 |</code></pre>
+</div>
+<div class="cell-output cell-output-stderr">
+<pre><code>C:\Users\glandrum\AppData\Local\Temp\ipykernel_9592\1757963699.py:29: RuntimeWarning: invalid value encountered in divide
+  pct_delts[metric].extend(delt/v1)
+C:\Users\glandrum\AppData\Local\Temp\ipykernel_9592\1757963699.py:29: RuntimeWarning: divide by zero encountered in divide
+  pct_delts[metric].extend(delt/v1)</code></pre>
+</div>
+<div class="cell-output cell-output-stdout">
+<pre><code>| lr | hashap | EF5 | lt | 1.42e-08 | -0.2 | -0.0385 |
+| lr | hashtt | EF5 | lt | 6.58e-38 | -0.4 | -0.0769 |
+| lmnb | mfp2 | EF5 | lt | 1.44e-82 | -1 | -0.154 |
+| lmnb | mfp3 | EF5 | lt | 2.57e-92 | -1.4 | -0.264 |
+| lmnb | rdk5 | EF5 | same | 0.725 | -0.4 | nan |
+| lmnb | hashap | EF5 | lt | 1.47e-64 | -1 | -0.217 |
+| lmnb | hashtt | EF5 | lt | 6.85e-73 | -0.81 | -0.185 |
+| rf | mfp2 | EF5 | lt | 3.72e-39 | -0.61 | -0.118 |
+| rf | mfp3 | EF5 | lt | 3.14e-26 | -0.4 | -0.0948 |
+| rf | rdk5 | EF5 | same | 0.988 | 0 | 0 |
+| rf | hashap | EF5 | gt | 6.9e-14 | 0.61 | 0.0769 |
+| rf | hashtt | EF5 | lt | 2.61e-19 | -0.4 | -0.0811 |
+| brf | mfp2 | EF5 | lt | 4.02e-16 | -0.4 | -0.0476 |
+| brf | mfp3 | EF5 | lt | 8.91e-25 | -0.6 | -0.0854 |
+| brf | rdk5 | EF5 | same | 0.319 | 0 | 0 |
+| brf | hashap | EF5 | gt | 9.01e-07 | 0.4 | 0.0674 |
+| brf | hashtt | EF5 | lt | 1.18e-22 | -0.4 | -0.101 |
+| xgb | mfp2 | EF5 | lt | 3.14e-05 | -0.2 | -0.0308 |
+| xgb | mfp3 | EF5 | lt | 4.57e-13 | -0.4 | -0.0797 |
+| xgb | rdk5 | EF5 | same | 0.00432 | -0.2 | -0.0354 |
+| xgb | hashap | EF5 | gt | 1.24e-09 | 0.61 | 0.1 |
+| xgb | hashtt | EF5 | lt | 0.000141 | -0.2 | -0.0199 |
+
+
+</code></pre>
+</div>
+</div>
+<p>And now display that:</p>
+<section id="auc" class="level2">
+<h2 class="anchored" data-anchor-id="auc">AUC</h2>
+<table class="table">
+<thead>
+<tr class="header">
+<th>alg</th>
+<th>fp</th>
+<th>metric</th>
+<th>result</th>
+<th>P</th>
+<th>delt</th>
+<th>pct_delt</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>lr</td>
+<td>mfp2</td>
+<td>AUC</td>
+<td>lt</td>
+<td>8.68e-51</td>
+<td>-0.011</td>
+<td>-0.0142</td>
+</tr>
+<tr class="even">
+<td>lr</td>
+<td>mfp3</td>
+<td>AUC</td>
+<td>lt</td>
+<td>2.6e-64</td>
+<td>-0.019</td>
+<td>-0.0243</td>
+</tr>
+<tr class="odd">
+<td>lr</td>
+<td>rdk5</td>
+<td>AUC</td>
+<td>lt</td>
+<td>2.09e-24</td>
+<td>-0.011</td>
+<td>-0.0143</td>
+</tr>
+<tr class="even">
+<td>lr</td>
+<td>hashap</td>
+<td>AUC</td>
+<td>lt</td>
+<td>8.77e-37</td>
+<td>-0.026</td>
+<td>-0.0325</td>
+</tr>
+<tr class="odd">
+<td>lr</td>
+<td>hashtt</td>
+<td>AUC</td>
+<td>lt</td>
+<td>8.02e-54</td>
+<td>-0.022</td>
+<td>-0.0294</td>
+</tr>
+<tr class="even">
+<td>lmnb</td>
+<td>mfp2</td>
+<td>AUC</td>
+<td>lt</td>
+<td>3.2e-104</td>
+<td>-0.042</td>
+<td>-0.0573</td>
+</tr>
+<tr class="odd">
+<td>lmnb</td>
+<td>mfp3</td>
+<td>AUC</td>
+<td>lt</td>
+<td>6.05e-107</td>
+<td>-0.077</td>
+<td>-0.109</td>
+</tr>
+<tr class="even">
+<td>lmnb</td>
+<td>rdk5</td>
+<td>AUC</td>
+<td>lt</td>
+<td>4.32e-60</td>
+<td>-0.071</td>
+<td>-0.193</td>
+</tr>
+<tr class="odd">
+<td>lmnb</td>
+<td>hashap</td>
+<td>AUC</td>
+<td>gt</td>
+<td>1.67e-18</td>
+<td>0.031</td>
+<td>0.0494</td>
+</tr>
+<tr class="even">
+<td>lmnb</td>
+<td>hashtt</td>
+<td>AUC</td>
+<td>lt</td>
+<td>7.52e-105</td>
+<td>-0.051</td>
+<td>-0.0767</td>
+</tr>
+<tr class="odd">
+<td>rf</td>
+<td>mfp2</td>
+<td>AUC</td>
+<td>lt</td>
+<td>1.45e-102</td>
+<td>-0.087</td>
+<td>-0.132</td>
+</tr>
+<tr class="even">
+<td>rf</td>
+<td>mfp3</td>
+<td>AUC</td>
+<td>lt</td>
+<td>2.23e-92</td>
+<td>-0.074</td>
+<td>-0.115</td>
+</tr>
+<tr class="odd">
+<td>rf</td>
+<td>rdk5</td>
+<td>AUC</td>
+<td>gt</td>
+<td>4.27e-11</td>
+<td>0.015</td>
+<td>0.0212</td>
+</tr>
+<tr class="even">
+<td>rf</td>
+<td>hashap</td>
+<td>AUC</td>
+<td>same</td>
+<td>0.00227</td>
+<td>0.0036</td>
+<td>0.00503</td>
+</tr>
+<tr class="odd">
+<td>rf</td>
+<td>hashtt</td>
+<td>AUC</td>
+<td>lt</td>
+<td>1.25e-63</td>
+<td>-0.046</td>
+<td>-0.0677</td>
+</tr>
+<tr class="even">
+<td>brf</td>
+<td>mfp2</td>
+<td>AUC</td>
+<td>lt</td>
+<td>6.61e-37</td>
+<td>-0.024</td>
+<td>-0.0304</td>
+</tr>
+<tr class="odd">
+<td>brf</td>
+<td>mfp3</td>
+<td>AUC</td>
+<td>lt</td>
+<td>9.25e-40</td>
+<td>-0.031</td>
+<td>-0.04</td>
+</tr>
+<tr class="even">
+<td>brf</td>
+<td>rdk5</td>
+<td>AUC</td>
+<td>gt</td>
+<td>2.77e-09</td>
+<td>0.01</td>
+<td>0.0131</td>
+</tr>
+<tr class="odd">
+<td>brf</td>
+<td>hashap</td>
+<td>AUC</td>
+<td>gt</td>
+<td>5.32e-07</td>
+<td>0.011</td>
+<td>0.0152</td>
+</tr>
+<tr class="even">
+<td>brf</td>
+<td>hashtt</td>
+<td>AUC</td>
+<td>lt</td>
+<td>8.45e-29</td>
+<td>-0.027</td>
+<td>-0.0362</td>
+</tr>
+<tr class="odd">
+<td>xgb</td>
+<td>mfp2</td>
+<td>AUC</td>
+<td>same</td>
+<td>0.831</td>
+<td>0.00097</td>
+<td>0.00109</td>
+</tr>
+<tr class="even">
+<td>xgb</td>
+<td>mfp3</td>
+<td>AUC</td>
+<td>same</td>
+<td>0.00162</td>
+<td>-0.0051</td>
+<td>-0.00719</td>
+</tr>
+<tr class="odd">
+<td>xgb</td>
+<td>rdk5</td>
+<td>AUC</td>
+<td>gt</td>
+<td>1.36e-07</td>
+<td>0.012</td>
+<td>0.0157</td>
+</tr>
+<tr class="even">
+<td>xgb</td>
+<td>hashap</td>
+<td>AUC</td>
+<td>gt</td>
+<td>1.49e-20</td>
+<td>0.027</td>
+<td>0.0358</td>
+</tr>
+<tr class="odd">
+<td>xgb</td>
+<td>hashtt</td>
+<td>AUC</td>
+<td>same</td>
+<td>0.0265</td>
+<td>-0.0043</td>
+<td>-0.00645</td>
+</tr>
+</tbody>
+</table>
+</section>
+<section id="auprc" class="level2">
+<h2 class="anchored" data-anchor-id="auprc">AUPRC</h2>
+<table class="table">
+<thead>
+<tr class="header">
+<th>alg</th>
+<th>fp</th>
+<th>metric</th>
+<th>result</th>
+<th>P</th>
+<th>delt</th>
+<th>pct_delt</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>lr</td>
+<td>mfp2</td>
+<td>AUPRC</td>
+<td>lt</td>
+<td>9.58e-55</td>
+<td>-0.0079</td>
+<td>-0.0535</td>
+</tr>
+<tr class="even">
+<td>lr</td>
+<td>mfp3</td>
+<td>AUPRC</td>
+<td>lt</td>
+<td>1.72e-71</td>
+<td>-0.011</td>
+<td>-0.0758</td>
+</tr>
+<tr class="odd">
+<td>lr</td>
+<td>rdk5</td>
+<td>AUPRC</td>
+<td>lt</td>
+<td>2.93e-38</td>
+<td>-0.0042</td>
+<td>-0.0508</td>
+</tr>
+<tr class="even">
+<td>lr</td>
+<td>hashap</td>
+<td>AUPRC</td>
+<td>lt</td>
+<td>1.11e-13</td>
+<td>-0.01</td>
+<td>-0.0857</td>
+</tr>
+<tr class="odd">
+<td>lr</td>
+<td>hashtt</td>
+<td>AUPRC</td>
+<td>lt</td>
+<td>2.33e-60</td>
+<td>-0.0091</td>
+<td>-0.102</td>
+</tr>
+<tr class="even">
+<td>lmnb</td>
+<td>mfp2</td>
+<td>AUPRC</td>
+<td>lt</td>
+<td>9.34e-31</td>
+<td>-0.009</td>
+<td>-0.101</td>
+</tr>
+<tr class="odd">
+<td>lmnb</td>
+<td>mfp3</td>
+<td>AUPRC</td>
+<td>lt</td>
+<td>5.43e-27</td>
+<td>-0.0099</td>
+<td>-0.135</td>
+</tr>
+<tr class="even">
+<td>lmnb</td>
+<td>rdk5</td>
+<td>AUPRC</td>
+<td>gt</td>
+<td>0.000113</td>
+<td>0.00025</td>
+<td>0.00953</td>
+</tr>
+<tr class="odd">
+<td>lmnb</td>
+<td>hashap</td>
+<td>AUPRC</td>
+<td>lt</td>
+<td>1.02e-18</td>
+<td>-0.0052</td>
+<td>-0.114</td>
+</tr>
+<tr class="even">
+<td>lmnb</td>
+<td>hashtt</td>
+<td>AUPRC</td>
+<td>lt</td>
+<td>2.39e-17</td>
+<td>-0.0039</td>
+<td>-0.0839</td>
+</tr>
+<tr class="odd">
+<td>rf</td>
+<td>mfp2</td>
+<td>AUPRC</td>
+<td>lt</td>
+<td>3.24e-46</td>
+<td>-0.017</td>
+<td>-0.174</td>
+</tr>
+<tr class="even">
+<td>rf</td>
+<td>mfp3</td>
+<td>AUPRC</td>
+<td>lt</td>
+<td>3.09e-59</td>
+<td>-0.019</td>
+<td>-0.211</td>
+</tr>
+<tr class="odd">
+<td>rf</td>
+<td>rdk5</td>
+<td>AUPRC</td>
+<td>same</td>
+<td>0.41</td>
+<td>1.1e-05</td>
+<td>0.000428</td>
+</tr>
+<tr class="even">
+<td>rf</td>
+<td>hashap</td>
+<td>AUPRC</td>
+<td>gt</td>
+<td>2.54e-05</td>
+<td>0.011</td>
+<td>0.1</td>
+</tr>
+<tr class="odd">
+<td>rf</td>
+<td>hashtt</td>
+<td>AUPRC</td>
+<td>lt</td>
+<td>8.39e-42</td>
+<td>-0.011</td>
+<td>-0.14</td>
+</tr>
+<tr class="even">
+<td>brf</td>
+<td>mfp2</td>
+<td>AUPRC</td>
+<td>lt</td>
+<td>1.41e-22</td>
+<td>-0.0086</td>
+<td>-0.0915</td>
+</tr>
+<tr class="odd">
+<td>brf</td>
+<td>mfp3</td>
+<td>AUPRC</td>
+<td>lt</td>
+<td>4.72e-35</td>
+<td>-0.012</td>
+<td>-0.119</td>
+</tr>
+<tr class="even">
+<td>brf</td>
+<td>rdk5</td>
+<td>AUPRC</td>
+<td>same</td>
+<td>0.455</td>
+<td>-0.00027</td>
+<td>-0.00484</td>
+</tr>
+<tr class="odd">
+<td>brf</td>
+<td>hashap</td>
+<td>AUPRC</td>
+<td>gt</td>
+<td>0.00023</td>
+<td>0.0058</td>
+<td>0.0642</td>
+</tr>
+<tr class="even">
+<td>brf</td>
+<td>hashtt</td>
+<td>AUPRC</td>
+<td>lt</td>
+<td>3.38e-26</td>
+<td>-0.0075</td>
+<td>-0.121</td>
+</tr>
+<tr class="odd">
+<td>xgb</td>
+<td>mfp2</td>
+<td>AUPRC</td>
+<td>lt</td>
+<td>1.34e-12</td>
+<td>-0.0044</td>
+<td>-0.0558</td>
+</tr>
+<tr class="even">
+<td>xgb</td>
+<td>mfp3</td>
+<td>AUPRC</td>
+<td>lt</td>
+<td>1.74e-25</td>
+<td>-0.0088</td>
+<td>-0.113</td>
+</tr>
+<tr class="odd">
+<td>xgb</td>
+<td>rdk5</td>
+<td>AUPRC</td>
+<td>lt</td>
+<td>1.32e-08</td>
+<td>-0.0034</td>
+<td>-0.0545</td>
+</tr>
+<tr class="even">
+<td>xgb</td>
+<td>hashap</td>
+<td>AUPRC</td>
+<td>same</td>
+<td>0.221</td>
+<td>0.008</td>
+<td>0.0872</td>
+</tr>
+<tr class="odd">
+<td>xgb</td>
+<td>hashtt</td>
+<td>AUPRC</td>
+<td>lt</td>
+<td>1.07e-13</td>
+<td>-0.0044</td>
+<td>-0.0792</td>
+</tr>
+</tbody>
+</table>
+</section>
+<section id="ef1" class="level2">
+<h2 class="anchored" data-anchor-id="ef1">EF1</h2>
+<table class="table">
+<thead>
+<tr class="header">
+<th>alg</th>
+<th>fp</th>
+<th>metric</th>
+<th>result</th>
+<th>P</th>
+<th>delt</th>
+<th>pct_delt</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>lr</td>
+<td>mfp2</td>
+<td>EF1</td>
+<td>lt</td>
+<td>4.4e-23</td>
+<td>-1</td>
+<td>-0.0357</td>
+</tr>
+<tr class="even">
+<td>lr</td>
+<td>mfp3</td>
+<td>EF1</td>
+<td>lt</td>
+<td>1.24e-36</td>
+<td>-1</td>
+<td>-0.0625</td>
+</tr>
+<tr class="odd">
+<td>lr</td>
+<td>rdk5</td>
+<td>EF1</td>
+<td>lt</td>
+<td>7.74e-16</td>
+<td>0</td>
+<td>0</td>
+</tr>
+<tr class="even">
+<td>lr</td>
+<td>hashap</td>
+<td>EF1</td>
+<td>lt</td>
+<td>3.05e-06</td>
+<td>-1</td>
+<td>-0.0556</td>
+</tr>
+<tr class="odd">
+<td>lr</td>
+<td>hashtt</td>
+<td>EF1</td>
+<td>lt</td>
+<td>5.74e-36</td>
+<td>-1</td>
+<td>-0.0833</td>
+</tr>
+<tr class="even">
+<td>lmnb</td>
+<td>mfp2</td>
+<td>EF1</td>
+<td>lt</td>
+<td>2.32e-74</td>
+<td>-3</td>
+<td>-0.167</td>
+</tr>
+<tr class="odd">
+<td>lmnb</td>
+<td>mfp3</td>
+<td>EF1</td>
+<td>lt</td>
+<td>9.4e-69</td>
+<td>-3</td>
+<td>-0.25</td>
+</tr>
+<tr class="even">
+<td>lmnb</td>
+<td>rdk5</td>
+<td>EF1</td>
+<td>gt</td>
+<td>1.97e-58</td>
+<td>4</td>
+<td>nan</td>
+</tr>
+<tr class="odd">
+<td>lmnb</td>
+<td>hashap</td>
+<td>EF1</td>
+<td>same</td>
+<td>0.147</td>
+<td>-1</td>
+<td>nan</td>
+</tr>
+<tr class="even">
+<td>lmnb</td>
+<td>hashtt</td>
+<td>EF1</td>
+<td>lt</td>
+<td>5.42e-48</td>
+<td>-2</td>
+<td>-0.2</td>
+</tr>
+<tr class="odd">
+<td>rf</td>
+<td>mfp2</td>
+<td>EF1</td>
+<td>lt</td>
+<td>4.12e-11</td>
+<td>-1</td>
+<td>-0.0706</td>
+</tr>
+<tr class="even">
+<td>rf</td>
+<td>mfp3</td>
+<td>EF1</td>
+<td>lt</td>
+<td>1.94e-14</td>
+<td>-1</td>
+<td>-0.0833</td>
+</tr>
+<tr class="odd">
+<td>rf</td>
+<td>rdk5</td>
+<td>EF1</td>
+<td>same</td>
+<td>0.0619</td>
+<td>0</td>
+<td>0</td>
+</tr>
+<tr class="even">
+<td>rf</td>
+<td>hashap</td>
+<td>EF1</td>
+<td>gt</td>
+<td>3.15e-06</td>
+<td>2</td>
+<td>0.1</td>
+</tr>
+<tr class="odd">
+<td>rf</td>
+<td>hashtt</td>
+<td>EF1</td>
+<td>lt</td>
+<td>1.33e-09</td>
+<td>-1</td>
+<td>-0.0476</td>
+</tr>
+<tr class="even">
+<td>brf</td>
+<td>mfp2</td>
+<td>EF1</td>
+<td>lt</td>
+<td>2.84e-09</td>
+<td>-1</td>
+<td>-0.0421</td>
+</tr>
+<tr class="odd">
+<td>brf</td>
+<td>mfp3</td>
+<td>EF1</td>
+<td>lt</td>
+<td>4.46e-13</td>
+<td>-1</td>
+<td>-0.0769</td>
+</tr>
+<tr class="even">
+<td>brf</td>
+<td>rdk5</td>
+<td>EF1</td>
+<td>same</td>
+<td>0.301</td>
+<td>0</td>
+<td>nan</td>
+</tr>
+<tr class="odd">
+<td>brf</td>
+<td>hashap</td>
+<td>EF1</td>
+<td>gt</td>
+<td>9.93e-09</td>
+<td>1</td>
+<td>0.0779</td>
+</tr>
+<tr class="even">
+<td>brf</td>
+<td>hashtt</td>
+<td>EF1</td>
+<td>lt</td>
+<td>7.97e-14</td>
+<td>-1</td>
+<td>-0.0871</td>
+</tr>
+<tr class="odd">
+<td>xgb</td>
+<td>mfp2</td>
+<td>EF1</td>
+<td>lt</td>
+<td>1.06e-14</td>
+<td>-1</td>
+<td>-0.075</td>
+</tr>
+<tr class="even">
+<td>xgb</td>
+<td>mfp3</td>
+<td>EF1</td>
+<td>lt</td>
+<td>2.22e-17</td>
+<td>-1</td>
+<td>-0.0625</td>
+</tr>
+<tr class="odd">
+<td>xgb</td>
+<td>rdk5</td>
+<td>EF1</td>
+<td>lt</td>
+<td>4.54e-09</td>
+<td>-1</td>
+<td>nan</td>
+</tr>
+<tr class="even">
+<td>xgb</td>
+<td>hashap</td>
+<td>EF1</td>
+<td>same</td>
+<td>0.335</td>
+<td>1</td>
+<td>0.0769</td>
+</tr>
+<tr class="odd">
+<td>xgb</td>
+<td>hashtt</td>
+<td>EF1</td>
+<td>lt</td>
+<td>6.27e-09</td>
+<td>0</td>
+<td>0</td>
+</tr>
+</tbody>
+</table>
+</section>
+<section id="ef5" class="level2">
+<h2 class="anchored" data-anchor-id="ef5">EF5</h2>
+<table class="table">
+<thead>
+<tr class="header">
+<th>alg</th>
+<th>fp</th>
+<th>metric</th>
+<th>result</th>
+<th>P</th>
+<th>delt</th>
+<th>pct_delt</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>lr</td>
+<td>mfp2</td>
+<td>EF5</td>
+<td>lt</td>
+<td>4.32e-23</td>
+<td>-0.2</td>
+<td>-0.0357</td>
+</tr>
+<tr class="even">
+<td>lr</td>
+<td>mfp3</td>
+<td>EF5</td>
+<td>lt</td>
+<td>3.64e-38</td>
+<td>-0.4</td>
+<td>-0.0559</td>
+</tr>
+<tr class="odd">
+<td>lr</td>
+<td>rdk5</td>
+<td>EF5</td>
+<td>lt</td>
+<td>8.96e-26</td>
+<td>-0.2</td>
+<td>-0.0469</td>
+</tr>
+<tr class="even">
+<td>lr</td>
+<td>hashap</td>
+<td>EF5</td>
+<td>lt</td>
+<td>1.42e-08</td>
+<td>-0.2</td>
+<td>-0.0385</td>
+</tr>
+<tr class="odd">
+<td>lr</td>
+<td>hashtt</td>
+<td>EF5</td>
+<td>lt</td>
+<td>6.58e-38</td>
+<td>-0.4</td>
+<td>-0.0769</td>
+</tr>
+<tr class="even">
+<td>lmnb</td>
+<td>mfp2</td>
+<td>EF5</td>
+<td>lt</td>
+<td>1.44e-82</td>
+<td>-1</td>
+<td>-0.154</td>
+</tr>
+<tr class="odd">
+<td>lmnb</td>
+<td>mfp3</td>
+<td>EF5</td>
+<td>lt</td>
+<td>2.57e-92</td>
+<td>-1.4</td>
+<td>-0.264</td>
+</tr>
+<tr class="even">
+<td>lmnb</td>
+<td>rdk5</td>
+<td>EF5</td>
+<td>same</td>
+<td>0.725</td>
+<td>-0.4</td>
+<td>nan</td>
+</tr>
+<tr class="odd">
+<td>lmnb</td>
+<td>hashap</td>
+<td>EF5</td>
+<td>lt</td>
+<td>1.47e-64</td>
+<td>-1</td>
+<td>-0.217</td>
+</tr>
+<tr class="even">
+<td>lmnb</td>
+<td>hashtt</td>
+<td>EF5</td>
+<td>lt</td>
+<td>6.85e-73</td>
+<td>-0.81</td>
+<td>-0.185</td>
+</tr>
+<tr class="odd">
+<td>rf</td>
+<td>mfp2</td>
+<td>EF5</td>
+<td>lt</td>
+<td>3.72e-39</td>
+<td>-0.61</td>
+<td>-0.118</td>
+</tr>
+<tr class="even">
+<td>rf</td>
+<td>mfp3</td>
+<td>EF5</td>
+<td>lt</td>
+<td>3.14e-26</td>
+<td>-0.4</td>
+<td>-0.0948</td>
+</tr>
+<tr class="odd">
+<td>rf</td>
+<td>rdk5</td>
+<td>EF5</td>
+<td>same</td>
+<td>0.988</td>
+<td>0</td>
+<td>0</td>
+</tr>
+<tr class="even">
+<td>rf</td>
+<td>hashap</td>
+<td>EF5</td>
+<td>gt</td>
+<td>6.9e-14</td>
+<td>0.61</td>
+<td>0.0769</td>
+</tr>
+<tr class="odd">
+<td>rf</td>
+<td>hashtt</td>
+<td>EF5</td>
+<td>lt</td>
+<td>2.61e-19</td>
+<td>-0.4</td>
+<td>-0.0811</td>
+</tr>
+<tr class="even">
+<td>brf</td>
+<td>mfp2</td>
+<td>EF5</td>
+<td>lt</td>
+<td>4.02e-16</td>
+<td>-0.4</td>
+<td>-0.0476</td>
+</tr>
+<tr class="odd">
+<td>brf</td>
+<td>mfp3</td>
+<td>EF5</td>
+<td>lt</td>
+<td>8.91e-25</td>
+<td>-0.6</td>
+<td>-0.0854</td>
+</tr>
+<tr class="even">
+<td>brf</td>
+<td>rdk5</td>
+<td>EF5</td>
+<td>same</td>
+<td>0.319</td>
+<td>0</td>
+<td>0</td>
+</tr>
+<tr class="odd">
+<td>brf</td>
+<td>hashap</td>
+<td>EF5</td>
+<td>gt</td>
+<td>9.01e-07</td>
+<td>0.4</td>
+<td>0.0674</td>
+</tr>
+<tr class="even">
+<td>brf</td>
+<td>hashtt</td>
+<td>EF5</td>
+<td>lt</td>
+<td>1.18e-22</td>
+<td>-0.4</td>
+<td>-0.101</td>
+</tr>
+<tr class="odd">
+<td>xgb</td>
+<td>mfp2</td>
+<td>EF5</td>
+<td>lt</td>
+<td>3.14e-05</td>
+<td>-0.2</td>
+<td>-0.0308</td>
+</tr>
+<tr class="even">
+<td>xgb</td>
+<td>mfp3</td>
+<td>EF5</td>
+<td>lt</td>
+<td>4.57e-13</td>
+<td>-0.4</td>
+<td>-0.0797</td>
+</tr>
+<tr class="odd">
+<td>xgb</td>
+<td>rdk5</td>
+<td>EF5</td>
+<td>same</td>
+<td>0.00432</td>
+<td>-0.2</td>
+<td>-0.0354</td>
+</tr>
+<tr class="even">
+<td>xgb</td>
+<td>hashap</td>
+<td>EF5</td>
+<td>gt</td>
+<td>1.24e-09</td>
+<td>0.61</td>
+<td>0.1</td>
+</tr>
+</tbody>
+</table>
+<p>I am sorely tempted to compare the individual methods and fingerprints to each other as well, but that’s not the point of this post, so I’ll hold that for another time.</p>
+
+
+</section>
+</section>
+
+</main> <!-- /main -->
+<script id="quarto-html-after-body" type="application/javascript">
+window.document.addEventListener("DOMContentLoaded", function (event) {
+  const toggleBodyColorMode = (bsSheetEl) => {
+    const mode = bsSheetEl.getAttribute("data-mode");
+    const bodyEl = window.document.querySelector("body");
+    if (mode === "dark") {
+      bodyEl.classList.add("quarto-dark");
+      bodyEl.classList.remove("quarto-light");
+    } else {
+      bodyEl.classList.add("quarto-light");
+      bodyEl.classList.remove("quarto-dark");
+    }
+  }
+  const toggleBodyColorPrimary = () => {
+    const bsSheetEl = window.document.querySelector("link#quarto-bootstrap");
+    if (bsSheetEl) {
+      toggleBodyColorMode(bsSheetEl);
+    }
+  }
+  toggleBodyColorPrimary();  
+  const disableStylesheet = (stylesheets) => {
+    for (let i=0; i < stylesheets.length; i++) {
+      const stylesheet = stylesheets[i];
+      stylesheet.rel = 'prefetch';
+    }
+  }
+  const enableStylesheet = (stylesheets) => {
+    for (let i=0; i < stylesheets.length; i++) {
+      const stylesheet = stylesheets[i];
+      stylesheet.rel = 'stylesheet';
+    }
+  }
+  const manageTransitions = (selector, allowTransitions) => {
+    const els = window.document.querySelectorAll(selector);
+    for (let i=0; i < els.length; i++) {
+      const el = els[i];
+      if (allowTransitions) {
+        el.classList.remove('notransition');
+      } else {
+        el.classList.add('notransition');
+      }
+    }
+  }
+  const toggleColorMode = (alternate) => {
+    // Switch the stylesheets
+    const alternateStylesheets = window.document.querySelectorAll('link.quarto-color-scheme.quarto-color-alternate');
+    manageTransitions('#quarto-margin-sidebar .nav-link', false);
+    if (alternate) {
+      enableStylesheet(alternateStylesheets);
+      for (const sheetNode of alternateStylesheets) {
+        if (sheetNode.id === "quarto-bootstrap") {
+          toggleBodyColorMode(sheetNode);
+        }
+      }
+    } else {
+      disableStylesheet(alternateStylesheets);
+      toggleBodyColorPrimary();
+    }
+    manageTransitions('#quarto-margin-sidebar .nav-link', true);
+    // Switch the toggles
+    const toggles = window.document.querySelectorAll('.quarto-color-scheme-toggle');
+    for (let i=0; i < toggles.length; i++) {
+      const toggle = toggles[i];
+      if (toggle) {
+        if (alternate) {
+          toggle.classList.add("alternate");     
+        } else {
+          toggle.classList.remove("alternate");
+        }
+      }
+    }
+    // Hack to workaround the fact that safari doesn't
+    // properly recolor the scrollbar when toggling (#1455)
+    if (navigator.userAgent.indexOf('Safari') > 0 && navigator.userAgent.indexOf('Chrome') == -1) {
+      manageTransitions("body", false);
+      window.scrollTo(0, 1);
+      setTimeout(() => {
+        window.scrollTo(0, 0);
+        manageTransitions("body", true);
+      }, 40);  
+    }
+  }
+  const isFileUrl = () => { 
+    return window.location.protocol === 'file:';
+  }
+  const hasAlternateSentinel = () => {  
+    let styleSentinel = getColorSchemeSentinel();
+    if (styleSentinel !== null) {
+      return styleSentinel === "alternate";
+    } else {
+      return false;
+    }
+  }
+  const setStyleSentinel = (alternate) => {
+    const value = alternate ? "alternate" : "default";
+    if (!isFileUrl()) {
+      window.localStorage.setItem("quarto-color-scheme", value);
+    } else {
+      localAlternateSentinel = value;
+    }
+  }
+  const getColorSchemeSentinel = () => {
+    if (!isFileUrl()) {
+      const storageValue = window.localStorage.getItem("quarto-color-scheme");
+      return storageValue != null ? storageValue : localAlternateSentinel;
+    } else {
+      return localAlternateSentinel;
+    }
+  }
+  let localAlternateSentinel = 'default';
+  // Dark / light mode switch
+  window.quartoToggleColorScheme = () => {
+    // Read the current dark / light value 
+    let toAlternate = !hasAlternateSentinel();
+    toggleColorMode(toAlternate);
+    setStyleSentinel(toAlternate);
+  };
+  // Ensure there is a toggle, if there isn't float one in the top right
+  if (window.document.querySelector('.quarto-color-scheme-toggle') === null) {
+    const a = window.document.createElement('a');
+    a.classList.add('top-right');
+    a.classList.add('quarto-color-scheme-toggle');
+    a.href = "";
+    a.onclick = function() { try { window.quartoToggleColorScheme(); } catch {} return false; };
+    const i = window.document.createElement("i");
+    i.classList.add('bi');
+    a.appendChild(i);
+    window.document.body.appendChild(a);
+  }
+  // Switch to dark mode if need be
+  if (hasAlternateSentinel()) {
+    toggleColorMode(true);
+  } else {
+    toggleColorMode(false);
+  }
+  const icon = "";
+  const anchorJS = new window.AnchorJS();
+  anchorJS.options = {
+    placement: 'right',
+    icon: icon
+  };
+  anchorJS.add('.anchored');
+  const clipboard = new window.ClipboardJS('.code-copy-button', {
+    target: function(trigger) {
+      return trigger.previousElementSibling;
+    }
+  });
+  clipboard.on('success', function(e) {
+    // button target
+    const button = e.trigger;
+    // don't keep focus
+    button.blur();
+    // flash "checked"
+    button.classList.add('code-copy-button-checked');
+    var currentTitle = button.getAttribute("title");
+    button.setAttribute("title", "Copied!");
+    let tooltip;
+    if (window.bootstrap) {
+      button.setAttribute("data-bs-toggle", "tooltip");
+      button.setAttribute("data-bs-placement", "left");
+      button.setAttribute("data-bs-title", "Copied!");
+      tooltip = new bootstrap.Tooltip(button, 
+        { trigger: "manual", 
+          customClass: "code-copy-button-tooltip",
+          offset: [0, -8]});
+      tooltip.show();    
+    }
+    setTimeout(function() {
+      if (tooltip) {
+        tooltip.hide();
+        button.removeAttribute("data-bs-title");
+        button.removeAttribute("data-bs-toggle");
+        button.removeAttribute("data-bs-placement");
+      }
+      button.setAttribute("title", currentTitle);
+      button.classList.remove('code-copy-button-checked');
+    }, 1000);
+    // clear code selection
+    e.clearSelection();
+  });
+  function tippyHover(el, contentFn) {
+    const config = {
+      allowHTML: true,
+      content: contentFn,
+      maxWidth: 500,
+      delay: 100,
+      arrow: false,
+      appendTo: function(el) {
+          return el.parentElement;
+      },
+      interactive: true,
+      interactiveBorder: 10,
+      theme: 'quarto',
+      placement: 'bottom-start'
+    };
+    window.tippy(el, config); 
+  }
+  const noterefs = window.document.querySelectorAll('a[role="doc-noteref"]');
+  for (var i=0; i<noterefs.length; i++) {
+    const ref = noterefs[i];
+    tippyHover(ref, function() {
+      // use id or data attribute instead here
+      let href = ref.getAttribute('data-footnote-href') || ref.getAttribute('href');
+      try { href = new URL(href).hash; } catch {}
+      const id = href.replace(/^#\/?/, "");
+      const note = window.document.getElementById(id);
+      return note.innerHTML;
+    });
+  }
+  const findCites = (el) => {
+    const parentEl = el.parentElement;
+    if (parentEl) {
+      const cites = parentEl.dataset.cites;
+      if (cites) {
+        return {
+          el,
+          cites: cites.split(' ')
+        };
+      } else {
+        return findCites(el.parentElement)
+      }
+    } else {
+      return undefined;
+    }
+  };
+  var bibliorefs = window.document.querySelectorAll('a[role="doc-biblioref"]');
+  for (var i=0; i<bibliorefs.length; i++) {
+    const ref = bibliorefs[i];
+    const citeInfo = findCites(ref);
+    if (citeInfo) {
+      tippyHover(citeInfo.el, function() {
+        var popup = window.document.createElement('div');
+        citeInfo.cites.forEach(function(cite) {
+          var citeDiv = window.document.createElement('div');
+          citeDiv.classList.add('hanging-indent');
+          citeDiv.classList.add('csl-entry');
+          var biblioDiv = window.document.getElementById('ref-' + cite);
+          if (biblioDiv) {
+            citeDiv.innerHTML = biblioDiv.innerHTML;
+          }
+          popup.appendChild(citeDiv);
+        });
+        return popup.innerHTML;
+      });
+    }
+  }
+});
+</script>
+<script src="https://utteranc.es/client.js" repo="greglandrum/rdkit-blog" issue-term="pathname" theme="github-light" crossorigin="anonymous" async="">
+</script>
+</div> <!-- /content -->
+
+
+
+</body></html>
