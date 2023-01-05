@@ -1,6 +1,6 @@
 ---
 aliases:
-- /similarity/reference/2021/05/21/similarity-search-thresholds
+- /similarity/reference/2021/05/21/similarity-search-thresholds.html
 categories:
 - similarity
 - reference

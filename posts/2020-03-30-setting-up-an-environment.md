@@ -1,6 +1,6 @@
 ---
 aliases:
-- /contributing/tutorial/2020/03/30/setting-up-an-environment
+- /contributing/tutorial/2020/03/30/setting-up-an-environment.html
 categories:
 - contributing
 - tutorial

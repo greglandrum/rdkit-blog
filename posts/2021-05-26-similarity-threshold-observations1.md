@@ -1,6 +1,6 @@
 ---
 aliases:
-- /similarity/reference/2021/05/26/similarity-threshold-observations1
+- /similarity/reference/2021/05/26/similarity-threshold-observations1.html
 categories:
 - similarity
 - reference

@@ -1,6 +1,6 @@
 ---
 aliases:
-- /cartridge/2020/01/21/some-thoughts-on-cartridge-performance
+- /cartridge/2020/01/21/some-thoughts-on-cartridge-performance.html
 categories:
 - cartridge
 date: '2020-01-21'

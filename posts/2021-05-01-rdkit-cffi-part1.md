@@ -1,6 +1,6 @@
 ---
 aliases:
-- /technical/2021/05/01/rdkit-cffi-part1
+- /technical/2021/05/01/rdkit-cffi-part1.html
 categories:
 - technical
 date: '2021-05-01'

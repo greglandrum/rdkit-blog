@@ -1,6 +1,6 @@
 ---
 aliases:
-- /tutorial/technical/2021/07/24/setting-up-a-cxx-dev-env
+- /tutorial/technical/2021/07/24/setting-up-a-cxx-dev-env.html
 categories:
 - tutorial
 - technical

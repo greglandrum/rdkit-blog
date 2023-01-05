@@ -1,6 +1,6 @@
 ---
 aliases:
-- /technical/2022/03/18/refactoring-moldraw2d
+- /technical/2022/03/18/refactoring-moldraw2d.html
 categories:
 - technical
 date: '2022-03-18'
