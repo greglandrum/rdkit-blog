@@ -1,0 +1,952 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en"><head>
+
+<meta charset="utf-8">
+<meta name="generator" content="quarto-1.2.269">
+
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+
+<meta name="dcterms.date" content="2023-02-04">
+<meta name="description" content="Tutorial on how atomic coordinates are stored">
+
+<title>RDKit blog - Working with conformers</title>
+<style>
+code{white-space: pre-wrap;}
+span.smallcaps{font-variant: small-caps;}
+div.columns{display: flex; gap: min(4vw, 1.5em);}
+div.column{flex: auto; overflow-x: auto;}
+div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+ul.task-list{list-style: none;}
+ul.task-list li input[type="checkbox"] {
+  width: 0.8em;
+  margin: 0 0.8em 0.2em -1.6em;
+  vertical-align: middle;
+}
+pre > code.sourceCode { white-space: pre; position: relative; }
+pre > code.sourceCode > span { display: inline-block; line-height: 1.25; }
+pre > code.sourceCode > span:empty { height: 1.2em; }
+.sourceCode { overflow: visible; }
+code.sourceCode > span { color: inherit; text-decoration: inherit; }
+div.sourceCode { margin: 1em 0; }
+pre.sourceCode { margin: 0; }
+@media screen {
+div.sourceCode { overflow: auto; }
+}
+@media print {
+pre > code.sourceCode { white-space: pre-wrap; }
+pre > code.sourceCode > span { text-indent: -5em; padding-left: 5em; }
+}
+pre.numberSource code
+  { counter-reset: source-line 0; }
+pre.numberSource code > span
+  { position: relative; left: -4em; counter-increment: source-line; }
+pre.numberSource code > span > a:first-child::before
+  { content: counter(source-line);
+    position: relative; left: -1em; text-align: right; vertical-align: baseline;
+    border: none; display: inline-block;
+    -webkit-touch-callout: none; -webkit-user-select: none;
+    -khtml-user-select: none; -moz-user-select: none;
+    -ms-user-select: none; user-select: none;
+    padding: 0 4px; width: 4em;
+    color: #aaaaaa;
+  }
+pre.numberSource { margin-left: 3em; border-left: 1px solid #aaaaaa;  padding-left: 4px; }
+div.sourceCode
+  {   }
+@media screen {
+pre > code.sourceCode > span > a:first-child::before { text-decoration: underline; }
+}
+code span.al { color: #ff0000; font-weight: bold; } /* Alert */
+code span.an { color: #60a0b0; font-weight: bold; font-style: italic; } /* Annotation */
+code span.at { color: #7d9029; } /* Attribute */
+code span.bn { color: #40a070; } /* BaseN */
+code span.bu { color: #008000; } /* BuiltIn */
+code span.cf { color: #007020; font-weight: bold; } /* ControlFlow */
+code span.ch { color: #4070a0; } /* Char */
+code span.cn { color: #880000; } /* Constant */
+code span.co { color: #60a0b0; font-style: italic; } /* Comment */
+code span.cv { color: #60a0b0; font-weight: bold; font-style: italic; } /* CommentVar */
+code span.do { color: #ba2121; font-style: italic; } /* Documentation */
+code span.dt { color: #902000; } /* DataType */
+code span.dv { color: #40a070; } /* DecVal */
+code span.er { color: #ff0000; font-weight: bold; } /* Error */
+code span.ex { } /* Extension */
+code span.fl { color: #40a070; } /* Float */
+code span.fu { color: #06287e; } /* Function */
+code span.im { color: #008000; font-weight: bold; } /* Import */
+code span.in { color: #60a0b0; font-weight: bold; font-style: italic; } /* Information */
+code span.kw { color: #007020; font-weight: bold; } /* Keyword */
+code span.op { color: #666666; } /* Operator */
+code span.ot { color: #007020; } /* Other */
+code span.pp { color: #bc7a00; } /* Preprocessor */
+code span.sc { color: #4070a0; } /* SpecialChar */
+code span.ss { color: #bb6688; } /* SpecialString */
+code span.st { color: #4070a0; } /* String */
+code span.va { color: #19177c; } /* Variable */
+code span.vs { color: #4070a0; } /* VerbatimString */
+code span.wa { color: #60a0b0; font-weight: bold; font-style: italic; } /* Warning */
+</style>
+
+
+<script src="../site_libs/quarto-nav/quarto-nav.js"></script>
+<script src="../site_libs/quarto-nav/headroom.min.js"></script>
+<script src="../site_libs/clipboard/clipboard.min.js"></script>
+<script src="../site_libs/quarto-search/autocomplete.umd.js"></script>
+<script src="../site_libs/quarto-search/fuse.min.js"></script>
+<script src="../site_libs/quarto-search/quarto-search.js"></script>
+<meta name="quarto:offset" content="../">
+<link href="../posts/icons/favicon.ico" rel="icon">
+<script src="../site_libs/quarto-html/quarto.js"></script>
+<script src="../site_libs/quarto-html/popper.min.js"></script>
+<script src="../site_libs/quarto-html/tippy.umd.min.js"></script>
+<script src="../site_libs/quarto-html/anchor.min.js"></script>
+<link href="../site_libs/quarto-html/tippy.css" rel="stylesheet">
+<link href="../site_libs/quarto-html/quarto-syntax-highlighting.css" rel="stylesheet" class="quarto-color-scheme" id="quarto-text-highlighting-styles">
+<link href="../site_libs/quarto-html/quarto-syntax-highlighting-dark.css" rel="prefetch" class="quarto-color-scheme quarto-color-alternate" id="quarto-text-highlighting-styles">
+<script src="../site_libs/bootstrap/bootstrap.min.js"></script>
+<link href="../site_libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
+<link href="../site_libs/bootstrap/bootstrap.min.css" rel="stylesheet" class="quarto-color-scheme" id="quarto-bootstrap" data-mode="light">
+<link href="../site_libs/bootstrap/bootstrap-dark.min.css" rel="prefetch" class="quarto-color-scheme quarto-color-alternate" id="quarto-bootstrap" data-mode="dark">
+<script id="quarto-search-options" type="application/json">{
+  "location": "navbar",
+  "copy-button": false,
+  "collapse-after": 3,
+  "panel-placement": "end",
+  "type": "overlay",
+  "limit": 20,
+  "language": {
+    "search-no-results-text": "No results",
+    "search-matching-documents-text": "matching documents",
+    "search-copy-link-title": "Copy link to search",
+    "search-hide-matches-text": "Hide additional matches",
+    "search-more-match-text": "more match in this document",
+    "search-more-matches-text": "more matches in this document",
+    "search-clear-button-title": "Clear",
+    "search-detached-cancel-button-title": "Cancel",
+    "search-submit-button-title": "Submit"
+  }
+}</script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.6/require.min.js" integrity="sha512-c3Nl8+7g4LMSTdrm621y7kf9v3SDPnhxLNhcjFJbKECVnmZHTdo+IRO05sNLTH/D3vA6u1X32ehoLC7WFVdheg==" crossorigin="anonymous"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.5.1/jquery.min.js" integrity="sha512-bLT0Qm9VnAYZDflyKcBaQ2gg0hSYNQrJ8RilYldYQ1FxQYoCLtUjuuRuZo+fjqhx/qtq/1itJ0C2ejDxltZVFg==" crossorigin="anonymous"></script>
+<script type="application/javascript">define('jquery', [],function() {return window.jQuery;})</script>
+
+
+<link rel="stylesheet" href="../styles.css">
+</head>
+
+<body class="nav-fixed">
+
+<div id="quarto-search-results"></div>
+  <header id="quarto-header" class="headroom fixed-top">
+    <nav class="navbar navbar-expand-lg navbar-dark ">
+      <div class="navbar-container container-fluid">
+      <div class="navbar-brand-container">
+    <a class="navbar-brand" href="../index.html">
+    <span class="navbar-title">RDKit blog</span>
+    </a>
+  </div>
+          <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarCollapse" aria-controls="navbarCollapse" aria-expanded="false" aria-label="Toggle navigation" onclick="if (window.quartoToggleHeadroom) { window.quartoToggleHeadroom(); }">
+  <span class="navbar-toggler-icon"></span>
+</button>
+          <div class="collapse navbar-collapse" id="navbarCollapse">
+            <ul class="navbar-nav navbar-nav-scroll ms-auto">
+  <li class="nav-item">
+    <a class="nav-link" href="../about.html">
+ <span class="menu-text">RDKit experiments, tips, and tutorials</span></a>
+  </li>  
+  <li class="nav-item compact">
+    <a class="nav-link" href="https://github.com/rdkit/rdkit"><i class="bi bi-github" role="img">
+</i> 
+ <span class="menu-text"></span></a>
+  </li>  
+  <li class="nav-item compact">
+    <a class="nav-link" href="https://twitter.com/rdkit_org"><i class="bi bi-twitter" role="img">
+</i> 
+ <span class="menu-text"></span></a>
+  </li>  
+  <li class="nav-item compact">
+    <a class="nav-link" href="../index.xml"><i class="bi bi-rss" role="img">
+</i> 
+ <span class="menu-text"></span></a>
+  </li>  
+</ul>
+              <div class="quarto-toggle-container">
+                  <a href="" class="quarto-color-scheme-toggle nav-link" onclick="window.quartoToggleColorScheme(); return false;" title="Toggle dark mode"><i class="bi"></i></a>
+              </div>
+              <div id="quarto-search" class="" title="Search"></div>
+          </div> <!-- /navcollapse -->
+      </div> <!-- /container-fluid -->
+    </nav>
+</header>
+<!-- content -->
+<div id="quarto-content" class="quarto-container page-columns page-rows-contents page-layout-article page-navbar">
+<!-- sidebar -->
+<!-- margin-sidebar -->
+    <div id="quarto-margin-sidebar" class="sidebar margin-sidebar">
+        <nav id="TOC" role="doc-toc" class="toc-active">
+    <h2 id="toc-title">On this page</h2>
+   
+  <ul>
+  <li><a href="#conformer-ids" id="toc-conformer-ids" class="nav-link active" data-scroll-target="#conformer-ids">Conformer IDs</a></li>
+  <li><a href="#getting-atom-positions" id="toc-getting-atom-positions" class="nav-link" data-scroll-target="#getting-atom-positions">Getting atom positions</a></li>
+  <li><a href="#addingremoving-conformers" id="toc-addingremoving-conformers" class="nav-link" data-scroll-target="#addingremoving-conformers">Adding/removing conformers</a></li>
+  <li><a href="#getting-a-new-molecule-with-just-one-conformer" id="toc-getting-a-new-molecule-with-just-one-conformer" class="nav-link" data-scroll-target="#getting-a-new-molecule-with-just-one-conformer">Getting a new molecule with just one conformer</a></li>
+  </ul>
+</nav>
+    </div>
+<!-- main -->
+<main class="content" id="quarto-document-content">
+
+<header id="title-block-header" class="quarto-title-block default">
+<div class="quarto-title">
+<h1 class="title">Working with conformers</h1>
+  <div class="quarto-categories">
+    <div class="quarto-category">tutorial</div>
+    <div class="quarto-category">3d</div>
+  </div>
+  </div>
+
+<div>
+  <div class="description">
+    Tutorial on how atomic coordinates are stored
+  </div>
+</div>
+
+
+<div class="quarto-title-meta">
+
+    
+    <div>
+    <div class="quarto-title-meta-heading">Published</div>
+    <div class="quarto-title-meta-contents">
+      <p class="date">February 4, 2023</p>
+    </div>
+  </div>
+  
+    
+  </div>
+  
+
+</header>
+
+<p>The RDKit stores atomic coordinates in <code>Conformer</code> objects which are attached to the corresponding molecules. In this tutorial post we’re going to look in detail at the way conformers are stored and ways to work with them.</p>
+<div class="cell" data-execution_count="1">
+<div class="sourceCode cell-code" id="cb1"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> rdkit <span class="im">import</span> Chem</span>
+<span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> rdkit.Chem.Draw <span class="im">import</span> IPythonConsole</span>
+<span id="cb1-3"><a href="#cb1-3" aria-hidden="true" tabindex="-1"></a>IPythonConsole.ipython_3d <span class="op">=</span> <span class="va">True</span></span>
+<span id="cb1-4"><a href="#cb1-4" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> py3Dmol</span>
+<span id="cb1-5"><a href="#cb1-5" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> rdkit.Chem <span class="im">import</span> rdDepictor</span>
+<span id="cb1-6"><a href="#cb1-6" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> rdkit.Chem <span class="im">import</span> rdDistGeom</span>
+<span id="cb1-7"><a href="#cb1-7" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> rdkit</span>
+<span id="cb1-8"><a href="#cb1-8" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(rdkit.__version__)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>2022.09.4</code></pre>
+</div>
+</div>
+<p>A molecule constructed from SMILES has no conformer information:</p>
+<div class="cell" data-execution_count="2">
+<div class="sourceCode cell-code" id="cb3"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a>esomeprazole <span class="op">=</span> Chem.MolFromSmiles(<span class="st">'COc1ccc2[n-]c([S@@+]([O-])Cc3ncc(C)c(OC)c3C)nc2c1'</span>)</span>
+<span id="cb3-2"><a href="#cb3-2" aria-hidden="true" tabindex="-1"></a>esomeprazole.GetNumConformers()</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-display" data-execution_count="2">
+<pre><code>0</code></pre>
+</div>
+</div>
+<p>An aside: when you display a molecule without conformers in Jupyter, a 2D conformer is generated so that there’s something to display:</p>
+<div class="cell" data-execution_count="3">
+<div class="sourceCode cell-code" id="cb5"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a>esomeprazole</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-display" data-execution_count="3">
+<p><img src="2023-02-04-working-with-conformers_files/figure-html/cell-4-output-1.png" class="img-fluid"></p>
+</div>
+</div>
+<p>But this conformer is just temporary; the molecule itself is not modified:</p>
+<div class="cell" data-execution_count="4">
+<div class="sourceCode cell-code" id="cb6"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb6-1"><a href="#cb6-1" aria-hidden="true" tabindex="-1"></a>esomeprazole.GetNumConformers()</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-display" data-execution_count="4">
+<pre><code>0</code></pre>
+</div>
+</div>
+<p>When we ask to have 2D coordinates generated, they are added as a conformer:</p>
+<div class="cell" data-execution_count="5">
+<div class="sourceCode cell-code" id="cb8"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb8-1"><a href="#cb8-1" aria-hidden="true" tabindex="-1"></a>rdDepictor.Compute2DCoords(esomeprazole)</span>
+<span id="cb8-2"><a href="#cb8-2" aria-hidden="true" tabindex="-1"></a>esomeprazole.GetNumConformers()</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-display" data-execution_count="5">
+<pre><code>1</code></pre>
+</div>
+</div>
+<p>And that conformer is flagged as not being 3D:</p>
+<div class="cell" data-execution_count="6">
+<div class="sourceCode cell-code" id="cb10"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb10-1"><a href="#cb10-1" aria-hidden="true" tabindex="-1"></a>esomeprazole.GetConformer().Is3D()</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-display" data-execution_count="6">
+<pre><code>False</code></pre>
+</div>
+</div>
+<p>Generating a 3D structure also results in a conformer being added to the molecule (by default any existing conformers are cleared):</p>
+<div class="cell" data-execution_count="7">
+<div class="sourceCode cell-code" id="cb12"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb12-1"><a href="#cb12-1" aria-hidden="true" tabindex="-1"></a>esomeprazole <span class="op">=</span> Chem.AddHs(esomeprazole) <span class="co"># &lt;- add hydrogens so that we get a reasonable conformer</span></span>
+<span id="cb12-2"><a href="#cb12-2" aria-hidden="true" tabindex="-1"></a>rdDistGeom.EmbedMolecule(esomeprazole)</span>
+<span id="cb12-3"><a href="#cb12-3" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(esomeprazole.GetNumConformers(),esomeprazole.GetConformer().Is3D())</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>1 True</code></pre>
+</div>
+<div class="cell-output cell-output-stderr">
+<pre><code>[09:59:21] UFFTYPER: Unrecognized charge state for atom: 8</code></pre>
+</div>
+</div>
+<p>Molecules can have more than one conformer attached. This is what happens whenever we ask for multiple conformers to be generated:</p>
+<div class="cell" data-execution_count="8">
+<div class="sourceCode cell-code" id="cb15"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb15-1"><a href="#cb15-1" aria-hidden="true" tabindex="-1"></a>rdDistGeom.EmbedMultipleConfs(esomeprazole,<span class="dv">10</span>, randomSeed<span class="op">=</span><span class="bn">0xf00d</span>) <span class="co"># &lt;- generate 10 conformers</span></span>
+<span id="cb15-2"><a href="#cb15-2" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(esomeprazole.GetNumConformers(),esomeprazole.GetConformer().Is3D())</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stderr">
+<pre><code>[09:59:22] UFFTYPER: Unrecognized charge state for atom: 8</code></pre>
+</div>
+<div class="cell-output cell-output-stdout">
+<pre><code>10 True</code></pre>
+</div>
+</div>
+<p>Calling <code>GetConformer()</code> without arguments on a molecule with multiple conformers (as we did above) returns the default conformer. This is also what most RDKit operations that work with conformers do:</p>
+<div class="cell" data-execution_count="9">
+<div class="sourceCode cell-code" id="cb18"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb18-1"><a href="#cb18-1" aria-hidden="true" tabindex="-1"></a>IPythonConsole.drawMol3D(esomeprazole)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-display">
+<div id="3dmolviewer_167550116487972" style="position: relative; width: 400px; height: 400px">
+        <p id="3dmolwarning_167550116487972" style="background-color:#ffcccc;color:black">You appear to be running in JupyterLab (or JavaScript failed to load for some other reason).  You need to install the 3dmol extension: <br>
+        <tt>jupyter labextension install jupyterlab_3dmol</tt></p>
+        </div>
+<script>
+
+var loadScriptAsync = function(uri){
+  return new Promise((resolve, reject) => {
+    //this is to ignore the existence of requirejs amd
+    var savedexports, savedmodule;
+    if (typeof exports !== 'undefined') savedexports = exports;
+    else exports = {}
+    if (typeof module !== 'undefined') savedmodule = module;
+    else module = {}
+
+    var tag = document.createElement('script');
+    tag.src = uri;
+    tag.async = true;
+    tag.onload = () => {
+        exports = savedexports;
+        module = savedmodule;
+        resolve();
+    };
+  var firstScriptTag = document.getElementsByTagName('script')[0];
+  firstScriptTag.parentNode.insertBefore(tag, firstScriptTag);
+});
+};
+
+if(typeof $3Dmolpromise === 'undefined') {
+$3Dmolpromise = null;
+  $3Dmolpromise = loadScriptAsync('https://cdn.jsdelivr.net/npm/3dmol@latest/build/3Dmol-min.min.js');
+}
+
+var viewer_167550116487972 = null;
+var warn = document.getElementById("3dmolwarning_167550116487972");
+if(warn) {
+    warn.parentNode.removeChild(warn);
+}
+$3Dmolpromise.then(function() {
+viewer_167550116487972 = $3Dmol.createViewer(document.getElementById("3dmolviewer_167550116487972"),{backgroundColor:"white"});
+viewer_167550116487972.zoomTo();
+    viewer_167550116487972.removeAllModels();
+    viewer_167550116487972.addModel("\n     RDKit          3D\n\n 42 44  0  0  0  0  0  0  0  0999 V2000\n    7.6738    1.9026    0.7499 C   0  0  0  0  0  0  0  0  0  0  0  0\n    6.4550    1.5864    1.3565 O   0  0  0  0  0  0  0  0  0  0  0  0\n    5.4799    0.8715    0.7057 C   0  0  0  0  0  0  0  0  0  0  0  0\n    5.7398    0.4970   -0.6040 C   0  0  0  0  0  0  0  0  0  0  0  0\n    4.7837   -0.2272   -1.2808 C   0  0  0  0  0  0  0  0  0  0  0  0\n    3.5964   -0.5446   -0.5999 C   0  0  0  0  0  0  0  0  0  0  0  0\n    2.5941   -1.2138   -1.0393 N   0  0  0  0  0  2  0  0  0  0  0  0\n    1.5725   -1.3492   -0.0664 C   0  0  0  0  0  0  0  0  0  0  0  0\n    0.2376   -2.1881   -0.6107 S   0  0  0  0  0  3  0  0  0  0  0  0\n    0.8165   -3.8576   -0.6095 O   0  0  0  0  0  1  0  0  0  0  0  0\n   -1.2739   -2.2670    0.0901 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -2.1082   -1.1180    0.3984 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -1.9817   -0.4066    1.5657 N   0  0  0  0  0  0  0  0  0  0  0  0\n   -2.9438    0.4470    1.9742 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -4.1030    0.6869    1.2770 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -5.1913    1.5773    1.7705 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -4.2609   -0.0101    0.0749 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -5.4257    0.2315   -0.6552 O   0  0  0  0  0  0  0  0  0  0  0  0\n   -5.4209    1.2922   -1.6183 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -3.2935   -0.8628   -0.3141 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -3.3730   -1.5816   -1.6429 C   0  0  0  0  0  0  0  0  0  0  0  0\n    2.0933   -0.6955    0.9609 N   0  0  0  0  0  0  0  0  0  0  0  0\n    3.3232   -0.1867    0.6889 C   0  0  0  0  0  0  0  0  0  0  0  0\n    4.2815    0.5323    1.3441 C   0  0  0  0  0  0  0  0  0  0  0  0\n    8.0939    0.9560    0.2675 H   0  0  0  0  0  0  0  0  0  0  0  0\n    7.6506    2.6297   -0.0602 H   0  0  0  0  0  0  0  0  0  0  0  0\n    8.3862    2.2156    1.5682 H   0  0  0  0  0  0  0  0  0  0  0  0\n    6.6685    0.7445   -1.1342 H   0  0  0  0  0  0  0  0  0  0  0  0\n    4.8923   -0.5653   -2.3013 H   0  0  0  0  0  0  0  0  0  0  0  0\n   -1.9754   -3.0124   -0.4361 H   0  0  0  0  0  0  0  0  0  0  0  0\n   -1.2739   -2.8376    1.1315 H   0  0  0  0  0  0  0  0  0  0  0  0\n   -2.8378    0.9919    2.9307 H   0  0  0  0  0  0  0  0  0  0  0  0\n   -5.8666    0.9608    2.4493 H   0  0  0  0  0  0  0  0  0  0  0  0\n   -5.8402    1.8355    0.9298 H   0  0  0  0  0  0  0  0  0  0  0  0\n   -4.8624    2.5012    2.2287 H   0  0  0  0  0  0  0  0  0  0  0  0\n   -4.7878    1.0613   -2.5043 H   0  0  0  0  0  0  0  0  0  0  0  0\n   -4.9982    2.2349   -1.2041 H   0  0  0  0  0  0  0  0  0  0  0  0\n   -6.4360    1.4249   -2.0040 H   0  0  0  0  0  0  0  0  0  0  0  0\n   -4.2497   -1.2164   -2.2176 H   0  0  0  0  0  0  0  0  0  0  0  0\n   -2.4659   -1.2269   -2.2673 H   0  0  0  0  0  0  0  0  0  0  0  0\n   -3.4759   -2.6501   -1.5807 H   0  0  0  0  0  0  0  0  0  0  0  0\n    4.1067    0.8368    2.3464 H   0  0  0  0  0  0  0  0  0  0  0  0\n  1  2  1  0\n  2  3  1  0\n  3  4  2  0\n  4  5  1  0\n  5  6  2  0\n  6  7  1  0\n  7  8  1  0\n  8  9  1  0\n  9 10  1  1\n  9 11  1  0\n 11 12  1  0\n 12 13  2  0\n 13 14  1  0\n 14 15  2  0\n 15 16  1  0\n 15 17  1  0\n 17 18  1  0\n 18 19  1  0\n 17 20  2  0\n 20 21  1  0\n  8 22  2  0\n 22 23  1  0\n 23 24  2  0\n 24  3  1  0\n 23  6  1  0\n 20 12  1  0\n  1 25  1  0\n  1 26  1  0\n  1 27  1  0\n  4 28  1  0\n  5 29  1  0\n 11 30  1  0\n 11 31  1  0\n 14 32  1  0\n 16 33  1  0\n 16 34  1  0\n 16 35  1  0\n 19 36  1  0\n 19 37  1  0\n 19 38  1  0\n 21 39  1  0\n 21 40  1  0\n 21 41  1  0\n 24 42  1  0\nM  CHG  3   7  -1   9   1  10  -1\nM  END\n","sdf");
+    viewer_167550116487972.setStyle({"stick": {}});
+    viewer_167550116487972.setBackgroundColor("0xeeeeee");
+    viewer_167550116487972.zoomTo();
+viewer_167550116487972.render();
+});
+</script>
+</div>
+</div>
+<div class="cell" data-execution_count="10">
+<div class="sourceCode cell-code" id="cb19"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb19-1"><a href="#cb19-1" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(Chem.MolToV3KMolBlock(esomeprazole)[:<span class="dv">200</span>])</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>
+     RDKit          3D
+
+  0  0  0  0  0  0  0  0  0  0999 V3000
+M  V30 BEGIN CTAB
+M  V30 COUNTS 42 44 0 0 0
+M  V30 BEGIN ATOM
+M  V30 1 C 7.673833 1.902627 0.749932 0
+M  V30 2 O 6.455003 1.586360 1.35</code></pre>
+</div>
+</div>
+<p>But functions which use conformer information also generally take an optional <code>confId</code> argument that allows you to change which conformer is used:</p>
+<div class="cell" data-execution_count="11">
+<div class="sourceCode cell-code" id="cb21"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb21-1"><a href="#cb21-1" aria-hidden="true" tabindex="-1"></a>IPythonConsole.drawMol3D(esomeprazole,confId<span class="op">=</span><span class="dv">2</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-display">
+<div id="3dmolviewer_1675501166831226" style="position: relative; width: 400px; height: 400px">
+        <p id="3dmolwarning_1675501166831226" style="background-color:#ffcccc;color:black">You appear to be running in JupyterLab (or JavaScript failed to load for some other reason).  You need to install the 3dmol extension: <br>
+        <tt>jupyter labextension install jupyterlab_3dmol</tt></p>
+        </div>
+<script>
+
+var loadScriptAsync = function(uri){
+  return new Promise((resolve, reject) => {
+    //this is to ignore the existence of requirejs amd
+    var savedexports, savedmodule;
+    if (typeof exports !== 'undefined') savedexports = exports;
+    else exports = {}
+    if (typeof module !== 'undefined') savedmodule = module;
+    else module = {}
+
+    var tag = document.createElement('script');
+    tag.src = uri;
+    tag.async = true;
+    tag.onload = () => {
+        exports = savedexports;
+        module = savedmodule;
+        resolve();
+    };
+  var firstScriptTag = document.getElementsByTagName('script')[0];
+  firstScriptTag.parentNode.insertBefore(tag, firstScriptTag);
+});
+};
+
+if(typeof $3Dmolpromise === 'undefined') {
+$3Dmolpromise = null;
+  $3Dmolpromise = loadScriptAsync('https://cdn.jsdelivr.net/npm/3dmol@latest/build/3Dmol-min.min.js');
+}
+
+var viewer_1675501166831226 = null;
+var warn = document.getElementById("3dmolwarning_1675501166831226");
+if(warn) {
+    warn.parentNode.removeChild(warn);
+}
+$3Dmolpromise.then(function() {
+viewer_1675501166831226 = $3Dmol.createViewer(document.getElementById("3dmolviewer_1675501166831226"),{backgroundColor:"white"});
+viewer_1675501166831226.zoomTo();
+    viewer_1675501166831226.removeAllModels();
+    viewer_1675501166831226.addModel("\n     RDKit          3D\n\n 42 44  0  0  0  0  0  0  0  0999 V2000\n    8.2361    0.6767   -0.1340 C   0  0  0  0  0  0  0  0  0  0  0  0\n    7.6797   -0.5716    0.2118 O   0  0  0  0  0  0  0  0  0  0  0  0\n    6.3031   -0.7483    0.2056 C   0  0  0  0  0  0  0  0  0  0  0  0\n    5.7383   -1.9573    0.5395 C   0  0  0  0  0  0  0  0  0  0  0  0\n    4.3836   -2.1513    0.5394 C   0  0  0  0  0  0  0  0  0  0  0  0\n    3.5707   -1.1165    0.1986 C   0  0  0  0  0  0  0  0  0  0  0  0\n    2.2397   -0.9656    0.0974 N   0  0  0  0  0  2  0  0  0  0  0  0\n    1.9479    0.2750   -0.2822 C   0  0  0  0  0  0  0  0  0  0  0  0\n    0.3740    1.0151   -0.5681 S   0  0  0  0  0  3  0  0  0  0  0  0\n    0.0711    0.7206   -2.2095 O   0  0  0  0  0  1  0  0  0  0  0  0\n   -0.7970   -0.0308    0.2919 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -2.1498    0.4692    0.1376 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -2.3435    1.5855   -0.5864 N   0  0  0  0  0  0  0  0  0  0  0  0\n   -3.5165    2.1585   -0.8139 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -4.6381    1.5409   -0.2483 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -5.9670    2.1632   -0.4880 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -4.4897    0.3862    0.5076 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -5.6411   -0.1770    1.0406 O   0  0  0  0  0  0  0  0  0  0  0  0\n   -6.3372   -1.1354    0.2804 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -3.2335   -0.1493    0.6987 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -3.0658   -1.3729    1.4984 C   0  0  0  0  0  0  0  0  0  0  0  0\n    3.1025    0.9244   -0.4253 N   0  0  0  0  0  0  0  0  0  0  0  0\n    4.1287    0.0997   -0.1377 C   0  0  0  0  0  0  0  0  0  0  0  0\n    5.4770    0.2981   -0.1391 C   0  0  0  0  0  0  0  0  0  0  0  0\n    8.0945    0.9462   -1.1922 H   0  0  0  0  0  0  0  0  0  0  0  0\n    9.3030    0.6459    0.1709 H   0  0  0  0  0  0  0  0  0  0  0  0\n    7.7407    1.4886    0.4663 H   0  0  0  0  0  0  0  0  0  0  0  0\n    6.3898   -2.7959    0.8153 H   0  0  0  0  0  0  0  0  0  0  0  0\n    3.9390   -3.1185    0.8067 H   0  0  0  0  0  0  0  0  0  0  0  0\n   -0.5237    0.0692    1.3856 H   0  0  0  0  0  0  0  0  0  0  0  0\n   -0.6435   -1.0926    0.0562 H   0  0  0  0  0  0  0  0  0  0  0  0\n   -3.6115    3.0618   -1.4081 H   0  0  0  0  0  0  0  0  0  0  0  0\n   -6.6911    1.8140    0.2938 H   0  0  0  0  0  0  0  0  0  0  0  0\n   -5.8948    3.2826   -0.4268 H   0  0  0  0  0  0  0  0  0  0  0  0\n   -6.3208    1.9093   -1.5056 H   0  0  0  0  0  0  0  0  0  0  0  0\n   -6.0362   -1.1822   -0.7704 H   0  0  0  0  0  0  0  0  0  0  0  0\n   -7.4443   -1.0040    0.3440 H   0  0  0  0  0  0  0  0  0  0  0  0\n   -6.1370   -2.1368    0.7612 H   0  0  0  0  0  0  0  0  0  0  0  0\n   -2.0564   -1.5169    1.9046 H   0  0  0  0  0  0  0  0  0  0  0  0\n   -3.3352   -2.2801    0.9370 H   0  0  0  0  0  0  0  0  0  0  0  0\n   -3.7530   -1.2966    2.3698 H   0  0  0  0  0  0  0  0  0  0  0  0\n    5.9074    1.2690   -0.4082 H   0  0  0  0  0  0  0  0  0  0  0  0\n  1  2  1  0\n  2  3  1  0\n  3  4  2  0\n  4  5  1  0\n  5  6  2  0\n  6  7  1  0\n  7  8  1  0\n  8  9  1  0\n  9 10  1  6\n  9 11  1  0\n 11 12  1  0\n 12 13  2  0\n 13 14  1  0\n 14 15  2  0\n 15 16  1  0\n 15 17  1  0\n 17 18  1  0\n 18 19  1  0\n 17 20  2  0\n 20 21  1  0\n  8 22  2  0\n 22 23  1  0\n 23 24  2  0\n 24  3  1  0\n 23  6  1  0\n 20 12  1  0\n  1 25  1  0\n  1 26  1  0\n  1 27  1  0\n  4 28  1  0\n  5 29  1  0\n 11 30  1  0\n 11 31  1  0\n 14 32  1  0\n 16 33  1  0\n 16 34  1  0\n 16 35  1  0\n 19 36  1  0\n 19 37  1  0\n 19 38  1  0\n 21 39  1  0\n 21 40  1  0\n 21 41  1  0\n 24 42  1  0\nM  CHG  3   7  -1   9   1  10  -1\nM  END\n","sdf");
+    viewer_1675501166831226.setStyle({"stick": {}});
+    viewer_1675501166831226.setBackgroundColor("0xeeeeee");
+    viewer_1675501166831226.zoomTo();
+viewer_1675501166831226.render();
+});
+</script>
+</div>
+</div>
+<div class="cell" data-execution_count="12">
+<div class="sourceCode cell-code" id="cb22"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb22-1"><a href="#cb22-1" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(Chem.MolToV3KMolBlock(esomeprazole,confId<span class="op">=</span><span class="dv">2</span>)[:<span class="dv">200</span>])</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>
+     RDKit          3D
+
+  0  0  0  0  0  0  0  0  0  0999 V3000
+M  V30 BEGIN CTAB
+M  V30 COUNTS 42 44 0 0 0
+M  V30 BEGIN ATOM
+M  V30 1 C 8.236088 0.676672 -0.133971 0
+M  V30 2 O 7.679673 -0.571643 0.</code></pre>
+</div>
+</div>
+<p>As an aside: the <code>Is3D</code> flag on conformers is used by the RDKit’s jupyter integration to decide how to show the molecule. We can fool it by marking a 3D conformer as 2D:</p>
+<div class="cell" data-execution_count="14">
+<div class="sourceCode cell-code" id="cb24"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb24-1"><a href="#cb24-1" aria-hidden="true" tabindex="-1"></a>tmol <span class="op">=</span> Chem.Mol(esomeprazole)</span>
+<span id="cb24-2"><a href="#cb24-2" aria-hidden="true" tabindex="-1"></a>tmol.GetConformer().Set3D(<span class="va">False</span>)</span>
+<span id="cb24-3"><a href="#cb24-3" aria-hidden="true" tabindex="-1"></a>tmol</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-display" data-execution_count="14">
+<p><img src="2023-02-04-working-with-conformers_files/figure-html/cell-14-output-1.png" class="img-fluid"></p>
+</div>
+</div>
+<p>or a 2D conformer as 3D:</p>
+<div class="cell" data-execution_count="15">
+<div class="sourceCode cell-code" id="cb25"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb25-1"><a href="#cb25-1" aria-hidden="true" tabindex="-1"></a>rdDepictor.Compute2DCoords(tmol)</span>
+<span id="cb25-2"><a href="#cb25-2" aria-hidden="true" tabindex="-1"></a>tmol.GetConformer().Set3D(<span class="va">True</span>)</span>
+<span id="cb25-3"><a href="#cb25-3" aria-hidden="true" tabindex="-1"></a>tmol</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-display">
+<div id="3dmolviewer_16755013583382678" style="position: relative; width: 400px; height: 400px">
+        <p id="3dmolwarning_16755013583382678" style="background-color:#ffcccc;color:black">You appear to be running in JupyterLab (or JavaScript failed to load for some other reason).  You need to install the 3dmol extension: <br>
+        <tt>jupyter labextension install jupyterlab_3dmol</tt></p>
+        </div>
+<script>
+
+var loadScriptAsync = function(uri){
+  return new Promise((resolve, reject) => {
+    //this is to ignore the existence of requirejs amd
+    var savedexports, savedmodule;
+    if (typeof exports !== 'undefined') savedexports = exports;
+    else exports = {}
+    if (typeof module !== 'undefined') savedmodule = module;
+    else module = {}
+
+    var tag = document.createElement('script');
+    tag.src = uri;
+    tag.async = true;
+    tag.onload = () => {
+        exports = savedexports;
+        module = savedmodule;
+        resolve();
+    };
+  var firstScriptTag = document.getElementsByTagName('script')[0];
+  firstScriptTag.parentNode.insertBefore(tag, firstScriptTag);
+});
+};
+
+if(typeof $3Dmolpromise === 'undefined') {
+$3Dmolpromise = null;
+  $3Dmolpromise = loadScriptAsync('https://cdn.jsdelivr.net/npm/3dmol@latest/build/3Dmol-min.min.js');
+}
+
+var viewer_16755013583382678 = null;
+var warn = document.getElementById("3dmolwarning_16755013583382678");
+if(warn) {
+    warn.parentNode.removeChild(warn);
+}
+$3Dmolpromise.then(function() {
+viewer_16755013583382678 = $3Dmol.createViewer(document.getElementById("3dmolviewer_16755013583382678"),{backgroundColor:"white"});
+viewer_16755013583382678.zoomTo();
+    viewer_16755013583382678.removeAllModels();
+    viewer_16755013583382678.addModel("\n     RDKit          3D\n\n 42 44  0  0  0  0  0  0  0  0999 V2000\n    8.4108    1.9081    0.0000 C   0  0  0  0  0  0  0  0  0  0  0  0\n    6.9241    2.1077    0.0000 O   0  0  0  0  0  0  0  0  0  0  0  0\n    6.0080    0.9199    0.0000 C   0  0  0  0  0  0  0  0  0  0  0  0\n    6.5785   -0.4673    0.0000 C   0  0  0  0  0  0  0  0  0  0  0  0\n    5.6624   -1.6551    0.0000 C   0  0  0  0  0  0  0  0  0  0  0  0\n    4.1757   -1.4555    0.0000 C   0  0  0  0  0  0  0  0  0  0  0  0\n    3.0327   -2.4269    0.0000 N   0  0  0  0  0  2  0  0  0  0  0  0\n    1.7557   -1.6399    0.0000 C   0  0  0  0  0  0  0  0  0  0  0  0\n    0.3684   -2.2104    0.0000 S   0  0  0  0  0  3  0  0  0  0  0  0\n    0.1689   -3.6971    0.0000 O   0  0  0  0  0  1  0  0  0  0  0  0\n   -0.8193   -1.2943    0.0000 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -2.0071   -0.3782    0.0000 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -1.8075    1.1085    0.0000 N   0  0  0  0  0  0  0  0  0  0  0  0\n   -2.9953    2.0246    0.0000 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -4.3825    1.4540    0.0000 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -5.5703    2.3702    0.0000 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -4.5820   -0.0326    0.0000 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -5.9693   -0.6032    0.0000 O   0  0  0  0  0  0  0  0  0  0  0  0\n   -7.1570    0.3130    0.0000 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -3.3943   -0.9487    0.0000 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -3.5938   -2.4354    0.0000 C   0  0  0  0  0  0  0  0  0  0  0  0\n    2.1095   -0.1822    0.0000 N   0  0  0  0  0  0  0  0  0  0  0  0\n    3.6052   -0.0683    0.0000 C   0  0  0  0  0  0  0  0  0  0  0  0\n    4.5213    1.1194    0.0000 C   0  0  0  0  0  0  0  0  0  0  0  0\n    9.8974    1.7086    0.0000 H   0  0  0  0  0  0  0  0  0  0  0  0\n    8.6103    3.3948    0.0000 H   0  0  0  0  0  0  0  0  0  0  0  0\n    8.2112    0.4215    0.0000 H   0  0  0  0  0  0  0  0  0  0  0  0\n    8.0652   -0.6668    0.0000 H   0  0  0  0  0  0  0  0  0  0  0  0\n    6.2329   -3.0423    0.0000 H   0  0  0  0  0  0  0  0  0  0  0  0\n    0.0968   -0.1066    0.0000 H   0  0  0  0  0  0  0  0  0  0  0  0\n   -1.5838   -2.5849    0.0000 H   0  0  0  0  0  0  0  0  0  0  0  0\n   -2.7957    3.5113    0.0000 H   0  0  0  0  0  0  0  0  0  0  0  0\n   -6.7580    3.2863    0.0000 H   0  0  0  0  0  0  0  0  0  0  0  0\n   -4.6541    3.5579    0.0000 H   0  0  0  0  0  0  0  0  0  0  0  0\n   -6.1304    1.8030    0.0000 H   0  0  0  0  0  0  0  0  0  0  0  0\n   -8.3448    1.2291    0.0000 H   0  0  0  0  0  0  0  0  0  0  0  0\n   -8.0732   -0.8748    0.0000 H   0  0  0  0  0  0  0  0  0  0  0  0\n   -6.7507    0.9988    0.0000 H   0  0  0  0  0  0  0  0  0  0  0  0\n   -3.7933   -3.9221    0.0000 H   0  0  0  0  0  0  0  0  0  0  0  0\n   -5.0805   -2.2359    0.0000 H   0  0  0  0  0  0  0  0  0  0  0  0\n   -2.1426   -2.8147    0.0000 H   0  0  0  0  0  0  0  0  0  0  0  0\n    3.9507    2.5067    0.0000 H   0  0  0  0  0  0  0  0  0  0  0  0\n  1  2  1  0\n  2  3  1  0\n  3  4  2  0\n  4  5  1  0\n  5  6  2  0\n  6  7  1  0\n  7  8  1  0\n  8  9  1  0\n  9 10  1  1\n  9 11  1  0\n 11 12  1  0\n 12 13  2  0\n 13 14  1  0\n 14 15  2  0\n 15 16  1  0\n 15 17  1  0\n 17 18  1  0\n 18 19  1  0\n 17 20  2  0\n 20 21  1  0\n  8 22  2  0\n 22 23  1  0\n 23 24  2  0\n 24  3  1  0\n 23  6  1  0\n 20 12  1  0\n  1 25  1  0\n  1 26  1  0\n  1 27  1  0\n  4 28  1  0\n  5 29  1  0\n 11 30  1  0\n 11 31  1  0\n 14 32  1  0\n 16 33  1  0\n 16 34  1  0\n 16 35  1  0\n 19 36  1  0\n 19 37  1  0\n 19 38  1  0\n 21 39  1  0\n 21 40  1  0\n 21 41  1  0\n 24 42  1  0\nM  CHG  3   7  -1   9   1  10  -1\nM  END\n","sdf");
+    viewer_16755013583382678.setStyle({"stick": {}});
+    viewer_16755013583382678.setBackgroundColor("0xeeeeee");
+    viewer_16755013583382678.zoomTo();
+viewer_16755013583382678.render();
+});
+</script>
+</div>
+<div class="cell-output cell-output-display" data-execution_count="15">
+
+</div>
+</div>
+<section id="conformer-ids" class="level2">
+<h2 class="anchored" data-anchor-id="conformer-ids">Conformer IDs</h2>
+<p>Each conformer has an ID associated with it:</p>
+<div class="cell" data-execution_count="26">
+<div class="sourceCode cell-code" id="cb26"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb26-1"><a href="#cb26-1" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>([x.GetId() <span class="cf">for</span> x <span class="kw">in</span> esomeprazole.GetConformers()])</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>[0, 1, 2, 3, 4, 5, 6, 7, 8, 9]</code></pre>
+</div>
+</div>
+<p>And there’s no guarantee that the IDs are consecutive:</p>
+<div class="cell" data-execution_count="28">
+<div class="sourceCode cell-code" id="cb28"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb28-1"><a href="#cb28-1" aria-hidden="true" tabindex="-1"></a>cp <span class="op">=</span> Chem.Mol(esomeprazole)</span>
+<span id="cb28-2"><a href="#cb28-2" aria-hidden="true" tabindex="-1"></a>cp.RemoveConformer(<span class="dv">0</span>)</span>
+<span id="cb28-3"><a href="#cb28-3" aria-hidden="true" tabindex="-1"></a>cp.RemoveConformer(<span class="dv">3</span>)</span>
+<span id="cb28-4"><a href="#cb28-4" aria-hidden="true" tabindex="-1"></a>cp.RemoveConformer(<span class="dv">7</span>)</span>
+<span id="cb28-5"><a href="#cb28-5" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>([x.GetId() <span class="cf">for</span> x <span class="kw">in</span> cp.GetConformers()])</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>[1, 2, 4, 5, 6, 8, 9]</code></pre>
+</div>
+</div>
+<p>The default conformer is just the first one:</p>
+<div class="cell" data-execution_count="30">
+<div class="sourceCode cell-code" id="cb30"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb30-1"><a href="#cb30-1" aria-hidden="true" tabindex="-1"></a>esomeprazole.GetConformer().GetId(),cp.GetConformer().GetId()</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-display" data-execution_count="30">
+<pre><code>(0, 1)</code></pre>
+</div>
+</div>
+<p>If we ask for a conformer Id which doesn’t exist, we get an error</p>
+<div class="cell" data-execution_count="33">
+<div class="sourceCode cell-code" id="cb32"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb32-1"><a href="#cb32-1" aria-hidden="true" tabindex="-1"></a>cp.GetConformer(<span class="dv">12</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-error">
+<pre><code>ValueError: Bad Conformer Id</code></pre>
+</div>
+</div>
+<p>So it’s usually better to loop over conformers by using <code>for conf in m.GetConformers()</code> than to do something like <code>for confid in range(m.GetNumConformers())</code></p>
+</section>
+<section id="getting-atom-positions" class="level2">
+<h2 class="anchored" data-anchor-id="getting-atom-positions">Getting atom positions</h2>
+<p>We can get the position of an individual atom using the <code>GetAtomPosition()</code> method:</p>
+<div class="cell" data-execution_count="17">
+<div class="sourceCode cell-code" id="cb34"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb34-1"><a href="#cb34-1" aria-hidden="true" tabindex="-1"></a>conf <span class="op">=</span> esomeprazole.GetConformer()</span>
+<span id="cb34-2"><a href="#cb34-2" aria-hidden="true" tabindex="-1"></a>pos <span class="op">=</span> conf.GetAtomPosition(<span class="dv">0</span>)</span>
+<span id="cb34-3"><a href="#cb34-3" aria-hidden="true" tabindex="-1"></a>pos</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-display" data-execution_count="17">
+<pre><code>&lt;rdkit.Geometry.rdGeometry.Point3D at 0x24549d77940&gt;</code></pre>
+</div>
+</div>
+<p>Point3D objects have x, y, an z members:</p>
+<div class="cell" data-execution_count="18">
+<div class="sourceCode cell-code" id="cb36"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb36-1"><a href="#cb36-1" aria-hidden="true" tabindex="-1"></a>pos.x</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-display" data-execution_count="18">
+<pre><code>7.673833423925606</code></pre>
+</div>
+</div>
+<p>We can also treat them as vectors:</p>
+<div class="cell" data-execution_count="19">
+<div class="sourceCode cell-code" id="cb38"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb38-1"><a href="#cb38-1" aria-hidden="true" tabindex="-1"></a>pos[<span class="dv">0</span>]</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-display" data-execution_count="19">
+<pre><code>7.673833423925606</code></pre>
+</div>
+</div>
+<p>or convert them to a list:</p>
+<div class="cell" data-execution_count="20">
+<div class="sourceCode cell-code" id="cb40"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb40-1"><a href="#cb40-1" aria-hidden="true" tabindex="-1"></a><span class="bu">list</span>(pos)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-display" data-execution_count="20">
+<pre><code>[7.673833423925606, 1.9026270201484923, 0.7499323617732389]</code></pre>
+</div>
+</div>
+<p>If you want to work with all of the atom positions at once, you can get the full set of positions as a numeric python array:</p>
+<div class="cell" data-execution_count="36">
+<div class="sourceCode cell-code" id="cb42"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb42-1"><a href="#cb42-1" aria-hidden="true" tabindex="-1"></a>conf <span class="op">=</span> esomeprazole.GetConformer()</span>
+<span id="cb42-2"><a href="#cb42-2" aria-hidden="true" tabindex="-1"></a>conf.GetPositions()</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-display" data-execution_count="36">
+<pre><code>array([[ 7.67383342,  1.90262702,  0.74993236],
+       [ 6.45500303,  1.5863599 ,  1.35650536],
+       [ 5.47994258,  0.87148768,  0.70572686],
+       [ 5.73975972,  0.49700014, -0.60402982],
+       [ 4.78365557, -0.22724183, -1.28080521],
+       [ 3.59642905, -0.54463893, -0.59986585],
+       [ 2.59405829, -1.21382165, -1.03927358],
+       [ 1.57249064, -1.34923356, -0.0664238 ],
+       [ 0.23760111, -2.18813362, -0.61069031],
+       [ 0.81652921, -3.85758446, -0.60953112],
+       [-1.27391039, -2.26700639,  0.09012225],
+       [-2.10815098, -1.11798724,  0.39836845],
+       [-1.98174435, -0.40660263,  1.56568982],
+       [-2.94381966,  0.4469877 ,  1.9742195 ],
+       [-4.10302205,  0.68692145,  1.27699325],
+       [-5.19127878,  1.57733968,  1.7705111 ],
+       [-4.26093798, -0.01014656,  0.07490913],
+       [-5.42572563,  0.23147474, -0.6552053 ],
+       [-5.42087157,  1.29218749, -1.61825447],
+       [-3.29351791, -0.86279333, -0.31409244],
+       [-3.3729589 , -1.58163605, -1.64292335],
+       [ 2.09334884, -0.69551121,  0.96089041],
+       [ 3.32320448, -0.18671147,  0.68892685],
+       [ 4.28153998,  0.53232818,  1.34410496],
+       [ 8.09389757,  0.95596456,  0.26748966],
+       [ 7.65061035,  2.62967184, -0.06019159],
+       [ 8.38623492,  2.21563152,  1.56819868],
+       [ 6.66853902,  0.74454419, -1.13424145],
+       [ 4.89232116, -0.56528193, -2.30134486],
+       [-1.97542789, -3.01240938, -0.43608787],
+       [-1.27389641, -2.83764033,  1.13153208],
+       [-2.83784116,  0.99189563,  2.93071709],
+       [-5.86663733,  0.96082859,  2.44934068],
+       [-5.84018865,  1.83545526,  0.9297767 ],
+       [-4.86235377,  2.50117065,  2.2287445 ],
+       [-4.78779089,  1.06132465, -2.50433141],
+       [-4.99817085,  2.23486583, -1.20407518],
+       [-6.43595476,  1.42487573, -2.00400931],
+       [-4.24971742, -1.21643589, -2.21758627],
+       [-2.46593717, -1.22685901, -2.26727455],
+       [-3.47585534, -2.65007473, -1.58068986],
+       [ 4.1067109 ,  0.83680778,  2.34637208]])</code></pre>
+</div>
+</div>
+</section>
+<section id="addingremoving-conformers" class="level2">
+<h2 class="anchored" data-anchor-id="addingremoving-conformers">Adding/removing conformers</h2>
+<p>I already showed how to remove conformer in the section on conformer IDs, but you can also add conformers to a molecule.</p>
+<p>Let’s start by getting a conformer which is a canonical orientation: centered at the origin and with its principle axes aligned with the cartesian axes:</p>
+<div class="cell" data-execution_count="22">
+<div class="sourceCode cell-code" id="cb44"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb44-1"><a href="#cb44-1" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> rdkit.Chem <span class="im">import</span> rdMolTransforms</span>
+<span id="cb44-2"><a href="#cb44-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb44-3"><a href="#cb44-3" aria-hidden="true" tabindex="-1"></a><span class="co"># GetConformer() returns a reference to the existing conformer, we want a copy:</span></span>
+<span id="cb44-4"><a href="#cb44-4" aria-hidden="true" tabindex="-1"></a>conf <span class="op">=</span> Chem.Conformer(esomeprazole.GetConformer(<span class="dv">0</span>))</span>
+<span id="cb44-5"><a href="#cb44-5" aria-hidden="true" tabindex="-1"></a>rdMolTransforms.CanonicalizeConformer(conf)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+<p>Make a copy of the molecule and add a 2D conformer, by default Compute2DCoords() clears the existing conformers</p>
+<div class="cell" data-execution_count="28">
+<div class="sourceCode cell-code" id="cb45"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb45-1"><a href="#cb45-1" aria-hidden="true" tabindex="-1"></a>cp <span class="op">=</span> Chem.Mol(esomeprazole)</span>
+<span id="cb45-2"><a href="#cb45-2" aria-hidden="true" tabindex="-1"></a>rdDepictor.Compute2DCoords(cp)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-display" data-execution_count="28">
+<pre><code>0</code></pre>
+</div>
+</div>
+<p>Now add the that canonical conformer and set its ID so that it is unique. The return value is the new conformer ID</p>
+<div class="cell" data-execution_count="29">
+<div class="sourceCode cell-code" id="cb47"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb47-1"><a href="#cb47-1" aria-hidden="true" tabindex="-1"></a>cp.AddConformer(conf,assignId<span class="op">=</span><span class="va">True</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-display" data-execution_count="29">
+<pre><code>1</code></pre>
+</div>
+</div>
+<div class="cell" data-execution_count="32">
+<div class="sourceCode cell-code" id="cb49"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb49-1"><a href="#cb49-1" aria-hidden="true" tabindex="-1"></a>cp.GetConformer().GetPositions()[:<span class="dv">3</span>]</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-display" data-execution_count="32">
+<pre><code>array([[8.41075857, 1.90814121, 0.        ],
+       [6.92408705, 2.10766008, 0.        ],
+       [6.00796287, 0.91992422, 0.        ]])</code></pre>
+</div>
+</div>
+<div class="cell" data-execution_count="33">
+<div class="sourceCode cell-code" id="cb51"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb51-1"><a href="#cb51-1" aria-hidden="true" tabindex="-1"></a>cp.GetConformer(<span class="dv">1</span>).GetPositions()[:<span class="dv">3</span>]</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-display" data-execution_count="33">
+<pre><code>array([[ 7.39395019,  1.81765991, -0.52124964],
+       [ 6.17231368,  1.90827963,  0.15172549],
+       [ 5.15244456,  1.01460864, -0.06395248]])</code></pre>
+</div>
+</div>
+</section>
+<section id="getting-a-new-molecule-with-just-one-conformer" class="level2">
+<h2 class="anchored" data-anchor-id="getting-a-new-molecule-with-just-one-conformer">Getting a new molecule with just one conformer</h2>
+<p>There are often times you want to copy a multi-conformer molecule but just keep one of the conformers.</p>
+<p>The standard way of copying RDKit molecules will copy all conformers:</p>
+<div class="cell" data-execution_count="35">
+<div class="sourceCode cell-code" id="cb53"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb53-1"><a href="#cb53-1" aria-hidden="true" tabindex="-1"></a>cp <span class="op">=</span> Chem.Mol(esomeprazole)</span>
+<span id="cb53-2"><a href="#cb53-2" aria-hidden="true" tabindex="-1"></a>cp.GetNumConformers()</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-display" data-execution_count="35">
+<pre><code>10</code></pre>
+</div>
+</div>
+<p>But we can tell it to just copy one:</p>
+<div class="cell" data-execution_count="38">
+<div class="sourceCode cell-code" id="cb55"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb55-1"><a href="#cb55-1" aria-hidden="true" tabindex="-1"></a>cp <span class="op">=</span> Chem.Mol(esomeprazole,confId<span class="op">=</span><span class="dv">5</span>)</span>
+<span id="cb55-2"><a href="#cb55-2" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(cp.GetNumConformers(), cp.GetConformer().GetId())</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>1 5</code></pre>
+</div>
+</div>
+
+
+</section>
+
+</main> <!-- /main -->
+<script id="quarto-html-after-body" type="application/javascript">
+window.document.addEventListener("DOMContentLoaded", function (event) {
+  const toggleBodyColorMode = (bsSheetEl) => {
+    const mode = bsSheetEl.getAttribute("data-mode");
+    const bodyEl = window.document.querySelector("body");
+    if (mode === "dark") {
+      bodyEl.classList.add("quarto-dark");
+      bodyEl.classList.remove("quarto-light");
+    } else {
+      bodyEl.classList.add("quarto-light");
+      bodyEl.classList.remove("quarto-dark");
+    }
+  }
+  const toggleBodyColorPrimary = () => {
+    const bsSheetEl = window.document.querySelector("link#quarto-bootstrap");
+    if (bsSheetEl) {
+      toggleBodyColorMode(bsSheetEl);
+    }
+  }
+  toggleBodyColorPrimary();  
+  const disableStylesheet = (stylesheets) => {
+    for (let i=0; i < stylesheets.length; i++) {
+      const stylesheet = stylesheets[i];
+      stylesheet.rel = 'prefetch';
+    }
+  }
+  const enableStylesheet = (stylesheets) => {
+    for (let i=0; i < stylesheets.length; i++) {
+      const stylesheet = stylesheets[i];
+      stylesheet.rel = 'stylesheet';
+    }
+  }
+  const manageTransitions = (selector, allowTransitions) => {
+    const els = window.document.querySelectorAll(selector);
+    for (let i=0; i < els.length; i++) {
+      const el = els[i];
+      if (allowTransitions) {
+        el.classList.remove('notransition');
+      } else {
+        el.classList.add('notransition');
+      }
+    }
+  }
+  const toggleColorMode = (alternate) => {
+    // Switch the stylesheets
+    const alternateStylesheets = window.document.querySelectorAll('link.quarto-color-scheme.quarto-color-alternate');
+    manageTransitions('#quarto-margin-sidebar .nav-link', false);
+    if (alternate) {
+      enableStylesheet(alternateStylesheets);
+      for (const sheetNode of alternateStylesheets) {
+        if (sheetNode.id === "quarto-bootstrap") {
+          toggleBodyColorMode(sheetNode);
+        }
+      }
+    } else {
+      disableStylesheet(alternateStylesheets);
+      toggleBodyColorPrimary();
+    }
+    manageTransitions('#quarto-margin-sidebar .nav-link', true);
+    // Switch the toggles
+    const toggles = window.document.querySelectorAll('.quarto-color-scheme-toggle');
+    for (let i=0; i < toggles.length; i++) {
+      const toggle = toggles[i];
+      if (toggle) {
+        if (alternate) {
+          toggle.classList.add("alternate");     
+        } else {
+          toggle.classList.remove("alternate");
+        }
+      }
+    }
+    // Hack to workaround the fact that safari doesn't
+    // properly recolor the scrollbar when toggling (#1455)
+    if (navigator.userAgent.indexOf('Safari') > 0 && navigator.userAgent.indexOf('Chrome') == -1) {
+      manageTransitions("body", false);
+      window.scrollTo(0, 1);
+      setTimeout(() => {
+        window.scrollTo(0, 0);
+        manageTransitions("body", true);
+      }, 40);  
+    }
+  }
+  const isFileUrl = () => { 
+    return window.location.protocol === 'file:';
+  }
+  const hasAlternateSentinel = () => {  
+    let styleSentinel = getColorSchemeSentinel();
+    if (styleSentinel !== null) {
+      return styleSentinel === "alternate";
+    } else {
+      return false;
+    }
+  }
+  const setStyleSentinel = (alternate) => {
+    const value = alternate ? "alternate" : "default";
+    if (!isFileUrl()) {
+      window.localStorage.setItem("quarto-color-scheme", value);
+    } else {
+      localAlternateSentinel = value;
+    }
+  }
+  const getColorSchemeSentinel = () => {
+    if (!isFileUrl()) {
+      const storageValue = window.localStorage.getItem("quarto-color-scheme");
+      return storageValue != null ? storageValue : localAlternateSentinel;
+    } else {
+      return localAlternateSentinel;
+    }
+  }
+  let localAlternateSentinel = 'default';
+  // Dark / light mode switch
+  window.quartoToggleColorScheme = () => {
+    // Read the current dark / light value 
+    let toAlternate = !hasAlternateSentinel();
+    toggleColorMode(toAlternate);
+    setStyleSentinel(toAlternate);
+  };
+  // Ensure there is a toggle, if there isn't float one in the top right
+  if (window.document.querySelector('.quarto-color-scheme-toggle') === null) {
+    const a = window.document.createElement('a');
+    a.classList.add('top-right');
+    a.classList.add('quarto-color-scheme-toggle');
+    a.href = "";
+    a.onclick = function() { try { window.quartoToggleColorScheme(); } catch {} return false; };
+    const i = window.document.createElement("i");
+    i.classList.add('bi');
+    a.appendChild(i);
+    window.document.body.appendChild(a);
+  }
+  // Switch to dark mode if need be
+  if (hasAlternateSentinel()) {
+    toggleColorMode(true);
+  } else {
+    toggleColorMode(false);
+  }
+  const icon = "";
+  const anchorJS = new window.AnchorJS();
+  anchorJS.options = {
+    placement: 'right',
+    icon: icon
+  };
+  anchorJS.add('.anchored');
+  const clipboard = new window.ClipboardJS('.code-copy-button', {
+    target: function(trigger) {
+      return trigger.previousElementSibling;
+    }
+  });
+  clipboard.on('success', function(e) {
+    // button target
+    const button = e.trigger;
+    // don't keep focus
+    button.blur();
+    // flash "checked"
+    button.classList.add('code-copy-button-checked');
+    var currentTitle = button.getAttribute("title");
+    button.setAttribute("title", "Copied!");
+    let tooltip;
+    if (window.bootstrap) {
+      button.setAttribute("data-bs-toggle", "tooltip");
+      button.setAttribute("data-bs-placement", "left");
+      button.setAttribute("data-bs-title", "Copied!");
+      tooltip = new bootstrap.Tooltip(button, 
+        { trigger: "manual", 
+          customClass: "code-copy-button-tooltip",
+          offset: [0, -8]});
+      tooltip.show();    
+    }
+    setTimeout(function() {
+      if (tooltip) {
+        tooltip.hide();
+        button.removeAttribute("data-bs-title");
+        button.removeAttribute("data-bs-toggle");
+        button.removeAttribute("data-bs-placement");
+      }
+      button.setAttribute("title", currentTitle);
+      button.classList.remove('code-copy-button-checked');
+    }, 1000);
+    // clear code selection
+    e.clearSelection();
+  });
+  function tippyHover(el, contentFn) {
+    const config = {
+      allowHTML: true,
+      content: contentFn,
+      maxWidth: 500,
+      delay: 100,
+      arrow: false,
+      appendTo: function(el) {
+          return el.parentElement;
+      },
+      interactive: true,
+      interactiveBorder: 10,
+      theme: 'quarto',
+      placement: 'bottom-start'
+    };
+    window.tippy(el, config); 
+  }
+  const noterefs = window.document.querySelectorAll('a[role="doc-noteref"]');
+  for (var i=0; i<noterefs.length; i++) {
+    const ref = noterefs[i];
+    tippyHover(ref, function() {
+      // use id or data attribute instead here
+      let href = ref.getAttribute('data-footnote-href') || ref.getAttribute('href');
+      try { href = new URL(href).hash; } catch {}
+      const id = href.replace(/^#\/?/, "");
+      const note = window.document.getElementById(id);
+      return note.innerHTML;
+    });
+  }
+  const findCites = (el) => {
+    const parentEl = el.parentElement;
+    if (parentEl) {
+      const cites = parentEl.dataset.cites;
+      if (cites) {
+        return {
+          el,
+          cites: cites.split(' ')
+        };
+      } else {
+        return findCites(el.parentElement)
+      }
+    } else {
+      return undefined;
+    }
+  };
+  var bibliorefs = window.document.querySelectorAll('a[role="doc-biblioref"]');
+  for (var i=0; i<bibliorefs.length; i++) {
+    const ref = bibliorefs[i];
+    const citeInfo = findCites(ref);
+    if (citeInfo) {
+      tippyHover(citeInfo.el, function() {
+        var popup = window.document.createElement('div');
+        citeInfo.cites.forEach(function(cite) {
+          var citeDiv = window.document.createElement('div');
+          citeDiv.classList.add('hanging-indent');
+          citeDiv.classList.add('csl-entry');
+          var biblioDiv = window.document.getElementById('ref-' + cite);
+          if (biblioDiv) {
+            citeDiv.innerHTML = biblioDiv.innerHTML;
+          }
+          popup.appendChild(citeDiv);
+        });
+        return popup.innerHTML;
+      });
+    }
+  }
+});
+</script>
+<script src="https://utteranc.es/client.js" repo="greglandrum/rdkit-blog" issue-term="pathname" theme="github-light" crossorigin="anonymous" async="">
+</script>
+</div> <!-- /content -->
+
+
+
+</body></html>
