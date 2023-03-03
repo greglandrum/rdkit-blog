@@ -1,0 +1,799 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en"><head>
+
+<meta charset="utf-8">
+<meta name="generator" content="quarto-1.2.269">
+
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+
+<meta name="dcterms.date" content="2023-03-02">
+<meta name="description" content="Tutorial on how to cluster molecular conformers.">
+
+<title>RDKit blog - Clustering conformers</title>
+<style>
+code{white-space: pre-wrap;}
+span.smallcaps{font-variant: small-caps;}
+div.columns{display: flex; gap: min(4vw, 1.5em);}
+div.column{flex: auto; overflow-x: auto;}
+div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+ul.task-list{list-style: none;}
+ul.task-list li input[type="checkbox"] {
+  width: 0.8em;
+  margin: 0 0.8em 0.2em -1.6em;
+  vertical-align: middle;
+}
+pre > code.sourceCode { white-space: pre; position: relative; }
+pre > code.sourceCode > span { display: inline-block; line-height: 1.25; }
+pre > code.sourceCode > span:empty { height: 1.2em; }
+.sourceCode { overflow: visible; }
+code.sourceCode > span { color: inherit; text-decoration: inherit; }
+div.sourceCode { margin: 1em 0; }
+pre.sourceCode { margin: 0; }
+@media screen {
+div.sourceCode { overflow: auto; }
+}
+@media print {
+pre > code.sourceCode { white-space: pre-wrap; }
+pre > code.sourceCode > span { text-indent: -5em; padding-left: 5em; }
+}
+pre.numberSource code
+  { counter-reset: source-line 0; }
+pre.numberSource code > span
+  { position: relative; left: -4em; counter-increment: source-line; }
+pre.numberSource code > span > a:first-child::before
+  { content: counter(source-line);
+    position: relative; left: -1em; text-align: right; vertical-align: baseline;
+    border: none; display: inline-block;
+    -webkit-touch-callout: none; -webkit-user-select: none;
+    -khtml-user-select: none; -moz-user-select: none;
+    -ms-user-select: none; user-select: none;
+    padding: 0 4px; width: 4em;
+    color: #aaaaaa;
+  }
+pre.numberSource { margin-left: 3em; border-left: 1px solid #aaaaaa;  padding-left: 4px; }
+div.sourceCode
+  {   }
+@media screen {
+pre > code.sourceCode > span > a:first-child::before { text-decoration: underline; }
+}
+code span.al { color: #ff0000; font-weight: bold; } /* Alert */
+code span.an { color: #60a0b0; font-weight: bold; font-style: italic; } /* Annotation */
+code span.at { color: #7d9029; } /* Attribute */
+code span.bn { color: #40a070; } /* BaseN */
+code span.bu { color: #008000; } /* BuiltIn */
+code span.cf { color: #007020; font-weight: bold; } /* ControlFlow */
+code span.ch { color: #4070a0; } /* Char */
+code span.cn { color: #880000; } /* Constant */
+code span.co { color: #60a0b0; font-style: italic; } /* Comment */
+code span.cv { color: #60a0b0; font-weight: bold; font-style: italic; } /* CommentVar */
+code span.do { color: #ba2121; font-style: italic; } /* Documentation */
+code span.dt { color: #902000; } /* DataType */
+code span.dv { color: #40a070; } /* DecVal */
+code span.er { color: #ff0000; font-weight: bold; } /* Error */
+code span.ex { } /* Extension */
+code span.fl { color: #40a070; } /* Float */
+code span.fu { color: #06287e; } /* Function */
+code span.im { color: #008000; font-weight: bold; } /* Import */
+code span.in { color: #60a0b0; font-weight: bold; font-style: italic; } /* Information */
+code span.kw { color: #007020; font-weight: bold; } /* Keyword */
+code span.op { color: #666666; } /* Operator */
+code span.ot { color: #007020; } /* Other */
+code span.pp { color: #bc7a00; } /* Preprocessor */
+code span.sc { color: #4070a0; } /* SpecialChar */
+code span.ss { color: #bb6688; } /* SpecialString */
+code span.st { color: #4070a0; } /* String */
+code span.va { color: #19177c; } /* Variable */
+code span.vs { color: #4070a0; } /* VerbatimString */
+code span.wa { color: #60a0b0; font-weight: bold; font-style: italic; } /* Warning */
+</style>
+
+
+<script src="../site_libs/quarto-nav/quarto-nav.js"></script>
+<script src="../site_libs/quarto-nav/headroom.min.js"></script>
+<script src="../site_libs/clipboard/clipboard.min.js"></script>
+<script src="../site_libs/quarto-search/autocomplete.umd.js"></script>
+<script src="../site_libs/quarto-search/fuse.min.js"></script>
+<script src="../site_libs/quarto-search/quarto-search.js"></script>
+<meta name="quarto:offset" content="../">
+<link href="../posts/icons/favicon.ico" rel="icon">
+<script src="../site_libs/quarto-html/quarto.js"></script>
+<script src="../site_libs/quarto-html/popper.min.js"></script>
+<script src="../site_libs/quarto-html/tippy.umd.min.js"></script>
+<script src="../site_libs/quarto-html/anchor.min.js"></script>
+<link href="../site_libs/quarto-html/tippy.css" rel="stylesheet">
+<link href="../site_libs/quarto-html/quarto-syntax-highlighting.css" rel="stylesheet" class="quarto-color-scheme" id="quarto-text-highlighting-styles">
+<link href="../site_libs/quarto-html/quarto-syntax-highlighting-dark.css" rel="prefetch" class="quarto-color-scheme quarto-color-alternate" id="quarto-text-highlighting-styles">
+<script src="../site_libs/bootstrap/bootstrap.min.js"></script>
+<link href="../site_libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
+<link href="../site_libs/bootstrap/bootstrap.min.css" rel="stylesheet" class="quarto-color-scheme" id="quarto-bootstrap" data-mode="light">
+<link href="../site_libs/bootstrap/bootstrap-dark.min.css" rel="prefetch" class="quarto-color-scheme quarto-color-alternate" id="quarto-bootstrap" data-mode="dark">
+<script id="quarto-search-options" type="application/json">{
+  "location": "navbar",
+  "copy-button": false,
+  "collapse-after": 3,
+  "panel-placement": "end",
+  "type": "overlay",
+  "limit": 20,
+  "language": {
+    "search-no-results-text": "No results",
+    "search-matching-documents-text": "matching documents",
+    "search-copy-link-title": "Copy link to search",
+    "search-hide-matches-text": "Hide additional matches",
+    "search-more-match-text": "more match in this document",
+    "search-more-matches-text": "more matches in this document",
+    "search-clear-button-title": "Clear",
+    "search-detached-cancel-button-title": "Cancel",
+    "search-submit-button-title": "Submit"
+  }
+}</script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.6/require.min.js" integrity="sha512-c3Nl8+7g4LMSTdrm621y7kf9v3SDPnhxLNhcjFJbKECVnmZHTdo+IRO05sNLTH/D3vA6u1X32ehoLC7WFVdheg==" crossorigin="anonymous"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.5.1/jquery.min.js" integrity="sha512-bLT0Qm9VnAYZDflyKcBaQ2gg0hSYNQrJ8RilYldYQ1FxQYoCLtUjuuRuZo+fjqhx/qtq/1itJ0C2ejDxltZVFg==" crossorigin="anonymous"></script>
+<script type="application/javascript">define('jquery', [],function() {return window.jQuery;})</script>
+
+
+<link rel="stylesheet" href="../styles.css">
+</head>
+
+<body class="nav-fixed">
+
+<div id="quarto-search-results"></div>
+  <header id="quarto-header" class="headroom fixed-top">
+    <nav class="navbar navbar-expand-lg navbar-dark ">
+      <div class="navbar-container container-fluid">
+      <div class="navbar-brand-container">
+    <a class="navbar-brand" href="../index.html">
+    <span class="navbar-title">RDKit blog</span>
+    </a>
+  </div>
+          <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarCollapse" aria-controls="navbarCollapse" aria-expanded="false" aria-label="Toggle navigation" onclick="if (window.quartoToggleHeadroom) { window.quartoToggleHeadroom(); }">
+  <span class="navbar-toggler-icon"></span>
+</button>
+          <div class="collapse navbar-collapse" id="navbarCollapse">
+            <ul class="navbar-nav navbar-nav-scroll ms-auto">
+  <li class="nav-item">
+    <a class="nav-link" href="../about.html">
+ <span class="menu-text">RDKit experiments, tips, and tutorials</span></a>
+  </li>  
+  <li class="nav-item compact">
+    <a class="nav-link" href="https://github.com/rdkit/rdkit"><i class="bi bi-github" role="img">
+</i> 
+ <span class="menu-text"></span></a>
+  </li>  
+  <li class="nav-item compact">
+    <a class="nav-link" href="https://twitter.com/rdkit_org"><i class="bi bi-twitter" role="img">
+</i> 
+ <span class="menu-text"></span></a>
+  </li>  
+  <li class="nav-item compact">
+    <a class="nav-link" href="../index.xml"><i class="bi bi-rss" role="img">
+</i> 
+ <span class="menu-text"></span></a>
+  </li>  
+</ul>
+              <div class="quarto-toggle-container">
+                  <a href="" class="quarto-color-scheme-toggle nav-link" onclick="window.quartoToggleColorScheme(); return false;" title="Toggle dark mode"><i class="bi"></i></a>
+              </div>
+              <div id="quarto-search" class="" title="Search"></div>
+          </div> <!-- /navcollapse -->
+      </div> <!-- /container-fluid -->
+    </nav>
+</header>
+<!-- content -->
+<div id="quarto-content" class="quarto-container page-columns page-rows-contents page-layout-article page-navbar">
+<!-- sidebar -->
+<!-- margin-sidebar -->
+    <div id="quarto-margin-sidebar" class="sidebar margin-sidebar">
+        <nav id="TOC" role="doc-toc" class="toc-active">
+    <h2 id="toc-title">On this page</h2>
+   
+  <ul>
+  <li><a href="#generate-conformers" id="toc-generate-conformers" class="nav-link active" data-scroll-target="#generate-conformers">Generate conformers</a></li>
+  <li><a href="#direct-alignment-vs-best-alignment" id="toc-direct-alignment-vs-best-alignment" class="nav-link" data-scroll-target="#direct-alignment-vs-best-alignment">Direct alignment vs best alignment</a></li>
+  <li><a href="#cluster-them" id="toc-cluster-them" class="nav-link" data-scroll-target="#cluster-them">Cluster Them</a></li>
+  </ul>
+</nav>
+    </div>
+<!-- main -->
+<main class="content" id="quarto-document-content">
+
+<header id="title-block-header" class="quarto-title-block default">
+<div class="quarto-title">
+<h1 class="title">Clustering conformers</h1>
+  <div class="quarto-categories">
+    <div class="quarto-category">tutorial</div>
+    <div class="quarto-category">3d</div>
+    <div class="quarto-category">conformers</div>
+  </div>
+  </div>
+
+<div>
+  <div class="description">
+    Tutorial on how to cluster molecular conformers.
+  </div>
+</div>
+
+
+<div class="quarto-title-meta">
+
+    
+    <div>
+    <div class="quarto-title-meta-heading">Published</div>
+    <div class="quarto-title-meta-contents">
+      <p class="date">March 2, 2023</p>
+    </div>
+  </div>
+  
+    
+  </div>
+  
+
+</header>
+
+<p>This one came up during a conversation with Felix Pultar, a postdoc in the group, and I thought it made for a nice blog post, so here we go.</p>
+<p>One common workflow in conformational analysis is to generate a bunch of conformers for a molecule and then find a representative subset by clustering them.</p>
+<p>The RDKit has everything required to do this, but there’s not all that much info out there showing how to do it.</p>
+<p>This blog post aims to change that.</p>
+<div class="cell" data-executetime="{&quot;end_time&quot;:&quot;2023-03-02T18:21:37.658151Z&quot;,&quot;start_time&quot;:&quot;2023-03-02T18:21:37.574673Z&quot;}" data-execution_count="1">
+<div class="sourceCode cell-code" id="cb1"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> rdkit.Chem <span class="im">import</span> Draw</span>
+<span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> rdkit.Chem.Draw <span class="im">import</span> IPythonConsole</span>
+<span id="cb1-3"><a href="#cb1-3" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> rdkit <span class="im">import</span> Chem</span>
+<span id="cb1-4"><a href="#cb1-4" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> rdkit.Chem <span class="im">import</span> rdDistGeom</span>
+<span id="cb1-5"><a href="#cb1-5" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> rdkit.Chem <span class="im">import</span> rdMolAlign</span>
+<span id="cb1-6"><a href="#cb1-6" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> rdkit</span>
+<span id="cb1-7"><a href="#cb1-7" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(rdkit.__version__)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>2022.09.4</code></pre>
+</div>
+</div>
+<section id="generate-conformers" class="level1">
+<h1>Generate conformers</h1>
+<p>Start by constructing a molecule and then generating a set of 300 conformers for it using <a href="https://doi.org/10.1021/acs.jcim.0c00025">ETKDGv3</a>.</p>
+<div class="cell" data-executetime="{&quot;end_time&quot;:&quot;2023-03-02T18:21:37.714550Z&quot;,&quot;start_time&quot;:&quot;2023-03-02T18:21:37.659255Z&quot;}" data-execution_count="2">
+<div class="sourceCode cell-code" id="cb3"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a><span class="co"># modified CHEMBL12747, ionized</span></span>
+<span id="cb3-2"><a href="#cb3-2" aria-hidden="true" tabindex="-1"></a>m <span class="op">=</span> Chem.MolFromSmiles(<span class="st">'O=C([O-])CCn1c(=O)c(=O)[nH]c2cc([N+](=O)[O-])c(-n3ccc(C=NOCc4ccccc4)c3)cc21'</span>)</span>
+<span id="cb3-3"><a href="#cb3-3" aria-hidden="true" tabindex="-1"></a>m</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-display" data-execution_count="2">
+<p><img src="2023-03-02-clustering-conformers_files/figure-html/cell-3-output-1.png" class="img-fluid"></p>
+</div>
+</div>
+<div class="cell" data-executetime="{&quot;end_time&quot;:&quot;2023-03-02T18:21:39.365950Z&quot;,&quot;start_time&quot;:&quot;2023-03-02T18:21:37.716081Z&quot;}" data-execution_count="3">
+<div class="sourceCode cell-code" id="cb4"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a>mh <span class="op">=</span> Chem.AddHs(m)</span>
+<span id="cb4-2"><a href="#cb4-2" aria-hidden="true" tabindex="-1"></a>ps <span class="op">=</span> rdDistGeom.ETKDGv3()</span>
+<span id="cb4-3"><a href="#cb4-3" aria-hidden="true" tabindex="-1"></a>ps.randomSeed <span class="op">=</span> <span class="bn">0xd06f00d</span></span>
+<span id="cb4-4"><a href="#cb4-4" aria-hidden="true" tabindex="-1"></a>ps.numThreads <span class="op">=</span> <span class="dv">10</span></span>
+<span id="cb4-5"><a href="#cb4-5" aria-hidden="true" tabindex="-1"></a>cids <span class="op">=</span> rdDistGeom.EmbedMultipleConfs(mh,<span class="dv">300</span>,ps)</span>
+<span id="cb4-6"><a href="#cb4-6" aria-hidden="true" tabindex="-1"></a><span class="bu">len</span>(cids)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-display" data-execution_count="3">
+<pre><code>300</code></pre>
+</div>
+</div>
+<p>Remove Hs from the molecule at this point because they aren’t particularly informative for the rest of the analysis and they just make things more difficult</p>
+<div class="cell" data-executetime="{&quot;end_time&quot;:&quot;2023-03-02T18:21:39.369588Z&quot;,&quot;start_time&quot;:&quot;2023-03-02T18:21:39.367022Z&quot;}" data-execution_count="4">
+<div class="sourceCode cell-code" id="cb6"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb6-1"><a href="#cb6-1" aria-hidden="true" tabindex="-1"></a>m3d <span class="op">=</span> Chem.RemoveHs(mh)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+</section>
+<section id="direct-alignment-vs-best-alignment" class="level1">
+<h1>Direct alignment vs best alignment</h1>
+<p>Find a pair of conformers with a decent size mismatch between the direct alignment (which does not take symmetry into account) and the best alignment (which does):</p>
+<div class="cell" data-executetime="{&quot;end_time&quot;:&quot;2023-03-02T18:21:39.852970Z&quot;,&quot;start_time&quot;:&quot;2023-03-02T18:21:39.370652Z&quot;}" data-execution_count="5">
+<div class="sourceCode cell-code" id="cb7"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb7-1"><a href="#cb7-1" aria-hidden="true" tabindex="-1"></a>maxd <span class="op">=</span> <span class="op">-</span><span class="dv">100</span></span>
+<span id="cb7-2"><a href="#cb7-2" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> j <span class="kw">in</span> <span class="bu">range</span>(<span class="dv">0</span>,<span class="dv">5</span>):</span>
+<span id="cb7-3"><a href="#cb7-3" aria-hidden="true" tabindex="-1"></a>    <span class="cf">for</span> i <span class="kw">in</span> <span class="bu">range</span>(j,<span class="bu">len</span>(cids)):</span>
+<span id="cb7-4"><a href="#cb7-4" aria-hidden="true" tabindex="-1"></a>        d1 <span class="op">=</span> rdMolAlign.AlignMol(m3d,m3d,prbCid<span class="op">=</span>cids[i],refCid<span class="op">=</span>cids[j])</span>
+<span id="cb7-5"><a href="#cb7-5" aria-hidden="true" tabindex="-1"></a>        d2 <span class="op">=</span> rdMolAlign.GetBestRMS(m3d,m3d,prbId<span class="op">=</span>cids[i],refId<span class="op">=</span>cids[j])</span>
+<span id="cb7-6"><a href="#cb7-6" aria-hidden="true" tabindex="-1"></a>        delt <span class="op">=</span> d1<span class="op">-</span>d2</span>
+<span id="cb7-7"><a href="#cb7-7" aria-hidden="true" tabindex="-1"></a>        <span class="cf">if</span> delt<span class="op">&lt;-</span><span class="fl">1e-5</span>:</span>
+<span id="cb7-8"><a href="#cb7-8" aria-hidden="true" tabindex="-1"></a>            <span class="bu">print</span>(<span class="ss">f'ooops, </span><span class="sc">{</span>i<span class="sc">}</span><span class="ss">, </span><span class="sc">{</span>delt<span class="sc">}</span><span class="ss">'</span>)</span>
+<span id="cb7-9"><a href="#cb7-9" aria-hidden="true" tabindex="-1"></a>        <span class="cf">if</span> delt<span class="op">&gt;</span>maxd:</span>
+<span id="cb7-10"><a href="#cb7-10" aria-hidden="true" tabindex="-1"></a>            maxd <span class="op">=</span> delt</span>
+<span id="cb7-11"><a href="#cb7-11" aria-hidden="true" tabindex="-1"></a>            maxi <span class="op">=</span> i</span>
+<span id="cb7-12"><a href="#cb7-12" aria-hidden="true" tabindex="-1"></a>            maxj <span class="op">=</span> j</span>
+<span id="cb7-13"><a href="#cb7-13" aria-hidden="true" tabindex="-1"></a>d1 <span class="op">=</span> rdMolAlign.AlignMol(m3d,m3d,prbCid<span class="op">=</span>cids[maxi],refCid<span class="op">=</span>cids[maxj])</span>
+<span id="cb7-14"><a href="#cb7-14" aria-hidden="true" tabindex="-1"></a>d2 <span class="op">=</span> rdMolAlign.GetBestRMS(m3d,m3d,prbId<span class="op">=</span>cids[maxi],refId<span class="op">=</span>cids[maxj])</span>
+<span id="cb7-15"><a href="#cb7-15" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(maxi,maxd,d1,d2)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>282 0.703433090406554 1.0038182177331938 0.3003851273604343</code></pre>
+</div>
+</div>
+<p>Now show those two conformers:</p>
+<div class="cell" data-executetime="{&quot;end_time&quot;:&quot;2023-03-02T18:21:39.857191Z&quot;,&quot;start_time&quot;:&quot;2023-03-02T18:21:39.854251Z&quot;}" data-execution_count="6">
+<div class="sourceCode cell-code" id="cb9"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb9-1"><a href="#cb9-1" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> py3Dmol</span>
+<span id="cb9-2"><a href="#cb9-2" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> drawit(m, cids<span class="op">=</span>[<span class="op">-</span><span class="dv">1</span>], p<span class="op">=</span><span class="va">None</span>, removeHs<span class="op">=</span><span class="va">True</span>,</span>
+<span id="cb9-3"><a href="#cb9-3" aria-hidden="true" tabindex="-1"></a>           colors<span class="op">=</span>(<span class="st">'cyanCarbon'</span>,<span class="st">'redCarbon'</span>,<span class="st">'blueCarbon'</span>,<span class="st">'magentaCarbon'</span>,<span class="st">'whiteCarbon'</span>,<span class="st">'purpleCarbon'</span>)):</span>
+<span id="cb9-4"><a href="#cb9-4" aria-hidden="true" tabindex="-1"></a>        <span class="cf">if</span> removeHs:</span>
+<span id="cb9-5"><a href="#cb9-5" aria-hidden="true" tabindex="-1"></a>            m <span class="op">=</span> Chem.RemoveHs(m)</span>
+<span id="cb9-6"><a href="#cb9-6" aria-hidden="true" tabindex="-1"></a>        <span class="cf">if</span> p <span class="kw">is</span> <span class="va">None</span>:</span>
+<span id="cb9-7"><a href="#cb9-7" aria-hidden="true" tabindex="-1"></a>            p <span class="op">=</span> py3Dmol.view(width<span class="op">=</span><span class="dv">400</span>, height<span class="op">=</span><span class="dv">400</span>)</span>
+<span id="cb9-8"><a href="#cb9-8" aria-hidden="true" tabindex="-1"></a>        p.removeAllModels()</span>
+<span id="cb9-9"><a href="#cb9-9" aria-hidden="true" tabindex="-1"></a>        <span class="cf">for</span> i,cid <span class="kw">in</span> <span class="bu">enumerate</span>(cids):</span>
+<span id="cb9-10"><a href="#cb9-10" aria-hidden="true" tabindex="-1"></a>            IPythonConsole.addMolToView(m,p,confId<span class="op">=</span>cid)</span>
+<span id="cb9-11"><a href="#cb9-11" aria-hidden="true" tabindex="-1"></a>        <span class="cf">for</span> i,cid <span class="kw">in</span> <span class="bu">enumerate</span>(cids):</span>
+<span id="cb9-12"><a href="#cb9-12" aria-hidden="true" tabindex="-1"></a>            p.setStyle({<span class="st">'model'</span>:i,},</span>
+<span id="cb9-13"><a href="#cb9-13" aria-hidden="true" tabindex="-1"></a>                            {<span class="st">'stick'</span>:{<span class="st">'colorscheme'</span>:colors[i<span class="op">%</span><span class="bu">len</span>(colors)]}})</span>
+<span id="cb9-14"><a href="#cb9-14" aria-hidden="true" tabindex="-1"></a>        p.zoomTo()</span>
+<span id="cb9-15"><a href="#cb9-15" aria-hidden="true" tabindex="-1"></a>        <span class="cf">return</span> p.show()</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+<p>Here are the two conformers aligned using the atom indices:</p>
+<div class="cell" data-executetime="{&quot;end_time&quot;:&quot;2023-03-02T18:21:39.957868Z&quot;,&quot;start_time&quot;:&quot;2023-03-02T18:21:39.858054Z&quot;}" data-execution_count="7">
+<div class="sourceCode cell-code" id="cb10"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb10-1"><a href="#cb10-1" aria-hidden="true" tabindex="-1"></a>d1 <span class="op">=</span> rdMolAlign.AlignMol(m3d,m3d,prbCid<span class="op">=</span>cids[maxi],refCid<span class="op">=</span>cids[maxj])</span>
+<span id="cb10-2"><a href="#cb10-2" aria-hidden="true" tabindex="-1"></a>drawit(m3d,[cids[maxj],cids[maxi]])</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-display">
+<div id="3dmolviewer_16777812999559639" style="position: relative; width: 400px; height: 400px">
+        <p id="3dmolwarning_16777812999559639" style="background-color:#ffcccc;color:black">You appear to be running in JupyterLab (or JavaScript failed to load for some other reason).  You need to install the 3dmol extension: <br>
+        <tt>jupyter labextension install jupyterlab_3dmol</tt></p>
+        </div>
+<script>
+
+var loadScriptAsync = function(uri){
+  return new Promise((resolve, reject) => {
+    //this is to ignore the existence of requirejs amd
+    var savedexports, savedmodule;
+    if (typeof exports !== 'undefined') savedexports = exports;
+    else exports = {}
+    if (typeof module !== 'undefined') savedmodule = module;
+    else module = {}
+
+    var tag = document.createElement('script');
+    tag.src = uri;
+    tag.async = true;
+    tag.onload = () => {
+        exports = savedexports;
+        module = savedmodule;
+        resolve();
+    };
+  var firstScriptTag = document.getElementsByTagName('script')[0];
+  firstScriptTag.parentNode.insertBefore(tag, firstScriptTag);
+});
+};
+
+if(typeof $3Dmolpromise === 'undefined') {
+$3Dmolpromise = null;
+  $3Dmolpromise = loadScriptAsync('https://cdn.jsdelivr.net/npm/3dmol@latest/build/3Dmol-min.min.js');
+}
+
+var viewer_16777812999559639 = null;
+var warn = document.getElementById("3dmolwarning_16777812999559639");
+if(warn) {
+    warn.parentNode.removeChild(warn);
+}
+$3Dmolpromise.then(function() {
+viewer_16777812999559639 = $3Dmol.createViewer(document.getElementById("3dmolviewer_16777812999559639"),{backgroundColor:"white"});
+viewer_16777812999559639.zoomTo();
+    viewer_16777812999559639.removeAllModels();
+    viewer_16777812999559639.addModel("\n     RDKit          3D\n\n 35 38  0  0  0  0  0  0  0  0999 V2000\n   -5.5569   -3.2683    1.6319 O   0  0  0  0  0  0  0  0  0  0  0  0\n   -5.1663   -2.3070    2.3054 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -4.9678   -2.4908    3.6698 O   0  0  0  0  0  1  0  0  0  0  0  0\n   -4.9160   -1.0003    1.6875 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -5.2093   -1.0823    0.1988 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -4.9704    0.1936   -0.4306 N   0  0  0  0  0  0  0  0  0  0  0  0\n   -5.9705    1.0854   -0.5259 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -7.1233    0.7927   -0.0579 O   0  0  0  0  0  0  0  0  0  0  0  0\n   -5.8110    2.3196   -1.1129 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -6.7961    3.1329   -1.1783 O   0  0  0  0  0  0  0  0  0  0  0  0\n   -4.6090    2.6392   -1.6071 N   0  0  0  0  0  0  0  0  0  0  0  0\n   -3.5623    1.7911   -1.5445 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -2.3328    2.1402   -2.0583 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -1.2982    1.2529   -1.9734 C   0  0  0  0  0  0  0  0  0  0  0  0\n    0.0127    1.5567   -2.4905 N   0  0  0  0  0  4  0  0  0  0  0  0\n    0.7024    0.6216   -2.9342 O   0  0  0  0  0  0  0  0  0  0  0  0\n    0.5248    2.8099   -2.5160 O   0  0  0  0  0  1  0  0  0  0  0  0\n   -1.4615    0.0139   -1.3828 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -0.3989   -0.9342   -1.2798 N   0  0  0  0  0  0  0  0  0  0  0  0\n   -0.2828   -2.1404   -1.8450 C   0  0  0  0  0  0  0  0  0  0  0  0\n    0.8978   -2.7382   -1.4926 C   0  0  0  0  0  0  0  0  0  0  0  0\n    1.5542   -1.8507   -0.6587 C   0  0  0  0  0  0  0  0  0  0  0  0\n    2.8507   -2.0959   -0.0573 C   0  0  0  0  0  0  0  0  0  0  0  0\n    3.4605   -1.2786    0.7139 N   0  0  0  0  0  0  0  0  0  0  0  0\n    3.0014   -0.0617    1.0928 O   0  0  0  0  0  0  0  0  0  0  0  0\n    3.7539    0.6181    2.0962 C   0  0  0  0  0  0  0  0  0  0  0  0\n    5.1183    0.8028    1.5391 C   0  0  0  0  0  0  0  0  0  0  0  0\n    6.0436   -0.1946    1.7683 C   0  0  0  0  0  0  0  0  0  0  0  0\n    7.3307   -0.0946    1.2834 C   0  0  0  0  0  0  0  0  0  0  0  0\n    7.6939    1.0147    0.5624 C   0  0  0  0  0  0  0  0  0  0  0  0\n    6.7815    2.0065    0.3320 C   0  0  0  0  0  0  0  0  0  0  0  0\n    5.4854    1.9068    0.8198 C   0  0  0  0  0  0  0  0  0  0  0  0\n    0.7414   -0.7689   -0.5509 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -2.7126   -0.3299   -0.8651 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -3.7693    0.5493   -0.9401 C   0  0  0  0  0  0  0  0  0  0  0  0\n  1  2  2  0\n  2  3  1  0\n  2  4  1  0\n  4  5  1  0\n  5  6  1  0\n  6  7  1  0\n  7  8  2  0\n  7  9  1  0\n  9 10  2  0\n  9 11  1  0\n 11 12  1  0\n 12 13  2  0\n 13 14  1  0\n 14 15  1  0\n 15 16  2  0\n 15 17  1  0\n 14 18  2  0\n 18 19  1  0\n 19 20  1  0\n 20 21  2  0\n 21 22  1  0\n 22 23  1  0\n 23 24  2  3\n 24 25  1  0\n 25 26  1  0\n 26 27  1  0\n 27 28  2  0\n 28 29  1  0\n 29 30  2  0\n 30 31  1  0\n 31 32  2  0\n 22 33  2  0\n 18 34  1  0\n 34 35  2  0\n 35  6  1  0\n 35 12  1  0\n 33 19  1  0\n 32 27  1  0\nM  CHG  3   3  -1  15   1  17  -1\nM  END\n","sdf");
+    viewer_16777812999559639.setStyle({"stick": {}});
+    viewer_16777812999559639.addModel("\n     RDKit          3D\n\n 35 38  0  0  0  0  0  0  0  0999 V2000\n   -5.5768   -3.2594    1.5240 O   0  0  0  0  0  0  0  0  0  0  0  0\n   -5.1620   -2.3290    2.2613 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -4.9988   -2.5822    3.5974 O   0  0  0  0  0  1  0  0  0  0  0  0\n   -4.8762   -1.0145    1.6318 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -5.1567   -1.0458    0.1402 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -4.8709    0.2381   -0.4372 N   0  0  0  0  0  0  0  0  0  0  0  0\n   -5.8493    1.1719   -0.5118 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -6.9818    0.8421   -0.0567 O   0  0  0  0  0  0  0  0  0  0  0  0\n   -5.6064    2.4080   -1.0569 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -6.5292    3.2624   -1.1172 O   0  0  0  0  0  0  0  0  0  0  0  0\n   -4.3927    2.7162   -1.5273 N   0  0  0  0  0  0  0  0  0  0  0  0\n   -3.3950    1.8041   -1.4664 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -2.1444    2.1523   -1.9619 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -1.1402    1.2228   -1.8951 C   0  0  0  0  0  0  0  0  0  0  0  0\n    0.1756    1.5186   -2.3886 N   0  0  0  0  0  4  0  0  0  0  0  0\n    0.6059    2.7014   -2.4170 O   0  0  0  0  0  0  0  0  0  0  0  0\n    0.9445    0.4921   -2.8238 O   0  0  0  0  0  1  0  0  0  0  0  0\n   -1.3778   -0.0216   -1.3482 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -0.3462   -1.0003   -1.2730 N   0  0  0  0  0  0  0  0  0  0  0  0\n   -0.1990   -2.1590   -1.9350 C   0  0  0  0  0  0  0  0  0  0  0  0\n    0.9626   -2.7823   -1.5355 C   0  0  0  0  0  0  0  0  0  0  0  0\n    1.5575   -1.9712   -0.5849 C   0  0  0  0  0  0  0  0  0  0  0  0\n    2.8090   -2.2597    0.0975 C   0  0  0  0  0  0  0  0  0  0  0  0\n    3.3712   -1.5395    0.9656 N   0  0  0  0  0  0  0  0  0  0  0  0\n    2.8621   -0.3616    1.3888 O   0  0  0  0  0  0  0  0  0  0  0  0\n    3.6670    0.4518    2.2437 C   0  0  0  0  0  0  0  0  0  0  0  0\n    4.8973    0.7781    1.5138 C   0  0  0  0  0  0  0  0  0  0  0  0\n    4.9345    1.9140    0.7391 C   0  0  0  0  0  0  0  0  0  0  0  0\n    6.0808    2.2522    0.0357 C   0  0  0  0  0  0  0  0  0  0  0  0\n    7.1723    1.4370    0.1260 C   0  0  0  0  0  0  0  0  0  0  0  0\n    7.1459    0.3070    0.8923 C   0  0  0  0  0  0  0  0  0  0  0  0\n    6.0043   -0.0320    1.5943 C   0  0  0  0  0  0  0  0  0  0  0  0\n    0.7410   -0.9000   -0.4478 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -2.6384   -0.3596   -0.8538 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -3.6518    0.5589   -0.9139 C   0  0  0  0  0  0  0  0  0  0  0  0\n  1  2  2  0\n  2  3  1  0\n  2  4  1  0\n  4  5  1  0\n  5  6  1  0\n  6  7  1  0\n  7  8  2  0\n  7  9  1  0\n  9 10  2  0\n  9 11  1  0\n 11 12  1  0\n 12 13  2  0\n 13 14  1  0\n 14 15  1  0\n 15 16  2  0\n 15 17  1  0\n 14 18  2  0\n 18 19  1  0\n 19 20  1  0\n 20 21  2  0\n 21 22  1  0\n 22 23  1  0\n 23 24  2  3\n 24 25  1  0\n 25 26  1  0\n 26 27  1  0\n 27 28  2  0\n 28 29  1  0\n 29 30  2  0\n 30 31  1  0\n 31 32  2  0\n 22 33  2  0\n 18 34  1  0\n 34 35  2  0\n 35  6  1  0\n 35 12  1  0\n 33 19  1  0\n 32 27  1  0\nM  CHG  3   3  -1  15   1  17  -1\nM  END\n","sdf");
+    viewer_16777812999559639.setStyle({"stick": {}});
+    viewer_16777812999559639.setStyle({"model": 0},{"stick": {"colorscheme": "cyanCarbon"}});
+    viewer_16777812999559639.setStyle({"model": 1},{"stick": {"colorscheme": "redCarbon"}});
+    viewer_16777812999559639.zoomTo();
+viewer_16777812999559639.render();
+});
+</script>
+</div>
+</div>
+<p>And then aligned with GetBestRMS:</p>
+<div class="cell" data-executetime="{&quot;end_time&quot;:&quot;2023-03-02T18:21:40.033487Z&quot;,&quot;start_time&quot;:&quot;2023-03-02T18:21:39.959173Z&quot;}" data-execution_count="8">
+<div class="sourceCode cell-code" id="cb11"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb11-1"><a href="#cb11-1" aria-hidden="true" tabindex="-1"></a>d2 <span class="op">=</span> rdMolAlign.GetBestRMS(m3d,m3d,prbId<span class="op">=</span>cids[maxi],refId<span class="op">=</span>cids[maxj])</span>
+<span id="cb11-2"><a href="#cb11-2" aria-hidden="true" tabindex="-1"></a>drawit(m3d,[cids[maxj],cids[maxi]])</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-display">
+<div id="3dmolviewer_16777813000313938" style="position: relative; width: 400px; height: 400px">
+        <p id="3dmolwarning_16777813000313938" style="background-color:#ffcccc;color:black">You appear to be running in JupyterLab (or JavaScript failed to load for some other reason).  You need to install the 3dmol extension: <br>
+        <tt>jupyter labextension install jupyterlab_3dmol</tt></p>
+        </div>
+<script>
+
+var loadScriptAsync = function(uri){
+  return new Promise((resolve, reject) => {
+    //this is to ignore the existence of requirejs amd
+    var savedexports, savedmodule;
+    if (typeof exports !== 'undefined') savedexports = exports;
+    else exports = {}
+    if (typeof module !== 'undefined') savedmodule = module;
+    else module = {}
+
+    var tag = document.createElement('script');
+    tag.src = uri;
+    tag.async = true;
+    tag.onload = () => {
+        exports = savedexports;
+        module = savedmodule;
+        resolve();
+    };
+  var firstScriptTag = document.getElementsByTagName('script')[0];
+  firstScriptTag.parentNode.insertBefore(tag, firstScriptTag);
+});
+};
+
+if(typeof $3Dmolpromise === 'undefined') {
+$3Dmolpromise = null;
+  $3Dmolpromise = loadScriptAsync('https://cdn.jsdelivr.net/npm/3dmol@latest/build/3Dmol-min.min.js');
+}
+
+var viewer_16777813000313938 = null;
+var warn = document.getElementById("3dmolwarning_16777813000313938");
+if(warn) {
+    warn.parentNode.removeChild(warn);
+}
+$3Dmolpromise.then(function() {
+viewer_16777813000313938 = $3Dmol.createViewer(document.getElementById("3dmolviewer_16777813000313938"),{backgroundColor:"white"});
+viewer_16777813000313938.zoomTo();
+    viewer_16777813000313938.removeAllModels();
+    viewer_16777813000313938.addModel("\n     RDKit          3D\n\n 35 38  0  0  0  0  0  0  0  0999 V2000\n   -5.5569   -3.2683    1.6319 O   0  0  0  0  0  0  0  0  0  0  0  0\n   -5.1663   -2.3070    2.3054 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -4.9678   -2.4908    3.6698 O   0  0  0  0  0  1  0  0  0  0  0  0\n   -4.9160   -1.0003    1.6875 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -5.2093   -1.0823    0.1988 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -4.9704    0.1936   -0.4306 N   0  0  0  0  0  0  0  0  0  0  0  0\n   -5.9705    1.0854   -0.5259 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -7.1233    0.7927   -0.0579 O   0  0  0  0  0  0  0  0  0  0  0  0\n   -5.8110    2.3196   -1.1129 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -6.7961    3.1329   -1.1783 O   0  0  0  0  0  0  0  0  0  0  0  0\n   -4.6090    2.6392   -1.6071 N   0  0  0  0  0  0  0  0  0  0  0  0\n   -3.5623    1.7911   -1.5445 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -2.3328    2.1402   -2.0583 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -1.2982    1.2529   -1.9734 C   0  0  0  0  0  0  0  0  0  0  0  0\n    0.0127    1.5567   -2.4905 N   0  0  0  0  0  4  0  0  0  0  0  0\n    0.7024    0.6216   -2.9342 O   0  0  0  0  0  0  0  0  0  0  0  0\n    0.5248    2.8099   -2.5160 O   0  0  0  0  0  1  0  0  0  0  0  0\n   -1.4615    0.0139   -1.3828 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -0.3989   -0.9342   -1.2798 N   0  0  0  0  0  0  0  0  0  0  0  0\n   -0.2828   -2.1404   -1.8450 C   0  0  0  0  0  0  0  0  0  0  0  0\n    0.8978   -2.7382   -1.4926 C   0  0  0  0  0  0  0  0  0  0  0  0\n    1.5542   -1.8507   -0.6587 C   0  0  0  0  0  0  0  0  0  0  0  0\n    2.8507   -2.0959   -0.0573 C   0  0  0  0  0  0  0  0  0  0  0  0\n    3.4605   -1.2786    0.7139 N   0  0  0  0  0  0  0  0  0  0  0  0\n    3.0014   -0.0617    1.0928 O   0  0  0  0  0  0  0  0  0  0  0  0\n    3.7539    0.6181    2.0962 C   0  0  0  0  0  0  0  0  0  0  0  0\n    5.1183    0.8028    1.5391 C   0  0  0  0  0  0  0  0  0  0  0  0\n    6.0436   -0.1946    1.7683 C   0  0  0  0  0  0  0  0  0  0  0  0\n    7.3307   -0.0946    1.2834 C   0  0  0  0  0  0  0  0  0  0  0  0\n    7.6939    1.0147    0.5624 C   0  0  0  0  0  0  0  0  0  0  0  0\n    6.7815    2.0065    0.3320 C   0  0  0  0  0  0  0  0  0  0  0  0\n    5.4854    1.9068    0.8198 C   0  0  0  0  0  0  0  0  0  0  0  0\n    0.7414   -0.7689   -0.5509 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -2.7126   -0.3299   -0.8651 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -3.7693    0.5493   -0.9401 C   0  0  0  0  0  0  0  0  0  0  0  0\n  1  2  2  0\n  2  3  1  0\n  2  4  1  0\n  4  5  1  0\n  5  6  1  0\n  6  7  1  0\n  7  8  2  0\n  7  9  1  0\n  9 10  2  0\n  9 11  1  0\n 11 12  1  0\n 12 13  2  0\n 13 14  1  0\n 14 15  1  0\n 15 16  2  0\n 15 17  1  0\n 14 18  2  0\n 18 19  1  0\n 19 20  1  0\n 20 21  2  0\n 21 22  1  0\n 22 23  1  0\n 23 24  2  3\n 24 25  1  0\n 25 26  1  0\n 26 27  1  0\n 27 28  2  0\n 28 29  1  0\n 29 30  2  0\n 30 31  1  0\n 31 32  2  0\n 22 33  2  0\n 18 34  1  0\n 34 35  2  0\n 35  6  1  0\n 35 12  1  0\n 33 19  1  0\n 32 27  1  0\nM  CHG  3   3  -1  15   1  17  -1\nM  END\n","sdf");
+    viewer_16777813000313938.setStyle({"stick": {}});
+    viewer_16777813000313938.addModel("\n     RDKit          3D\n\n 35 38  0  0  0  0  0  0  0  0999 V2000\n   -5.5909   -3.2400    1.5217 O   0  0  0  0  0  0  0  0  0  0  0  0\n   -5.1736   -2.3102    2.2585 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -5.0129   -2.5625    3.5950 O   0  0  0  0  0  1  0  0  0  0  0  0\n   -4.8824   -0.9974    1.6279 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -5.1612   -1.0293    0.1360 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -4.8703    0.2530   -0.4424 N   0  0  0  0  0  0  0  0  0  0  0  0\n   -5.8452    1.1901   -0.5192 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -6.9795    0.8648   -0.0651 O   0  0  0  0  0  0  0  0  0  0  0  0\n   -5.5973    2.4248   -1.0653 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -6.5170    3.2824   -1.1276 O   0  0  0  0  0  0  0  0  0  0  0  0\n   -4.3819    2.7281   -1.5346 N   0  0  0  0  0  0  0  0  0  0  0  0\n   -3.3876    1.8126   -1.4716 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -2.1352    2.1559   -1.9659 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -1.1343    1.2230   -1.8969 C   0  0  0  0  0  0  0  0  0  0  0  0\n    0.1831    1.5135   -2.3892 N   0  0  0  0  0  4  0  0  0  0  0  0\n    0.6176    2.6948   -2.4183 O   0  0  0  0  0  0  0  0  0  0  0  0\n    0.9488    0.4838   -2.8223 O   0  0  0  0  0  1  0  0  0  0  0  0\n   -1.3770   -0.0201   -1.3490 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -0.3489   -1.0023   -1.2715 N   0  0  0  0  0  0  0  0  0  0  0  0\n   -0.2050   -2.1622   -1.9321 C   0  0  0  0  0  0  0  0  0  0  0  0\n    0.9539   -2.7892   -1.5305 C   0  0  0  0  0  0  0  0  0  0  0  0\n    1.5505   -1.9791   -0.5801 C   0  0  0  0  0  0  0  0  0  0  0  0\n    2.8002   -2.2714    0.1042 C   0  0  0  0  0  0  0  0  0  0  0  0\n    3.3638   -1.5522    0.9721 N   0  0  0  0  0  0  0  0  0  0  0  0\n    2.8584   -0.3721    1.3934 O   0  0  0  0  0  0  0  0  0  0  0  0\n    3.6652    0.4394    2.2485 C   0  0  0  0  0  0  0  0  0  0  0  0\n    4.8975    0.7605    1.5197 C   0  0  0  0  0  0  0  0  0  0  0  0\n    4.9396    1.8955    0.7438 C   0  0  0  0  0  0  0  0  0  0  0  0\n    6.0879    2.2289    0.0415 C   0  0  0  0  0  0  0  0  0  0  0  0\n    7.1764    1.4100    0.1339 C   0  0  0  0  0  0  0  0  0  0  0  0\n    7.1452    0.2809    0.9014 C   0  0  0  0  0  0  0  0  0  0  0  0\n    6.0015   -0.0534    1.6024 C   0  0  0  0  0  0  0  0  0  0  0  0\n    0.7376   -0.9050   -0.4451 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -2.6394   -0.3531   -0.8557 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -3.6495    0.5690   -0.9180 C   0  0  0  0  0  0  0  0  0  0  0  0\n  1  2  2  0\n  2  3  1  0\n  2  4  1  0\n  4  5  1  0\n  5  6  1  0\n  6  7  1  0\n  7  8  2  0\n  7  9  1  0\n  9 10  2  0\n  9 11  1  0\n 11 12  1  0\n 12 13  2  0\n 13 14  1  0\n 14 15  1  0\n 15 16  2  0\n 15 17  1  0\n 14 18  2  0\n 18 19  1  0\n 19 20  1  0\n 20 21  2  0\n 21 22  1  0\n 22 23  1  0\n 23 24  2  3\n 24 25  1  0\n 25 26  1  0\n 26 27  1  0\n 27 28  2  0\n 28 29  1  0\n 29 30  2  0\n 30 31  1  0\n 31 32  2  0\n 22 33  2  0\n 18 34  1  0\n 34 35  2  0\n 35  6  1  0\n 35 12  1  0\n 33 19  1  0\n 32 27  1  0\nM  CHG  3   3  -1  15   1  17  -1\nM  END\n","sdf");
+    viewer_16777813000313938.setStyle({"stick": {}});
+    viewer_16777813000313938.setStyle({"model": 0},{"stick": {"colorscheme": "cyanCarbon"}});
+    viewer_16777813000313938.setStyle({"model": 1},{"stick": {"colorscheme": "redCarbon"}});
+    viewer_16777813000313938.zoomTo();
+viewer_16777813000313938.render();
+});
+</script>
+</div>
+</div>
+<p>The alignments don’t actually look all that different. The difference in RMSD is due to the atoms in the nitro group and the terminal phenyl ring: <code>GetBestRMS()</code> recognizes that the symmetry while <code>AlignMol()</code> just matches atoms by their indices.</p>
+</section>
+<section id="cluster-them" class="level1">
+<h1>Cluster Them</h1>
+<p>Now generate the RMSD distance matrix using <code>GetBestRMS()</code>. Note that as of the 2022.09 release cycle the convenience function <code>AllChem.GetConformerRMSMatrix()</code> does not take symmetry into account, so we need to build the symmetric matrix (we just store the lower triangle) manually:</p>
+<div class="cell" data-executetime="{&quot;end_time&quot;:&quot;2023-03-02T18:21:49.591567Z&quot;,&quot;start_time&quot;:&quot;2023-03-02T18:21:40.034806Z&quot;}" data-execution_count="9">
+<div class="sourceCode cell-code" id="cb12"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb12-1"><a href="#cb12-1" aria-hidden="true" tabindex="-1"></a>dists <span class="op">=</span> []</span>
+<span id="cb12-2"><a href="#cb12-2" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> i <span class="kw">in</span> <span class="bu">range</span>(<span class="bu">len</span>(cids)):</span>
+<span id="cb12-3"><a href="#cb12-3" aria-hidden="true" tabindex="-1"></a>    <span class="cf">for</span> j <span class="kw">in</span> <span class="bu">range</span>(i):</span>
+<span id="cb12-4"><a href="#cb12-4" aria-hidden="true" tabindex="-1"></a>        dists.append(rdMolAlign.GetBestRMS(m3d,m3d,i,j))</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+<p>Now we can do Butina clustering. We use a distance threshold of 1.5 Å:</p>
+<div class="cell" data-executetime="{&quot;end_time&quot;:&quot;2023-03-02T18:21:49.602008Z&quot;,&quot;start_time&quot;:&quot;2023-03-02T18:21:49.592593Z&quot;}" data-execution_count="10">
+<div class="sourceCode cell-code" id="cb13"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb13-1"><a href="#cb13-1" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> rdkit.ML.Cluster <span class="im">import</span> Butina</span>
+<span id="cb13-2"><a href="#cb13-2" aria-hidden="true" tabindex="-1"></a>clusts <span class="op">=</span> Butina.ClusterData(dists, <span class="bu">len</span>(cids), <span class="fl">1.5</span>, isDistData<span class="op">=</span><span class="va">True</span>, reordering<span class="op">=</span><span class="va">True</span>)</span>
+<span id="cb13-3"><a href="#cb13-3" aria-hidden="true" tabindex="-1"></a><span class="bu">len</span>(clusts)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-display" data-execution_count="10">
+<pre><code>10</code></pre>
+</div>
+</div>
+<p>That’s it. The 300 conformers form 10 clusters. Let’s visualize the centroids (the first conformer in each cluster)</p>
+<p>To make visualization of the clusters easier to interpret, align all the conformers to the rigid 6-6 core:</p>
+<div class="cell" data-executetime="{&quot;end_time&quot;:&quot;2023-03-02T18:21:50.128378Z&quot;,&quot;start_time&quot;:&quot;2023-03-02T18:21:49.602888Z&quot;}" data-execution_count="11">
+<div class="sourceCode cell-code" id="cb15"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb15-1"><a href="#cb15-1" aria-hidden="true" tabindex="-1"></a>m</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-display" data-execution_count="11">
+<p><img src="2023-03-02-clustering-conformers_files/figure-html/cell-12-output-1.png" class="img-fluid"></p>
+</div>
+</div>
+<div class="cell" data-executetime="{&quot;end_time&quot;:&quot;2023-03-02T18:21:50.239372Z&quot;,&quot;start_time&quot;:&quot;2023-03-02T18:21:50.132165Z&quot;}" data-execution_count="12">
+<div class="sourceCode cell-code" id="cb16"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb16-1"><a href="#cb16-1" aria-hidden="true" tabindex="-1"></a>core <span class="op">=</span> Chem.MolFromSmiles(<span class="st">'O=C1C(=O)N(C)c2cc(N)c(N)cc2N1'</span>)</span>
+<span id="cb16-2"><a href="#cb16-2" aria-hidden="true" tabindex="-1"></a>core</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-display" data-execution_count="12">
+<p><img src="2023-03-02-clustering-conformers_files/figure-html/cell-13-output-1.png" class="img-fluid"></p>
+</div>
+</div>
+<div class="cell" data-executetime="{&quot;end_time&quot;:&quot;2023-03-02T18:21:50.306462Z&quot;,&quot;start_time&quot;:&quot;2023-03-02T18:21:50.243581Z&quot;}" data-execution_count="13">
+<div class="sourceCode cell-code" id="cb17"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb17-1"><a href="#cb17-1" aria-hidden="true" tabindex="-1"></a>rdMolAlign.AlignMolConformers(m3d,atomIds <span class="op">=</span> m3d.GetSubstructMatch(core))</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+<p>Now look at the first five cluster centroids;</p>
+<div class="cell" data-executetime="{&quot;end_time&quot;:&quot;2023-03-02T18:21:50.387066Z&quot;,&quot;start_time&quot;:&quot;2023-03-02T18:21:50.310811Z&quot;}" data-execution_count="14">
+<div class="sourceCode cell-code" id="cb18"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb18-1"><a href="#cb18-1" aria-hidden="true" tabindex="-1"></a>centroids <span class="op">=</span> [x[<span class="dv">0</span>] <span class="cf">for</span> x <span class="kw">in</span> clusts]</span>
+<span id="cb18-2"><a href="#cb18-2" aria-hidden="true" tabindex="-1"></a>drawit(m3d,centroids[:<span class="dv">5</span>])</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-display">
+<div id="3dmolviewer_16777813103808172" style="position: relative; width: 400px; height: 400px">
+        <p id="3dmolwarning_16777813103808172" style="background-color:#ffcccc;color:black">You appear to be running in JupyterLab (or JavaScript failed to load for some other reason).  You need to install the 3dmol extension: <br>
+        <tt>jupyter labextension install jupyterlab_3dmol</tt></p>
+        </div>
+<script>
+
+var loadScriptAsync = function(uri){
+  return new Promise((resolve, reject) => {
+    //this is to ignore the existence of requirejs amd
+    var savedexports, savedmodule;
+    if (typeof exports !== 'undefined') savedexports = exports;
+    else exports = {}
+    if (typeof module !== 'undefined') savedmodule = module;
+    else module = {}
+
+    var tag = document.createElement('script');
+    tag.src = uri;
+    tag.async = true;
+    tag.onload = () => {
+        exports = savedexports;
+        module = savedmodule;
+        resolve();
+    };
+  var firstScriptTag = document.getElementsByTagName('script')[0];
+  firstScriptTag.parentNode.insertBefore(tag, firstScriptTag);
+});
+};
+
+if(typeof $3Dmolpromise === 'undefined') {
+$3Dmolpromise = null;
+  $3Dmolpromise = loadScriptAsync('https://cdn.jsdelivr.net/npm/3dmol@latest/build/3Dmol-min.min.js');
+}
+
+var viewer_16777813103808172 = null;
+var warn = document.getElementById("3dmolwarning_16777813103808172");
+if(warn) {
+    warn.parentNode.removeChild(warn);
+}
+$3Dmolpromise.then(function() {
+viewer_16777813103808172 = $3Dmol.createViewer(document.getElementById("3dmolviewer_16777813103808172"),{backgroundColor:"white"});
+viewer_16777813103808172.zoomTo();
+    viewer_16777813103808172.removeAllModels();
+    viewer_16777813103808172.addModel("\n     RDKit          3D\n\n 35 38  0  0  0  0  0  0  0  0999 V2000\n   -5.2527   -3.2471    2.9715 O   0  0  0  0  0  0  0  0  0  0  0  0\n   -5.2476   -2.0418    2.5783 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -5.2054   -1.0051    3.4795 O   0  0  0  0  0  1  0  0  0  0  0  0\n   -5.2883   -1.7861    1.1176 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -5.2749   -0.3005    0.8981 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -5.3123    0.0754   -0.4855 N   0  0  0  0  0  0  0  0  0  0  0  0\n   -6.5304    0.2881   -1.0581 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -7.5884    0.1525   -0.3678 O   0  0  0  0  0  0  0  0  0  0  0  0\n   -6.5427    0.6461   -2.3827 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -7.6549    0.8563   -2.9646 O   0  0  0  0  0  0  0  0  0  0  0  0\n   -5.3964    0.7762   -3.0681 N   0  0  0  0  0  0  0  0  0  0  0  0\n   -4.1855    0.5639   -2.4971 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -3.0180    0.7018   -3.2328 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -1.7758    0.4852   -2.6713 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -0.6074    0.6393   -3.4659 N   0  0  0  0  0  4  0  0  0  0  0  0\n   -0.5580    1.4020   -4.4502 O   0  0  0  0  0  0  0  0  0  0  0  0\n    0.5281   -0.0702   -3.1578 O   0  0  0  0  0  1  0  0  0  0  0  0\n   -1.7415    0.1250   -1.3458 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -0.4463   -0.1056   -0.7451 N   0  0  0  0  0  0  0  0  0  0  0  0\n   -0.0154   -1.3007   -0.3052 C   0  0  0  0  0  0  0  0  0  0  0  0\n    1.2665   -1.1642    0.2113 C   0  0  0  0  0  0  0  0  0  0  0  0\n    1.6066    0.1450    0.0749 C   0  0  0  0  0  0  0  0  0  0  0  0\n    2.8355    0.8343    0.4494 C   0  0  0  0  0  0  0  0  0  0  0  0\n    3.8118    0.2394    0.9915 N   0  0  0  0  0  0  0  0  0  0  0  0\n    3.8285   -1.0804    1.2810 O   0  0  0  0  0  0  0  0  0  0  0  0\n    4.7510   -1.8938    0.5463 C   0  0  0  0  0  0  0  0  0  0  0  0\n    6.1218   -1.4036    0.7962 C   0  0  0  0  0  0  0  0  0  0  0  0\n    6.6721   -0.4344   -0.0203 C   0  0  0  0  0  0  0  0  0  0  0  0\n    7.9485    0.0275    0.2059 C   0  0  0  0  0  0  0  0  0  0  0  0\n    8.6827   -0.4895    1.2648 C   0  0  0  0  0  0  0  0  0  0  0  0\n    8.1319   -1.4507    2.0714 C   0  0  0  0  0  0  0  0  0  0  0  0\n    6.8523   -1.9144    1.8457 C   0  0  0  0  0  0  0  0  0  0  0  0\n    0.5072    0.7743   -0.5282 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -2.9033   -0.0130   -0.6103 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -4.1639    0.2030   -1.1636 C   0  0  0  0  0  0  0  0  0  0  0  0\n  1  2  2  0\n  2  3  1  0\n  2  4  1  0\n  4  5  1  0\n  5  6  1  0\n  6  7  1  0\n  7  8  2  0\n  7  9  1  0\n  9 10  2  0\n  9 11  1  0\n 11 12  1  0\n 12 13  2  0\n 13 14  1  0\n 14 15  1  0\n 15 16  2  0\n 15 17  1  0\n 14 18  2  0\n 18 19  1  0\n 19 20  1  0\n 20 21  2  0\n 21 22  1  0\n 22 23  1  0\n 23 24  2  3\n 24 25  1  0\n 25 26  1  0\n 26 27  1  0\n 27 28  2  0\n 28 29  1  0\n 29 30  2  0\n 30 31  1  0\n 31 32  2  0\n 22 33  2  0\n 18 34  1  0\n 34 35  2  0\n 35  6  1  0\n 35 12  1  0\n 33 19  1  0\n 32 27  1  0\nM  CHG  3   3  -1  15   1  17  -1\nM  END\n","sdf");
+    viewer_16777813103808172.setStyle({"stick": {}});
+    viewer_16777813103808172.addModel("\n     RDKit          3D\n\n 35 38  0  0  0  0  0  0  0  0999 V2000\n   -7.2695    1.5988    2.3238 O   0  0  0  0  0  0  0  0  0  0  0  0\n   -6.1864    1.8403    1.7391 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -6.0620    3.0171    1.0230 O   0  0  0  0  0  1  0  0  0  0  0  0\n   -5.0875    0.8837    1.8243 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -5.2325   -0.3043    0.8908 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -5.2928    0.0742   -0.4986 N   0  0  0  0  0  0  0  0  0  0  0  0\n   -6.4963    0.2886   -1.0587 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -7.5564    0.1675   -0.4024 O   0  0  0  0  0  0  0  0  0  0  0  0\n   -6.5600    0.6479   -2.3789 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -7.6736    0.8645   -2.9648 O   0  0  0  0  0  0  0  0  0  0  0  0\n   -5.4301    0.7806   -3.0914 N   0  0  0  0  0  0  0  0  0  0  0  0\n   -4.2355    0.5643   -2.5211 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -3.0539    0.7027   -3.2458 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -1.8287    0.4845   -2.6550 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -0.6392    0.6324   -3.4185 N   0  0  0  0  0  4  0  0  0  0  0  0\n    0.4067    1.0191   -2.8712 O   0  0  0  0  0  0  0  0  0  0  0  0\n   -0.7065    0.3330   -4.7566 O   0  0  0  0  0  1  0  0  0  0  0  0\n   -1.7073    0.1226   -1.3330 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -0.4366   -0.1100   -0.7016 N   0  0  0  0  0  0  0  0  0  0  0  0\n    0.2700    0.7135    0.0929 C   0  0  0  0  0  0  0  0  0  0  0  0\n    1.4384    0.0759    0.4783 C   0  0  0  0  0  0  0  0  0  0  0  0\n    1.4553   -1.1751   -0.0925 C   0  0  0  0  0  0  0  0  0  0  0  0\n    2.4814   -2.2006    0.0316 C   0  0  0  0  0  0  0  0  0  0  0  0\n    2.3734   -3.3345   -0.5583 N   0  0  0  0  0  0  0  0  0  0  0  0\n    3.3591   -4.2801   -0.4205 O   0  0  0  0  0  0  0  0  0  0  0  0\n    4.6177   -4.1553   -1.0551 C   0  0  0  0  0  0  0  0  0  0  0  0\n    5.4155   -5.3480   -0.6866 C   0  0  0  0  0  0  0  0  0  0  0  0\n    5.3608   -6.4768   -1.4735 C   0  0  0  0  0  0  0  0  0  0  0  0\n    6.1340   -7.5646   -1.0710 C   0  0  0  0  0  0  0  0  0  0  0  0\n    6.9156   -7.5116    0.0607 C   0  0  0  0  0  0  0  0  0  0  0  0\n    6.9709   -6.3919    0.8423 C   0  0  0  0  0  0  0  0  0  0  0  0\n    6.1991   -5.2973    0.4463 C   0  0  0  0  0  0  0  0  0  0  0  0\n    0.2684   -1.2490   -0.8193 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -2.8821   -0.0168   -0.6066 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -4.1168    0.1952   -1.1749 C   0  0  0  0  0  0  0  0  0  0  0  0\n  1  2  2  0\n  2  3  1  0\n  2  4  1  0\n  4  5  1  0\n  5  6  1  0\n  6  7  1  0\n  7  8  2  0\n  7  9  1  0\n  9 10  2  0\n  9 11  1  0\n 11 12  1  0\n 12 13  2  0\n 13 14  1  0\n 14 15  1  0\n 15 16  2  0\n 15 17  1  0\n 14 18  2  0\n 18 19  1  0\n 19 20  1  0\n 20 21  2  0\n 21 22  1  0\n 22 23  1  0\n 23 24  2  3\n 24 25  1  0\n 25 26  1  0\n 26 27  1  0\n 27 28  2  0\n 28 29  1  0\n 29 30  2  0\n 30 31  1  0\n 31 32  2  0\n 22 33  2  0\n 18 34  1  0\n 34 35  2  0\n 35  6  1  0\n 35 12  1  0\n 33 19  1  0\n 32 27  1  0\nM  CHG  3   3  -1  15   1  17  -1\nM  END\n","sdf");
+    viewer_16777813103808172.setStyle({"stick": {}});
+    viewer_16777813103808172.addModel("\n     RDKit          3D\n\n 35 38  0  0  0  0  0  0  0  0999 V2000\n   -5.2110   -3.5686    2.5489 O   0  0  0  0  0  0  0  0  0  0  0  0\n   -5.1880   -2.3216    2.3811 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -5.1138   -1.5254    3.5136 O   0  0  0  0  0  1  0  0  0  0  0  0\n   -5.2416   -1.8226    1.0025 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -5.2082   -0.3126    0.9221 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -5.2650    0.0629   -0.4526 N   0  0  0  0  0  0  0  0  0  0  0  0\n   -6.4614    0.2896   -1.0738 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -7.4978    0.1543   -0.3829 O   0  0  0  0  0  0  0  0  0  0  0  0\n   -6.5430    0.6509   -2.3974 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -7.6609    0.8525   -2.9399 O   0  0  0  0  0  0  0  0  0  0  0  0\n   -5.4141    0.7891   -3.1158 N   0  0  0  0  0  0  0  0  0  0  0  0\n   -4.2138    0.5757   -2.5451 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -3.0468    0.7112   -3.2677 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -1.8209    0.4875   -2.6710 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -0.6025    0.6184   -3.3898 N   0  0  0  0  0  4  0  0  0  0  0  0\n   -0.6278    0.4254   -4.6317 O   0  0  0  0  0  0  0  0  0  0  0  0\n    0.5971    0.9397   -2.8269 O   0  0  0  0  0  1  0  0  0  0  0  0\n   -1.7841    0.1288   -1.3489 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -0.5376   -0.1047   -0.7157 N   0  0  0  0  0  0  0  0  0  0  0  0\n    0.1430   -1.2538   -0.5972 C   0  0  0  0  0  0  0  0  0  0  0  0\n    1.3189   -1.0571    0.0921 C   0  0  0  0  0  0  0  0  0  0  0  0\n    1.3511    0.2896    0.4090 C   0  0  0  0  0  0  0  0  0  0  0  0\n    2.3776    1.0165    1.1336 C   0  0  0  0  0  0  0  0  0  0  0  0\n    2.3589    2.2586    1.3989 N   0  0  0  0  0  0  0  0  0  0  0  0\n    1.4235    3.1770    1.0895 O   0  0  0  0  0  0  0  0  0  0  0  0\n    1.6149    4.1975    0.1044 C   0  0  0  0  0  0  0  0  0  0  0  0\n    2.7583    5.0764    0.4397 C   0  0  0  0  0  0  0  0  0  0  0  0\n    2.6103    6.2210    1.2000 C   0  0  0  0  0  0  0  0  0  0  0  0\n    3.7010    7.0165    1.4920 C   0  0  0  0  0  0  0  0  0  0  0  0\n    4.9581    6.6724    1.0232 C   0  0  0  0  0  0  0  0  0  0  0  0\n    5.1387    5.5266    0.2555 C   0  0  0  0  0  0  0  0  0  0  0  0\n    4.0280    4.7562   -0.0164 C   0  0  0  0  0  0  0  0  0  0  0  0\n    0.2044    0.8466   -0.0968 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -2.9368   -0.0187   -0.5847 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -4.1490    0.2087   -1.1974 C   0  0  0  0  0  0  0  0  0  0  0  0\n  1  2  2  0\n  2  3  1  0\n  2  4  1  0\n  4  5  1  0\n  5  6  1  0\n  6  7  1  0\n  7  8  2  0\n  7  9  1  0\n  9 10  2  0\n  9 11  1  0\n 11 12  1  0\n 12 13  2  0\n 13 14  1  0\n 14 15  1  0\n 15 16  2  0\n 15 17  1  0\n 14 18  2  0\n 18 19  1  0\n 19 20  1  0\n 20 21  2  0\n 21 22  1  0\n 22 23  1  0\n 23 24  2  3\n 24 25  1  0\n 25 26  1  0\n 26 27  1  0\n 27 28  2  0\n 28 29  1  0\n 29 30  2  0\n 30 31  1  0\n 31 32  2  0\n 22 33  2  0\n 18 34  1  0\n 34 35  2  0\n 35  6  1  0\n 35 12  1  0\n 33 19  1  0\n 32 27  1  0\nM  CHG  3   3  -1  15   1  17  -1\nM  END\n","sdf");
+    viewer_16777813103808172.setStyle({"stick": {}});
+    viewer_16777813103808172.addModel("\n     RDKit          3D\n\n 35 38  0  0  0  0  0  0  0  0999 V2000\n   -5.1075   -0.8023    3.5093 O   0  0  0  0  0  0  0  0  0  0  0  0\n   -5.0756    0.4254    3.2389 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -4.9866    1.2946    4.3177 O   0  0  0  0  0  1  0  0  0  0  0  0\n   -5.1304    0.9107    1.8358 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -5.2308   -0.3105    0.9211 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -5.2855    0.0651   -0.4594 N   0  0  0  0  0  0  0  0  0  0  0  0\n   -6.4583    0.2939   -1.0896 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -7.5072    0.1584   -0.3923 O   0  0  0  0  0  0  0  0  0  0  0  0\n   -6.5670    0.6546   -2.4057 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -7.6719    0.8631   -2.9733 O   0  0  0  0  0  0  0  0  0  0  0  0\n   -5.4212    0.7826   -3.0937 N   0  0  0  0  0  0  0  0  0  0  0  0\n   -4.2108    0.5653   -2.5145 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -3.0622    0.7086   -3.2595 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -1.8432    0.4862   -2.6608 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -0.6374    0.6255   -3.3992 N   0  0  0  0  0  4  0  0  0  0  0  0\n   -0.6132    1.4056   -4.3702 O   0  0  0  0  0  0  0  0  0  0  0  0\n    0.4751   -0.0942   -3.0368 O   0  0  0  0  0  1  0  0  0  0  0  0\n   -1.7232    0.1230   -1.3356 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -0.4741   -0.1086   -0.7173 N   0  0  0  0  0  0  0  0  0  0  0  0\n    0.4811    0.7328   -0.3806 C   0  0  0  0  0  0  0  0  0  0  0  0\n    1.5430    0.0602    0.2121 C   0  0  0  0  0  0  0  0  0  0  0  0\n    1.2171   -1.2577    0.2374 C   0  0  0  0  0  0  0  0  0  0  0  0\n    2.0069   -2.3398    0.7669 C   0  0  0  0  0  0  0  0  0  0  0  0\n    3.1317   -2.1918    1.3010 N   0  0  0  0  0  0  0  0  0  0  0  0\n    3.8978   -1.1273    1.5398 O   0  0  0  0  0  0  0  0  0  0  0  0\n    3.9731   -0.4078    2.7512 C   0  0  0  0  0  0  0  0  0  0  0  0\n    4.4164   -1.2607    3.8805 C   0  0  0  0  0  0  0  0  0  0  0  0\n    3.4446   -1.9174    4.5987 C   0  0  0  0  0  0  0  0  0  0  0  0\n    3.7606   -2.7311    5.6605 C   0  0  0  0  0  0  0  0  0  0  0  0\n    5.0753   -2.9104    6.0354 C   0  0  0  0  0  0  0  0  0  0  0  0\n    6.0493   -2.2359    5.2952 C   0  0  0  0  0  0  0  0  0  0  0  0\n    5.7275   -1.4338    4.2474 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -0.0512   -1.3296   -0.3519 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -2.9024   -0.0113   -0.6179 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -4.1466    0.1976   -1.1628 C   0  0  0  0  0  0  0  0  0  0  0  0\n  1  2  2  0\n  2  3  1  0\n  2  4  1  0\n  4  5  1  0\n  5  6  1  0\n  6  7  1  0\n  7  8  2  0\n  7  9  1  0\n  9 10  2  0\n  9 11  1  0\n 11 12  1  0\n 12 13  2  0\n 13 14  1  0\n 14 15  1  0\n 15 16  2  0\n 15 17  1  0\n 14 18  2  0\n 18 19  1  0\n 19 20  1  0\n 20 21  2  0\n 21 22  1  0\n 22 23  1  0\n 23 24  2  3\n 24 25  1  0\n 25 26  1  0\n 26 27  1  0\n 27 28  2  0\n 28 29  1  0\n 29 30  2  0\n 30 31  1  0\n 31 32  2  0\n 22 33  2  0\n 18 34  1  0\n 34 35  2  0\n 35  6  1  0\n 35 12  1  0\n 33 19  1  0\n 32 27  1  0\nM  CHG  3   3  -1  15   1  17  -1\nM  END\n","sdf");
+    viewer_16777813103808172.setStyle({"stick": {}});
+    viewer_16777813103808172.addModel("\n     RDKit          3D\n\n 35 38  0  0  0  0  0  0  0  0999 V2000\n   -4.9367   -3.9079    1.3997 O   0  0  0  0  0  0  0  0  0  0  0  0\n   -4.7905   -2.7693    0.7646 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -3.9025   -2.8636   -0.2733 O   0  0  0  0  0  1  0  0  0  0  0  0\n   -5.5632   -1.6797    1.2588 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -5.2837   -0.2738    0.8930 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -5.3006    0.0577   -0.4933 N   0  0  0  0  0  0  0  0  0  0  0  0\n   -6.5246    0.2889   -1.0653 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -7.5800    0.1598   -0.3600 O   0  0  0  0  0  0  0  0  0  0  0  0\n   -6.5517    0.6511   -2.3814 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -7.6552    0.8693   -2.9346 O   0  0  0  0  0  0  0  0  0  0  0  0\n   -5.4064    0.7741   -3.0833 N   0  0  0  0  0  0  0  0  0  0  0  0\n   -4.2106    0.5491   -2.5238 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -3.0474    0.6971   -3.2371 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -1.7841    0.4892   -2.6631 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -0.6028    0.6507   -3.4234 N   0  0  0  0  0  4  0  0  0  0  0  0\n   -0.7340    0.4388   -4.6671 O   0  0  0  0  0  0  0  0  0  0  0  0\n    0.6147    1.0000   -2.9409 O   0  0  0  0  0  1  0  0  0  0  0  0\n   -1.7108    0.1256   -1.3476 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -0.4412   -0.1008   -0.7207 N   0  0  0  0  0  0  0  0  0  0  0  0\n    0.0640    0.5281    0.3601 C   0  0  0  0  0  0  0  0  0  0  0  0\n    1.2911    0.0462    0.6787 C   0  0  0  0  0  0  0  0  0  0  0  0\n    1.5918   -0.9486   -0.2503 C   0  0  0  0  0  0  0  0  0  0  0  0\n    2.8155   -1.7133   -0.2448 C   0  0  0  0  0  0  0  0  0  0  0  0\n    3.0820   -2.6064   -1.0988 N   0  0  0  0  0  0  0  0  0  0  0  0\n    2.2168   -2.9136   -2.1039 O   0  0  0  0  0  0  0  0  0  0  0  0\n    2.6748   -2.5556   -3.4234 C   0  0  0  0  0  0  0  0  0  0  0  0\n    3.9336   -3.3175   -3.6050 C   0  0  0  0  0  0  0  0  0  0  0  0\n    3.8910   -4.5616   -4.1775 C   0  0  0  0  0  0  0  0  0  0  0  0\n    5.0418   -5.3241   -4.3641 C   0  0  0  0  0  0  0  0  0  0  0  0\n    6.2490   -4.7987   -3.9565 C   0  0  0  0  0  0  0  0  0  0  0  0\n    6.3037   -3.5506   -3.3808 C   0  0  0  0  0  0  0  0  0  0  0  0\n    5.1368   -2.8055   -3.2043 C   0  0  0  0  0  0  0  0  0  0  0  0\n    0.5038   -0.9998   -1.0822 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -2.8927   -0.0211   -0.6412 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -4.1499    0.1769   -1.1788 C   0  0  0  0  0  0  0  0  0  0  0  0\n  1  2  2  0\n  2  3  1  0\n  2  4  1  0\n  4  5  1  0\n  5  6  1  0\n  6  7  1  0\n  7  8  2  0\n  7  9  1  0\n  9 10  2  0\n  9 11  1  0\n 11 12  1  0\n 12 13  2  0\n 13 14  1  0\n 14 15  1  0\n 15 16  2  0\n 15 17  1  0\n 14 18  2  0\n 18 19  1  0\n 19 20  1  0\n 20 21  2  0\n 21 22  1  0\n 22 23  1  0\n 23 24  2  3\n 24 25  1  0\n 25 26  1  0\n 26 27  1  0\n 27 28  2  0\n 28 29  1  0\n 29 30  2  0\n 30 31  1  0\n 31 32  2  0\n 22 33  2  0\n 18 34  1  0\n 34 35  2  0\n 35  6  1  0\n 35 12  1  0\n 33 19  1  0\n 32 27  1  0\nM  CHG  3   3  -1  15   1  17  -1\nM  END\n","sdf");
+    viewer_16777813103808172.setStyle({"stick": {}});
+    viewer_16777813103808172.setStyle({"model": 0},{"stick": {"colorscheme": "cyanCarbon"}});
+    viewer_16777813103808172.setStyle({"model": 1},{"stick": {"colorscheme": "redCarbon"}});
+    viewer_16777813103808172.setStyle({"model": 2},{"stick": {"colorscheme": "blueCarbon"}});
+    viewer_16777813103808172.setStyle({"model": 3},{"stick": {"colorscheme": "magentaCarbon"}});
+    viewer_16777813103808172.setStyle({"model": 4},{"stick": {"colorscheme": "whiteCarbon"}});
+    viewer_16777813103808172.zoomTo();
+viewer_16777813103808172.render();
+});
+</script>
+</div>
+</div>
+
+
+</section>
+
+</main> <!-- /main -->
+<script id="quarto-html-after-body" type="application/javascript">
+window.document.addEventListener("DOMContentLoaded", function (event) {
+  const toggleBodyColorMode = (bsSheetEl) => {
+    const mode = bsSheetEl.getAttribute("data-mode");
+    const bodyEl = window.document.querySelector("body");
+    if (mode === "dark") {
+      bodyEl.classList.add("quarto-dark");
+      bodyEl.classList.remove("quarto-light");
+    } else {
+      bodyEl.classList.add("quarto-light");
+      bodyEl.classList.remove("quarto-dark");
+    }
+  }
+  const toggleBodyColorPrimary = () => {
+    const bsSheetEl = window.document.querySelector("link#quarto-bootstrap");
+    if (bsSheetEl) {
+      toggleBodyColorMode(bsSheetEl);
+    }
+  }
+  toggleBodyColorPrimary();  
+  const disableStylesheet = (stylesheets) => {
+    for (let i=0; i < stylesheets.length; i++) {
+      const stylesheet = stylesheets[i];
+      stylesheet.rel = 'prefetch';
+    }
+  }
+  const enableStylesheet = (stylesheets) => {
+    for (let i=0; i < stylesheets.length; i++) {
+      const stylesheet = stylesheets[i];
+      stylesheet.rel = 'stylesheet';
+    }
+  }
+  const manageTransitions = (selector, allowTransitions) => {
+    const els = window.document.querySelectorAll(selector);
+    for (let i=0; i < els.length; i++) {
+      const el = els[i];
+      if (allowTransitions) {
+        el.classList.remove('notransition');
+      } else {
+        el.classList.add('notransition');
+      }
+    }
+  }
+  const toggleColorMode = (alternate) => {
+    // Switch the stylesheets
+    const alternateStylesheets = window.document.querySelectorAll('link.quarto-color-scheme.quarto-color-alternate');
+    manageTransitions('#quarto-margin-sidebar .nav-link', false);
+    if (alternate) {
+      enableStylesheet(alternateStylesheets);
+      for (const sheetNode of alternateStylesheets) {
+        if (sheetNode.id === "quarto-bootstrap") {
+          toggleBodyColorMode(sheetNode);
+        }
+      }
+    } else {
+      disableStylesheet(alternateStylesheets);
+      toggleBodyColorPrimary();
+    }
+    manageTransitions('#quarto-margin-sidebar .nav-link', true);
+    // Switch the toggles
+    const toggles = window.document.querySelectorAll('.quarto-color-scheme-toggle');
+    for (let i=0; i < toggles.length; i++) {
+      const toggle = toggles[i];
+      if (toggle) {
+        if (alternate) {
+          toggle.classList.add("alternate");     
+        } else {
+          toggle.classList.remove("alternate");
+        }
+      }
+    }
+    // Hack to workaround the fact that safari doesn't
+    // properly recolor the scrollbar when toggling (#1455)
+    if (navigator.userAgent.indexOf('Safari') > 0 && navigator.userAgent.indexOf('Chrome') == -1) {
+      manageTransitions("body", false);
+      window.scrollTo(0, 1);
+      setTimeout(() => {
+        window.scrollTo(0, 0);
+        manageTransitions("body", true);
+      }, 40);  
+    }
+  }
+  const isFileUrl = () => { 
+    return window.location.protocol === 'file:';
+  }
+  const hasAlternateSentinel = () => {  
+    let styleSentinel = getColorSchemeSentinel();
+    if (styleSentinel !== null) {
+      return styleSentinel === "alternate";
+    } else {
+      return false;
+    }
+  }
+  const setStyleSentinel = (alternate) => {
+    const value = alternate ? "alternate" : "default";
+    if (!isFileUrl()) {
+      window.localStorage.setItem("quarto-color-scheme", value);
+    } else {
+      localAlternateSentinel = value;
+    }
+  }
+  const getColorSchemeSentinel = () => {
+    if (!isFileUrl()) {
+      const storageValue = window.localStorage.getItem("quarto-color-scheme");
+      return storageValue != null ? storageValue : localAlternateSentinel;
+    } else {
+      return localAlternateSentinel;
+    }
+  }
+  let localAlternateSentinel = 'default';
+  // Dark / light mode switch
+  window.quartoToggleColorScheme = () => {
+    // Read the current dark / light value 
+    let toAlternate = !hasAlternateSentinel();
+    toggleColorMode(toAlternate);
+    setStyleSentinel(toAlternate);
+  };
+  // Ensure there is a toggle, if there isn't float one in the top right
+  if (window.document.querySelector('.quarto-color-scheme-toggle') === null) {
+    const a = window.document.createElement('a');
+    a.classList.add('top-right');
+    a.classList.add('quarto-color-scheme-toggle');
+    a.href = "";
+    a.onclick = function() { try { window.quartoToggleColorScheme(); } catch {} return false; };
+    const i = window.document.createElement("i");
+    i.classList.add('bi');
+    a.appendChild(i);
+    window.document.body.appendChild(a);
+  }
+  // Switch to dark mode if need be
+  if (hasAlternateSentinel()) {
+    toggleColorMode(true);
+  } else {
+    toggleColorMode(false);
+  }
+  const icon = "";
+  const anchorJS = new window.AnchorJS();
+  anchorJS.options = {
+    placement: 'right',
+    icon: icon
+  };
+  anchorJS.add('.anchored');
+  const clipboard = new window.ClipboardJS('.code-copy-button', {
+    target: function(trigger) {
+      return trigger.previousElementSibling;
+    }
+  });
+  clipboard.on('success', function(e) {
+    // button target
+    const button = e.trigger;
+    // don't keep focus
+    button.blur();
+    // flash "checked"
+    button.classList.add('code-copy-button-checked');
+    var currentTitle = button.getAttribute("title");
+    button.setAttribute("title", "Copied!");
+    let tooltip;
+    if (window.bootstrap) {
+      button.setAttribute("data-bs-toggle", "tooltip");
+      button.setAttribute("data-bs-placement", "left");
+      button.setAttribute("data-bs-title", "Copied!");
+      tooltip = new bootstrap.Tooltip(button, 
+        { trigger: "manual", 
+          customClass: "code-copy-button-tooltip",
+          offset: [0, -8]});
+      tooltip.show();    
+    }
+    setTimeout(function() {
+      if (tooltip) {
+        tooltip.hide();
+        button.removeAttribute("data-bs-title");
+        button.removeAttribute("data-bs-toggle");
+        button.removeAttribute("data-bs-placement");
+      }
+      button.setAttribute("title", currentTitle);
+      button.classList.remove('code-copy-button-checked');
+    }, 1000);
+    // clear code selection
+    e.clearSelection();
+  });
+  function tippyHover(el, contentFn) {
+    const config = {
+      allowHTML: true,
+      content: contentFn,
+      maxWidth: 500,
+      delay: 100,
+      arrow: false,
+      appendTo: function(el) {
+          return el.parentElement;
+      },
+      interactive: true,
+      interactiveBorder: 10,
+      theme: 'quarto',
+      placement: 'bottom-start'
+    };
+    window.tippy(el, config); 
+  }
+  const noterefs = window.document.querySelectorAll('a[role="doc-noteref"]');
+  for (var i=0; i<noterefs.length; i++) {
+    const ref = noterefs[i];
+    tippyHover(ref, function() {
+      // use id or data attribute instead here
+      let href = ref.getAttribute('data-footnote-href') || ref.getAttribute('href');
+      try { href = new URL(href).hash; } catch {}
+      const id = href.replace(/^#\/?/, "");
+      const note = window.document.getElementById(id);
+      return note.innerHTML;
+    });
+  }
+  const findCites = (el) => {
+    const parentEl = el.parentElement;
+    if (parentEl) {
+      const cites = parentEl.dataset.cites;
+      if (cites) {
+        return {
+          el,
+          cites: cites.split(' ')
+        };
+      } else {
+        return findCites(el.parentElement)
+      }
+    } else {
+      return undefined;
+    }
+  };
+  var bibliorefs = window.document.querySelectorAll('a[role="doc-biblioref"]');
+  for (var i=0; i<bibliorefs.length; i++) {
+    const ref = bibliorefs[i];
+    const citeInfo = findCites(ref);
+    if (citeInfo) {
+      tippyHover(citeInfo.el, function() {
+        var popup = window.document.createElement('div');
+        citeInfo.cites.forEach(function(cite) {
+          var citeDiv = window.document.createElement('div');
+          citeDiv.classList.add('hanging-indent');
+          citeDiv.classList.add('csl-entry');
+          var biblioDiv = window.document.getElementById('ref-' + cite);
+          if (biblioDiv) {
+            citeDiv.innerHTML = biblioDiv.innerHTML;
+          }
+          popup.appendChild(citeDiv);
+        });
+        return popup.innerHTML;
+      });
+    }
+  }
+});
+</script>
+<script src="https://utteranc.es/client.js" repo="greglandrum/rdkit-blog" issue-term="pathname" theme="github-light" crossorigin="anonymous" async="">
+</script>
+</div> <!-- /content -->
+
+
+
+</body></html>
