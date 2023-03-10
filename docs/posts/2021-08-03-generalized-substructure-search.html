@@ -225,7 +225,7 @@ code span.wa { color: #60a0b0; font-weight: bold; font-style: italic; } /* Warni
 
 </header>
 
-<p><em>[Updated 19.12.2021 to use new functionality from the 2021.09 RDKit release]</em></p>
+<p><em>[Updated 10.03.2023 by Charles T Hoyt to demonstrate the use of his chembl_downloader]</em> <em>[Updated 19.12.2021 to use new functionality from the 2021.09 RDKit release]</em></p>
 <p>Over the last couple of releases we’ve added a number of RDKit features which allow useage of more advanced substructure query features and more control over the results returned by substructure searches. These include</p>
 <ul>
 <li><code>Chem.AdjustQueryProperties()</code> to tune the results returned by a substructure query</li>
@@ -256,38 +256,38 @@ code span.wa { color: #60a0b0; font-weight: bold; font-style: italic; } /* Warni
 Sun Dec 19 06:14:00 2021</code></pre>
 </div>
 </div>
-<p>Load a <code>SubstructLibrary</code> created using ChEMBL_29. The code used to construct this is:</p>
-<pre><code>from rdkit import RDLogger
-from rdkit import Chem
-from rdkit.Chem import rdSubstructLibrary
-import pickle, time
-import gzip
-
-gz = gzip.GzipFile('/home/glandrum/Downloads/chembl_29.sdf.gz')
-suppl = Chem.ForwardSDMolSupplier(gz)
-RDLogger.DisableLog("rdApp.warning")
-t1=time.time()
-data = []
-for i,mol in enumerate(suppl):
-    if not ((i+1)%50000):
-        print(f"Processed {i+1} molecules in {(time.time()-t1):.1f} seconds")
-    if mol is None or mol.GetNumAtoms()&gt;50:
-        continue
-    fp = Chem.PatternFingerprint(mol,fpSize=1024,tautomerFingerprints=True)
-    smi = Chem.MolToSmiles(mol)
-    data.append((smi,fp))
-t2=time.time()
-pickle.dump(data,open('../data/chembl29_sssdata.pkl','wb+'))
-t1=time.time()
-mols = rdSubstructLibrary.CachedTrustedSmilesMolHolder()
-fps = rdSubstructLibrary.TautomerPatternHolder(1024)
-for smi,fp in data:
-    mols.AddSmiles(smi)
-    fps.AddFingerprint(fp)
-library = rdSubstructLibrary.SubstructLibrary(mols,fps)
-t2=time.time()
-print(f"That took {t2-t1:.2f} seconds. The library has {len(library)} molecules.")
-pickle.dump(library,open('../data/chembl29_ssslib.pkl','wb+'))</code></pre>
+<p>Load a <code>SubstructLibrary</code> created using ChEMBL 29. The <a href="https://github.com/cthoyt/chembl-downloader"><code>chembl_downloader</code></a> Python package is used to abstract away downloading and parsing the ChEMBL SDF data. More information can be found in this blog post: https://cthoyt.com/2021/08/04/taming-chembl-sdf.html. The code used to construct this is:</p>
+<div class="sourceCode" id="cb3"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> rdkit <span class="im">import</span> RDLogger</span>
+<span id="cb3-2"><a href="#cb3-2" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> rdkit <span class="im">import</span> Chem</span>
+<span id="cb3-3"><a href="#cb3-3" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> rdkit.Chem <span class="im">import</span> rdSubstructLibrary</span>
+<span id="cb3-4"><a href="#cb3-4" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> pickle, time</span>
+<span id="cb3-5"><a href="#cb3-5" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> gzip</span>
+<span id="cb3-6"><a href="#cb3-6" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> chembl_downloader</span>
+<span id="cb3-7"><a href="#cb3-7" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb3-8"><a href="#cb3-8" aria-hidden="true" tabindex="-1"></a>RDLogger.DisableLog(<span class="st">"rdApp.warning"</span>)</span>
+<span id="cb3-9"><a href="#cb3-9" aria-hidden="true" tabindex="-1"></a><span class="cf">with</span> chembl_downloader.supplier(version<span class="op">=</span><span class="st">"29"</span>) <span class="im">as</span> suppl:</span>
+<span id="cb3-10"><a href="#cb3-10" aria-hidden="true" tabindex="-1"></a>    t1<span class="op">=</span>time.time()</span>
+<span id="cb3-11"><a href="#cb3-11" aria-hidden="true" tabindex="-1"></a>    data <span class="op">=</span> []</span>
+<span id="cb3-12"><a href="#cb3-12" aria-hidden="true" tabindex="-1"></a>    <span class="cf">for</span> i,mol <span class="kw">in</span> <span class="bu">enumerate</span>(suppl):</span>
+<span id="cb3-13"><a href="#cb3-13" aria-hidden="true" tabindex="-1"></a>        <span class="cf">if</span> <span class="kw">not</span> ((i<span class="op">+</span><span class="dv">1</span>)<span class="op">%</span><span class="dv">50000</span>):</span>
+<span id="cb3-14"><a href="#cb3-14" aria-hidden="true" tabindex="-1"></a>            <span class="bu">print</span>(<span class="ss">f"Processed </span><span class="sc">{</span>i<span class="op">+</span><span class="dv">1</span><span class="sc">}</span><span class="ss"> molecules in </span><span class="sc">{</span>(time.time()<span class="op">-</span>t1)<span class="sc">:.1f}</span><span class="ss"> seconds"</span>)</span>
+<span id="cb3-15"><a href="#cb3-15" aria-hidden="true" tabindex="-1"></a>        <span class="cf">if</span> mol <span class="kw">is</span> <span class="va">None</span> <span class="kw">or</span> mol.GetNumAtoms()<span class="op">&gt;</span><span class="dv">50</span>:</span>
+<span id="cb3-16"><a href="#cb3-16" aria-hidden="true" tabindex="-1"></a>            <span class="cf">continue</span></span>
+<span id="cb3-17"><a href="#cb3-17" aria-hidden="true" tabindex="-1"></a>        fp <span class="op">=</span> Chem.PatternFingerprint(mol,fpSize<span class="op">=</span><span class="dv">1024</span>,tautomerFingerprints<span class="op">=</span><span class="va">True</span>)</span>
+<span id="cb3-18"><a href="#cb3-18" aria-hidden="true" tabindex="-1"></a>        smi <span class="op">=</span> Chem.MolToSmiles(mol)</span>
+<span id="cb3-19"><a href="#cb3-19" aria-hidden="true" tabindex="-1"></a>        data.append((smi,fp))</span>
+<span id="cb3-20"><a href="#cb3-20" aria-hidden="true" tabindex="-1"></a>t2<span class="op">=</span>time.time()</span>
+<span id="cb3-21"><a href="#cb3-21" aria-hidden="true" tabindex="-1"></a>pickle.dump(data,<span class="bu">open</span>(<span class="st">'../data/chembl29_sssdata.pkl'</span>,<span class="st">'wb+'</span>))</span>
+<span id="cb3-22"><a href="#cb3-22" aria-hidden="true" tabindex="-1"></a>t1<span class="op">=</span>time.time()</span>
+<span id="cb3-23"><a href="#cb3-23" aria-hidden="true" tabindex="-1"></a>mols <span class="op">=</span> rdSubstructLibrary.CachedTrustedSmilesMolHolder()</span>
+<span id="cb3-24"><a href="#cb3-24" aria-hidden="true" tabindex="-1"></a>fps <span class="op">=</span> rdSubstructLibrary.TautomerPatternHolder(<span class="dv">1024</span>)</span>
+<span id="cb3-25"><a href="#cb3-25" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> smi,fp <span class="kw">in</span> data:</span>
+<span id="cb3-26"><a href="#cb3-26" aria-hidden="true" tabindex="-1"></a>    mols.AddSmiles(smi)</span>
+<span id="cb3-27"><a href="#cb3-27" aria-hidden="true" tabindex="-1"></a>    fps.AddFingerprint(fp)</span>
+<span id="cb3-28"><a href="#cb3-28" aria-hidden="true" tabindex="-1"></a>library <span class="op">=</span> rdSubstructLibrary.SubstructLibrary(mols,fps)</span>
+<span id="cb3-29"><a href="#cb3-29" aria-hidden="true" tabindex="-1"></a>t2<span class="op">=</span>time.time()</span>
+<span id="cb3-30"><a href="#cb3-30" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"That took </span><span class="sc">{</span>t2<span class="op">-</span>t1<span class="sc">:.2f}</span><span class="ss"> seconds. The library has </span><span class="sc">{</span><span class="bu">len</span>(library)<span class="sc">}</span><span class="ss"> molecules."</span>)</span>
+<span id="cb3-31"><a href="#cb3-31" aria-hidden="true" tabindex="-1"></a>pickle.dump(library,<span class="bu">open</span>(<span class="st">'../data/chembl29_ssslib.pkl'</span>,<span class="st">'wb+'</span>))</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 <div class="cell" data-execution_count="2">
 <div class="sourceCode cell-code" id="cb4"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> pickle</span>
 <span id="cb4-2"><a href="#cb4-2" aria-hidden="true" tabindex="-1"></a><span class="cf">with</span> <span class="bu">open</span>(<span class="st">'./results/chembl29_ssslib.pkl'</span>,<span class="st">'rb'</span>) <span class="im">as</span> inf:</span>
