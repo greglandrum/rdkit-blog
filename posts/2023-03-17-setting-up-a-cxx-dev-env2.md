@@ -7,6 +7,7 @@ title: Setting up an RDKit development environment 1
 description: It's surprisingly straightforward
 layout: post
 toc: true
+image: images/blog/setting-up-a-cxx-dev-env2.png
 
 ---
 
@@ -64,7 +65,7 @@ mamba`
 # Part 2: run cmake and build
 
 Now we're going to actually build the RDKit. These instructions build the code
-and installs it in the RDKit source tree (instead of trying to install it
+and install it in the RDKit source tree (instead of trying to install it
 centrally on your computer).
 
 From inside the RDKit source directory you checked out above:
@@ -99,7 +100,7 @@ errors. The last line of the output should be something like this:
 
 # Part 3: setup your environment and then run the tests
 
-At this poing you have a completed build of the RDKit that is installed within
+At this point you have a completed build of the RDKit that is installed within
 the source tree. Now we're going to set up your enviroment so that you can
 actually use that build.
 
