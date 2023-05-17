@@ -1,0 +1,681 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en"><head>
+
+<meta charset="utf-8">
+<meta name="generator" content="quarto-1.2.280">
+
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+
+<meta name="dcterms.date" content="2023-05-17">
+<meta name="description" content="Getting more information when the conformer generation doesn’t work">
+
+<title>RDKit blog - Understanding conformer generation failures</title>
+<style>
+code{white-space: pre-wrap;}
+span.smallcaps{font-variant: small-caps;}
+div.columns{display: flex; gap: min(4vw, 1.5em);}
+div.column{flex: auto; overflow-x: auto;}
+div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+ul.task-list{list-style: none;}
+ul.task-list li input[type="checkbox"] {
+  width: 0.8em;
+  margin: 0 0.8em 0.2em -1.6em;
+  vertical-align: middle;
+}
+pre > code.sourceCode { white-space: pre; position: relative; }
+pre > code.sourceCode > span { display: inline-block; line-height: 1.25; }
+pre > code.sourceCode > span:empty { height: 1.2em; }
+.sourceCode { overflow: visible; }
+code.sourceCode > span { color: inherit; text-decoration: inherit; }
+div.sourceCode { margin: 1em 0; }
+pre.sourceCode { margin: 0; }
+@media screen {
+div.sourceCode { overflow: auto; }
+}
+@media print {
+pre > code.sourceCode { white-space: pre-wrap; }
+pre > code.sourceCode > span { text-indent: -5em; padding-left: 5em; }
+}
+pre.numberSource code
+  { counter-reset: source-line 0; }
+pre.numberSource code > span
+  { position: relative; left: -4em; counter-increment: source-line; }
+pre.numberSource code > span > a:first-child::before
+  { content: counter(source-line);
+    position: relative; left: -1em; text-align: right; vertical-align: baseline;
+    border: none; display: inline-block;
+    -webkit-touch-callout: none; -webkit-user-select: none;
+    -khtml-user-select: none; -moz-user-select: none;
+    -ms-user-select: none; user-select: none;
+    padding: 0 4px; width: 4em;
+    color: #aaaaaa;
+  }
+pre.numberSource { margin-left: 3em; border-left: 1px solid #aaaaaa;  padding-left: 4px; }
+div.sourceCode
+  {   }
+@media screen {
+pre > code.sourceCode > span > a:first-child::before { text-decoration: underline; }
+}
+code span.al { color: #ff0000; font-weight: bold; } /* Alert */
+code span.an { color: #60a0b0; font-weight: bold; font-style: italic; } /* Annotation */
+code span.at { color: #7d9029; } /* Attribute */
+code span.bn { color: #40a070; } /* BaseN */
+code span.bu { color: #008000; } /* BuiltIn */
+code span.cf { color: #007020; font-weight: bold; } /* ControlFlow */
+code span.ch { color: #4070a0; } /* Char */
+code span.cn { color: #880000; } /* Constant */
+code span.co { color: #60a0b0; font-style: italic; } /* Comment */
+code span.cv { color: #60a0b0; font-weight: bold; font-style: italic; } /* CommentVar */
+code span.do { color: #ba2121; font-style: italic; } /* Documentation */
+code span.dt { color: #902000; } /* DataType */
+code span.dv { color: #40a070; } /* DecVal */
+code span.er { color: #ff0000; font-weight: bold; } /* Error */
+code span.ex { } /* Extension */
+code span.fl { color: #40a070; } /* Float */
+code span.fu { color: #06287e; } /* Function */
+code span.im { color: #008000; font-weight: bold; } /* Import */
+code span.in { color: #60a0b0; font-weight: bold; font-style: italic; } /* Information */
+code span.kw { color: #007020; font-weight: bold; } /* Keyword */
+code span.op { color: #666666; } /* Operator */
+code span.ot { color: #007020; } /* Other */
+code span.pp { color: #bc7a00; } /* Preprocessor */
+code span.sc { color: #4070a0; } /* SpecialChar */
+code span.ss { color: #bb6688; } /* SpecialString */
+code span.st { color: #4070a0; } /* String */
+code span.va { color: #19177c; } /* Variable */
+code span.vs { color: #4070a0; } /* VerbatimString */
+code span.wa { color: #60a0b0; font-weight: bold; font-style: italic; } /* Warning */
+</style>
+
+
+<script src="../site_libs/quarto-nav/quarto-nav.js"></script>
+<script src="../site_libs/quarto-nav/headroom.min.js"></script>
+<script src="../site_libs/clipboard/clipboard.min.js"></script>
+<script src="../site_libs/quarto-search/autocomplete.umd.js"></script>
+<script src="../site_libs/quarto-search/fuse.min.js"></script>
+<script src="../site_libs/quarto-search/quarto-search.js"></script>
+<meta name="quarto:offset" content="../">
+<link href="../posts/icons/favicon.ico" rel="icon">
+<script src="../site_libs/quarto-html/quarto.js"></script>
+<script src="../site_libs/quarto-html/popper.min.js"></script>
+<script src="../site_libs/quarto-html/tippy.umd.min.js"></script>
+<script src="../site_libs/quarto-html/anchor.min.js"></script>
+<link href="../site_libs/quarto-html/tippy.css" rel="stylesheet">
+<link href="../site_libs/quarto-html/quarto-syntax-highlighting.css" rel="stylesheet" class="quarto-color-scheme" id="quarto-text-highlighting-styles">
+<link href="../site_libs/quarto-html/quarto-syntax-highlighting-dark.css" rel="prefetch" class="quarto-color-scheme quarto-color-alternate" id="quarto-text-highlighting-styles">
+<script src="../site_libs/bootstrap/bootstrap.min.js"></script>
+<link href="../site_libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
+<link href="../site_libs/bootstrap/bootstrap.min.css" rel="stylesheet" class="quarto-color-scheme" id="quarto-bootstrap" data-mode="light">
+<link href="../site_libs/bootstrap/bootstrap-dark.min.css" rel="prefetch" class="quarto-color-scheme quarto-color-alternate" id="quarto-bootstrap" data-mode="dark">
+<script id="quarto-search-options" type="application/json">{
+  "location": "navbar",
+  "copy-button": false,
+  "collapse-after": 3,
+  "panel-placement": "end",
+  "type": "overlay",
+  "limit": 20,
+  "language": {
+    "search-no-results-text": "No results",
+    "search-matching-documents-text": "matching documents",
+    "search-copy-link-title": "Copy link to search",
+    "search-hide-matches-text": "Hide additional matches",
+    "search-more-match-text": "more match in this document",
+    "search-more-matches-text": "more matches in this document",
+    "search-clear-button-title": "Clear",
+    "search-detached-cancel-button-title": "Cancel",
+    "search-submit-button-title": "Submit"
+  }
+}</script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.6/require.min.js" integrity="sha512-c3Nl8+7g4LMSTdrm621y7kf9v3SDPnhxLNhcjFJbKECVnmZHTdo+IRO05sNLTH/D3vA6u1X32ehoLC7WFVdheg==" crossorigin="anonymous"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.5.1/jquery.min.js" integrity="sha512-bLT0Qm9VnAYZDflyKcBaQ2gg0hSYNQrJ8RilYldYQ1FxQYoCLtUjuuRuZo+fjqhx/qtq/1itJ0C2ejDxltZVFg==" crossorigin="anonymous"></script>
+<script type="application/javascript">define('jquery', [],function() {return window.jQuery;})</script>
+
+
+<link rel="stylesheet" href="../styles.css">
+</head>
+
+<body class="nav-fixed">
+
+<div id="quarto-search-results"></div>
+  <header id="quarto-header" class="headroom fixed-top">
+    <nav class="navbar navbar-expand-lg navbar-dark ">
+      <div class="navbar-container container-fluid">
+      <div class="navbar-brand-container">
+    <a class="navbar-brand" href="../index.html">
+    <span class="navbar-title">RDKit blog</span>
+    </a>
+  </div>
+          <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarCollapse" aria-controls="navbarCollapse" aria-expanded="false" aria-label="Toggle navigation" onclick="if (window.quartoToggleHeadroom) { window.quartoToggleHeadroom(); }">
+  <span class="navbar-toggler-icon"></span>
+</button>
+          <div class="collapse navbar-collapse" id="navbarCollapse">
+            <ul class="navbar-nav navbar-nav-scroll ms-auto">
+  <li class="nav-item">
+    <a class="nav-link" href="../about.html">
+ <span class="menu-text">RDKit experiments, tips, and tutorials</span></a>
+  </li>  
+  <li class="nav-item compact">
+    <a class="nav-link" href="https://github.com/rdkit/rdkit"><i class="bi bi-github" role="img">
+</i> 
+ <span class="menu-text"></span></a>
+  </li>  
+  <li class="nav-item compact">
+    <a class="nav-link" href="https://twitter.com/rdkit_org"><i class="bi bi-twitter" role="img">
+</i> 
+ <span class="menu-text"></span></a>
+  </li>  
+  <li class="nav-item compact">
+    <a class="nav-link" href="../index.xml"><i class="bi bi-rss" role="img">
+</i> 
+ <span class="menu-text"></span></a>
+  </li>  
+</ul>
+              <div class="quarto-toggle-container">
+                  <a href="" class="quarto-color-scheme-toggle nav-link" onclick="window.quartoToggleColorScheme(); return false;" title="Toggle dark mode"><i class="bi"></i></a>
+              </div>
+              <div id="quarto-search" class="" title="Search"></div>
+          </div> <!-- /navcollapse -->
+      </div> <!-- /container-fluid -->
+    </nav>
+</header>
+<!-- content -->
+<div id="quarto-content" class="quarto-container page-columns page-rows-contents page-layout-article page-navbar">
+<!-- sidebar -->
+<!-- margin-sidebar -->
+    <div id="quarto-margin-sidebar" class="sidebar margin-sidebar">
+        
+    </div>
+<!-- main -->
+<main class="content" id="quarto-document-content">
+
+<header id="title-block-header" class="quarto-title-block default">
+<div class="quarto-title">
+<h1 class="title">Understanding conformer generation failures</h1>
+  <div class="quarto-categories">
+    <div class="quarto-category">3d</div>
+    <div class="quarto-category">documentation</div>
+  </div>
+  </div>
+
+<div>
+  <div class="description">
+    Getting more information when the conformer generation doesn’t work
+  </div>
+</div>
+
+
+<div class="quarto-title-meta">
+
+    
+    <div>
+    <div class="quarto-title-meta-heading">Published</div>
+    <div class="quarto-title-meta-contents">
+      <p class="date">May 17, 2023</p>
+    </div>
+  </div>
+  
+    
+  </div>
+  
+
+</header>
+
+<p>When the RDKit generates conformers for a molecule it performs a number of checks along the way to make sure that the atomic coordinates are reasonable/correct. When one of these checks fails, the current conformer is abandoned and the coordinate generation process starts from scratch. The maximum number of times this restart can happen is controlled by the <code>maxIterations</code> parameter: after <code>maxIterations</code> restarts the conformer generation fails. If you’ve called <code>EmbedMolecule()</code>, asking for a single conformer, you’ll get a conformation ID of -1 to mark this failure. If you’ve asked for multiple conformers, you won’t get as many as you requested.</p>
+<p>One of the changes for the 2023.03.1 release of the RDKit was the addition of an option to track which checks are failing during conformer generation. This can help understand what problems were encountered and to understand why conformer generation is not generating the expected results. Since, as is often the case, the RDKit’s capabilities are ahead of its documentation, this short blog post will explain how to use this functionality and interpret the results.</p>
+<p>A general overview of the conformer generation process can be found in <a href="https://www.rdkit.org/docs/RDKit_Book.html#introduction">the documentation</a>.</p>
+<div class="cell" data-execution_count="1">
+<div class="sourceCode cell-code" id="cb1"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> rdkit <span class="im">import</span> Chem</span>
+<span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> rdkit.Chem <span class="im">import</span> rdDistGeom</span>
+<span id="cb1-3"><a href="#cb1-3" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> rdkit.Chem <span class="im">import</span> rdDepictor</span>
+<span id="cb1-4"><a href="#cb1-4" aria-hidden="true" tabindex="-1"></a>rdDepictor.SetPreferCoordGen(<span class="va">True</span>)</span>
+<span id="cb1-5"><a href="#cb1-5" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> rdkit.Chem.Draw <span class="im">import</span> IPythonConsole</span>
+<span id="cb1-6"><a href="#cb1-6" aria-hidden="true" tabindex="-1"></a>IPythonConsole.ipython_3d <span class="op">=</span> <span class="va">True</span></span>
+<span id="cb1-7"><a href="#cb1-7" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> rdkit</span>
+<span id="cb1-8"><a href="#cb1-8" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(rdkit.__version__)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>2023.03.1</code></pre>
+</div>
+</div>
+<p>Molecules containing chiral centers in bridged rings can cause problems, so let’s start with a norbornane derivative:</p>
+<div class="cell" data-execution_count="2">
+<div class="sourceCode cell-code" id="cb3"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a>m <span class="op">=</span> Chem.MolFromSmiles(<span class="st">'C1C[C@]2(F)CC[C@@]1(Cl)C2'</span>)</span>
+<span id="cb3-2"><a href="#cb3-2" aria-hidden="true" tabindex="-1"></a>m</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-display" data-execution_count="2">
+<p><img src="2023-05-17-understanding-confgen-errors_files/figure-html/cell-3-output-1.png" class="img-fluid"></p>
+</div>
+</div>
+<div class="cell" data-execution_count="3">
+<div class="sourceCode cell-code" id="cb4"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a>mh <span class="op">=</span> Chem.AddHs(m)</span>
+<span id="cb4-2"><a href="#cb4-2" aria-hidden="true" tabindex="-1"></a>ps <span class="op">=</span> rdDistGeom.ETKDGv3()</span>
+<span id="cb4-3"><a href="#cb4-3" aria-hidden="true" tabindex="-1"></a>ps.randomSeed <span class="op">=</span> <span class="bn">0xf00d</span></span>
+<span id="cb4-4"><a href="#cb4-4" aria-hidden="true" tabindex="-1"></a>rdDistGeom.EmbedMolecule(mh,ps)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-display" data-execution_count="3">
+<pre><code>0</code></pre>
+</div>
+</div>
+<div class="cell" data-execution_count="4">
+<div class="sourceCode cell-code" id="cb6"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb6-1"><a href="#cb6-1" aria-hidden="true" tabindex="-1"></a>mh</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-display">
+<div id="3dmolviewer_16842980760963316" style="position: relative; width: 400px; height: 400px">
+        <p id="3dmolwarning_16842980760963316" style="background-color:#ffcccc;color:black">You appear to be running in JupyterLab (or JavaScript failed to load for some other reason).  You need to install the 3dmol extension: <br>
+        <tt>jupyter labextension install jupyterlab_3dmol</tt></p>
+        </div>
+<script>
+
+var loadScriptAsync = function(uri){
+  return new Promise((resolve, reject) => {
+    //this is to ignore the existence of requirejs amd
+    var savedexports, savedmodule;
+    if (typeof exports !== 'undefined') savedexports = exports;
+    else exports = {}
+    if (typeof module !== 'undefined') savedmodule = module;
+    else module = {}
+
+    var tag = document.createElement('script');
+    tag.src = uri;
+    tag.async = true;
+    tag.onload = () => {
+        exports = savedexports;
+        module = savedmodule;
+        resolve();
+    };
+  var firstScriptTag = document.getElementsByTagName('script')[0];
+  firstScriptTag.parentNode.insertBefore(tag, firstScriptTag);
+});
+};
+
+if(typeof $3Dmolpromise === 'undefined') {
+$3Dmolpromise = null;
+  $3Dmolpromise = loadScriptAsync('https://cdnjs.cloudflare.com/ajax/libs/3Dmol/2.0.1/3Dmol-min.js');
+}
+
+var viewer_16842980760963316 = null;
+var warn = document.getElementById("3dmolwarning_16842980760963316");
+if(warn) {
+    warn.parentNode.removeChild(warn);
+}
+$3Dmolpromise.then(function() {
+viewer_16842980760963316 = $3Dmol.createViewer(document.getElementById("3dmolviewer_16842980760963316"),{backgroundColor:"white"});
+viewer_16842980760963316.zoomTo();
+    viewer_16842980760963316.removeAllModels();
+    viewer_16842980760963316.addModel("\n     RDKit          3D\n\n 19 20  0  0  0  0  0  0  0  0999 V2000\n    0.3977   -1.1048    0.9092 C   0  0  0  0  0  0  0  0  0  0  0  0\n    0.1714    0.2776    1.5310 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -0.0342    1.1541    0.3112 C   0  0  2  0  0  0  0  0  0  0  0  0\n    0.0592    2.4675    0.5313 F   0  0  0  0  0  0  0  0  0  0  0  0\n   -1.2277    0.6891   -0.4645 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -0.8251   -0.6288   -1.1377 C   0  0  0  0  0  0  0  0  0  0  0  0\n    0.5690   -0.8512   -0.5607 C   0  0  2  0  0  0  0  0  0  0  0  0\n    1.5427   -1.9684   -1.4195 Cl  0  0  0  0  0  0  0  0  0  0  0  0\n    1.0913    0.5941   -0.5783 C   0  0  0  0  0  0  0  0  0  0  0  0\n    1.2313   -1.6370    1.3677 H   0  0  0  0  0  0  0  0  0  0  0  0\n   -0.5685   -1.6584    1.1003 H   0  0  0  0  0  0  0  0  0  0  0  0\n   -0.6850    0.3071    2.1972 H   0  0  0  0  0  0  0  0  0  0  0  0\n    1.1088    0.5448    2.0466 H   0  0  0  0  0  0  0  0  0  0  0  0\n   -1.3738    1.4261   -1.3041 H   0  0  0  0  0  0  0  0  0  0  0  0\n   -2.1414    0.5927    0.1213 H   0  0  0  0  0  0  0  0  0  0  0  0\n   -1.5380   -1.3969   -0.7508 H   0  0  0  0  0  0  0  0  0  0  0  0\n   -0.8182   -0.5556   -2.2247 H   0  0  0  0  0  0  0  0  0  0  0  0\n    0.9726    1.0587   -1.5612 H   0  0  0  0  0  0  0  0  0  0  0  0\n    2.0679    0.6892   -0.1143 H   0  0  0  0  0  0  0  0  0  0  0  0\n  1  2  1  0\n  2  3  1  0\n  3  4  1  1\n  3  5  1  0\n  5  6  1  0\n  6  7  1  0\n  7  8  1  6\n  7  9  1  0\n  7  1  1  0\n  9  3  1  0\n  1 10  1  0\n  1 11  1  0\n  2 12  1  0\n  2 13  1  0\n  5 14  1  0\n  5 15  1  0\n  6 16  1  0\n  6 17  1  0\n  9 18  1  0\n  9 19  1  0\nM  END\n","sdf");
+    viewer_16842980760963316.setStyle({"stick": {}});
+    viewer_16842980760963316.setBackgroundColor("0xeeeeee");
+    viewer_16842980760963316.zoomTo();
+viewer_16842980760963316.render();
+});
+</script>
+</div>
+<div class="cell-output cell-output-display" data-execution_count="4">
+
+</div>
+</div>
+<p>Now invert one of the stereocenters to create the stereoisomer which can’t actually exist as a stable structure. Imagine inverting one of the chiral centers in the above molecule and you will see the problem: we’d have to point the attached halogen into the center of the cage.</p>
+<div class="cell" data-execution_count="5">
+<div class="sourceCode cell-code" id="cb7"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb7-1"><a href="#cb7-1" aria-hidden="true" tabindex="-1"></a>bad_m <span class="op">=</span> Chem.MolFromSmiles(<span class="st">'C1C[C@]2(F)CC[C@]1(Cl)C2'</span>)</span>
+<span id="cb7-2"><a href="#cb7-2" aria-hidden="true" tabindex="-1"></a>bad_m</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-display" data-execution_count="5">
+<p><img src="2023-05-17-understanding-confgen-errors_files/figure-html/cell-6-output-1.png" class="img-fluid"></p>
+</div>
+</div>
+<p>Try creating a conformer for that:</p>
+<div class="cell" data-execution_count="6">
+<div class="sourceCode cell-code" id="cb8"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb8-1"><a href="#cb8-1" aria-hidden="true" tabindex="-1"></a>bad_mh <span class="op">=</span> Chem.AddHs(bad_m)</span>
+<span id="cb8-2"><a href="#cb8-2" aria-hidden="true" tabindex="-1"></a>ps <span class="op">=</span> rdDistGeom.ETKDGv3()</span>
+<span id="cb8-3"><a href="#cb8-3" aria-hidden="true" tabindex="-1"></a>ps.randomSeed <span class="op">=</span> <span class="bn">0xf00d</span></span>
+<span id="cb8-4"><a href="#cb8-4" aria-hidden="true" tabindex="-1"></a>rdDistGeom.EmbedMolecule(bad_mh,ps)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-display" data-execution_count="6">
+<pre><code>-1</code></pre>
+</div>
+</div>
+<p>The new functionality allows us to keep track of why the embedding failed:</p>
+<div class="cell" data-execution_count="7">
+<div class="sourceCode cell-code" id="cb10"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb10-1"><a href="#cb10-1" aria-hidden="true" tabindex="-1"></a>ps.trackFailures <span class="op">=</span> <span class="va">True</span></span>
+<span id="cb10-2"><a href="#cb10-2" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(rdDistGeom.EmbedMolecule(bad_mh,ps))</span>
+<span id="cb10-3"><a href="#cb10-3" aria-hidden="true" tabindex="-1"></a>counts <span class="op">=</span> ps.GetFailureCounts()</span>
+<span id="cb10-4"><a href="#cb10-4" aria-hidden="true" tabindex="-1"></a>counts</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>-1</code></pre>
+</div>
+<div class="cell-output cell-output-display" data-execution_count="7">
+<pre><code>(7, 11, 30, 0, 0, 0, 142, 0, 0, 0)</code></pre>
+</div>
+</div>
+<p>Here’s a quick loop over all the failure causes to see where the problems were:</p>
+<div class="cell" data-execution_count="8">
+<div class="sourceCode cell-code" id="cb13"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb13-1"><a href="#cb13-1" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> print_failure_causes(counts):</span>
+<span id="cb13-2"><a href="#cb13-2" aria-hidden="true" tabindex="-1"></a>    <span class="cf">for</span> i,k <span class="kw">in</span> <span class="bu">enumerate</span>(rdDistGeom.EmbedFailureCauses.names):</span>
+<span id="cb13-3"><a href="#cb13-3" aria-hidden="true" tabindex="-1"></a>        <span class="bu">print</span>(k,counts[i])</span>
+<span id="cb13-4"><a href="#cb13-4" aria-hidden="true" tabindex="-1"></a>    <span class="co"># in v2022.03.1 two names are missing from `rdDistGeom.EmbedFailureCauses`:</span></span>
+<span id="cb13-5"><a href="#cb13-5" aria-hidden="true" tabindex="-1"></a>    <span class="bu">print</span>(<span class="st">'LINEAR_DOUBLE_BOND'</span>,counts[i<span class="op">+</span><span class="dv">1</span>])</span>
+<span id="cb13-6"><a href="#cb13-6" aria-hidden="true" tabindex="-1"></a>    <span class="bu">print</span>(<span class="st">'BAD_DOUBLE_BOND_STEREO'</span>,counts[i<span class="op">+</span><span class="dv">2</span>])    </span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+<div class="cell" data-execution_count="9">
+<div class="sourceCode cell-code" id="cb14"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb14-1"><a href="#cb14-1" aria-hidden="true" tabindex="-1"></a>print_failure_causes(counts)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>INITIAL_COORDS 7
+FIRST_MINIMIZATION 11
+CHECK_TETRAHEDRAL_CENTERS 30
+CHECK_CHIRAL_CENTERS 0
+MINIMIZE_FOURTH_DIMENSION 0
+ETK_MINIMIZATION 0
+FINAL_CHIRAL_BOUNDS 142
+FINAL_CENTER_IN_VOLUME 0
+LINEAR_DOUBLE_BOND 0
+BAD_DOUBLE_BOND_STEREO 0</code></pre>
+</div>
+</div>
+<p>Here’s what the individual failures mean:</p>
+<ul>
+<li><code>INITIAL_COORDS</code>: generation of the initial coordinates from the random distance matrix (default) or from a set of random coordinates (when using random coordinate embedding) failed.</li>
+<li><code>FIRST_MINIMIZATION</code>: the initial optimization of the atom positions using the distance-geometry force field failed to produce a low-enough energy conformer. The check here has thresholds for both average energy per atom and the individual atom energies. I’m not providing the threshold values here since the energies from the distance-geometry force field are not physically meaningful - the threshold values are not interpretable.</li>
+<li><code>CHECK_TETRAHEDRAL_CENTERS</code>: at least one tetrahedral C and N centers either has a volume around it which is too small or is outside the volume defined by its neighbors</li>
+<li><code>MINIMIZE_FOURTH_DIMENSION</code>: the minmization to force the values of the fourth-dimensional component of each atom position failed</li>
+<li><code>ETK_MINIMIZATION</code>: after the minimization with the ET and/or K terms, at least one atom which should have been planar was not</li>
+<li><code>FINAL_CHIRAL_BOUNDS</code>: the neighborhood of an atom with specified chirality was too distorted (it violated distance constraints)</li>
+<li><code>FINAL_CENTER_IN_VOLUME</code>: an atom with specified chirality was outside of the volume defined by its neighbors</li>
+<li><code>LINEAR_DOUBLE_BOND</code>: one of the end atoms of a double bond had a linear geometry</li>
+<li><code>BAD_DOUBLE_BOND_STEREO</code>: the stereochemistry of a double bond with specified stereochemistry was wrong in the generated conformer</li>
+</ul>
+<p>Just for comparison, the starting molecule had no failures:</p>
+<div class="cell" data-execution_count="10">
+<div class="sourceCode cell-code" id="cb16"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb16-1"><a href="#cb16-1" aria-hidden="true" tabindex="-1"></a>ps.trackFailures <span class="op">=</span> <span class="va">True</span></span>
+<span id="cb16-2"><a href="#cb16-2" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(rdDistGeom.EmbedMolecule(mh,ps))</span>
+<span id="cb16-3"><a href="#cb16-3" aria-hidden="true" tabindex="-1"></a>counts <span class="op">=</span> ps.GetFailureCounts()</span>
+<span id="cb16-4"><a href="#cb16-4" aria-hidden="true" tabindex="-1"></a>counts</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>0</code></pre>
+</div>
+<div class="cell-output cell-output-display" data-execution_count="10">
+<pre><code>(0, 0, 0, 0, 0, 0, 0, 0, 0, 0)</code></pre>
+</div>
+</div>
+<p>Let’s try a more complicated molecule from ChEMBL; specified bond stereochemistry in macrocycles can also make conformer generation challenging.</p>
+<div class="cell" data-execution_count="11">
+<div class="sourceCode cell-code" id="cb19"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb19-1"><a href="#cb19-1" aria-hidden="true" tabindex="-1"></a>m <span class="op">=</span> Chem.MolFromSmiles(<span class="vs">r'COc1cc(O)c2CSC[C@H](\N=C(/S)\CCC[C@@H](CO)OC(=O)c2c1C)c3onc(C)n3'</span>)</span>
+<span id="cb19-2"><a href="#cb19-2" aria-hidden="true" tabindex="-1"></a>m</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-display" data-execution_count="11">
+<p><img src="2023-05-17-understanding-confgen-errors_files/figure-html/cell-12-output-1.png" class="img-fluid"></p>
+</div>
+</div>
+<div class="cell" data-scrolled="true" data-execution_count="12">
+<div class="sourceCode cell-code" id="cb20"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb20-1"><a href="#cb20-1" aria-hidden="true" tabindex="-1"></a>mh <span class="op">=</span> Chem.AddHs(m)</span>
+<span id="cb20-2"><a href="#cb20-2" aria-hidden="true" tabindex="-1"></a>ps <span class="op">=</span> rdDistGeom.ETKDGv3()</span>
+<span id="cb20-3"><a href="#cb20-3" aria-hidden="true" tabindex="-1"></a>ps.randomSeed <span class="op">=</span> <span class="bn">0xbadd06</span></span>
+<span id="cb20-4"><a href="#cb20-4" aria-hidden="true" tabindex="-1"></a>ps.trackFailures <span class="op">=</span> <span class="va">True</span></span>
+<span id="cb20-5"><a href="#cb20-5" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(rdDistGeom.EmbedMolecule(mh,ps))</span>
+<span id="cb20-6"><a href="#cb20-6" aria-hidden="true" tabindex="-1"></a>print_failure_causes(ps.GetFailureCounts())</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>0
+INITIAL_COORDS 2
+FIRST_MINIMIZATION 0
+CHECK_TETRAHEDRAL_CENTERS 0
+CHECK_CHIRAL_CENTERS 0
+MINIMIZE_FOURTH_DIMENSION 0
+ETK_MINIMIZATION 0
+FINAL_CHIRAL_BOUNDS 0
+FINAL_CENTER_IN_VOLUME 0
+LINEAR_DOUBLE_BOND 3
+BAD_DOUBLE_BOND_STEREO 4</code></pre>
+</div>
+</div>
+<p>Here we did get a conformer, but there were some rejected conformers along the way. The double-bond-related failures indicate that the code had some problems with the ring double bond with specified stereochemistry.</p>
+
+
+
+</main> <!-- /main -->
+<script id="quarto-html-after-body" type="application/javascript">
+window.document.addEventListener("DOMContentLoaded", function (event) {
+  const toggleBodyColorMode = (bsSheetEl) => {
+    const mode = bsSheetEl.getAttribute("data-mode");
+    const bodyEl = window.document.querySelector("body");
+    if (mode === "dark") {
+      bodyEl.classList.add("quarto-dark");
+      bodyEl.classList.remove("quarto-light");
+    } else {
+      bodyEl.classList.add("quarto-light");
+      bodyEl.classList.remove("quarto-dark");
+    }
+  }
+  const toggleBodyColorPrimary = () => {
+    const bsSheetEl = window.document.querySelector("link#quarto-bootstrap");
+    if (bsSheetEl) {
+      toggleBodyColorMode(bsSheetEl);
+    }
+  }
+  toggleBodyColorPrimary();  
+  const disableStylesheet = (stylesheets) => {
+    for (let i=0; i < stylesheets.length; i++) {
+      const stylesheet = stylesheets[i];
+      stylesheet.rel = 'prefetch';
+    }
+  }
+  const enableStylesheet = (stylesheets) => {
+    for (let i=0; i < stylesheets.length; i++) {
+      const stylesheet = stylesheets[i];
+      stylesheet.rel = 'stylesheet';
+    }
+  }
+  const manageTransitions = (selector, allowTransitions) => {
+    const els = window.document.querySelectorAll(selector);
+    for (let i=0; i < els.length; i++) {
+      const el = els[i];
+      if (allowTransitions) {
+        el.classList.remove('notransition');
+      } else {
+        el.classList.add('notransition');
+      }
+    }
+  }
+  const toggleColorMode = (alternate) => {
+    // Switch the stylesheets
+    const alternateStylesheets = window.document.querySelectorAll('link.quarto-color-scheme.quarto-color-alternate');
+    manageTransitions('#quarto-margin-sidebar .nav-link', false);
+    if (alternate) {
+      enableStylesheet(alternateStylesheets);
+      for (const sheetNode of alternateStylesheets) {
+        if (sheetNode.id === "quarto-bootstrap") {
+          toggleBodyColorMode(sheetNode);
+        }
+      }
+    } else {
+      disableStylesheet(alternateStylesheets);
+      toggleBodyColorPrimary();
+    }
+    manageTransitions('#quarto-margin-sidebar .nav-link', true);
+    // Switch the toggles
+    const toggles = window.document.querySelectorAll('.quarto-color-scheme-toggle');
+    for (let i=0; i < toggles.length; i++) {
+      const toggle = toggles[i];
+      if (toggle) {
+        if (alternate) {
+          toggle.classList.add("alternate");     
+        } else {
+          toggle.classList.remove("alternate");
+        }
+      }
+    }
+    // Hack to workaround the fact that safari doesn't
+    // properly recolor the scrollbar when toggling (#1455)
+    if (navigator.userAgent.indexOf('Safari') > 0 && navigator.userAgent.indexOf('Chrome') == -1) {
+      manageTransitions("body", false);
+      window.scrollTo(0, 1);
+      setTimeout(() => {
+        window.scrollTo(0, 0);
+        manageTransitions("body", true);
+      }, 40);  
+    }
+  }
+  const isFileUrl = () => { 
+    return window.location.protocol === 'file:';
+  }
+  const hasAlternateSentinel = () => {  
+    let styleSentinel = getColorSchemeSentinel();
+    if (styleSentinel !== null) {
+      return styleSentinel === "alternate";
+    } else {
+      return false;
+    }
+  }
+  const setStyleSentinel = (alternate) => {
+    const value = alternate ? "alternate" : "default";
+    if (!isFileUrl()) {
+      window.localStorage.setItem("quarto-color-scheme", value);
+    } else {
+      localAlternateSentinel = value;
+    }
+  }
+  const getColorSchemeSentinel = () => {
+    if (!isFileUrl()) {
+      const storageValue = window.localStorage.getItem("quarto-color-scheme");
+      return storageValue != null ? storageValue : localAlternateSentinel;
+    } else {
+      return localAlternateSentinel;
+    }
+  }
+  let localAlternateSentinel = 'default';
+  // Dark / light mode switch
+  window.quartoToggleColorScheme = () => {
+    // Read the current dark / light value 
+    let toAlternate = !hasAlternateSentinel();
+    toggleColorMode(toAlternate);
+    setStyleSentinel(toAlternate);
+  };
+  // Ensure there is a toggle, if there isn't float one in the top right
+  if (window.document.querySelector('.quarto-color-scheme-toggle') === null) {
+    const a = window.document.createElement('a');
+    a.classList.add('top-right');
+    a.classList.add('quarto-color-scheme-toggle');
+    a.href = "";
+    a.onclick = function() { try { window.quartoToggleColorScheme(); } catch {} return false; };
+    const i = window.document.createElement("i");
+    i.classList.add('bi');
+    a.appendChild(i);
+    window.document.body.appendChild(a);
+  }
+  // Switch to dark mode if need be
+  if (hasAlternateSentinel()) {
+    toggleColorMode(true);
+  } else {
+    toggleColorMode(false);
+  }
+  const icon = "";
+  const anchorJS = new window.AnchorJS();
+  anchorJS.options = {
+    placement: 'right',
+    icon: icon
+  };
+  anchorJS.add('.anchored');
+  const clipboard = new window.ClipboardJS('.code-copy-button', {
+    target: function(trigger) {
+      return trigger.previousElementSibling;
+    }
+  });
+  clipboard.on('success', function(e) {
+    // button target
+    const button = e.trigger;
+    // don't keep focus
+    button.blur();
+    // flash "checked"
+    button.classList.add('code-copy-button-checked');
+    var currentTitle = button.getAttribute("title");
+    button.setAttribute("title", "Copied!");
+    let tooltip;
+    if (window.bootstrap) {
+      button.setAttribute("data-bs-toggle", "tooltip");
+      button.setAttribute("data-bs-placement", "left");
+      button.setAttribute("data-bs-title", "Copied!");
+      tooltip = new bootstrap.Tooltip(button, 
+        { trigger: "manual", 
+          customClass: "code-copy-button-tooltip",
+          offset: [0, -8]});
+      tooltip.show();    
+    }
+    setTimeout(function() {
+      if (tooltip) {
+        tooltip.hide();
+        button.removeAttribute("data-bs-title");
+        button.removeAttribute("data-bs-toggle");
+        button.removeAttribute("data-bs-placement");
+      }
+      button.setAttribute("title", currentTitle);
+      button.classList.remove('code-copy-button-checked');
+    }, 1000);
+    // clear code selection
+    e.clearSelection();
+  });
+  function tippyHover(el, contentFn) {
+    const config = {
+      allowHTML: true,
+      content: contentFn,
+      maxWidth: 500,
+      delay: 100,
+      arrow: false,
+      appendTo: function(el) {
+          return el.parentElement;
+      },
+      interactive: true,
+      interactiveBorder: 10,
+      theme: 'quarto',
+      placement: 'bottom-start'
+    };
+    window.tippy(el, config); 
+  }
+  const noterefs = window.document.querySelectorAll('a[role="doc-noteref"]');
+  for (var i=0; i<noterefs.length; i++) {
+    const ref = noterefs[i];
+    tippyHover(ref, function() {
+      // use id or data attribute instead here
+      let href = ref.getAttribute('data-footnote-href') || ref.getAttribute('href');
+      try { href = new URL(href).hash; } catch {}
+      const id = href.replace(/^#\/?/, "");
+      const note = window.document.getElementById(id);
+      return note.innerHTML;
+    });
+  }
+  const findCites = (el) => {
+    const parentEl = el.parentElement;
+    if (parentEl) {
+      const cites = parentEl.dataset.cites;
+      if (cites) {
+        return {
+          el,
+          cites: cites.split(' ')
+        };
+      } else {
+        return findCites(el.parentElement)
+      }
+    } else {
+      return undefined;
+    }
+  };
+  var bibliorefs = window.document.querySelectorAll('a[role="doc-biblioref"]');
+  for (var i=0; i<bibliorefs.length; i++) {
+    const ref = bibliorefs[i];
+    const citeInfo = findCites(ref);
+    if (citeInfo) {
+      tippyHover(citeInfo.el, function() {
+        var popup = window.document.createElement('div');
+        citeInfo.cites.forEach(function(cite) {
+          var citeDiv = window.document.createElement('div');
+          citeDiv.classList.add('hanging-indent');
+          citeDiv.classList.add('csl-entry');
+          var biblioDiv = window.document.getElementById('ref-' + cite);
+          if (biblioDiv) {
+            citeDiv.innerHTML = biblioDiv.innerHTML;
+          }
+          popup.appendChild(citeDiv);
+        });
+        return popup.innerHTML;
+      });
+    }
+  }
+});
+</script>
+<script src="https://utteranc.es/client.js" repo="greglandrum/rdkit-blog" issue-term="pathname" theme="github-light" crossorigin="anonymous" async="">
+</script>
+</div> <!-- /content -->
+
+
+
+</body></html>
