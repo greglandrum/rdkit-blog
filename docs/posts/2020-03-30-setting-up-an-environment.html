@@ -2,7 +2,7 @@
 <html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en"><head>
 
 <meta charset="utf-8">
-<meta name="generator" content="quarto-1.2.269">
+<meta name="generator" content="quarto-1.2.280">
 
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
 
@@ -164,16 +164,17 @@ ul.task-list li input[type="checkbox"] {
 </header>
 
 <p><strong>Updated 24.05.2023</strong></p>
-<p>It has been tricky to contribute code or documentation to the RDKit if you’re a Python programmer who doesn’t want to deal with the complexities of getting an RDKit build working. We want to make it straightforward for people to contribute, so I’m working on some recipes to make thigs easier. This is the first pass at that.</p>
+<p>It has been tricky to contribute code or documentation to the RDKit if you’re a Python programmer who doesn’t want to deal with the complexities of getting an RDKit build working. We want to make it straightforward for people to contribute, so I’m working on some recipes to make thigs easier. This is an attempt at that.</p>
 <p>In order to fix bugs or add features in Python you need to be able to clone a local fork of the RDKit from github, modify the code in that local clone, and then run the local code in order to test it. The problem is that most RDKit functionality requires some binary components that need to be built from C++ and installed in the appropriate places. We’re going to work around that problem here by copying the binary components from a recent binary distribution of the RDKit into a local clone of the RDKit repo.</p>
 <p>I’m going to explain each of the required steps, but the complete set of steps required is at the bottom of this post. Assuming that you have the prerequisites (explained directly below), I hope that these will “just work” for you, but one never knows… I’d like to be able to include this in the RDKit documentation, so please me know how it goes if you try the recipe out. Please do not add a comment to this blog post, I’ve created a <a href="https://github.com/rdkit/rdkit/issues/3052">github issue</a> so that we have the comments in one place. If you don’t have a github account, please email me your comments and I’ll add them to the issue.</p>
 <section id="the-steps-explained" class="level1">
 <h1>The steps explained</h1>
-<p>At the moment this recipe only works on linux and the mac. I will put together a similar recipe for windows and either do a separate post or update this one.</p>
+<p>These instructions should work on linux, the Mac, and Windows. I’ve tried to indicate when there are differences between platforms. If I missed something, please let me know in the <a href="https://github.com/rdkit/rdkit/issues/3052">github issue</a>.</p>
 <p>Prerequisites:</p>
 <ul>
 <li>you need to have either anaconda python or miniconda installed and in your path</li>
 <li>you need to have git installed and in your path</li>
+<li><strong>On Windows</strong>: these instructions assume that you are running in git bash (or some other capable bash-type shell). I’m sure you can do all of this in powershell, but I haven’t managed to figure that out.</li>
 </ul>
 <p>You should start by changing into the directory where you want to clone the RDKit source repository and then running:</p>
 <pre><code>git clone https://github.com/rdkit/rdkit.git</code></pre>
@@ -185,16 +186,23 @@ export RDBASE=`pwd`</code></pre>
 conda activate py311_rdkit_beta
 conda install -y -c conda-forge rdkit</code></pre>
 <p>These instructions set up an environment using python 3.11; feel free to change that if you’d prefer another python version. You will need to adjust the path below. If you have other Python packages that you’d like to work with, go ahead and install them into the environment now.</p>
-<p>Next we copy the RDKit binary components from that environment into our local clone of the RDKit repo:</p>
+<p>Next we copy the RDKit binary components from that environment into our local clone of the RDKit repo.</p>
+<p>On Linux and the Mac you can do this as follows:</p>
 <pre><code>cd $CONDA_PREFIX/lib/python3.11/site-packages/rdkit
 rsync -a -m --include '*/' --include='*.so' --include='inchi.py' --exclude='*' . $RDBASE/rdkit</code></pre>
 <p>NOTE: that rsync command should be one long line.</p>
+<p>On Windows that’s:</p>
+<pre><code>cd $CONDA_PREFIX/lib/python3.11/site-packages/rdkit
+find . -name '*.pyd' -exec cp --parents \{\} $RDBASE/rdkit \; 
+cp Chem/inchi.py $RDBASE/rdkit/Chem</code></pre>
 <p>Finally we set our PYTHONPATH and then test that everything is working by importing the RDKit’s Chem module:</p>
 <pre><code>export PYTHONPATH="$RDBASE"
 cd $RDBASE/rdkit
 python -c 'from rdkit import Chem;print(Chem.__file__)'</code></pre>
 <p>That last command should not generate errors and should show you a filename that is in your local github clone. As an example, I started the first step of this process in my /scratch/rdkit_devel directory, so I see:</p>
 <pre><code>/scratch/rdkit_devel/rdkit/rdkit/Chem/__init__.py</code></pre>
+<p>On Windows I am working in my Code/rdkit_tmp directory, so I see:</p>
+<pre><code>c:\Users\glandrum\Code\rdkit_tmp\rdkit\Chem\__init__.py</code></pre>
 </section>
 <section id="running-the-tests" class="level1">
 <h1>Running the tests</h1>
@@ -214,7 +222,7 @@ export PYTHONPATH="$RDBASE"</code></pre>
 </section>
 <section id="the-recipe" class="level1">
 <h1>The recipe</h1>
-<p>Here’s the complete recipe:</p>
+<p>Here’s the complete recipe for linux and the Mac:</p>
 <pre><code>git clone https://github.com/rdkit/rdkit.git
 cd rdkit
 export RDBASE=`pwd`
@@ -223,6 +231,19 @@ conda activate py311_rdkit_beta
 conda install -y -c conda-forge rdkit
 cd $CONDA_PREFIX/lib/python3.11/site-packages/rdkit
 rsync -a -m --include '*/' --include='*.so' --include='inchi.py' --exclude='*' . $RDBASE/rdkit
+export PYTHONPATH="$RDBASE"
+cd $RDBASE/rdkit
+python -c 'from rdkit import Chem;print(Chem.__file__)'</code></pre>
+<p>and for Windows:</p>
+<pre><code>git clone https://github.com/rdkit/rdkit.git
+cd rdkit
+export RDBASE=`pwd`
+conda create -y -n py311_rdkit_beta python=3.11
+conda activate py311_rdkit_beta
+conda install -y -c conda-forge rdkit
+cd $CONDA_PREFIX/lib/python3.11/site-packages/rdkit
+find . -name '*.pyd' -exec cp --parents \{\} $RDBASE/rdkit \; 
+cp Chem/inchi.py $RDBASE/rdkit/Chem 
 export PYTHONPATH="$RDBASE"
 cd $RDBASE/rdkit
 python -c 'from rdkit import Chem;print(Chem.__file__)'</code></pre>
