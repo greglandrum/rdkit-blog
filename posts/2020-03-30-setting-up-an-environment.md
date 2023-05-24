@@ -12,11 +12,13 @@ toc: true
 
 ---
 
+**Updated 24.05.2023**
+
 It has been tricky to contribute code or documentation to the RDKit if you're a Python programmer who doesn't want to deal with the complexities of getting an RDKit build working. We want to make it straightforward for people to contribute, so I'm working on some recipes to make thigs easier. This is the first pass at that.
 
 In order to fix bugs or add features in Python you need to be able to clone a local fork of the RDKit from github, modify the code in that local clone, and then run the local code in order to test it. The problem is that most RDKit functionality requires some binary components that need to be built from C++ and installed in the appropriate places. We're going to work around that problem here by copying the binary components from a recent binary distribution of the RDKit into a local clone of the RDKit repo.
 
-I'm going to explain each of the required steps, but the complete set of steps required is at the bottom of this post. Assuming that you have the prerequisites (explained directly below), I hope that these will "just work" for you, but one never knows... I'd like to be able to include this in the RDKit documentation, so please me know how it goes if you try the recipe out. Please do not add a comment to this blog post, I've created a github issue so that we have the comments in one place. If you don't have a github account, please email me your comments and I'll add them to the issue.
+I'm going to explain each of the required steps, but the complete set of steps required is at the bottom of this post. Assuming that you have the prerequisites (explained directly below), I hope that these will "just work" for you, but one never knows... I'd like to be able to include this in the RDKit documentation, so please me know how it goes if you try the recipe out. Please do not add a comment to this blog post, I've created a [github issue](https://github.com/rdkit/rdkit/issues/3052) so that we have the comments in one place. If you don't have a github account, please email me your comments and I'll add them to the issue.
 
 # The steps explained
 At the moment this recipe only works on linux and the mac. I will put together a similar recipe for windows and either do a separate post or update this one.
@@ -39,20 +41,21 @@ cd rdkit
 export RDBASE=`pwd`
 ```
 
-The next step is to create the conda environment that we're going to use to hold the RDKit binary components and install a recent beta version of the RDKit into that environment:
+The next step is to create the conda environment that we're going to use to hold the RDKit binary components and install the most recent version of the RDKit into that environment:
 
 ```
-conda create -y -n py37_rdkit_beta python=3.7
-conda activate py37_rdkit_beta
-conda install -y -c rdkit/label/beta rdkit
+conda create -y -n py311_rdkit_beta python=3.11
+conda activate py311_rdkit_beta
+conda install -y -c conda-forge rdkit
 ```
 
+These instructions set up an environment using python 3.11; feel free to change that if you'd prefer another python version. You will need to adjust the path below.
 If you have other Python packages that you'd like to work with, go ahead and install them into the environment now.
 
 Next we copy the RDKit binary components from that environment into our local clone of the RDKit repo:
 
 ```
-cd $CONDA_PREFIX/lib/python3.7/site-packages/rdkit
+cd $CONDA_PREFIX/lib/python3.11/site-packages/rdkit
 rsync -a -m --include '*/' --include='*.so' --include='inchi.py' --exclude='*' . $RDBASE/rdkit
 ```
 
@@ -87,10 +90,10 @@ Script: test_list.py.  Passed 40 tests in 69.70 seconds
 ```
 
 # Finishing up
-You're set. The one thing to remember is that whenever you want to use this environment in a new terminal window or shell, you need to activate the py37_rdkit_beta conda environment (don't delete it!), set RDBASE, and set your PYTHONPATH:
+You're set. The one thing to remember is that whenever you want to use this environment in a new terminal window or shell, you need to activate the py311_rdkit_beta conda environment (don't delete it!), set RDBASE, and set your PYTHONPATH:
 
 ```
-conda activate py37_rdkit_beta
+conda activate py311_rdkit_beta
 cd your_local_rdkit_clone  # <- replace this with the real name of the directory
 export RDBASE=`pwd`
 export PYTHONPATH="$RDBASE"
@@ -103,10 +106,10 @@ Here's the complete recipe:
 git clone https://github.com/rdkit/rdkit.git
 cd rdkit
 export RDBASE=`pwd`
-conda create -y -n py37_rdkit_beta python=3.7
-conda activate py37_rdkit_beta
-conda install -y -c rdkit/label/beta rdkit
-cd $CONDA_PREFIX/lib/python3.7/site-packages/rdkit
+conda create -y -n py311_rdkit_beta python=3.11
+conda activate py311_rdkit_beta
+conda install -y -c conda-forge rdkit
+cd $CONDA_PREFIX/lib/python3.11/site-packages/rdkit
 rsync -a -m --include '*/' --include='*.so' --include='inchi.py' --exclude='*' . $RDBASE/rdkit
 export PYTHONPATH="$RDBASE"
 cd $RDBASE/rdkit
