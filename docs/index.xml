@@ -10,7 +10,507 @@
 <atom:link href="https://greglandrum.github.io/rdkit-blog/index.xml" rel="self" type="application/rss+xml"/>
 <description>RDKit experiments, tips, and tutorials</description>
 <generator>quarto-1.2.269</generator>
-<lastBuildDate>Tue, 24 Oct 2023 22:00:00 GMT</lastBuildDate>
+<lastBuildDate>Thu, 26 Oct 2023 22:00:00 GMT</lastBuildDate>
+<item>
+  <title>New MCS features in 2023.09.1</title>
+  <link>https://greglandrum.github.io/rdkit-blog/posts/2023-10-27-mcswhatsnew.html</link>
+  <description><![CDATA[ 
+
+
+
+<p>This guest post by Paolo Tosco (GitHub: <span class="citation" data-cites="ptosco">@ptosco</span>), one of the RDKit core maintainers, is the fourth of a few posts covering some of the new or improved features in the 2023.09.1 RDKit release.</p>
+<p>A PR of mine dealing with MCS code clean up, refactoring and fixing open bugs has been open for one year or so.<br><br> The growing sense of guilt, together with new and more exciting bugs being found by myself and others during this year, prompted me to take it up again.<br><br> Eventually, I managed to complete the PR, which fixed all outstanding MCS-related bugs at the time of PR submission.<br><br> The PR was merged with no changes.<br> <a href="https://github.com/rdkit/rdkit/pull/6646">A quick glance at the PR will tell you that this was not necessarily due to my impeccable code style.</a></p>
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="https://greglandrum.github.io/rdkit-blog/posts/2023-10-27-mcswhatsnew_files/figure-html/178d15e4-ffdf-45e8-838f-0374c4cae9ac-1-e36fdb59-83a6-4d0a-9137-621513a7613e.png" class="img-fluid figure-img"></p>
+<p></p><figcaption class="figure-caption">image.png</figcaption><p></p>
+</figure>
+</div>
+<p>In addition to several bug fixes, the PR introduces significant performance improvements, particularly for difficult MCS cases involving the <code>CompleteRingsOnly</code> flag, which now run in finite time rather than just hanging and slowly consuming all of the available memory as they used to.</p>
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="https://greglandrum.github.io/rdkit-blog/posts/2023-10-27-mcswhatsnew_files/figure-html/eb695d0c-d771-4d9e-b85a-aac872b9ec84-1-8bd21686-5140-4528-8f18-94cc03234dd9.png" class="img-fluid figure-img"></p>
+<p></p><figcaption class="figure-caption">image.png</figcaption><p></p>
+</figure>
+</div>
+<p>Here I would like to showcase the new features introduced as part of this PR, which relate to requests I had from colleagues as well as from members of the community.</p>
+<section id="custom-python-atomcompare-and-bondcompare-classes" class="level1">
+<h1>Custom Python <code>AtomCompare</code> and <code>BondCompare</code> classes</h1>
+<p>Actually I have already implemented this feature some time ago, but I am not sure how many users are aware of it; therefore, in the following you will find a quick refresher.</p>
+<div class="cell" data-execution="{&quot;iopub.execute_input&quot;:&quot;2023-10-24T09:01:52.563359Z&quot;,&quot;iopub.status.busy&quot;:&quot;2023-10-24T09:01:52.562780Z&quot;,&quot;iopub.status.idle&quot;:&quot;2023-10-24T09:01:52.759490Z&quot;,&quot;shell.execute_reply&quot;:&quot;2023-10-24T09:01:52.758313Z&quot;,&quot;shell.execute_reply.started&quot;:&quot;2023-10-24T09:01:52.563321Z&quot;}" data-tags="[]" data-execution_count="1">
+<div class="sourceCode cell-code" id="cb1" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb1-1"><span class="im" style="color: #00769E;">from</span> rdkit <span class="im" style="color: #00769E;">import</span> Chem</span>
+<span id="cb1-2"><span class="im" style="color: #00769E;">from</span> rdkit.Chem <span class="im" style="color: #00769E;">import</span> rdFMCS</span>
+<span id="cb1-3"><span class="im" style="color: #00769E;">from</span> rdkit.Chem.Draw <span class="im" style="color: #00769E;">import</span> IPythonConsole, MolsToGridImage</span></code></pre></div>
+</div>
+<p>Let’s assume that for some reason we would like to implement a custom MCS criterion that will ignore elements and bond orders/aromaticity in ring systems, while enforcing element and bond order consideration in non-ring portions of the molecules.<br> This is not something which is readily available among the built-in <a href="https://rdkit.org/docs/source/rdkit.Chem.rdFMCS.html#rdkit.Chem.rdFMCS.AtomCompare">AtomCompare</a> and <a href="https://rdkit.org/docs/source/rdkit.Chem.rdFMCS.html#rdkit.Chem.rdFMCS.BondCompare">BondCompare</a> options; therefore, we will need custom subclasses, respectively derived from <code>AtomCompare</code> and <code>BondCompare</code> classes.</p>
+<div class="cell" data-execution="{&quot;iopub.execute_input&quot;:&quot;2023-10-24T09:01:52.760671Z&quot;,&quot;iopub.status.busy&quot;:&quot;2023-10-24T09:01:52.760388Z&quot;,&quot;iopub.status.idle&quot;:&quot;2023-10-24T09:01:52.767806Z&quot;,&quot;shell.execute_reply&quot;:&quot;2023-10-24T09:01:52.766853Z&quot;,&quot;shell.execute_reply.started&quot;:&quot;2023-10-24T09:01:52.760650Z&quot;}" data-tags="[]" data-execution_count="2">
+<div class="sourceCode cell-code" id="cb2" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb2-1">mols <span class="op" style="color: #5E5E5E;">=</span> [Chem.MolFromSmiles(smi) <span class="cf" style="color: #003B4F;">for</span> smi <span class="kw" style="color: #003B4F;">in</span> <span class="st" style="color: #20794D;">"""C[C@H]1COC2=C3N1C=C(C(=O)C3=CC(=C2N4CCN(CC4)C)F)C(=O)O</span></span>
+<span id="cb2-2"><span class="st" style="color: #20794D;">C1[C@@H]2[C@@H](C2N)CN1C3=C(C=C4C(=O)C(=CN(C4=N3)C5=C(C=C(C=C5)F)F)C(=O)O)F</span></span>
+<span id="cb2-3"><span class="st" style="color: #20794D;">CN(C)CC[C@@](C1=CC=CC2=CC=CC=C21)([C@H](C3=CC=CC=C3)C4=C(N=C5C=CC(=CC5=C4)Br)OC)O</span></span>
+<span id="cb2-4"><span class="st" style="color: #20794D;">"""</span>.split()]</span></code></pre></div>
+</div>
+<div class="cell" data-execution="{&quot;iopub.execute_input&quot;:&quot;2023-10-24T09:01:52.769008Z&quot;,&quot;iopub.status.busy&quot;:&quot;2023-10-24T09:01:52.768693Z&quot;,&quot;iopub.status.idle&quot;:&quot;2023-10-24T09:01:52.841755Z&quot;,&quot;shell.execute_reply&quot;:&quot;2023-10-24T09:01:52.840603Z&quot;,&quot;shell.execute_reply.started&quot;:&quot;2023-10-24T09:01:52.768974Z&quot;}" data-tags="[]" data-execution_count="3">
+<div class="sourceCode cell-code" id="cb3" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb3-1">MolsToGridImage(mols, subImgSize<span class="op" style="color: #5E5E5E;">=</span>(<span class="dv" style="color: #AD0000;">300</span>, <span class="dv" style="color: #AD0000;">200</span>))</span></code></pre></div>
+<div class="cell-output cell-output-display" data-execution_count="3">
+<p><img src="https://greglandrum.github.io/rdkit-blog/posts/2023-10-27-mcswhatsnew_files/figure-html/cell-4-output-1.png" class="img-fluid"></p>
+</div>
+</div>
+<p>WIth this rather standard set of parameters, which enforces that ring bonds should only match ring bonds and that rings should be complete, the MCS is 3-methylpyridine:</p>
+<div class="cell" data-execution="{&quot;iopub.execute_input&quot;:&quot;2023-10-24T09:01:52.843060Z&quot;,&quot;iopub.status.busy&quot;:&quot;2023-10-24T09:01:52.842819Z&quot;,&quot;iopub.status.idle&quot;:&quot;2023-10-24T09:01:52.877856Z&quot;,&quot;shell.execute_reply&quot;:&quot;2023-10-24T09:01:52.876509Z&quot;,&quot;shell.execute_reply.started&quot;:&quot;2023-10-24T09:01:52.843040Z&quot;}" data-tags="[]" data-execution_count="4">
+<div class="sourceCode cell-code" id="cb4" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb4-1">params <span class="op" style="color: #5E5E5E;">=</span> rdFMCS.MCSParameters()</span>
+<span id="cb4-2">params.AtomTyper <span class="op" style="color: #5E5E5E;">=</span> rdFMCS.AtomCompare.CompareElements</span>
+<span id="cb4-3">params.BondTyper <span class="op" style="color: #5E5E5E;">=</span> rdFMCS.BondCompare.CompareOrder</span>
+<span id="cb4-4">params.BondCompareParameters.RingMatchesRingOnly <span class="op" style="color: #5E5E5E;">=</span> <span class="va" style="color: #111111;">True</span></span>
+<span id="cb4-5">params.BondCompareParameters.CompleteRingsOnly <span class="op" style="color: #5E5E5E;">=</span> <span class="va" style="color: #111111;">True</span></span></code></pre></div>
+</div>
+<div class="cell" data-execution="{&quot;iopub.execute_input&quot;:&quot;2023-10-24T09:01:52.881102Z&quot;,&quot;iopub.status.busy&quot;:&quot;2023-10-24T09:01:52.879978Z&quot;,&quot;iopub.status.idle&quot;:&quot;2023-10-24T09:01:52.994359Z&quot;,&quot;shell.execute_reply&quot;:&quot;2023-10-24T09:01:52.992969Z&quot;,&quot;shell.execute_reply.started&quot;:&quot;2023-10-24T09:01:52.881041Z&quot;}" data-tags="[]" data-execution_count="5">
+<div class="sourceCode cell-code" id="cb5" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb5-1">mcs <span class="op" style="color: #5E5E5E;">=</span> rdFMCS.FindMCS(mols, params)</span></code></pre></div>
+</div>
+<div class="cell" data-execution="{&quot;iopub.execute_input&quot;:&quot;2023-10-24T09:01:52.999790Z&quot;,&quot;iopub.status.busy&quot;:&quot;2023-10-24T09:01:52.999440Z&quot;,&quot;iopub.status.idle&quot;:&quot;2023-10-24T09:01:53.109988Z&quot;,&quot;shell.execute_reply&quot;:&quot;2023-10-24T09:01:53.109048Z&quot;,&quot;shell.execute_reply.started&quot;:&quot;2023-10-24T09:01:52.999763Z&quot;}" data-tags="[]" data-execution_count="6">
+<div class="sourceCode cell-code" id="cb6" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb6-1">MolsToGridImage(mols, subImgSize<span class="op" style="color: #5E5E5E;">=</span>(<span class="dv" style="color: #AD0000;">300</span>, <span class="dv" style="color: #AD0000;">200</span>), highlightAtomLists<span class="op" style="color: #5E5E5E;">=</span>[m.GetSubstructMatch(mcs.queryMol) <span class="cf" style="color: #003B4F;">for</span> m <span class="kw" style="color: #003B4F;">in</span> mols])</span></code></pre></div>
+<div class="cell-output cell-output-display" data-execution_count="6">
+<p><img src="https://greglandrum.github.io/rdkit-blog/posts/2023-10-27-mcswhatsnew_files/figure-html/cell-7-output-1.png" class="img-fluid"></p>
+</div>
+</div>
+<div class="cell" data-execution="{&quot;iopub.execute_input&quot;:&quot;2023-10-24T09:01:53.111119Z&quot;,&quot;iopub.status.busy&quot;:&quot;2023-10-24T09:01:53.110888Z&quot;,&quot;iopub.status.idle&quot;:&quot;2023-10-24T09:01:53.144364Z&quot;,&quot;shell.execute_reply&quot;:&quot;2023-10-24T09:01:53.142743Z&quot;,&quot;shell.execute_reply.started&quot;:&quot;2023-10-24T09:01:53.111098Z&quot;}" data-tags="[]" data-execution_count="7">
+<div class="sourceCode cell-code" id="cb7" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb7-1"><span class="kw" style="color: #003B4F;">class</span> CompareOrderOutsideRings(rdFMCS.MCSBondCompare):</span>
+<span id="cb7-2">    <span class="kw" style="color: #003B4F;">def</span> <span class="fu" style="color: #4758AB;">__call__</span>(<span class="va" style="color: #111111;">self</span>, p, mol1, bond1, mol2, bond2):</span>
+<span id="cb7-3">        b1 <span class="op" style="color: #5E5E5E;">=</span> mol1.GetBondWithIdx(bond1)</span>
+<span id="cb7-4">        b2 <span class="op" style="color: #5E5E5E;">=</span> mol2.GetBondWithIdx(bond2)</span>
+<span id="cb7-5">        <span class="cf" style="color: #003B4F;">if</span> (b1.IsInRing() <span class="kw" style="color: #003B4F;">and</span> b2.IsInRing()) <span class="kw" style="color: #003B4F;">or</span> (b1.GetBondType() <span class="op" style="color: #5E5E5E;">==</span> b2.GetBondType()):</span>
+<span id="cb7-6">            <span class="cf" style="color: #003B4F;">if</span> (p.MatchStereo <span class="kw" style="color: #003B4F;">and</span> <span class="kw" style="color: #003B4F;">not</span> <span class="va" style="color: #111111;">self</span>.CheckBondStereo(p, mol1, bond1, mol2, bond2)):</span>
+<span id="cb7-7">                <span class="cf" style="color: #003B4F;">return</span> <span class="va" style="color: #111111;">False</span></span>
+<span id="cb7-8">            <span class="cf" style="color: #003B4F;">if</span> p.RingMatchesRingOnly:</span>
+<span id="cb7-9">                <span class="cf" style="color: #003B4F;">return</span> <span class="va" style="color: #111111;">self</span>.CheckBondRingMatch(p, mol1, bond1, mol2, bond2)</span>
+<span id="cb7-10">            <span class="cf" style="color: #003B4F;">return</span> <span class="va" style="color: #111111;">True</span></span>
+<span id="cb7-11">        <span class="cf" style="color: #003B4F;">return</span> <span class="va" style="color: #111111;">False</span></span></code></pre></div>
+</div>
+<div class="cell" data-execution="{&quot;iopub.execute_input&quot;:&quot;2023-10-24T09:01:53.147571Z&quot;,&quot;iopub.status.busy&quot;:&quot;2023-10-24T09:01:53.146861Z&quot;,&quot;iopub.status.idle&quot;:&quot;2023-10-24T09:01:53.206851Z&quot;,&quot;shell.execute_reply&quot;:&quot;2023-10-24T09:01:53.205003Z&quot;,&quot;shell.execute_reply.started&quot;:&quot;2023-10-24T09:01:53.147526Z&quot;}" data-tags="[]" data-execution_count="8">
+<div class="sourceCode cell-code" id="cb8" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb8-1"><span class="kw" style="color: #003B4F;">class</span> CompareElementsOutsideRings(rdFMCS.MCSAtomCompare):</span>
+<span id="cb8-2">    <span class="kw" style="color: #003B4F;">def</span> <span class="fu" style="color: #4758AB;">__call__</span>(<span class="va" style="color: #111111;">self</span>, p, mol1, atom1, mol2, atom2):</span>
+<span id="cb8-3">        a1 <span class="op" style="color: #5E5E5E;">=</span> mol1.GetAtomWithIdx(atom1)</span>
+<span id="cb8-4">        a2 <span class="op" style="color: #5E5E5E;">=</span> mol2.GetAtomWithIdx(atom2)</span>
+<span id="cb8-5">        <span class="cf" style="color: #003B4F;">if</span> (a1.GetAtomicNum() <span class="op" style="color: #5E5E5E;">!=</span> a2.GetAtomicNum()) <span class="kw" style="color: #003B4F;">and</span> <span class="kw" style="color: #003B4F;">not</span> (a1.IsInRing() <span class="kw" style="color: #003B4F;">and</span> a2.IsInRing()):</span>
+<span id="cb8-6">            <span class="cf" style="color: #003B4F;">return</span> <span class="va" style="color: #111111;">False</span></span>
+<span id="cb8-7">        <span class="cf" style="color: #003B4F;">if</span> (p.MatchChiralTag <span class="kw" style="color: #003B4F;">and</span> <span class="kw" style="color: #003B4F;">not</span> <span class="va" style="color: #111111;">self</span>.CheckAtomChirality(p, mol1, atom1, mol2, atom2)):</span>
+<span id="cb8-8">            <span class="cf" style="color: #003B4F;">return</span> <span class="va" style="color: #111111;">False</span></span>
+<span id="cb8-9">        <span class="cf" style="color: #003B4F;">if</span> p.RingMatchesRingOnly:</span>
+<span id="cb8-10">            <span class="cf" style="color: #003B4F;">return</span> <span class="va" style="color: #111111;">self</span>.CheckAtomRingMatch(p, mol1, atom1, mol2, atom2)</span>
+<span id="cb8-11">        <span class="cf" style="color: #003B4F;">return</span> <span class="va" style="color: #111111;">True</span></span></code></pre></div>
+</div>
+<p>By using our more lenient atom/bond comparison criterion, while keeping the constraint that ring atoms should only match ring atoms and that rings should be complete, we retrieve a larger MCS:</p>
+<div class="cell" data-execution="{&quot;iopub.execute_input&quot;:&quot;2023-10-24T09:01:53.210742Z&quot;,&quot;iopub.status.busy&quot;:&quot;2023-10-24T09:01:53.209759Z&quot;,&quot;iopub.status.idle&quot;:&quot;2023-10-24T09:01:53.318014Z&quot;,&quot;shell.execute_reply&quot;:&quot;2023-10-24T09:01:53.316083Z&quot;,&quot;shell.execute_reply.started&quot;:&quot;2023-10-24T09:01:53.210680Z&quot;}" data-tags="[]" data-execution_count="9">
+<div class="sourceCode cell-code" id="cb9" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb9-1">params <span class="op" style="color: #5E5E5E;">=</span> rdFMCS.MCSParameters()</span>
+<span id="cb9-2">params.AtomTyper <span class="op" style="color: #5E5E5E;">=</span> CompareElementsOutsideRings()</span>
+<span id="cb9-3">params.BondTyper <span class="op" style="color: #5E5E5E;">=</span> CompareOrderOutsideRings()</span>
+<span id="cb9-4">params.BondCompareParameters.RingMatchesRingOnly <span class="op" style="color: #5E5E5E;">=</span> <span class="va" style="color: #111111;">True</span></span>
+<span id="cb9-5">params.BondCompareParameters.CompleteRingsOnly <span class="op" style="color: #5E5E5E;">=</span> <span class="va" style="color: #111111;">True</span></span></code></pre></div>
+</div>
+<div class="cell" data-execution="{&quot;iopub.execute_input&quot;:&quot;2023-10-24T09:01:53.321874Z&quot;,&quot;iopub.status.busy&quot;:&quot;2023-10-24T09:01:53.321051Z&quot;,&quot;iopub.status.idle&quot;:&quot;2023-10-24T09:01:53.506686Z&quot;,&quot;shell.execute_reply&quot;:&quot;2023-10-24T09:01:53.505570Z&quot;,&quot;shell.execute_reply.started&quot;:&quot;2023-10-24T09:01:53.321813Z&quot;}" data-tags="[]" data-execution_count="10">
+<div class="sourceCode cell-code" id="cb10" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb10-1">mcs <span class="op" style="color: #5E5E5E;">=</span> rdFMCS.FindMCS(mols, params)</span></code></pre></div>
+</div>
+<div class="cell" data-execution="{&quot;iopub.execute_input&quot;:&quot;2023-10-24T09:01:53.508405Z&quot;,&quot;iopub.status.busy&quot;:&quot;2023-10-24T09:01:53.508158Z&quot;,&quot;iopub.status.idle&quot;:&quot;2023-10-24T09:01:53.559501Z&quot;,&quot;shell.execute_reply&quot;:&quot;2023-10-24T09:01:53.558476Z&quot;,&quot;shell.execute_reply.started&quot;:&quot;2023-10-24T09:01:53.508384Z&quot;}" data-tags="[]" data-execution_count="11">
+<div class="sourceCode cell-code" id="cb11" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb11-1">MolsToGridImage(mols, subImgSize<span class="op" style="color: #5E5E5E;">=</span>(<span class="dv" style="color: #AD0000;">300</span>, <span class="dv" style="color: #AD0000;">200</span>), highlightAtomLists<span class="op" style="color: #5E5E5E;">=</span>[m.GetSubstructMatch(mcs.queryMol) <span class="cf" style="color: #003B4F;">for</span> m <span class="kw" style="color: #003B4F;">in</span> mols])</span></code></pre></div>
+<div class="cell-output cell-output-display" data-execution_count="11">
+<p><img src="https://greglandrum.github.io/rdkit-blog/posts/2023-10-27-mcswhatsnew_files/figure-html/cell-12-output-1.png" class="img-fluid"></p>
+</div>
+</div>
+<p>Note that the first molecule can actually match two equivalent ring systems:</p>
+<div class="cell" data-execution="{&quot;iopub.execute_input&quot;:&quot;2023-10-24T09:01:53.560683Z&quot;,&quot;iopub.status.busy&quot;:&quot;2023-10-24T09:01:53.560454Z&quot;,&quot;iopub.status.idle&quot;:&quot;2023-10-24T09:01:53.657438Z&quot;,&quot;shell.execute_reply&quot;:&quot;2023-10-24T09:01:53.655958Z&quot;,&quot;shell.execute_reply.started&quot;:&quot;2023-10-24T09:01:53.560663Z&quot;}" data-tags="[]" data-execution_count="12">
+<div class="sourceCode cell-code" id="cb12" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb12-1">[m.GetSubstructMatches(mcs.queryMol) <span class="cf" style="color: #003B4F;">for</span> m <span class="kw" style="color: #003B4F;">in</span> mols]</span></code></pre></div>
+<div class="cell-output cell-output-display" data-execution_count="12">
+<pre><code>[((1, 2, 6, 3, 7, 4, 8, 5, 9, 23, 11, 25),
+  (5, 4, 6, 14, 7, 13, 8, 12, 9, 23, 11, 25)),
+ ((9, 8, 10, 7, 11, 17, 13, 16, 14, 26, 15, 28),),
+ ((9, 10, 8, 11, 7, 12, 6, 13, 15, 5, 14, 36),)]</code></pre>
+</div>
+</div>
+<p>The fact that we instantiate custom compare <em>classes</em> rather than custom compare <em>functions</em> allows to put some non-molecule specific (<em>i.e.</em>, static) data that we may need for the comparison in addition to the <code>MCSParameters</code> that get passed to the <code>__call__</code> method by the MCS code.<br> We may access this data stored on the class instance inside the <code>__call__</code> method.<br> For example, let’s assume that we want to enforce that aromatic only matches aromatic based on a user-specified setting.<br> All we need to do is modify our <code>CompareOrderOutsideRings</code> as follows:</p>
+<div class="cell" data-execution="{&quot;iopub.execute_input&quot;:&quot;2023-10-24T09:01:53.661295Z&quot;,&quot;iopub.status.busy&quot;:&quot;2023-10-24T09:01:53.660650Z&quot;,&quot;iopub.status.idle&quot;:&quot;2023-10-24T09:01:53.699592Z&quot;,&quot;shell.execute_reply&quot;:&quot;2023-10-24T09:01:53.697838Z&quot;,&quot;shell.execute_reply.started&quot;:&quot;2023-10-24T09:01:53.661241Z&quot;}" data-tags="[]" data-execution_count="13">
+<div class="sourceCode cell-code" id="cb14" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb14-1"><span class="kw" style="color: #003B4F;">class</span> CompareOrderOutsideRings(rdFMCS.MCSBondCompare):</span>
+<span id="cb14-2">    <span class="kw" style="color: #003B4F;">def</span> <span class="fu" style="color: #4758AB;">__init__</span>(<span class="va" style="color: #111111;">self</span>, aromatic_match_aromatic<span class="op" style="color: #5E5E5E;">=</span><span class="va" style="color: #111111;">False</span>):</span>
+<span id="cb14-3">        <span class="bu" style="color: null;">super</span>().<span class="fu" style="color: #4758AB;">__init__</span>()</span>
+<span id="cb14-4">        <span class="va" style="color: #111111;">self</span>.aromatic_match_aromatic <span class="op" style="color: #5E5E5E;">=</span> aromatic_match_aromatic</span>
+<span id="cb14-5"></span>
+<span id="cb14-6">    <span class="kw" style="color: #003B4F;">def</span> <span class="fu" style="color: #4758AB;">__call__</span>(<span class="va" style="color: #111111;">self</span>, p, mol1, bond1, mol2, bond2):</span>
+<span id="cb14-7">        b1 <span class="op" style="color: #5E5E5E;">=</span> mol1.GetBondWithIdx(bond1)</span>
+<span id="cb14-8">        b2 <span class="op" style="color: #5E5E5E;">=</span> mol2.GetBondWithIdx(bond2)</span>
+<span id="cb14-9">        <span class="cf" style="color: #003B4F;">if</span> ((b1.IsInRing() <span class="kw" style="color: #003B4F;">and</span> b2.IsInRing()</span>
+<span id="cb14-10">            <span class="kw" style="color: #003B4F;">and</span> (<span class="kw" style="color: #003B4F;">not</span> <span class="va" style="color: #111111;">self</span>.aromatic_match_aromatic <span class="kw" style="color: #003B4F;">or</span> <span class="kw" style="color: #003B4F;">not</span> (b1.GetIsAromatic() <span class="op" style="color: #5E5E5E;">^</span> b2.IsInRing())))</span>
+<span id="cb14-11">            <span class="kw" style="color: #003B4F;">or</span> b1.GetBondType() <span class="op" style="color: #5E5E5E;">==</span> b2.GetBondType()):</span>
+<span id="cb14-12">            <span class="cf" style="color: #003B4F;">if</span> (p.MatchStereo <span class="kw" style="color: #003B4F;">and</span> <span class="kw" style="color: #003B4F;">not</span> <span class="va" style="color: #111111;">self</span>.CheckBondStereo(p, mol1, bond1, mol2, bond2)):</span>
+<span id="cb14-13">                <span class="cf" style="color: #003B4F;">return</span> <span class="va" style="color: #111111;">False</span></span>
+<span id="cb14-14">            <span class="cf" style="color: #003B4F;">if</span> p.RingMatchesRingOnly:</span>
+<span id="cb14-15">                <span class="cf" style="color: #003B4F;">return</span> <span class="va" style="color: #111111;">self</span>.CheckBondRingMatch(p, mol1, bond1, mol2, bond2)</span>
+<span id="cb14-16">            <span class="cf" style="color: #003B4F;">return</span> <span class="va" style="color: #111111;">True</span></span>
+<span id="cb14-17">        <span class="cf" style="color: #003B4F;">return</span> <span class="va" style="color: #111111;">False</span></span></code></pre></div>
+</div>
+<p>If we instantiate the <code>CompareOrderOutsideRings</code> class without passing the <code>aromatic_match_aromatic</code> optional parameter, which defaults to <code>False</code>, we will get the same results as before:</p>
+<div class="cell" data-execution="{&quot;iopub.execute_input&quot;:&quot;2023-10-24T09:01:53.703371Z&quot;,&quot;iopub.status.busy&quot;:&quot;2023-10-24T09:01:53.702650Z&quot;,&quot;iopub.status.idle&quot;:&quot;2023-10-24T09:01:53.768191Z&quot;,&quot;shell.execute_reply&quot;:&quot;2023-10-24T09:01:53.766561Z&quot;,&quot;shell.execute_reply.started&quot;:&quot;2023-10-24T09:01:53.703272Z&quot;}" data-tags="[]" data-execution_count="14">
+<div class="sourceCode cell-code" id="cb15" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb15-1">params <span class="op" style="color: #5E5E5E;">=</span> rdFMCS.MCSParameters()</span>
+<span id="cb15-2">params.AtomTyper <span class="op" style="color: #5E5E5E;">=</span> CompareElementsOutsideRings()</span>
+<span id="cb15-3">params.BondTyper <span class="op" style="color: #5E5E5E;">=</span> CompareOrderOutsideRings()</span>
+<span id="cb15-4">params.BondCompareParameters.RingMatchesRingOnly <span class="op" style="color: #5E5E5E;">=</span> <span class="va" style="color: #111111;">True</span></span>
+<span id="cb15-5">params.BondCompareParameters.CompleteRingsOnly <span class="op" style="color: #5E5E5E;">=</span> <span class="va" style="color: #111111;">True</span></span></code></pre></div>
+</div>
+<div class="cell" data-execution="{&quot;iopub.execute_input&quot;:&quot;2023-10-24T09:01:53.772019Z&quot;,&quot;iopub.status.busy&quot;:&quot;2023-10-24T09:01:53.771320Z&quot;,&quot;iopub.status.idle&quot;:&quot;2023-10-24T09:01:53.972347Z&quot;,&quot;shell.execute_reply&quot;:&quot;2023-10-24T09:01:53.971371Z&quot;,&quot;shell.execute_reply.started&quot;:&quot;2023-10-24T09:01:53.771959Z&quot;}" data-tags="[]" data-execution_count="15">
+<div class="sourceCode cell-code" id="cb16" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb16-1">mcs <span class="op" style="color: #5E5E5E;">=</span> rdFMCS.FindMCS(mols, params)</span></code></pre></div>
+</div>
+<div class="cell" data-execution="{&quot;iopub.execute_input&quot;:&quot;2023-10-24T09:01:53.973923Z&quot;,&quot;iopub.status.busy&quot;:&quot;2023-10-24T09:01:53.973683Z&quot;,&quot;iopub.status.idle&quot;:&quot;2023-10-24T09:01:54.020289Z&quot;,&quot;shell.execute_reply&quot;:&quot;2023-10-24T09:01:54.019276Z&quot;,&quot;shell.execute_reply.started&quot;:&quot;2023-10-24T09:01:53.973903Z&quot;}" data-tags="[]" data-execution_count="16">
+<div class="sourceCode cell-code" id="cb17" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb17-1">MolsToGridImage(mols, subImgSize<span class="op" style="color: #5E5E5E;">=</span>(<span class="dv" style="color: #AD0000;">300</span>, <span class="dv" style="color: #AD0000;">200</span>), highlightAtomLists<span class="op" style="color: #5E5E5E;">=</span>[m.GetSubstructMatch(mcs.queryMol) <span class="cf" style="color: #003B4F;">for</span> m <span class="kw" style="color: #003B4F;">in</span> mols])</span></code></pre></div>
+<div class="cell-output cell-output-display" data-execution_count="16">
+<p><img src="https://greglandrum.github.io/rdkit-blog/posts/2023-10-27-mcswhatsnew_files/figure-html/cell-17-output-1.png" class="img-fluid"></p>
+</div>
+</div>
+<div class="cell" data-execution="{&quot;iopub.execute_input&quot;:&quot;2023-10-24T09:01:54.021364Z&quot;,&quot;iopub.status.busy&quot;:&quot;2023-10-24T09:01:54.021124Z&quot;,&quot;iopub.status.idle&quot;:&quot;2023-10-24T09:01:54.121478Z&quot;,&quot;shell.execute_reply&quot;:&quot;2023-10-24T09:01:54.119819Z&quot;,&quot;shell.execute_reply.started&quot;:&quot;2023-10-24T09:01:54.021343Z&quot;}" data-tags="[]" data-execution_count="17">
+<div class="sourceCode cell-code" id="cb18" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb18-1">[m.GetSubstructMatches(mcs.queryMol) <span class="cf" style="color: #003B4F;">for</span> m <span class="kw" style="color: #003B4F;">in</span> mols]</span></code></pre></div>
+<div class="cell-output cell-output-display" data-execution_count="17">
+<pre><code>[((1, 2, 6, 3, 7, 4, 8, 5, 9, 23, 11, 25),
+  (5, 4, 6, 14, 7, 13, 8, 12, 9, 23, 11, 25)),
+ ((9, 8, 10, 7, 11, 17, 13, 16, 14, 26, 15, 28),),
+ ((9, 10, 8, 11, 7, 12, 6, 13, 15, 5, 14, 36),)]</code></pre>
+</div>
+</div>
+<p>However, if we instantiate the <code>CompareOrderOutsideRings</code> class setting the <code>aromatic_match_aromatic</code> optional parameter to <code>True</code>, the first molecule will match only on the quinoline ring system:</p>
+<div class="cell" data-execution="{&quot;iopub.execute_input&quot;:&quot;2023-10-24T09:01:54.125934Z&quot;,&quot;iopub.status.busy&quot;:&quot;2023-10-24T09:01:54.124980Z&quot;,&quot;iopub.status.idle&quot;:&quot;2023-10-24T09:01:54.177577Z&quot;,&quot;shell.execute_reply&quot;:&quot;2023-10-24T09:01:54.175924Z&quot;,&quot;shell.execute_reply.started&quot;:&quot;2023-10-24T09:01:54.125854Z&quot;}" data-tags="[]" data-execution_count="18">
+<div class="sourceCode cell-code" id="cb20" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb20-1">params <span class="op" style="color: #5E5E5E;">=</span> rdFMCS.MCSParameters()</span>
+<span id="cb20-2">params.AtomTyper <span class="op" style="color: #5E5E5E;">=</span> CompareElementsOutsideRings()</span>
+<span id="cb20-3">params.BondTyper <span class="op" style="color: #5E5E5E;">=</span> CompareOrderOutsideRings(<span class="va" style="color: #111111;">True</span>)</span>
+<span id="cb20-4">params.BondCompareParameters.RingMatchesRingOnly <span class="op" style="color: #5E5E5E;">=</span> <span class="va" style="color: #111111;">True</span></span>
+<span id="cb20-5">params.BondCompareParameters.CompleteRingsOnly <span class="op" style="color: #5E5E5E;">=</span> <span class="va" style="color: #111111;">True</span></span></code></pre></div>
+</div>
+<div class="cell" data-execution="{&quot;iopub.execute_input&quot;:&quot;2023-10-24T09:01:54.181743Z&quot;,&quot;iopub.status.busy&quot;:&quot;2023-10-24T09:01:54.180845Z&quot;,&quot;iopub.status.idle&quot;:&quot;2023-10-24T09:01:54.314047Z&quot;,&quot;shell.execute_reply&quot;:&quot;2023-10-24T09:01:54.313077Z&quot;,&quot;shell.execute_reply.started&quot;:&quot;2023-10-24T09:01:54.181681Z&quot;}" data-tags="[]" data-execution_count="19">
+<div class="sourceCode cell-code" id="cb21" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb21-1">mcs <span class="op" style="color: #5E5E5E;">=</span> rdFMCS.FindMCS(mols, params)</span></code></pre></div>
+</div>
+<div class="cell" data-execution="{&quot;iopub.execute_input&quot;:&quot;2023-10-24T09:01:54.315487Z&quot;,&quot;iopub.status.busy&quot;:&quot;2023-10-24T09:01:54.315198Z&quot;,&quot;iopub.status.idle&quot;:&quot;2023-10-24T09:01:54.362661Z&quot;,&quot;shell.execute_reply&quot;:&quot;2023-10-24T09:01:54.361837Z&quot;,&quot;shell.execute_reply.started&quot;:&quot;2023-10-24T09:01:54.315462Z&quot;}" data-tags="[]" data-execution_count="20">
+<div class="sourceCode cell-code" id="cb22" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb22-1">MolsToGridImage(mols, subImgSize<span class="op" style="color: #5E5E5E;">=</span>(<span class="dv" style="color: #AD0000;">300</span>, <span class="dv" style="color: #AD0000;">200</span>), highlightAtomLists<span class="op" style="color: #5E5E5E;">=</span>[m.GetSubstructMatch(mcs.queryMol) <span class="cf" style="color: #003B4F;">for</span> m <span class="kw" style="color: #003B4F;">in</span> mols])</span></code></pre></div>
+<div class="cell-output cell-output-display" data-execution_count="20">
+<p><img src="https://greglandrum.github.io/rdkit-blog/posts/2023-10-27-mcswhatsnew_files/figure-html/cell-21-output-1.png" class="img-fluid"></p>
+</div>
+</div>
+<div class="cell" data-execution="{&quot;iopub.execute_input&quot;:&quot;2023-10-24T09:01:54.370834Z&quot;,&quot;iopub.status.busy&quot;:&quot;2023-10-24T09:01:54.370616Z&quot;,&quot;iopub.status.idle&quot;:&quot;2023-10-24T09:01:54.445155Z&quot;,&quot;shell.execute_reply&quot;:&quot;2023-10-24T09:01:54.443667Z&quot;,&quot;shell.execute_reply.started&quot;:&quot;2023-10-24T09:01:54.370814Z&quot;}" data-tags="[]" data-execution_count="21">
+<div class="sourceCode cell-code" id="cb23" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb23-1">[m.GetSubstructMatches(mcs.queryMol) <span class="cf" style="color: #003B4F;">for</span> m <span class="kw" style="color: #003B4F;">in</span> mols]</span></code></pre></div>
+<div class="cell-output cell-output-display" data-execution_count="21">
+<pre><code>[((4, 5, 14, 6, 13, 7, 12, 8, 11, 9, 23, 25),),
+ ((8, 9, 7, 10, 17, 11, 16, 13, 15, 14, 26, 28),),
+ ((10, 9, 11, 8, 12, 7, 13, 6, 14, 15, 5, 36),)]</code></pre>
+</div>
+</div>
+</section>
+<section id="retrieve-all-degenerate-mcss" class="level1">
+<h1>Retrieve all degenerate MCSs</h1>
+<p>It may happen that there are multiple degenerate MCSs (i.e., with the same size) across a set of molecules.<br> Before my PR, the MCS algorithm implemented in RDKit would return only one of them, but which one would be rather unpredictable, as it depends on atom ordering in the molecules.<br> This topic was raised during an RDKit UGM 2-3 years ago, but I did not realize its importance until one of my colleagues was bitten by the degenerate MCS issue.<br> Now there is an optional <code>StoreAll</code> parameter, which defaults to <code>False</code>, which if set to <code>True</code> will trigger the storage of all degenerate MCSs in an array.<br> See below for an example.</p>
+<div class="cell" data-execution="{&quot;iopub.execute_input&quot;:&quot;2023-10-24T09:01:54.448912Z&quot;,&quot;iopub.status.busy&quot;:&quot;2023-10-24T09:01:54.447857Z&quot;,&quot;iopub.status.idle&quot;:&quot;2023-10-24T09:01:54.499612Z&quot;,&quot;shell.execute_reply&quot;:&quot;2023-10-24T09:01:54.498083Z&quot;,&quot;shell.execute_reply.started&quot;:&quot;2023-10-24T09:01:54.448835Z&quot;}" data-tags="[]" data-execution_count="22">
+<div class="sourceCode cell-code" id="cb25" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb25-1">mols <span class="op" style="color: #5E5E5E;">=</span> [Chem.MolFromSmiles(smi) <span class="cf" style="color: #003B4F;">for</span> smi <span class="kw" style="color: #003B4F;">in</span> [</span>
+<span id="cb25-2">    <span class="st" style="color: #20794D;">"Nc1ccc(cc1)C-Cc1c(N)cccc1"</span>,</span>
+<span id="cb25-3">    <span class="st" style="color: #20794D;">"Nc1ccc(cc1)C=Cc1c(N)cccc1"</span>]</span>
+<span id="cb25-4">]</span></code></pre></div>
+</div>
+<div class="cell" data-execution="{&quot;iopub.execute_input&quot;:&quot;2023-10-24T09:01:54.503750Z&quot;,&quot;iopub.status.busy&quot;:&quot;2023-10-24T09:01:54.502869Z&quot;,&quot;iopub.status.idle&quot;:&quot;2023-10-24T09:01:54.600684Z&quot;,&quot;shell.execute_reply&quot;:&quot;2023-10-24T09:01:54.599707Z&quot;,&quot;shell.execute_reply.started&quot;:&quot;2023-10-24T09:01:54.503689Z&quot;}" data-tags="[]" data-execution_count="23">
+<div class="sourceCode cell-code" id="cb26" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb26-1">MolsToGridImage(mols, subImgSize<span class="op" style="color: #5E5E5E;">=</span>(<span class="dv" style="color: #AD0000;">300</span>, <span class="dv" style="color: #AD0000;">200</span>))</span></code></pre></div>
+<div class="cell-output cell-output-display" data-execution_count="23">
+<p><img src="https://greglandrum.github.io/rdkit-blog/posts/2023-10-27-mcswhatsnew_files/figure-html/cell-24-output-1.png" class="img-fluid"></p>
+</div>
+</div>
+<p>You can see at a glance that two degenerate MCSs can be found between the above molecules, i.e., <em>o</em>-methylaniline and <em>p</em>-methylaniline.<br> However, by default <code>rdFMCS</code> will only find one, in this case the <em>para</em> isomer:</p>
+<div class="cell" data-execution="{&quot;iopub.execute_input&quot;:&quot;2023-10-24T09:01:54.602443Z&quot;,&quot;iopub.status.busy&quot;:&quot;2023-10-24T09:01:54.602106Z&quot;,&quot;iopub.status.idle&quot;:&quot;2023-10-24T09:01:54.747450Z&quot;,&quot;shell.execute_reply&quot;:&quot;2023-10-24T09:01:54.745856Z&quot;,&quot;shell.execute_reply.started&quot;:&quot;2023-10-24T09:01:54.602417Z&quot;}" data-tags="[]" data-execution_count="24">
+<div class="sourceCode cell-code" id="cb27" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb27-1">mcs <span class="op" style="color: #5E5E5E;">=</span> rdFMCS.FindMCS(mols)</span></code></pre></div>
+</div>
+<div class="cell" data-execution="{&quot;iopub.execute_input&quot;:&quot;2023-10-24T09:01:54.750771Z&quot;,&quot;iopub.status.busy&quot;:&quot;2023-10-24T09:01:54.750212Z&quot;,&quot;iopub.status.idle&quot;:&quot;2023-10-24T09:01:54.795490Z&quot;,&quot;shell.execute_reply&quot;:&quot;2023-10-24T09:01:54.793825Z&quot;,&quot;shell.execute_reply.started&quot;:&quot;2023-10-24T09:01:54.750720Z&quot;}" data-tags="[]" data-execution_count="25">
+<div class="sourceCode cell-code" id="cb28" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb28-1">mcs.numAtoms, mcs.numBonds</span></code></pre></div>
+<div class="cell-output cell-output-display" data-execution_count="25">
+<pre><code>(8, 8)</code></pre>
+</div>
+</div>
+<div class="cell" data-execution="{&quot;iopub.execute_input&quot;:&quot;2023-10-24T09:01:54.799860Z&quot;,&quot;iopub.status.busy&quot;:&quot;2023-10-24T09:01:54.798844Z&quot;,&quot;iopub.status.idle&quot;:&quot;2023-10-24T09:01:54.925513Z&quot;,&quot;shell.execute_reply&quot;:&quot;2023-10-24T09:01:54.924410Z&quot;,&quot;shell.execute_reply.started&quot;:&quot;2023-10-24T09:01:54.799798Z&quot;}" data-tags="[]" data-execution_count="26">
+<div class="sourceCode cell-code" id="cb30" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb30-1">mcs.queryMol</span></code></pre></div>
+<div class="cell-output cell-output-display" data-execution_count="26">
+<p><img src="https://greglandrum.github.io/rdkit-blog/posts/2023-10-27-mcswhatsnew_files/figure-html/cell-27-output-1.png" class="img-fluid"></p>
+</div>
+</div>
+<div class="cell" data-execution="{&quot;iopub.execute_input&quot;:&quot;2023-10-24T09:01:54.927504Z&quot;,&quot;iopub.status.busy&quot;:&quot;2023-10-24T09:01:54.927010Z&quot;,&quot;iopub.status.idle&quot;:&quot;2023-10-24T09:01:55.071218Z&quot;,&quot;shell.execute_reply&quot;:&quot;2023-10-24T09:01:55.070411Z&quot;,&quot;shell.execute_reply.started&quot;:&quot;2023-10-24T09:01:54.927469Z&quot;}" data-tags="[]" data-execution_count="27">
+<div class="sourceCode cell-code" id="cb31" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb31-1">MolsToGridImage(mols, subImgSize<span class="op" style="color: #5E5E5E;">=</span>(<span class="dv" style="color: #AD0000;">300</span>, <span class="dv" style="color: #AD0000;">200</span>), highlightAtomLists<span class="op" style="color: #5E5E5E;">=</span>[m.GetSubstructMatch(mcs.queryMol) <span class="cf" style="color: #003B4F;">for</span> m <span class="kw" style="color: #003B4F;">in</span> mols])</span></code></pre></div>
+<div class="cell-output cell-output-display" data-execution_count="27">
+<p><img src="https://greglandrum.github.io/rdkit-blog/posts/2023-10-27-mcswhatsnew_files/figure-html/cell-28-output-1.png" class="img-fluid"></p>
+</div>
+</div>
+<div class="cell" data-execution="{&quot;iopub.execute_input&quot;:&quot;2023-10-24T09:01:55.072185Z&quot;,&quot;iopub.status.busy&quot;:&quot;2023-10-24T09:01:55.071976Z&quot;,&quot;iopub.status.idle&quot;:&quot;2023-10-24T09:01:55.126376Z&quot;,&quot;shell.execute_reply&quot;:&quot;2023-10-24T09:01:55.124547Z&quot;,&quot;shell.execute_reply.started&quot;:&quot;2023-10-24T09:01:55.072166Z&quot;}" data-tags="[]" data-execution_count="28">
+<div class="sourceCode cell-code" id="cb32" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb32-1">params <span class="op" style="color: #5E5E5E;">=</span> rdFMCS.MCSParameters()</span>
+<span id="cb32-2">params.StoreAll <span class="op" style="color: #5E5E5E;">=</span> <span class="va" style="color: #111111;">True</span></span></code></pre></div>
+</div>
+<div class="cell" data-execution="{&quot;iopub.execute_input&quot;:&quot;2023-10-24T09:01:55.130377Z&quot;,&quot;iopub.status.busy&quot;:&quot;2023-10-24T09:01:55.129665Z&quot;,&quot;iopub.status.idle&quot;:&quot;2023-10-24T09:01:55.236226Z&quot;,&quot;shell.execute_reply&quot;:&quot;2023-10-24T09:01:55.234583Z&quot;,&quot;shell.execute_reply.started&quot;:&quot;2023-10-24T09:01:55.130316Z&quot;}" data-tags="[]" data-execution_count="29">
+<div class="sourceCode cell-code" id="cb33" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb33-1">mcs <span class="op" style="color: #5E5E5E;">=</span> rdFMCS.FindMCS(mols, params)</span></code></pre></div>
+</div>
+<p>The number of atoms and bonds that constitute the MCS, as expected, are the same as before, since the MCSs are degenerate:</p>
+<div class="cell" data-execution="{&quot;iopub.execute_input&quot;:&quot;2023-10-24T09:01:55.238973Z&quot;,&quot;iopub.status.busy&quot;:&quot;2023-10-24T09:01:55.238463Z&quot;,&quot;iopub.status.idle&quot;:&quot;2023-10-24T09:01:55.292839Z&quot;,&quot;shell.execute_reply&quot;:&quot;2023-10-24T09:01:55.291372Z&quot;,&quot;shell.execute_reply.started&quot;:&quot;2023-10-24T09:01:55.238928Z&quot;}" data-tags="[]" data-execution_count="30">
+<div class="sourceCode cell-code" id="cb34" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb34-1">mcs.numAtoms, mcs.numBonds</span></code></pre></div>
+<div class="cell-output cell-output-display" data-execution_count="30">
+<pre><code>(8, 8)</code></pre>
+</div>
+</div>
+<p>However, this time <code>mcs.queryMol</code> and <code>mcs.smartsString</code> are <code>None</code> and <code>''</code>, respectively.<br> This is by design, as with <code>StoreAll</code> we need to be able to potentially access multiple MCSs, rather than only one as is the case for the <code>MCSResult.queryMol</code> and <code>MCSResult.smartsString</code> properties.<br> The property that allows to browse all degenerate MCSs is <code>MCSResult.degenerateSmartsQueryMolDict</code>, which is a <code>dict</code>:</p>
+<div class="cell" data-execution="{&quot;iopub.execute_input&quot;:&quot;2023-10-24T09:01:55.296544Z&quot;,&quot;iopub.status.busy&quot;:&quot;2023-10-24T09:01:55.295857Z&quot;,&quot;iopub.status.idle&quot;:&quot;2023-10-24T09:01:55.395778Z&quot;,&quot;shell.execute_reply&quot;:&quot;2023-10-24T09:01:55.394224Z&quot;,&quot;shell.execute_reply.started&quot;:&quot;2023-10-24T09:01:55.296484Z&quot;}" data-tags="[]" data-execution_count="31">
+<div class="sourceCode cell-code" id="cb36" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb36-1">mcs.queryMol</span></code></pre></div>
+</div>
+<div class="cell" data-execution="{&quot;iopub.execute_input&quot;:&quot;2023-10-24T09:01:55.399707Z&quot;,&quot;iopub.status.busy&quot;:&quot;2023-10-24T09:01:55.399033Z&quot;,&quot;iopub.status.idle&quot;:&quot;2023-10-24T09:01:55.517454Z&quot;,&quot;shell.execute_reply&quot;:&quot;2023-10-24T09:01:55.516003Z&quot;,&quot;shell.execute_reply.started&quot;:&quot;2023-10-24T09:01:55.399649Z&quot;}" data-tags="[]" data-execution_count="32">
+<div class="sourceCode cell-code" id="cb37" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb37-1">mcs.smartsString</span></code></pre></div>
+<div class="cell-output cell-output-display" data-execution_count="32">
+<pre><code>''</code></pre>
+</div>
+</div>
+<div class="cell" data-execution="{&quot;iopub.execute_input&quot;:&quot;2023-10-24T09:01:55.521308Z&quot;,&quot;iopub.status.busy&quot;:&quot;2023-10-24T09:01:55.520417Z&quot;,&quot;iopub.status.idle&quot;:&quot;2023-10-24T09:01:55.607592Z&quot;,&quot;shell.execute_reply&quot;:&quot;2023-10-24T09:01:55.606129Z&quot;,&quot;shell.execute_reply.started&quot;:&quot;2023-10-24T09:01:55.521201Z&quot;}" data-tags="[]" data-execution_count="33">
+<div class="sourceCode cell-code" id="cb39" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb39-1">mcs.degenerateSmartsQueryMolDict</span></code></pre></div>
+<div class="cell-output cell-output-display" data-execution_count="33">
+<pre><code>{'[#6]-[#6]1:[#6]:[#6]:[#6]:[#6]:[#6]:1-[#7]': &lt;rdkit.Chem.rdchem.Mol at 0x21594654c10&gt;,
+ '[#7]-[#6]1:[#6]:[#6]:[#6](:[#6]:[#6]:1)-[#6]': &lt;rdkit.Chem.rdchem.Mol at 0x215946550e0&gt;}</code></pre>
+</div>
+</div>
+<p>Below I show all degenerate MCSs found, labelled with their respective SMARTS pattern:</p>
+<div class="cell" data-execution="{&quot;iopub.execute_input&quot;:&quot;2023-10-24T09:01:55.611129Z&quot;,&quot;iopub.status.busy&quot;:&quot;2023-10-24T09:01:55.610443Z&quot;,&quot;iopub.status.idle&quot;:&quot;2023-10-24T09:01:55.688421Z&quot;,&quot;shell.execute_reply&quot;:&quot;2023-10-24T09:01:55.686786Z&quot;,&quot;shell.execute_reply.started&quot;:&quot;2023-10-24T09:01:55.611069Z&quot;}" data-tags="[]" data-execution_count="34">
+<div class="sourceCode cell-code" id="cb41" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb41-1">mols_highlights_smarts_list <span class="op" style="color: #5E5E5E;">=</span> [[mols, [m.GetSubstructMatch(query) <span class="cf" style="color: #003B4F;">for</span> m <span class="kw" style="color: #003B4F;">in</span> mols], [smarts <span class="cf" style="color: #003B4F;">for</span> _ <span class="kw" style="color: #003B4F;">in</span> mols]] <span class="cf" style="color: #003B4F;">for</span> smarts, query <span class="kw" style="color: #003B4F;">in</span> mcs.degenerateSmartsQueryMolDict.items()]</span></code></pre></div>
+</div>
+<div class="cell" data-execution="{&quot;iopub.execute_input&quot;:&quot;2023-10-24T09:01:55.692002Z&quot;,&quot;iopub.status.busy&quot;:&quot;2023-10-24T09:01:55.691327Z&quot;,&quot;iopub.status.idle&quot;:&quot;2023-10-24T09:01:55.788846Z&quot;,&quot;shell.execute_reply&quot;:&quot;2023-10-24T09:01:55.787128Z&quot;,&quot;shell.execute_reply.started&quot;:&quot;2023-10-24T09:01:55.691943Z&quot;}" data-tags="[]" data-execution_count="35">
+<div class="sourceCode cell-code" id="cb42" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb42-1">mols_to_display, highlight_atom_lists, legends <span class="op" style="color: #5E5E5E;">=</span> [<span class="bu" style="color: null;">sum</span>(item, []) <span class="cf" style="color: #003B4F;">for</span> item <span class="kw" style="color: #003B4F;">in</span> <span class="bu" style="color: null;">map</span>(<span class="bu" style="color: null;">list</span>, <span class="bu" style="color: null;">list</span>(<span class="bu" style="color: null;">zip</span>(<span class="op" style="color: #5E5E5E;">*</span>mols_highlights_smarts_list)))]</span></code></pre></div>
+</div>
+<div class="cell" data-execution="{&quot;iopub.execute_input&quot;:&quot;2023-10-24T09:01:55.792870Z&quot;,&quot;iopub.status.busy&quot;:&quot;2023-10-24T09:01:55.791991Z&quot;,&quot;iopub.status.idle&quot;:&quot;2023-10-24T09:01:55.905390Z&quot;,&quot;shell.execute_reply&quot;:&quot;2023-10-24T09:01:55.904216Z&quot;,&quot;shell.execute_reply.started&quot;:&quot;2023-10-24T09:01:55.792809Z&quot;}" data-tags="[]" data-execution_count="36">
+<div class="sourceCode cell-code" id="cb43" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb43-1">MolsToGridImage(mols_to_display, molsPerRow<span class="op" style="color: #5E5E5E;">=</span><span class="dv" style="color: #AD0000;">2</span>, subImgSize<span class="op" style="color: #5E5E5E;">=</span>(<span class="dv" style="color: #AD0000;">300</span>, <span class="dv" style="color: #AD0000;">200</span>), highlightAtomLists<span class="op" style="color: #5E5E5E;">=</span>highlight_atom_lists, legends<span class="op" style="color: #5E5E5E;">=</span>legends)</span></code></pre></div>
+<div class="cell-output cell-output-display" data-execution_count="36">
+<p><img src="https://greglandrum.github.io/rdkit-blog/posts/2023-10-27-mcswhatsnew_files/figure-html/cell-37-output-1.png" class="img-fluid"></p>
+</div>
+</div>
+</section>
+<section id="finalmatchchecker" class="level1">
+<h1><code>FinalMatchChecker</code></h1>
+<p><code>MCSParameters.FinalMatchChecker</code> allows to implement a final check on a <em>growing</em> MCS to determine whether it should be accepted (and eventually be allowed to grow further, if possible) or discarded.<br> Just to clarify a bit, the MCS algorithm already implements some built-in, optional final match checkers, <em>e.g.</em> to check: * stereochemistry, in case <code>MCSParameters.AtomCompareParameters.MatchChiralTag</code> is set to <code>True</code> * ring fusion, in case <code>MCSParameters.BondCompareParameters.MatchFusedRings</code> is set to <code>True</code></p>
+<p>By implementing a custom class derived from <code>rdFMCS.MCSFinalMatchCheck</code> you may enforce your own check.<br> For example, the following class will prevent any MCS containing nitrogen from growing further, causing it to be discarded straightaway:</p>
+<div class="cell" data-execution="{&quot;iopub.execute_input&quot;:&quot;2023-10-24T09:01:55.907038Z&quot;,&quot;iopub.status.busy&quot;:&quot;2023-10-24T09:01:55.906778Z&quot;,&quot;iopub.status.idle&quot;:&quot;2023-10-24T09:01:55.961725Z&quot;,&quot;shell.execute_reply&quot;:&quot;2023-10-24T09:01:55.960027Z&quot;,&quot;shell.execute_reply.started&quot;:&quot;2023-10-24T09:01:55.907006Z&quot;}" data-tags="[]" data-execution_count="37">
+<div class="sourceCode cell-code" id="cb44" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb44-1"><span class="kw" style="color: #003B4F;">class</span> FinalMatchCheckNoNitrogen(rdFMCS.MCSFinalMatchCheck):</span>
+<span id="cb44-2">    <span class="kw" style="color: #003B4F;">def</span> <span class="fu" style="color: #4758AB;">__call__</span>(<span class="va" style="color: #111111;">self</span>, mol1, mol2, atom_idx_match, bond_idx_match, params):</span>
+<span id="cb44-3">        <span class="cf" style="color: #003B4F;">return</span> <span class="kw" style="color: #003B4F;">not</span> <span class="bu" style="color: null;">any</span>(mol1.GetAtomWithIdx(mol1_atom_idx).GetAtomicNum() <span class="op" style="color: #5E5E5E;">==</span> <span class="dv" style="color: #AD0000;">7</span></span>
+<span id="cb44-4">               <span class="kw" style="color: #003B4F;">or</span> mol2.GetAtomWithIdx(mol2_atom_idx).GetAtomicNum() <span class="op" style="color: #5E5E5E;">==</span> <span class="dv" style="color: #AD0000;">7</span></span>
+<span id="cb44-5">               <span class="cf" style="color: #003B4F;">for</span> mol1_atom_idx, mol2_atom_idx <span class="kw" style="color: #003B4F;">in</span> atom_idx_match)</span></code></pre></div>
+</div>
+<p>Taking again as an example the two molecules from above, if we blacklist nitrogen we would expect the MCS to be toluene.</p>
+<div class="cell" data-execution="{&quot;iopub.execute_input&quot;:&quot;2023-10-24T09:01:55.965972Z&quot;,&quot;iopub.status.busy&quot;:&quot;2023-10-24T09:01:55.964654Z&quot;,&quot;iopub.status.idle&quot;:&quot;2023-10-24T09:01:56.009597Z&quot;,&quot;shell.execute_reply&quot;:&quot;2023-10-24T09:01:56.008054Z&quot;,&quot;shell.execute_reply.started&quot;:&quot;2023-10-24T09:01:55.965910Z&quot;}" data-tags="[]" data-execution_count="38">
+<div class="sourceCode cell-code" id="cb45" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb45-1">mols <span class="op" style="color: #5E5E5E;">=</span> [Chem.MolFromSmiles(smi) <span class="cf" style="color: #003B4F;">for</span> smi <span class="kw" style="color: #003B4F;">in</span> [</span>
+<span id="cb45-2">    <span class="st" style="color: #20794D;">"Nc1ccc(cc1)C-Cc1c(N)cccc1"</span>,</span>
+<span id="cb45-3">    <span class="st" style="color: #20794D;">"Nc1ccc(cc1)C=Cc1c(N)cccc1"</span>]</span>
+<span id="cb45-4">]</span></code></pre></div>
+</div>
+<div class="cell" data-execution="{&quot;iopub.execute_input&quot;:&quot;2023-10-24T09:01:56.014100Z&quot;,&quot;iopub.status.busy&quot;:&quot;2023-10-24T09:01:56.012557Z&quot;,&quot;iopub.status.idle&quot;:&quot;2023-10-24T09:01:56.093981Z&quot;,&quot;shell.execute_reply&quot;:&quot;2023-10-24T09:01:56.093409Z&quot;,&quot;shell.execute_reply.started&quot;:&quot;2023-10-24T09:01:56.014036Z&quot;}" data-tags="[]" data-execution_count="39">
+<div class="sourceCode cell-code" id="cb46" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb46-1">MolsToGridImage(mols, subImgSize<span class="op" style="color: #5E5E5E;">=</span>(<span class="dv" style="color: #AD0000;">300</span>, <span class="dv" style="color: #AD0000;">200</span>))</span></code></pre></div>
+<div class="cell-output cell-output-display" data-execution_count="39">
+<p><img src="https://greglandrum.github.io/rdkit-blog/posts/2023-10-27-mcswhatsnew_files/figure-html/cell-40-output-1.png" class="img-fluid"></p>
+</div>
+</div>
+<div class="cell" data-execution="{&quot;iopub.execute_input&quot;:&quot;2023-10-24T09:01:56.095669Z&quot;,&quot;iopub.status.busy&quot;:&quot;2023-10-24T09:01:56.095309Z&quot;,&quot;iopub.status.idle&quot;:&quot;2023-10-24T09:01:56.141825Z&quot;,&quot;shell.execute_reply&quot;:&quot;2023-10-24T09:01:56.140059Z&quot;,&quot;shell.execute_reply.started&quot;:&quot;2023-10-24T09:01:56.095633Z&quot;}" data-tags="[]" data-execution_count="40">
+<div class="sourceCode cell-code" id="cb47" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb47-1">params <span class="op" style="color: #5E5E5E;">=</span> rdFMCS.MCSParameters()</span>
+<span id="cb47-2">params.FinalMatchChecker <span class="op" style="color: #5E5E5E;">=</span> FinalMatchCheckNoNitrogen()</span></code></pre></div>
+</div>
+<div class="cell" data-execution="{&quot;iopub.execute_input&quot;:&quot;2023-10-24T09:01:56.145714Z&quot;,&quot;iopub.status.busy&quot;:&quot;2023-10-24T09:01:56.145022Z&quot;,&quot;iopub.status.idle&quot;:&quot;2023-10-24T09:01:56.226176Z&quot;,&quot;shell.execute_reply&quot;:&quot;2023-10-24T09:01:56.224858Z&quot;,&quot;shell.execute_reply.started&quot;:&quot;2023-10-24T09:01:56.145654Z&quot;}" data-tags="[]" data-execution_count="41">
+<div class="sourceCode cell-code" id="cb48" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb48-1">mcs <span class="op" style="color: #5E5E5E;">=</span> rdFMCS.FindMCS(mols, params)</span></code></pre></div>
+</div>
+<p>The number of atoms and bonds that constitute the MCS, as expected, are the same as before, since the MCSs are degenerate:</p>
+<div class="cell" data-execution="{&quot;iopub.execute_input&quot;:&quot;2023-10-24T09:01:56.228768Z&quot;,&quot;iopub.status.busy&quot;:&quot;2023-10-24T09:01:56.228052Z&quot;,&quot;iopub.status.idle&quot;:&quot;2023-10-24T09:01:56.351303Z&quot;,&quot;shell.execute_reply&quot;:&quot;2023-10-24T09:01:56.349798Z&quot;,&quot;shell.execute_reply.started&quot;:&quot;2023-10-24T09:01:56.228729Z&quot;}" data-tags="[]" data-execution_count="42">
+<div class="sourceCode cell-code" id="cb49" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb49-1">mcs.numAtoms, mcs.numBonds</span></code></pre></div>
+<div class="cell-output cell-output-display" data-execution_count="42">
+<pre><code>(7, 7)</code></pre>
+</div>
+</div>
+<p>And indeed, toluene is what we get:</p>
+<div class="cell" data-execution="{&quot;iopub.execute_input&quot;:&quot;2023-10-24T09:01:56.355528Z&quot;,&quot;iopub.status.busy&quot;:&quot;2023-10-24T09:01:56.354624Z&quot;,&quot;iopub.status.idle&quot;:&quot;2023-10-24T09:01:56.484396Z&quot;,&quot;shell.execute_reply&quot;:&quot;2023-10-24T09:01:56.483133Z&quot;,&quot;shell.execute_reply.started&quot;:&quot;2023-10-24T09:01:56.355467Z&quot;}" data-tags="[]" data-execution_count="43">
+<div class="sourceCode cell-code" id="cb51" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb51-1">mcs.queryMol</span></code></pre></div>
+<div class="cell-output cell-output-display" data-execution_count="43">
+<p><img src="https://greglandrum.github.io/rdkit-blog/posts/2023-10-27-mcswhatsnew_files/figure-html/cell-44-output-1.png" class="img-fluid"></p>
+</div>
+</div>
+<div class="cell" data-execution="{&quot;iopub.execute_input&quot;:&quot;2023-10-24T09:01:56.486883Z&quot;,&quot;iopub.status.busy&quot;:&quot;2023-10-24T09:01:56.486248Z&quot;,&quot;iopub.status.idle&quot;:&quot;2023-10-24T09:01:56.591440Z&quot;,&quot;shell.execute_reply&quot;:&quot;2023-10-24T09:01:56.589974Z&quot;,&quot;shell.execute_reply.started&quot;:&quot;2023-10-24T09:01:56.486849Z&quot;}" data-tags="[]" data-execution_count="44">
+<div class="sourceCode cell-code" id="cb52" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb52-1">mcs.smartsString</span></code></pre></div>
+<div class="cell-output cell-output-display" data-execution_count="44">
+<pre><code>'[#6]1:[#6]:[#6]:[#6](:[#6]:[#6]:1)-[#6]'</code></pre>
+</div>
+</div>
+<div class="cell" data-execution="{&quot;iopub.execute_input&quot;:&quot;2023-10-24T09:01:56.595587Z&quot;,&quot;iopub.status.busy&quot;:&quot;2023-10-24T09:01:56.594687Z&quot;,&quot;iopub.status.idle&quot;:&quot;2023-10-24T09:01:56.717351Z&quot;,&quot;shell.execute_reply&quot;:&quot;2023-10-24T09:01:56.716401Z&quot;,&quot;shell.execute_reply.started&quot;:&quot;2023-10-24T09:01:56.595525Z&quot;}" data-tags="[]" data-execution_count="45">
+<div class="sourceCode cell-code" id="cb54" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb54-1">MolsToGridImage(mols, subImgSize<span class="op" style="color: #5E5E5E;">=</span>(<span class="dv" style="color: #AD0000;">300</span>, <span class="dv" style="color: #AD0000;">200</span>), highlightAtomLists<span class="op" style="color: #5E5E5E;">=</span>[m.GetSubstructMatch(mcs.queryMol) <span class="cf" style="color: #003B4F;">for</span> m <span class="kw" style="color: #003B4F;">in</span> mols])</span></code></pre></div>
+<div class="cell-output cell-output-display" data-execution_count="45">
+<p><img src="https://greglandrum.github.io/rdkit-blog/posts/2023-10-27-mcswhatsnew_files/figure-html/cell-46-output-1.png" class="img-fluid"></p>
+</div>
+</div>
+</section>
+<section id="shouldacceptmcs" class="level1">
+<h1><code>ShouldAcceptMCS</code></h1>
+<p><code>MCSParameters.ShouldAcceptMCS</code> allows to implement a user-defined acceptance criterion on a complete MCS (which is already fully grown and potentially ready to be returned as result).<br> If the complete NCS fails the check, it will be discarded and not returned to the user.<br> A quite specific use case that we recently had internally was to find an MCS between two molecules, one of which containing a dummy atom.<br> We needed to enforce that, for the molecule containing the dummy atom, this dummy atom was actually part of the MCS.<br> We did this by using a custom <code>TerminalDummyMatchesAnyNonTerminalAtom</code> <code>AtomCompare</code> subclass and a custom <code>EnforceDummyAcceptance</code> <code>MCSAcceptance</code> subclass; see below.</p>
+<div class="cell" data-execution="{&quot;iopub.execute_input&quot;:&quot;2023-10-24T09:01:56.718573Z&quot;,&quot;iopub.status.busy&quot;:&quot;2023-10-24T09:01:56.718339Z&quot;,&quot;iopub.status.idle&quot;:&quot;2023-10-24T09:01:56.810604Z&quot;,&quot;shell.execute_reply&quot;:&quot;2023-10-24T09:01:56.808748Z&quot;,&quot;shell.execute_reply.started&quot;:&quot;2023-10-24T09:01:56.718553Z&quot;}" data-tags="[]" data-execution_count="46">
+<div class="sourceCode cell-code" id="cb55" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb55-1"><span class="kw" style="color: #003B4F;">class</span> TerminalDummyMatchesAnyNonTerminalAtom(rdFMCS.MCSAtomCompare):</span>
+<span id="cb55-2">    <span class="kw" style="color: #003B4F;">def</span> <span class="fu" style="color: #4758AB;">__call__</span>(<span class="va" style="color: #111111;">self</span>, p, mol1, atom1, mol2, atom2):</span>
+<span id="cb55-3">        a1 <span class="op" style="color: #5E5E5E;">=</span> mol1.GetAtomWithIdx(atom1)</span>
+<span id="cb55-4">        a2 <span class="op" style="color: #5E5E5E;">=</span> mol2.GetAtomWithIdx(atom2)</span>
+<span id="cb55-5">        a1_is_dummy <span class="op" style="color: #5E5E5E;">=</span> (a1.GetAtomicNum() <span class="op" style="color: #5E5E5E;">==</span> <span class="dv" style="color: #AD0000;">0</span>)</span>
+<span id="cb55-6">        a2_is_dummy <span class="op" style="color: #5E5E5E;">=</span> (a2.GetAtomicNum() <span class="op" style="color: #5E5E5E;">==</span> <span class="dv" style="color: #AD0000;">0</span>)</span>
+<span id="cb55-7">        <span class="cf" style="color: #003B4F;">if</span> a1_is_dummy <span class="op" style="color: #5E5E5E;">^</span> a2_is_dummy:</span>
+<span id="cb55-8">            atoms <span class="op" style="color: #5E5E5E;">=</span> (a1, a2)</span>
+<span id="cb55-9">            dummy_atom_idx <span class="op" style="color: #5E5E5E;">=</span> <span class="dv" style="color: #AD0000;">0</span> <span class="cf" style="color: #003B4F;">if</span> a1_is_dummy <span class="cf" style="color: #003B4F;">else</span> <span class="dv" style="color: #AD0000;">1</span></span>
+<span id="cb55-10">            other_atom_idx <span class="op" style="color: #5E5E5E;">=</span> <span class="dv" style="color: #AD0000;">1</span> <span class="op" style="color: #5E5E5E;">-</span> dummy_atom_idx</span>
+<span id="cb55-11">            <span class="cf" style="color: #003B4F;">return</span> atoms[dummy_atom_idx].GetDegree() <span class="op" style="color: #5E5E5E;">==</span> <span class="dv" style="color: #AD0000;">1</span> <span class="kw" style="color: #003B4F;">and</span> atoms[other_atom_idx].GetDegree() <span class="op" style="color: #5E5E5E;">&gt;</span> <span class="dv" style="color: #AD0000;">1</span></span>
+<span id="cb55-12">        <span class="cf" style="color: #003B4F;">if</span> a1.GetAtomicNum() <span class="op" style="color: #5E5E5E;">!=</span> a2.GetAtomicNum():</span>
+<span id="cb55-13">            <span class="cf" style="color: #003B4F;">return</span> <span class="va" style="color: #111111;">False</span></span>
+<span id="cb55-14">        <span class="cf" style="color: #003B4F;">return</span> <span class="va" style="color: #111111;">self</span>.CheckAtomRingMatch(p, mol1, atom1, mol2, atom2)</span></code></pre></div>
+</div>
+<div class="cell" data-execution="{&quot;iopub.execute_input&quot;:&quot;2023-10-24T09:01:56.814870Z&quot;,&quot;iopub.status.busy&quot;:&quot;2023-10-24T09:01:56.813959Z&quot;,&quot;iopub.status.idle&quot;:&quot;2023-10-24T09:01:56.961774Z&quot;,&quot;shell.execute_reply&quot;:&quot;2023-10-24T09:01:56.960000Z&quot;,&quot;shell.execute_reply.started&quot;:&quot;2023-10-24T09:01:56.814805Z&quot;}" data-tags="[]" data-execution_count="47">
+<div class="sourceCode cell-code" id="cb56" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb56-1"><span class="kw" style="color: #003B4F;">class</span> EnforceDummyAcceptance(rdFMCS.MCSAcceptance):</span>
+<span id="cb56-2">    <span class="kw" style="color: #003B4F;">def</span> <span class="fu" style="color: #4758AB;">__call__</span>(<span class="va" style="color: #111111;">self</span>, mol1, mol2, atom_idx_match, bond_idx_match, params):</span>
+<span id="cb56-3">        <span class="cf" style="color: #003B4F;">for</span> mol1_atom_idx, mol2_atom_idx <span class="kw" style="color: #003B4F;">in</span> atom_idx_match:</span>
+<span id="cb56-4">            <span class="cf" style="color: #003B4F;">if</span> mol1.GetAtomWithIdx(mol1_atom_idx).GetAtomicNum() <span class="op" style="color: #5E5E5E;">==</span> <span class="dv" style="color: #AD0000;">0</span>:</span>
+<span id="cb56-5">                <span class="cf" style="color: #003B4F;">return</span> <span class="va" style="color: #111111;">True</span> </span>
+<span id="cb56-6">            <span class="cf" style="color: #003B4F;">if</span> mol2.GetAtomWithIdx(mol2_atom_idx).GetAtomicNum() <span class="op" style="color: #5E5E5E;">==</span> <span class="dv" style="color: #AD0000;">0</span>:</span>
+<span id="cb56-7">                <span class="cf" style="color: #003B4F;">return</span> <span class="va" style="color: #111111;">True</span></span>
+<span id="cb56-8">        <span class="cf" style="color: #003B4F;">return</span> <span class="va" style="color: #111111;">False</span></span></code></pre></div>
+</div>
+<div class="cell" data-execution="{&quot;iopub.execute_input&quot;:&quot;2023-10-24T09:01:56.966205Z&quot;,&quot;iopub.status.busy&quot;:&quot;2023-10-24T09:01:56.965248Z&quot;,&quot;iopub.status.idle&quot;:&quot;2023-10-24T09:01:57.024256Z&quot;,&quot;shell.execute_reply&quot;:&quot;2023-10-24T09:01:57.022348Z&quot;,&quot;shell.execute_reply.started&quot;:&quot;2023-10-24T09:01:56.966097Z&quot;}" data-tags="[]" data-execution_count="48">
+<div class="sourceCode cell-code" id="cb57" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb57-1">mols <span class="op" style="color: #5E5E5E;">=</span> [</span>
+<span id="cb57-2">    Chem.MolFromSmiles(smi) <span class="cf" style="color: #003B4F;">for</span> smi <span class="kw" style="color: #003B4F;">in</span> [</span>
+<span id="cb57-3">    <span class="st" style="color: #20794D;">"OC(=O)CCc1c(C)ccc2ccccc12"</span>,</span>
+<span id="cb57-4">    <span class="st" style="color: #20794D;">"c1(C)cc(cccc2)c2c(*)c1"</span></span>
+<span id="cb57-5">    ]</span>
+<span id="cb57-6">]</span></code></pre></div>
+</div>
+<div class="cell" data-execution="{&quot;iopub.execute_input&quot;:&quot;2023-10-24T09:01:57.028545Z&quot;,&quot;iopub.status.busy&quot;:&quot;2023-10-24T09:01:57.027648Z&quot;,&quot;iopub.status.idle&quot;:&quot;2023-10-24T09:01:57.208902Z&quot;,&quot;shell.execute_reply&quot;:&quot;2023-10-24T09:01:57.208034Z&quot;,&quot;shell.execute_reply.started&quot;:&quot;2023-10-24T09:01:57.028482Z&quot;}" data-tags="[]" data-execution_count="49">
+<div class="sourceCode cell-code" id="cb58" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb58-1">MolsToGridImage(mols, subImgSize<span class="op" style="color: #5E5E5E;">=</span>(<span class="dv" style="color: #AD0000;">300</span>, <span class="dv" style="color: #AD0000;">200</span>))</span></code></pre></div>
+<div class="cell-output cell-output-display" data-execution_count="49">
+<p><img src="https://greglandrum.github.io/rdkit-blog/posts/2023-10-27-mcswhatsnew_files/figure-html/cell-50-output-1.png" class="img-fluid"></p>
+</div>
+</div>
+<p>If we set neither a custom <code>AtomCompare</code> class nor a custom <code>MCSAcceptance</code> but rather only request <code>BondCompareParameters.RingMatchesRingOnly</code> and <code>BondCompareParameters.CompleteRingsOnly</code> and set <code>StoreAll</code> to <code>True</code>, the only MCS found will be 2-naphthalene:</p>
+<div class="cell" data-execution="{&quot;iopub.execute_input&quot;:&quot;2023-10-24T09:01:57.210018Z&quot;,&quot;iopub.status.busy&quot;:&quot;2023-10-24T09:01:57.209775Z&quot;,&quot;iopub.status.idle&quot;:&quot;2023-10-24T09:01:57.452880Z&quot;,&quot;shell.execute_reply&quot;:&quot;2023-10-24T09:01:57.451120Z&quot;,&quot;shell.execute_reply.started&quot;:&quot;2023-10-24T09:01:57.209997Z&quot;}" data-tags="[]" data-execution_count="50">
+<div class="sourceCode cell-code" id="cb59" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb59-1">params <span class="op" style="color: #5E5E5E;">=</span> rdFMCS.MCSParameters()</span>
+<span id="cb59-2">params.BondCompareParameters.RingMatchesRingOnly <span class="op" style="color: #5E5E5E;">=</span> <span class="va" style="color: #111111;">True</span></span>
+<span id="cb59-3">params.BondCompareParameters.CompleteRingsOnly <span class="op" style="color: #5E5E5E;">=</span> <span class="va" style="color: #111111;">True</span></span>
+<span id="cb59-4">params.StoreAll <span class="op" style="color: #5E5E5E;">=</span> <span class="va" style="color: #111111;">True</span></span></code></pre></div>
+</div>
+<div class="cell" data-execution="{&quot;iopub.execute_input&quot;:&quot;2023-10-24T09:01:57.457264Z&quot;,&quot;iopub.status.busy&quot;:&quot;2023-10-24T09:01:57.456254Z&quot;,&quot;iopub.status.idle&quot;:&quot;2023-10-24T09:01:57.706769Z&quot;,&quot;shell.execute_reply&quot;:&quot;2023-10-24T09:01:57.705114Z&quot;,&quot;shell.execute_reply.started&quot;:&quot;2023-10-24T09:01:57.457204Z&quot;}" data-tags="[]" data-execution_count="51">
+<div class="sourceCode cell-code" id="cb60" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb60-1">mcs <span class="op" style="color: #5E5E5E;">=</span> rdFMCS.FindMCS(mols, params)</span></code></pre></div>
+</div>
+<div class="cell" data-execution="{&quot;iopub.execute_input&quot;:&quot;2023-10-24T09:01:57.711029Z&quot;,&quot;iopub.status.busy&quot;:&quot;2023-10-24T09:01:57.710089Z&quot;,&quot;iopub.status.idle&quot;:&quot;2023-10-24T09:01:57.971635Z&quot;,&quot;shell.execute_reply&quot;:&quot;2023-10-24T09:01:57.970098Z&quot;,&quot;shell.execute_reply.started&quot;:&quot;2023-10-24T09:01:57.710967Z&quot;}" data-tags="[]" data-execution_count="52">
+<div class="sourceCode cell-code" id="cb61" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb61-1">mcs.numAtoms, mcs.numBonds</span></code></pre></div>
+<div class="cell-output cell-output-display" data-execution_count="52">
+<pre><code>(11, 12)</code></pre>
+</div>
+</div>
+<div class="cell" data-execution="{&quot;iopub.execute_input&quot;:&quot;2023-10-24T09:01:57.975176Z&quot;,&quot;iopub.status.busy&quot;:&quot;2023-10-24T09:01:57.974498Z&quot;,&quot;iopub.status.idle&quot;:&quot;2023-10-24T09:01:58.225191Z&quot;,&quot;shell.execute_reply&quot;:&quot;2023-10-24T09:01:58.223677Z&quot;,&quot;shell.execute_reply.started&quot;:&quot;2023-10-24T09:01:57.975116Z&quot;}" data-tags="[]" data-execution_count="53">
+<div class="sourceCode cell-code" id="cb63" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb63-1"><span class="bu" style="color: null;">len</span>(mcs.degenerateSmartsQueryMolDict)</span></code></pre></div>
+<div class="cell-output cell-output-display" data-execution_count="53">
+<pre><code>1</code></pre>
+</div>
+</div>
+<div class="cell" data-execution="{&quot;iopub.execute_input&quot;:&quot;2023-10-24T09:01:58.229174Z&quot;,&quot;iopub.status.busy&quot;:&quot;2023-10-24T09:01:58.228465Z&quot;,&quot;iopub.status.idle&quot;:&quot;2023-10-24T09:01:58.471513Z&quot;,&quot;shell.execute_reply&quot;:&quot;2023-10-24T09:01:58.469709Z&quot;,&quot;shell.execute_reply.started&quot;:&quot;2023-10-24T09:01:58.229115Z&quot;}" data-tags="[]" data-execution_count="54">
+<div class="sourceCode cell-code" id="cb65" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb65-1">smarts_string, query_mol <span class="op" style="color: #5E5E5E;">=</span> <span class="bu" style="color: null;">tuple</span>(mcs.degenerateSmartsQueryMolDict.items())[<span class="dv" style="color: #AD0000;">0</span>]</span></code></pre></div>
+</div>
+<div class="cell" data-execution="{&quot;iopub.execute_input&quot;:&quot;2023-10-24T09:01:58.475986Z&quot;,&quot;iopub.status.busy&quot;:&quot;2023-10-24T09:01:58.474728Z&quot;,&quot;iopub.status.idle&quot;:&quot;2023-10-24T09:01:58.673003Z&quot;,&quot;shell.execute_reply&quot;:&quot;2023-10-24T09:01:58.671259Z&quot;,&quot;shell.execute_reply.started&quot;:&quot;2023-10-24T09:01:58.475856Z&quot;}" data-tags="[]" data-execution_count="55">
+<div class="sourceCode cell-code" id="cb66" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb66-1">smarts_string</span></code></pre></div>
+<div class="cell-output cell-output-display" data-execution_count="55">
+<pre><code>'[#6]1(-&amp;!@[#6]):&amp;@[#6]:&amp;@[#6]2:&amp;@[#6]:&amp;@[#6]:&amp;@[#6]:&amp;@[#6]:&amp;@[#6]:&amp;@2:&amp;@[#6]:&amp;@[#6]:&amp;@1'</code></pre>
+</div>
+</div>
+<div class="cell" data-execution="{&quot;iopub.execute_input&quot;:&quot;2023-10-24T09:01:58.676345Z&quot;,&quot;iopub.status.busy&quot;:&quot;2023-10-24T09:01:58.675675Z&quot;,&quot;iopub.status.idle&quot;:&quot;2023-10-24T09:01:58.959417Z&quot;,&quot;shell.execute_reply&quot;:&quot;2023-10-24T09:01:58.958467Z&quot;,&quot;shell.execute_reply.started&quot;:&quot;2023-10-24T09:01:58.676286Z&quot;}" data-tags="[]" data-execution_count="56">
+<div class="sourceCode cell-code" id="cb68" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb68-1">MolsToGridImage(mols, subImgSize<span class="op" style="color: #5E5E5E;">=</span>(<span class="dv" style="color: #AD0000;">300</span>, <span class="dv" style="color: #AD0000;">200</span>), highlightAtomLists<span class="op" style="color: #5E5E5E;">=</span>[m.GetSubstructMatch(query_mol) <span class="cf" style="color: #003B4F;">for</span> m <span class="kw" style="color: #003B4F;">in</span> mols])</span></code></pre></div>
+<div class="cell-output cell-output-display" data-execution_count="56">
+<p><img src="https://greglandrum.github.io/rdkit-blog/posts/2023-10-27-mcswhatsnew_files/figure-html/cell-57-output-1.png" class="img-fluid"></p>
+</div>
+</div>
+<p>Instead, if in addiiton to the above we specify the custom <code>TerminalDummyMatchesAnyNonTerminalAtom</code> <code>AtomCompare</code> subclass allowing dummy atoms to match any other atom, we will find two degenerate MCSs:</p>
+<div class="cell" data-execution="{&quot;iopub.execute_input&quot;:&quot;2023-10-24T09:01:58.961714Z&quot;,&quot;iopub.status.busy&quot;:&quot;2023-10-24T09:01:58.961483Z&quot;,&quot;iopub.status.idle&quot;:&quot;2023-10-24T09:01:59.010901Z&quot;,&quot;shell.execute_reply&quot;:&quot;2023-10-24T09:01:59.009188Z&quot;,&quot;shell.execute_reply.started&quot;:&quot;2023-10-24T09:01:58.961695Z&quot;}" data-tags="[]" data-execution_count="57">
+<div class="sourceCode cell-code" id="cb69" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb69-1">params <span class="op" style="color: #5E5E5E;">=</span> rdFMCS.MCSParameters()</span>
+<span id="cb69-2">params.AtomTyper <span class="op" style="color: #5E5E5E;">=</span> TerminalDummyMatchesAnyNonTerminalAtom()</span>
+<span id="cb69-3">params.BondCompareParameters.RingMatchesRingOnly <span class="op" style="color: #5E5E5E;">=</span> <span class="va" style="color: #111111;">True</span></span>
+<span id="cb69-4">params.BondCompareParameters.CompleteRingsOnly <span class="op" style="color: #5E5E5E;">=</span> <span class="va" style="color: #111111;">True</span></span>
+<span id="cb69-5">params.StoreAll <span class="op" style="color: #5E5E5E;">=</span> <span class="va" style="color: #111111;">True</span></span></code></pre></div>
+</div>
+<div class="cell" data-execution="{&quot;iopub.execute_input&quot;:&quot;2023-10-24T09:01:59.014634Z&quot;,&quot;iopub.status.busy&quot;:&quot;2023-10-24T09:01:59.013962Z&quot;,&quot;iopub.status.idle&quot;:&quot;2023-10-24T09:01:59.118363Z&quot;,&quot;shell.execute_reply&quot;:&quot;2023-10-24T09:01:59.117033Z&quot;,&quot;shell.execute_reply.started&quot;:&quot;2023-10-24T09:01:59.014576Z&quot;}" data-tags="[]" data-execution_count="58">
+<div class="sourceCode cell-code" id="cb70" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb70-1">mcs <span class="op" style="color: #5E5E5E;">=</span> rdFMCS.FindMCS(mols, params)</span></code></pre></div>
+</div>
+<div class="cell" data-execution="{&quot;iopub.execute_input&quot;:&quot;2023-10-24T09:01:59.119958Z&quot;,&quot;iopub.status.busy&quot;:&quot;2023-10-24T09:01:59.119643Z&quot;,&quot;iopub.status.idle&quot;:&quot;2023-10-24T09:01:59.174581Z&quot;,&quot;shell.execute_reply&quot;:&quot;2023-10-24T09:01:59.173117Z&quot;,&quot;shell.execute_reply.started&quot;:&quot;2023-10-24T09:01:59.119932Z&quot;}" data-tags="[]" data-execution_count="59">
+<div class="sourceCode cell-code" id="cb71" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb71-1">mcs.numAtoms, mcs.numBonds</span></code></pre></div>
+<div class="cell-output cell-output-display" data-execution_count="59">
+<pre><code>(11, 12)</code></pre>
+</div>
+</div>
+<div class="cell" data-execution="{&quot;iopub.execute_input&quot;:&quot;2023-10-24T09:01:59.178706Z&quot;,&quot;iopub.status.busy&quot;:&quot;2023-10-24T09:01:59.177786Z&quot;,&quot;iopub.status.idle&quot;:&quot;2023-10-24T09:01:59.264869Z&quot;,&quot;shell.execute_reply&quot;:&quot;2023-10-24T09:01:59.263240Z&quot;,&quot;shell.execute_reply.started&quot;:&quot;2023-10-24T09:01:59.178643Z&quot;}" data-tags="[]" data-execution_count="60">
+<div class="sourceCode cell-code" id="cb73" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb73-1"><span class="bu" style="color: null;">len</span>(mcs.degenerateSmartsQueryMolDict)</span></code></pre></div>
+<div class="cell-output cell-output-display" data-execution_count="60">
+<pre><code>2</code></pre>
+</div>
+</div>
+<div class="cell" data-execution="{&quot;iopub.execute_input&quot;:&quot;2023-10-24T09:01:59.268421Z&quot;,&quot;iopub.status.busy&quot;:&quot;2023-10-24T09:01:59.267745Z&quot;,&quot;iopub.status.idle&quot;:&quot;2023-10-24T09:01:59.330464Z&quot;,&quot;shell.execute_reply&quot;:&quot;2023-10-24T09:01:59.328868Z&quot;,&quot;shell.execute_reply.started&quot;:&quot;2023-10-24T09:01:59.268361Z&quot;}" data-tags="[]" data-execution_count="61">
+<div class="sourceCode cell-code" id="cb75" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb75-1">mcs.degenerateSmartsQueryMolDict</span></code></pre></div>
+<div class="cell-output cell-output-display" data-execution_count="61">
+<pre><code>{'[#6]1(-&amp;!@[#6]):&amp;@[#6]:&amp;@[#6]:&amp;@[#6]2:&amp;@[#6]:&amp;@[#6]:&amp;@[#6]:&amp;@[#6]:&amp;@[#6]:&amp;@2:&amp;@[#6]:&amp;@1': &lt;rdkit.Chem.rdchem.Mol at 0x215946566c0&gt;,
+ '[#6]1:&amp;@[#6]:&amp;@[#6]2:&amp;@[#6](:&amp;@[#6](-&amp;!@[#0,#6]):&amp;@[#6]:&amp;@1):&amp;@[#6]:&amp;@[#6]:&amp;@[#6]:&amp;@[#6]:&amp;@2': &lt;rdkit.Chem.rdchem.Mol at 0x21594656810&gt;}</code></pre>
+</div>
+</div>
+<p>Below I display I display all degenerate MCSs found, labelled with their respective SMARTS pattern:</p>
+<div class="cell" data-execution="{&quot;iopub.execute_input&quot;:&quot;2023-10-24T09:01:59.334070Z&quot;,&quot;iopub.status.busy&quot;:&quot;2023-10-24T09:01:59.333396Z&quot;,&quot;iopub.status.idle&quot;:&quot;2023-10-24T09:01:59.433844Z&quot;,&quot;shell.execute_reply&quot;:&quot;2023-10-24T09:01:59.432092Z&quot;,&quot;shell.execute_reply.started&quot;:&quot;2023-10-24T09:01:59.334010Z&quot;}" data-tags="[]" data-execution_count="62">
+<div class="sourceCode cell-code" id="cb77" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb77-1">mols_highlights_smarts_list <span class="op" style="color: #5E5E5E;">=</span> [[mols, [m.GetSubstructMatch(query) <span class="cf" style="color: #003B4F;">for</span> m <span class="kw" style="color: #003B4F;">in</span> mols], [smarts <span class="cf" style="color: #003B4F;">for</span> _ <span class="kw" style="color: #003B4F;">in</span> mols]] <span class="cf" style="color: #003B4F;">for</span> smarts, query <span class="kw" style="color: #003B4F;">in</span> mcs.degenerateSmartsQueryMolDict.items()]</span></code></pre></div>
+</div>
+<div class="cell" data-execution="{&quot;iopub.execute_input&quot;:&quot;2023-10-24T09:01:59.437376Z&quot;,&quot;iopub.status.busy&quot;:&quot;2023-10-24T09:01:59.436709Z&quot;,&quot;iopub.status.idle&quot;:&quot;2023-10-24T09:01:59.467021Z&quot;,&quot;shell.execute_reply&quot;:&quot;2023-10-24T09:01:59.465352Z&quot;,&quot;shell.execute_reply.started&quot;:&quot;2023-10-24T09:01:59.437318Z&quot;}" data-tags="[]" data-execution_count="63">
+<div class="sourceCode cell-code" id="cb78" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb78-1">mols_to_display, highlight_atom_lists, legends <span class="op" style="color: #5E5E5E;">=</span> [<span class="bu" style="color: null;">sum</span>(item, []) <span class="cf" style="color: #003B4F;">for</span> item <span class="kw" style="color: #003B4F;">in</span> <span class="bu" style="color: null;">map</span>(<span class="bu" style="color: null;">list</span>, <span class="bu" style="color: null;">list</span>(<span class="bu" style="color: null;">zip</span>(<span class="op" style="color: #5E5E5E;">*</span>mols_highlights_smarts_list)))]</span></code></pre></div>
+</div>
+<div class="cell" data-execution="{&quot;iopub.execute_input&quot;:&quot;2023-10-24T09:01:59.471156Z&quot;,&quot;iopub.status.busy&quot;:&quot;2023-10-24T09:01:59.470275Z&quot;,&quot;iopub.status.idle&quot;:&quot;2023-10-24T09:01:59.557412Z&quot;,&quot;shell.execute_reply&quot;:&quot;2023-10-24T09:01:59.556097Z&quot;,&quot;shell.execute_reply.started&quot;:&quot;2023-10-24T09:01:59.471095Z&quot;}" data-tags="[]" data-execution_count="64">
+<div class="sourceCode cell-code" id="cb79" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb79-1">MolsToGridImage(mols_to_display, molsPerRow<span class="op" style="color: #5E5E5E;">=</span><span class="dv" style="color: #AD0000;">2</span>, subImgSize<span class="op" style="color: #5E5E5E;">=</span>(<span class="dv" style="color: #AD0000;">300</span>, <span class="dv" style="color: #AD0000;">200</span>), highlightAtomLists<span class="op" style="color: #5E5E5E;">=</span>highlight_atom_lists, legends<span class="op" style="color: #5E5E5E;">=</span>legends)</span></code></pre></div>
+<div class="cell-output cell-output-display" data-execution_count="64">
+<p><img src="https://greglandrum.github.io/rdkit-blog/posts/2023-10-27-mcswhatsnew_files/figure-html/cell-65-output-1.png" class="img-fluid"></p>
+</div>
+</div>
+<p>As expected, since we allowed terminal dummies to match any non-terminal atom, we get both 1- and 2-naphthalene as degenerate MCSs.</p>
+<p>Finally, if in addition to the above we also use <code>EnforceDummyAcceptance</code> as custom <code>MCSAcceptance</code> criterion enforcing that the dummy atom should be part of the MCS if possible, we will again get a single MCS, i.e.&nbsp;1-naphthalene as it is the only one including the dummy atom:</p>
+<div class="cell" data-execution="{&quot;iopub.execute_input&quot;:&quot;2023-10-24T09:01:59.558382Z&quot;,&quot;iopub.status.busy&quot;:&quot;2023-10-24T09:01:59.558161Z&quot;,&quot;iopub.status.idle&quot;:&quot;2023-10-24T09:01:59.611045Z&quot;,&quot;shell.execute_reply&quot;:&quot;2023-10-24T09:01:59.609151Z&quot;,&quot;shell.execute_reply.started&quot;:&quot;2023-10-24T09:01:59.558364Z&quot;}" data-tags="[]" data-execution_count="65">
+<div class="sourceCode cell-code" id="cb80" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb80-1">params <span class="op" style="color: #5E5E5E;">=</span> rdFMCS.MCSParameters()</span>
+<span id="cb80-2">params.AtomTyper <span class="op" style="color: #5E5E5E;">=</span> TerminalDummyMatchesAnyNonTerminalAtom()</span>
+<span id="cb80-3">params.BondCompareParameters.RingMatchesRingOnly <span class="op" style="color: #5E5E5E;">=</span> <span class="va" style="color: #111111;">True</span></span>
+<span id="cb80-4">params.BondCompareParameters.CompleteRingsOnly <span class="op" style="color: #5E5E5E;">=</span> <span class="va" style="color: #111111;">True</span></span>
+<span id="cb80-5">params.ShouldAcceptMCS <span class="op" style="color: #5E5E5E;">=</span> EnforceDummyAcceptance()</span>
+<span id="cb80-6">params.StoreAll <span class="op" style="color: #5E5E5E;">=</span> <span class="va" style="color: #111111;">True</span></span></code></pre></div>
+</div>
+<div class="cell" data-execution="{&quot;iopub.execute_input&quot;:&quot;2023-10-24T09:01:59.631181Z&quot;,&quot;iopub.status.busy&quot;:&quot;2023-10-24T09:01:59.630419Z&quot;,&quot;iopub.status.idle&quot;:&quot;2023-10-24T09:01:59.665869Z&quot;,&quot;shell.execute_reply&quot;:&quot;2023-10-24T09:01:59.664744Z&quot;,&quot;shell.execute_reply.started&quot;:&quot;2023-10-24T09:01:59.631132Z&quot;}" data-tags="[]" data-execution_count="66">
+<div class="sourceCode cell-code" id="cb81" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb81-1">mcs <span class="op" style="color: #5E5E5E;">=</span> rdFMCS.FindMCS(mols, params)</span></code></pre></div>
+</div>
+<div class="cell" data-execution="{&quot;iopub.execute_input&quot;:&quot;2023-10-24T09:01:59.667097Z&quot;,&quot;iopub.status.busy&quot;:&quot;2023-10-24T09:01:59.666856Z&quot;,&quot;iopub.status.idle&quot;:&quot;2023-10-24T09:01:59.674669Z&quot;,&quot;shell.execute_reply&quot;:&quot;2023-10-24T09:01:59.673705Z&quot;,&quot;shell.execute_reply.started&quot;:&quot;2023-10-24T09:01:59.667078Z&quot;}" data-tags="[]" data-execution_count="67">
+<div class="sourceCode cell-code" id="cb82" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb82-1">mcs.numAtoms, mcs.numBonds</span></code></pre></div>
+<div class="cell-output cell-output-display" data-execution_count="67">
+<pre><code>(11, 12)</code></pre>
+</div>
+</div>
+<div class="cell" data-execution="{&quot;iopub.execute_input&quot;:&quot;2023-10-24T09:01:59.676192Z&quot;,&quot;iopub.status.busy&quot;:&quot;2023-10-24T09:01:59.675909Z&quot;,&quot;iopub.status.idle&quot;:&quot;2023-10-24T09:01:59.707362Z&quot;,&quot;shell.execute_reply&quot;:&quot;2023-10-24T09:01:59.705787Z&quot;,&quot;shell.execute_reply.started&quot;:&quot;2023-10-24T09:01:59.676168Z&quot;}" data-tags="[]" data-execution_count="68">
+<div class="sourceCode cell-code" id="cb84" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb84-1"><span class="bu" style="color: null;">len</span>(mcs.degenerateSmartsQueryMolDict)</span></code></pre></div>
+<div class="cell-output cell-output-display" data-execution_count="68">
+<pre><code>1</code></pre>
+</div>
+</div>
+<div class="cell" data-execution="{&quot;iopub.execute_input&quot;:&quot;2023-10-24T09:01:59.711297Z&quot;,&quot;iopub.status.busy&quot;:&quot;2023-10-24T09:01:59.710593Z&quot;,&quot;iopub.status.idle&quot;:&quot;2023-10-24T09:01:59.751614Z&quot;,&quot;shell.execute_reply&quot;:&quot;2023-10-24T09:01:59.749942Z&quot;,&quot;shell.execute_reply.started&quot;:&quot;2023-10-24T09:01:59.711237Z&quot;}" data-tags="[]" data-execution_count="69">
+<div class="sourceCode cell-code" id="cb86" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb86-1">smarts_string, query_mol <span class="op" style="color: #5E5E5E;">=</span> <span class="bu" style="color: null;">tuple</span>(mcs.degenerateSmartsQueryMolDict.items())[<span class="dv" style="color: #AD0000;">0</span>]</span></code></pre></div>
+</div>
+<div class="cell" data-execution="{&quot;iopub.execute_input&quot;:&quot;2023-10-24T09:01:59.755573Z&quot;,&quot;iopub.status.busy&quot;:&quot;2023-10-24T09:01:59.754877Z&quot;,&quot;iopub.status.idle&quot;:&quot;2023-10-24T09:01:59.876251Z&quot;,&quot;shell.execute_reply&quot;:&quot;2023-10-24T09:01:59.874666Z&quot;,&quot;shell.execute_reply.started&quot;:&quot;2023-10-24T09:01:59.755513Z&quot;}" data-tags="[]" data-execution_count="70">
+<div class="sourceCode cell-code" id="cb87" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb87-1">smarts_string</span></code></pre></div>
+<div class="cell-output cell-output-display" data-execution_count="70">
+<pre><code>'[#6]1:&amp;@[#6]:&amp;@[#6]2:&amp;@[#6](:&amp;@[#6](-&amp;!@[#0,#6]):&amp;@[#6]:&amp;@1):&amp;@[#6]:&amp;@[#6]:&amp;@[#6]:&amp;@[#6]:&amp;@2'</code></pre>
+</div>
+</div>
+<div class="cell" data-execution="{&quot;iopub.execute_input&quot;:&quot;2023-10-24T09:01:59.880238Z&quot;,&quot;iopub.status.busy&quot;:&quot;2023-10-24T09:01:59.879546Z&quot;,&quot;iopub.status.idle&quot;:&quot;2023-10-24T09:01:59.977067Z&quot;,&quot;shell.execute_reply&quot;:&quot;2023-10-24T09:01:59.976143Z&quot;,&quot;shell.execute_reply.started&quot;:&quot;2023-10-24T09:01:59.880178Z&quot;}" data-tags="[]" data-execution_count="71">
+<div class="sourceCode cell-code" id="cb89" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb89-1">MolsToGridImage(mols, subImgSize<span class="op" style="color: #5E5E5E;">=</span>(<span class="dv" style="color: #AD0000;">300</span>, <span class="dv" style="color: #AD0000;">200</span>), highlightAtomLists<span class="op" style="color: #5E5E5E;">=</span>[m.GetSubstructMatch(query_mol) <span class="cf" style="color: #003B4F;">for</span> m <span class="kw" style="color: #003B4F;">in</span> mols])</span></code></pre></div>
+<div class="cell-output cell-output-display" data-execution_count="71">
+<p><img src="https://greglandrum.github.io/rdkit-blog/posts/2023-10-27-mcswhatsnew_files/figure-html/cell-72-output-1.png" class="img-fluid"></p>
+</div>
+</div>
+
+
+</section>
+
+ ]]></description>
+  <category>release</category>
+  <category>tutorial</category>
+  <guid>https://greglandrum.github.io/rdkit-blog/posts/2023-10-27-mcswhatsnew.html</guid>
+  <pubDate>Thu, 26 Oct 2023 22:00:00 GMT</pubDate>
+  <media:content url="https://greglandrum.github.io/rdkit-blog/posts/images/blog/mcswhatsnew-1.png" medium="image" type="image/png" height="96" width="144"/>
+</item>
 <item>
   <title>Plotting rows and columns of molecules with MolsMatrixToGridImage</title>
   <link>https://greglandrum.github.io/rdkit-blog/posts/2023-10-25-molsmatrixtogridimage.html</link>
@@ -1059,7 +1559,7 @@ Q 174.3 83.2, 175.8 83.2
 <p>These boxplots look at Cohen’s kappa (left plot) and AUROC (right plot) for classifiers built on the MDCK dataset. The left pair of bars in each plot show the distribution of values for 100 random splits, the right pair show distributions for 50 different 5-fold cross validations. The left bar in each pair has the results for XGB, the right bar for RF.</p>
 <div class="quarto-figure quarto-figure-center">
 <figure class="figure">
-<p><img src="https://greglandrum.github.io/rdkit-blog/posts/2023-08-13-xval-variability1_files/figure-html/36fa39dc-1-image-2.png" class="img-fluid figure-img"></p>
+<p><img src="https://greglandrum.github.io/rdkit-blog/posts/2023-08-13-xval-variability1_files/figure-html/7dbde205-1-image-2.png" class="img-fluid figure-img"></p>
 <p></p><figcaption class="figure-caption">image-2.png</figcaption><p></p>
 </figure>
 </div>
@@ -2100,7 +2600,7 @@ AUC fraction&gt;0: 1.00</code></pre>
 <p>The TL;DR summary: if we’re careful about using as much metadata as possible to ascertain which assays can be combined, we get quite good agreement between Ki assays:</p>
 <div class="quarto-figure quarto-figure-center">
 <figure class="figure">
-<p><img src="https://greglandrum.github.io/rdkit-blog/posts/2023-06-17-overlapping-Ki-assays1_files/figure-html/e0f62cdd-1-image.png" class="img-fluid figure-img"></p>
+<p><img src="https://greglandrum.github.io/rdkit-blog/posts/2023-06-17-overlapping-Ki-assays1_files/figure-html/6c63a8c5-1-image.png" class="img-fluid figure-img"></p>
 <p></p><figcaption class="figure-caption">results summary</figcaption><p></p>
 </figure>
 </div>
@@ -7334,7 +7834,7 @@ CHEMBL1019596  CHEMBL828284    0.00 22</code></pre>
 <p>If I am careful about which xC50 assays I combine, making sure as much available metadata as possible matches, and then plot the pchembl values for duplicate compounds, I get the following:</p>
 <div class="quarto-figure quarto-figure-center">
 <figure class="figure">
-<p><img src="https://greglandrum.github.io/rdkit-blog/posts/2023-06-12-overlapping-ic50-assays1_files/figure-html/b38e1943-1-image-6.png" class="img-fluid figure-img"></p>
+<p><img src="https://greglandrum.github.io/rdkit-blog/posts/2023-06-12-overlapping-ic50-assays1_files/figure-html/0291b43b-1-image-6.png" class="img-fluid figure-img"></p>
 <p></p><figcaption class="figure-caption">image-6.png</figcaption><p></p>
 </figure>
 </div>
@@ -7343,7 +7843,7 @@ CHEMBL1019596  CHEMBL828284    0.00 22</code></pre>
 <p>If I’m not careful at all, and just combine using the target ID and the type of the result (so that I’m not combining IC50 and EC50), I get the following (this time it’s a hexbin plot, because otherwise you can’t see anything):</p>
 <div class="quarto-figure quarto-figure-center">
 <figure class="figure">
-<p><img src="https://greglandrum.github.io/rdkit-blog/posts/2023-06-12-overlapping-ic50-assays1_files/figure-html/b38e1943-2-image-7.png" class="img-fluid figure-img"></p>
+<p><img src="https://greglandrum.github.io/rdkit-blog/posts/2023-06-12-overlapping-ic50-assays1_files/figure-html/0291b43b-2-image-7.png" class="img-fluid figure-img"></p>
 <p></p><figcaption class="figure-caption">image-7.png</figcaption><p></p>
 </figure>
 </div>
@@ -37949,855 +38449,6 @@ viewer_16755013583382678.render();
   <guid>https://greglandrum.github.io/rdkit-blog/posts/2023-02-04-working-with-conformers.html</guid>
   <pubDate>Fri, 03 Feb 2023 23:00:00 GMT</pubDate>
   <media:content url="https://greglandrum.github.io/rdkit-blog/posts/images/blog/working-with-conformers-1.png" medium="image" type="image/png" height="135" width="144"/>
-</item>
-<item>
-  <title>Colliding bits III, expanded</title>
-  <link>https://greglandrum.github.io/rdkit-blog/posts/2023-01-23-colliding-bits-iii-expanded.html</link>
-  <description><![CDATA[ 
-
-
-
-<p>This is an updated and expanded version of an <a href="https://rdkit.blogspot.com/2016/02/colliding-bits-iii.html">old post</a></p>
-<p>I looked at the number of collisions in Morgan fingerprints in an <a href="http://rdkit.blogspot.ch/2014/02/colliding-bits.html">earlier post</a>. The topic came up again in discussions about the recent post on <a href="http://rdkit.blogspot.ch/2016/02/morgan-fingerprint-bit-statistics.html">Morgan fingerprint stats</a>, which used a much larger data set.</p>
-<p>Here I repeat the earlier collision analysis using a dataset of 4 million compounds and look at a number of different fingerprint types – Morgan fingeprints of various radii, RDKit fingerprints, atom pair fingerprints, and topological torsion fingerprints– folded to a set of different sizes – 64, 128, 256, 512, 1K, 2K, 4K, 8K, 16K.</p>
-<p>After evaluating the number of collisions, I look at the impact that fingerprint size has on computed similarity values.</p>
-<p>TL;DR version: The conclusions match what I observed before, there are a fair number of collisions at fingerprint sizes below 4K. As you would expect, fingerprints with more bits set have more collisions.</p>
-<p>Here’s a table with some of the comparisons between Tanimoto similarities calculated with folded fingerprint and those with unfolded fingerprints (the full table is towards the end of the post). In the table <code>d</code> refers to the difference between similarities calculated with the folded and unfolded (=“no” collisions) fingerprint at a particular size. Positive values of <code>d</code> indicate that the similarity with the folded fingerprint is higher than that with the unfolded fingerprint. <code>SpearmanR</code> is the Spearman correlation coefficient between the folded and unfolded similarities.</p>
-<table class="table">
-<thead>
-<tr class="header">
-<th>nBits</th>
-<th>fingerprint</th>
-<th>SpearmanR</th>
-<th>mean(d)</th>
-<th>std(d)</th>
-<th>90% |d|</th>
-</tr>
-</thead>
-<tbody>
-<tr class="odd">
-<td>16384</td>
-<td>mfp1</td>
-<td>1.000</td>
-<td>0.00023</td>
-<td>0.0025</td>
-<td>0</td>
-</tr>
-<tr class="even">
-<td>16384</td>
-<td>mfp2</td>
-<td>0.999</td>
-<td>0.00085</td>
-<td>0.0036</td>
-<td>0.0034</td>
-</tr>
-<tr class="odd">
-<td>16384</td>
-<td>mfp3</td>
-<td>0.999</td>
-<td>0.0014</td>
-<td>0.0038</td>
-<td>0.0056</td>
-</tr>
-<tr class="even">
-<td>16384</td>
-<td>rdk5</td>
-<td>1.000</td>
-<td>0.0054</td>
-<td>0.0046</td>
-<td>0.012</td>
-</tr>
-<tr class="odd">
-<td>16384</td>
-<td>hashap</td>
-<td>0.997</td>
-<td>0.0066</td>
-<td>0.0072</td>
-<td>0.016</td>
-</tr>
-<tr class="even">
-<td>16384</td>
-<td>hashtt</td>
-<td>0.999</td>
-<td>0.0024</td>
-<td>0.0074</td>
-<td>0.011</td>
-</tr>
-<tr class="odd">
-<td>1024</td>
-<td>mfp1</td>
-<td>0.989</td>
-<td>0.0067</td>
-<td>0.016</td>
-<td>0.028</td>
-</tr>
-<tr class="even">
-<td>1024</td>
-<td>mfp2</td>
-<td>0.990</td>
-<td>0.014</td>
-<td>0.016</td>
-<td>0.036</td>
-</tr>
-<tr class="odd">
-<td>1024</td>
-<td>mfp3</td>
-<td>0.987</td>
-<td>0.022</td>
-<td>0.017</td>
-<td>0.044</td>
-</tr>
-<tr class="even">
-<td>1024</td>
-<td>rdk5</td>
-<td>0.981</td>
-<td>0.085</td>
-<td>0.049</td>
-<td>0.15</td>
-</tr>
-<tr class="odd">
-<td>1024</td>
-<td>hashap</td>
-<td>0.874</td>
-<td>0.1</td>
-<td>0.051</td>
-<td>0.17</td>
-</tr>
-<tr class="even">
-<td>1024</td>
-<td>hashtt</td>
-<td>0.983</td>
-<td>0.025</td>
-<td>0.026</td>
-<td>0.061</td>
-</tr>
-<tr class="odd">
-<td>512</td>
-<td>mfp1</td>
-<td>0.980</td>
-<td>0.013</td>
-<td>0.021</td>
-<td>0.044</td>
-</tr>
-<tr class="even">
-<td>512</td>
-<td>mfp2</td>
-<td>0.979</td>
-<td>0.028</td>
-<td>0.023</td>
-<td>0.059</td>
-</tr>
-<tr class="odd">
-<td>512</td>
-<td>mfp3</td>
-<td>0.972</td>
-<td>0.044</td>
-<td>0.026</td>
-<td>0.078</td>
-</tr>
-<tr class="even">
-<td>512</td>
-<td>rdk5</td>
-<td>0.929</td>
-<td>0.16</td>
-<td>0.09</td>
-<td>0.28</td>
-</tr>
-<tr class="odd">
-<td>512</td>
-<td>hashap</td>
-<td>0.702</td>
-<td>0.19</td>
-<td>0.083</td>
-<td>0.3</td>
-</tr>
-<tr class="even">
-<td>512</td>
-<td>hashtt</td>
-<td>0.967</td>
-<td>0.046</td>
-<td>0.037</td>
-<td>0.096</td>
-</tr>
-<tr class="odd">
-<td>128</td>
-<td>mfp1</td>
-<td>0.918</td>
-<td>0.049</td>
-<td>0.043</td>
-<td>0.11</td>
-</tr>
-<tr class="even">
-<td>128</td>
-<td>mfp2</td>
-<td>0.897</td>
-<td>0.11</td>
-<td>0.054</td>
-<td>0.18</td>
-</tr>
-<tr class="odd">
-<td>128</td>
-<td>mfp3</td>
-<td>0.839</td>
-<td>0.17</td>
-<td>0.066</td>
-<td>0.25</td>
-</tr>
-<tr class="even">
-<td>128</td>
-<td>rdk5</td>
-<td>0.528</td>
-<td>0.42</td>
-<td>0.2</td>
-<td>0.68</td>
-</tr>
-<tr class="odd">
-<td>128</td>
-<td>hashap</td>
-<td>0.343</td>
-<td>0.42</td>
-<td>0.12</td>
-<td>0.57</td>
-</tr>
-<tr class="even">
-<td>128</td>
-<td>hashtt</td>
-<td>0.828</td>
-<td>0.17</td>
-<td>0.085</td>
-<td>0.28</td>
-</tr>
-<tr class="odd">
-<td>64</td>
-<td>mfp1</td>
-<td>0.832</td>
-<td>0.099</td>
-<td>0.064</td>
-<td>0.18</td>
-</tr>
-<tr class="even">
-<td>64</td>
-<td>mfp2</td>
-<td>0.771</td>
-<td>0.2</td>
-<td>0.083</td>
-<td>0.31</td>
-</tr>
-<tr class="odd">
-<td>64</td>
-<td>mfp3</td>
-<td>0.642</td>
-<td>0.31</td>
-<td>0.1</td>
-<td>0.44</td>
-</tr>
-<tr class="even">
-<td>64</td>
-<td>rdk5</td>
-<td>0.235</td>
-<td>0.5</td>
-<td>0.22</td>
-<td>0.77</td>
-</tr>
-<tr class="odd">
-<td>64</td>
-<td>hashap</td>
-<td>0.158</td>
-<td>0.51</td>
-<td>0.13</td>
-<td>0.65</td>
-</tr>
-<tr class="even">
-<td>64</td>
-<td>hashtt</td>
-<td>0.672</td>
-<td>0.28</td>
-<td>0.12</td>
-<td>0.43</td>
-</tr>
-</tbody>
-</table>
-<p>Down to a fingerprint size of 1024 bits all the fingerprints except hashap have an R of &gt;0.90 and comparatively low deviations (last column). With the very small 128 bit fingerprints only the mfp1 and mfp2 (both of which don’t set many bits) are showing halfway decent performance, and with 64bit fingerprints the deviations are large for all fingerprint types (though the R values for mfp1 and mfp2 are surprisingly high).</p>
-<p>There are a number of things worth further exploration here, but those will be other blog posts.</p>
-<div class="cell" data-executetime="{&quot;end_time&quot;:&quot;2023-01-18T12:22:54.449896Z&quot;,&quot;start_time&quot;:&quot;2023-01-18T12:22:54.435658Z&quot;}" data-execution_count="24">
-<div class="sourceCode cell-code" id="cb1" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb1-1"><span class="im" style="color: #00769E;">from</span> rdkit <span class="im" style="color: #00769E;">import</span> Chem,DataStructs</span>
-<span id="cb1-2"><span class="im" style="color: #00769E;">import</span> time,random,gzip,pickle,copy</span>
-<span id="cb1-3"><span class="im" style="color: #00769E;">import</span> numpy <span class="im" style="color: #00769E;">as</span> np</span>
-<span id="cb1-4"><span class="im" style="color: #00769E;">from</span> collections <span class="im" style="color: #00769E;">import</span> defaultdict</span>
-<span id="cb1-5"><span class="im" style="color: #00769E;">from</span> rdkit.Chem <span class="im" style="color: #00769E;">import</span> Draw</span>
-<span id="cb1-6"><span class="im" style="color: #00769E;">from</span> rdkit.Chem <span class="im" style="color: #00769E;">import</span> rdFingerprintGenerator</span>
-<span id="cb1-7"><span class="im" style="color: #00769E;">from</span> rdkit.Chem.Draw <span class="im" style="color: #00769E;">import</span> IPythonConsole</span>
-<span id="cb1-8"><span class="im" style="color: #00769E;">from</span> rdkit <span class="im" style="color: #00769E;">import</span> DataStructs</span>
-<span id="cb1-9"><span class="im" style="color: #00769E;">import</span> rdkit</span>
-<span id="cb1-10"><span class="op" style="color: #5E5E5E;">%</span>pylab inline</span>
-<span id="cb1-11">plt.style.use(<span class="st" style="color: #20794D;">'tableau-colorblind10'</span>)</span>
-<span id="cb1-12">plt.rcParams[<span class="st" style="color: #20794D;">'font.size'</span>] <span class="op" style="color: #5E5E5E;">=</span> <span class="st" style="color: #20794D;">'14'</span></span>
-<span id="cb1-13"><span class="bu" style="color: null;">print</span>(rdkit.__version__)</span>
-<span id="cb1-14"><span class="im" style="color: #00769E;">import</span> time</span>
-<span id="cb1-15"><span class="bu" style="color: null;">print</span>(time.asctime())</span></code></pre></div>
-<div class="cell-output cell-output-stdout">
-<pre><code>%pylab is deprecated, use %matplotlib inline and import the required libraries.
-Populating the interactive namespace from numpy and matplotlib
-2022.09.1
-Wed Jan 18 13:22:54 2023</code></pre>
-</div>
-<div class="cell-output cell-output-stderr">
-<pre><code>/localhome/glandrum/.conda/envs/py310_rdkit/lib/python3.10/site-packages/IPython/core/magics/pylab.py:162: UserWarning: pylab import has clobbered these variables: ['random', 'copy']
-`%matplotlib` prevents importing * from pylab and numpy
-  warn("pylab import has clobbered these variables: %s"  % clobbered +</code></pre>
-</div>
-</div>
-<section id="generating-the-data" class="level1">
-<h1>Generating the data</h1>
-<p>For test data I’ll use the 4 million random compounds from PubChem with &lt;=50 heavy atoms. I constructed the set of compounds by downloading the <a href="https://ftp.ncbi.nlm.nih.gov/pubchem/Compound/Extras/CID-SMILES.gz">full pubchem compound set</a> (on 8 Jan, 2023), and picking 10 million random lines using an <a href="https://stackoverflow.com/a/692401">awk script</a>.</p>
-<div class="cell" data-executetime="{&quot;end_time&quot;:&quot;2023-01-15T04:58:24.448190Z&quot;,&quot;start_time&quot;:&quot;2023-01-15T04:58:24.446138Z&quot;}" data-execution_count="2">
-<div class="sourceCode cell-code" id="cb4" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb4-1">filen<span class="op" style="color: #5E5E5E;">=</span><span class="st" style="color: #20794D;">'/localhome/glandrum/Datasets/PubChem/pubchem_compound_random_10000000.txt.gz'</span></span></code></pre></div>
-</div>
-<p>Loop over the molecules and build fingerprints of multiple radii and folded lengths.</p>
-<div class="cell" data-executetime="{&quot;end_time&quot;:&quot;2023-01-18T12:03:40.813100Z&quot;,&quot;start_time&quot;:&quot;2023-01-18T12:03:40.810417Z&quot;}" data-execution_count="12">
-<div class="sourceCode cell-code" id="cb5" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb5-1">gens <span class="op" style="color: #5E5E5E;">=</span> [(<span class="st" style="color: #20794D;">'mfp1'</span>,<span class="kw" style="color: #003B4F;">lambda</span> fpsize: rdFingerprintGenerator.GetMorganGenerator(radius<span class="op" style="color: #5E5E5E;">=</span><span class="dv" style="color: #AD0000;">1</span>,fpSize<span class="op" style="color: #5E5E5E;">=</span>fpsize)),</span>
-<span id="cb5-2">        (<span class="st" style="color: #20794D;">'mfp2'</span>,<span class="kw" style="color: #003B4F;">lambda</span> fpsize: rdFingerprintGenerator.GetMorganGenerator(radius<span class="op" style="color: #5E5E5E;">=</span><span class="dv" style="color: #AD0000;">2</span>,fpSize<span class="op" style="color: #5E5E5E;">=</span>fpsize)),</span>
-<span id="cb5-3">         (<span class="st" style="color: #20794D;">'mfp3'</span>,<span class="kw" style="color: #003B4F;">lambda</span> fpsize: rdFingerprintGenerator.GetMorganGenerator(radius<span class="op" style="color: #5E5E5E;">=</span><span class="dv" style="color: #AD0000;">3</span>,fpSize<span class="op" style="color: #5E5E5E;">=</span>fpsize)),</span>
-<span id="cb5-4">         (<span class="st" style="color: #20794D;">'rdk5'</span>,<span class="kw" style="color: #003B4F;">lambda</span> fpsize: rdFingerprintGenerator.GetRDKitFPGenerator(maxPath<span class="op" style="color: #5E5E5E;">=</span><span class="dv" style="color: #AD0000;">5</span>,fpSize<span class="op" style="color: #5E5E5E;">=</span>fpsize)),</span>
-<span id="cb5-5">         (<span class="st" style="color: #20794D;">'hashap'</span>,<span class="kw" style="color: #003B4F;">lambda</span> fpsize: rdFingerprintGenerator.GetAtomPairGenerator(fpSize<span class="op" style="color: #5E5E5E;">=</span>fpsize)),</span>
-<span id="cb5-6">         (<span class="st" style="color: #20794D;">'hashtt'</span>,<span class="kw" style="color: #003B4F;">lambda</span> fpsize: rdFingerprintGenerator.GetTopologicalTorsionGenerator(fpSize<span class="op" style="color: #5E5E5E;">=</span>fpsize)),</span>
-<span id="cb5-7">         ]</span></code></pre></div>
-</div>
-<div class="cell" data-executetime="{&quot;start_time&quot;:&quot;2023-01-15T05:04:14.833Z&quot;}">
-<div class="sourceCode cell-code" id="cb6" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb6-1"><span class="im" style="color: #00769E;">from</span> rdkit <span class="im" style="color: #00769E;">import</span> RDLogger</span>
-<span id="cb6-2">RDLogger.DisableLog(<span class="st" style="color: #20794D;">'rdApp.*'</span>)</span>
-<span id="cb6-3"><span class="im" style="color: #00769E;">import</span> copy</span>
-<span id="cb6-4">history<span class="op" style="color: #5E5E5E;">=</span>{} <span class="co" style="color: #5E5E5E;"># we will use this to see how quickly the results converge</span></span>
-<span id="cb6-5">counts<span class="op" style="color: #5E5E5E;">=</span>defaultdict(<span class="kw" style="color: #003B4F;">lambda</span>:defaultdict(<span class="bu" style="color: null;">int</span>))</span>
-<span id="cb6-6">t1 <span class="op" style="color: #5E5E5E;">=</span> time.time()</span>
-<span id="cb6-7">i <span class="op" style="color: #5E5E5E;">=</span> <span class="dv" style="color: #AD0000;">0</span></span>
-<span id="cb6-8"><span class="cf" style="color: #003B4F;">with</span> gzip.<span class="bu" style="color: null;">open</span>(filen,<span class="st" style="color: #20794D;">'rb'</span>) <span class="im" style="color: #00769E;">as</span> inf:</span>
-<span id="cb6-9">    <span class="cf" style="color: #003B4F;">for</span> inl <span class="kw" style="color: #003B4F;">in</span> inf:</span>
-<span id="cb6-10">        <span class="cf" style="color: #003B4F;">try</span>:</span>
-<span id="cb6-11">            nm,smi <span class="op" style="color: #5E5E5E;">=</span> inl.strip().split()</span>
-<span id="cb6-12">        <span class="cf" style="color: #003B4F;">except</span>:</span>
-<span id="cb6-13">            <span class="cf" style="color: #003B4F;">break</span></span>
-<span id="cb6-14">        m <span class="op" style="color: #5E5E5E;">=</span> Chem.MolFromSmiles(smi)</span>
-<span id="cb6-15">        <span class="cf" style="color: #003B4F;">if</span> m <span class="kw" style="color: #003B4F;">is</span> <span class="va" style="color: #111111;">None</span> <span class="kw" style="color: #003B4F;">or</span> m.GetNumHeavyAtoms()<span class="op" style="color: #5E5E5E;">&gt;</span><span class="dv" style="color: #AD0000;">50</span>:</span>
-<span id="cb6-16">            <span class="cf" style="color: #003B4F;">continue</span></span>
-<span id="cb6-17">        i<span class="op" style="color: #5E5E5E;">+=</span><span class="dv" style="color: #AD0000;">1</span></span>
-<span id="cb6-18">        <span class="cf" style="color: #003B4F;">for</span> nm,fpg <span class="kw" style="color: #003B4F;">in</span> gens:</span>
-<span id="cb6-19">            fpgen <span class="op" style="color: #5E5E5E;">=</span> fpg(<span class="dv" style="color: #AD0000;">1024</span>) <span class="co" style="color: #5E5E5E;"># doesn't matter here</span></span>
-<span id="cb6-20">            onbits<span class="op" style="color: #5E5E5E;">=</span><span class="bu" style="color: null;">len</span>(fpgen.GetSparseFingerprint(m).GetOnBits())</span>
-<span id="cb6-21">            counts[nm][onbits]<span class="op" style="color: #5E5E5E;">+=</span><span class="dv" style="color: #AD0000;">1</span></span>
-<span id="cb6-22">            <span class="cf" style="color: #003B4F;">for</span> l <span class="kw" style="color: #003B4F;">in</span> <span class="dv" style="color: #AD0000;">64</span>,<span class="dv" style="color: #AD0000;">128</span>,<span class="dv" style="color: #AD0000;">256</span>,<span class="dv" style="color: #AD0000;">512</span>,<span class="dv" style="color: #AD0000;">1024</span>,<span class="dv" style="color: #AD0000;">2048</span>,<span class="dv" style="color: #AD0000;">4096</span>,<span class="dv" style="color: #AD0000;">8192</span>,<span class="dv" style="color: #AD0000;">16384</span>:</span>
-<span id="cb6-23">                fpnm <span class="op" style="color: #5E5E5E;">=</span> <span class="ss" style="color: #20794D;">f'</span><span class="sc" style="color: #5E5E5E;">{</span>nm<span class="sc" style="color: #5E5E5E;">}</span><span class="ss" style="color: #20794D;">-</span><span class="sc" style="color: #5E5E5E;">{</span>l<span class="sc" style="color: #5E5E5E;">}</span><span class="ss" style="color: #20794D;">'</span></span>
-<span id="cb6-24">                fpgen <span class="op" style="color: #5E5E5E;">=</span> fpg(l)</span>
-<span id="cb6-25">                dbits <span class="op" style="color: #5E5E5E;">=</span> onbits<span class="op" style="color: #5E5E5E;">-</span>fpgen.GetFingerprint(m).GetNumOnBits()</span>
-<span id="cb6-26">                counts[fpnm][dbits]<span class="op" style="color: #5E5E5E;">+=</span><span class="dv" style="color: #AD0000;">1</span></span>
-<span id="cb6-27">        <span class="cf" style="color: #003B4F;">if</span> <span class="kw" style="color: #003B4F;">not</span> i<span class="op" style="color: #5E5E5E;">%</span><span class="dv" style="color: #AD0000;">50000</span>:</span>
-<span id="cb6-28">            t2 <span class="op" style="color: #5E5E5E;">=</span> time.time()</span>
-<span id="cb6-29">            <span class="bu" style="color: null;">print</span>(<span class="ss" style="color: #20794D;">f"Done </span><span class="sc" style="color: #5E5E5E;">{</span>i<span class="sc" style="color: #5E5E5E;">}</span><span class="ss" style="color: #20794D;"> in </span><span class="sc" style="color: #5E5E5E;">{</span>t2<span class="op" style="color: #5E5E5E;">-</span>t1<span class="sc" style="color: #5E5E5E;">:.2f}</span><span class="ss" style="color: #20794D;"> sec"</span>)</span>
-<span id="cb6-30">        <span class="cf" style="color: #003B4F;">if</span> <span class="kw" style="color: #003B4F;">not</span> i<span class="op" style="color: #5E5E5E;">%</span><span class="dv" style="color: #AD0000;">100000</span>:</span>
-<span id="cb6-31">            history[i] <span class="op" style="color: #5E5E5E;">=</span> copy.deepcopy(counts)</span>
-<span id="cb6-32">        <span class="cf" style="color: #003B4F;">if</span> i<span class="op" style="color: #5E5E5E;">&gt;=</span><span class="dv" style="color: #AD0000;">4000000</span>:</span>
-<span id="cb6-33">            <span class="cf" style="color: #003B4F;">break</span></span></code></pre></div>
-<div class="cell-output cell-output-stdout">
-<pre><code>Done 50000 in 214.60 sec
-Done 100000 in 475.92 sec
-Done 150000 in 790.69 sec
-Done 200000 in 1065.40 sec
-Done 250000 in 1350.49 sec
-Done 300000 in 1663.03 sec
-Done 350000 in 1979.41 sec
-Done 400000 in 2289.94 sec
-Done 450000 in 2584.58 sec
-Done 500000 in 2889.27 sec
-Done 550000 in 3156.72 sec
-Done 600000 in 3416.83 sec
-Done 650000 in 3673.20 sec
-Done 700000 in 3930.41 sec
-Done 750000 in 4232.50 sec
-Done 800000 in 4518.37 sec
-Done 850000 in 4788.19 sec
-Done 900000 in 5080.44 sec
-Done 950000 in 5272.51 sec
-Done 1000000 in 5507.97 sec
-Done 1050000 in 5831.47 sec
-Done 1100000 in 6124.22 sec
-Done 1150000 in 6405.13 sec
-Done 1200000 in 6699.62 sec
-Done 1250000 in 7004.17 sec
-Done 1300000 in 7264.67 sec
-Done 1350000 in 7525.13 sec
-Done 1400000 in 7779.24 sec
-Done 1450000 in 8045.30 sec
-Done 1500000 in 8314.90 sec
-Done 1550000 in 8643.98 sec
-Done 1600000 in 8978.91 sec
-Done 1650000 in 9292.37 sec
-Done 1700000 in 9596.19 sec
-Done 1750000 in 9854.10 sec
-Done 1800000 in 10134.48 sec
-Done 1850000 in 10407.01 sec
-Done 1900000 in 10729.17 sec
-Done 1950000 in 11005.57 sec
-Done 2000000 in 11183.76 sec
-Done 2050000 in 11527.20 sec
-Done 2100000 in 11831.40 sec
-Done 2150000 in 12141.98 sec
-Done 2200000 in 12413.20 sec
-Done 2250000 in 12708.59 sec
-Done 2300000 in 12979.10 sec
-Done 2350000 in 13263.71 sec
-Done 2400000 in 13504.37 sec
-Done 2450000 in 13755.21 sec
-Done 2500000 in 13974.78 sec
-Done 2550000 in 14282.01 sec
-Done 2600000 in 14586.37 sec
-Done 2650000 in 14844.31 sec
-Done 2700000 in 15153.73 sec
-Done 2750000 in 15473.13 sec
-Done 2800000 in 15783.14 sec
-Done 2850000 in 16093.12 sec</code></pre>
-</div>
-</div>
-<div class="cell" data-executetime="{&quot;end_time&quot;:&quot;2023-01-15T16:06:31.783574Z&quot;,&quot;start_time&quot;:&quot;2023-01-15T16:06:31.778484Z&quot;}" data-execution_count="9">
-<div class="sourceCode cell-code" id="cb8" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb8-1">counts.keys()</span></code></pre></div>
-<div class="cell-output cell-output-display" data-execution_count="9">
-<pre><code>dict_keys(['mfp1', 'mfp1-64', 'mfp1-128', 'mfp1-256', 'mfp1-512', 'mfp1-1024', 'mfp1-2048', 'mfp1-4096', 'mfp1-8192', 'mfp1-16384', 'mfp2', 'mfp2-64', 'mfp2-128', 'mfp2-256', 'mfp2-512', 'mfp2-1024', 'mfp2-2048', 'mfp2-4096', 'mfp2-8192', 'mfp2-16384', 'mfp3', 'mfp3-64', 'mfp3-128', 'mfp3-256', 'mfp3-512', 'mfp3-1024', 'mfp3-2048', 'mfp3-4096', 'mfp3-8192', 'mfp3-16384', 'rdk5', 'rdk5-64', 'rdk5-128', 'rdk5-256', 'rdk5-512', 'rdk5-1024', 'rdk5-2048', 'rdk5-4096', 'rdk5-8192', 'rdk5-16384', 'hashap', 'hashap-64', 'hashap-128', 'hashap-256', 'hashap-512', 'hashap-1024', 'hashap-2048', 'hashap-4096', 'hashap-8192', 'hashap-16384', 'hashtt', 'hashtt-64', 'hashtt-128', 'hashtt-256', 'hashtt-512', 'hashtt-1024', 'hashtt-2048', 'hashtt-4096', 'hashtt-8192', 'hashtt-16384'])</code></pre>
-</div>
-</div>
-<div class="cell" data-executetime="{&quot;end_time&quot;:&quot;2023-01-15T16:07:48.967588Z&quot;,&quot;start_time&quot;:&quot;2023-01-15T16:07:48.951992Z&quot;}" data-execution_count="10">
-<div class="sourceCode cell-code" id="cb10" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb10-1">pickle.dump(<span class="bu" style="color: null;">dict</span>(counts),gzip.<span class="bu" style="color: null;">open</span>(<span class="st" style="color: #20794D;">'../data/fp_collision_counts.pkl.gz'</span>,<span class="st" style="color: #20794D;">'wb+'</span>))</span></code></pre></div>
-</div>
-<div class="cell" data-executetime="{&quot;end_time&quot;:&quot;2023-01-15T16:07:50.062902Z&quot;,&quot;start_time&quot;:&quot;2023-01-15T16:07:49.913961Z&quot;}" data-execution_count="11">
-<div class="sourceCode cell-code" id="cb11" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb11-1"><span class="cf" style="color: #003B4F;">for</span> k,d <span class="kw" style="color: #003B4F;">in</span> history.items():</span>
-<span id="cb11-2">    history[k] <span class="op" style="color: #5E5E5E;">=</span> <span class="bu" style="color: null;">dict</span>(d)</span>
-<span id="cb11-3">pickle.dump(<span class="bu" style="color: null;">dict</span>(history),gzip.<span class="bu" style="color: null;">open</span>(<span class="st" style="color: #20794D;">'../data/fp_collision_counts.history.pkl.gz'</span>,<span class="st" style="color: #20794D;">'wb+'</span>))</span></code></pre></div>
-</div>
-<div class="cell" data-executetime="{&quot;end_time&quot;:&quot;2023-01-18T11:50:10.054156Z&quot;,&quot;start_time&quot;:&quot;2023-01-18T11:50:10.003131Z&quot;}" data-execution_count="2">
-<div class="sourceCode cell-code" id="cb12" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb12-1"><span class="cf" style="color: #003B4F;">with</span> gzip.<span class="bu" style="color: null;">open</span>(<span class="st" style="color: #20794D;">'../data/fp_collision_counts.pkl.gz'</span>,<span class="st" style="color: #20794D;">'rb'</span>) <span class="im" style="color: #00769E;">as</span> inf:</span>
-<span id="cb12-2">    counts <span class="op" style="color: #5E5E5E;">=</span> pickle.load(inf)</span>
-<span id="cb12-3"><span class="cf" style="color: #003B4F;">with</span> gzip.<span class="bu" style="color: null;">open</span>(<span class="st" style="color: #20794D;">'../data/fp_collision_counts.history.pkl.gz'</span>,<span class="st" style="color: #20794D;">'rb'</span>) <span class="im" style="color: #00769E;">as</span> inf:</span>
-<span id="cb12-4">    history <span class="op" style="color: #5E5E5E;">=</span> pickle.load(inf)</span></code></pre></div>
-</div>
-</section>
-<section id="quantifying-the-number-of-collisions" class="level1">
-<h1>Quantifying the number of collisions</h1>
-<p>Now plot histograms of the numbers of collisions along with the distributions of the number of bits set in the non-folded FPs</p>
-<div class="cell" data-executetime="{&quot;end_time&quot;:&quot;2023-01-18T12:23:01.524057Z&quot;,&quot;start_time&quot;:&quot;2023-01-18T12:22:59.125801Z&quot;}" data-execution_count="25">
-<div class="sourceCode cell-code" id="cb13" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb13-1">allCounts <span class="op" style="color: #5E5E5E;">=</span> (<span class="dv" style="color: #AD0000;">16384</span>, <span class="dv" style="color: #AD0000;">8192</span>,<span class="dv" style="color: #AD0000;">4096</span>,<span class="dv" style="color: #AD0000;">2048</span>,<span class="dv" style="color: #AD0000;">1024</span>,) <span class="co" style="color: #5E5E5E;">#512,256,128,64)</span></span>
-<span id="cb13-2"></span>
-<span id="cb13-3">figure(figsize<span class="op" style="color: #5E5E5E;">=</span>(<span class="dv" style="color: #AD0000;">16</span>,<span class="dv" style="color: #AD0000;">5</span><span class="op" style="color: #5E5E5E;">*</span><span class="bu" style="color: null;">len</span>(allCounts)))</span>
-<span id="cb13-4"></span>
-<span id="cb13-5">pidx<span class="op" style="color: #5E5E5E;">=</span><span class="dv" style="color: #AD0000;">1</span></span>
-<span id="cb13-6"><span class="co" style="color: #5E5E5E;">#----------------------------</span></span>
-<span id="cb13-7"><span class="cf" style="color: #003B4F;">for</span> nbits <span class="kw" style="color: #003B4F;">in</span> allCounts:</span>
-<span id="cb13-8">    subplot(<span class="bu" style="color: null;">len</span>(allCounts),<span class="dv" style="color: #AD0000;">2</span>,pidx)</span>
-<span id="cb13-9">    pidx<span class="op" style="color: #5E5E5E;">+=</span><span class="dv" style="color: #AD0000;">1</span></span>
-<span id="cb13-10">    maxCollisions <span class="op" style="color: #5E5E5E;">=</span> <span class="bu" style="color: null;">max</span>(counts[<span class="ss" style="color: #20794D;">f'mfp3-</span><span class="sc" style="color: #5E5E5E;">{</span>allCounts[<span class="op" style="color: #5E5E5E;">-</span><span class="dv" style="color: #AD0000;">1</span>]<span class="sc" style="color: #5E5E5E;">}</span><span class="ss" style="color: #20794D;">'</span>].keys())<span class="op" style="color: #5E5E5E;">+</span><span class="dv" style="color: #AD0000;">1</span></span>
-<span id="cb13-11">    d1<span class="op" style="color: #5E5E5E;">=</span>np.zeros(maxCollisions,<span class="bu" style="color: null;">int</span>)</span>
-<span id="cb13-12">    <span class="cf" style="color: #003B4F;">for</span> k,v <span class="kw" style="color: #003B4F;">in</span> counts[<span class="ss" style="color: #20794D;">f'mfp1-</span><span class="sc" style="color: #5E5E5E;">{</span>nbits<span class="sc" style="color: #5E5E5E;">}</span><span class="ss" style="color: #20794D;">'</span>].items():</span>
-<span id="cb13-13">        d1[k]<span class="op" style="color: #5E5E5E;">=</span>v</span>
-<span id="cb13-14">    d2<span class="op" style="color: #5E5E5E;">=</span>np.zeros(maxCollisions,<span class="bu" style="color: null;">int</span>)</span>
-<span id="cb13-15">    <span class="cf" style="color: #003B4F;">for</span> k,v <span class="kw" style="color: #003B4F;">in</span> counts[<span class="ss" style="color: #20794D;">f'mfp2-</span><span class="sc" style="color: #5E5E5E;">{</span>nbits<span class="sc" style="color: #5E5E5E;">}</span><span class="ss" style="color: #20794D;">'</span>].items():</span>
-<span id="cb13-16">        d2[k]<span class="op" style="color: #5E5E5E;">=</span>v</span>
-<span id="cb13-17">    d3<span class="op" style="color: #5E5E5E;">=</span>np.zeros(maxCollisions,<span class="bu" style="color: null;">int</span>)</span>
-<span id="cb13-18">    <span class="cf" style="color: #003B4F;">for</span> k,v <span class="kw" style="color: #003B4F;">in</span> counts[<span class="ss" style="color: #20794D;">f'mfp3-</span><span class="sc" style="color: #5E5E5E;">{</span>nbits<span class="sc" style="color: #5E5E5E;">}</span><span class="ss" style="color: #20794D;">'</span>].items():</span>
-<span id="cb13-19">        d3[k]<span class="op" style="color: #5E5E5E;">=</span>v</span>
-<span id="cb13-20">    barWidth<span class="op" style="color: #5E5E5E;">=</span><span class="fl" style="color: #AD0000;">.25</span></span>
-<span id="cb13-21">    locs <span class="op" style="color: #5E5E5E;">=</span> np.array(<span class="bu" style="color: null;">range</span>(maxCollisions))</span>
-<span id="cb13-22"></span>
-<span id="cb13-23">    bar(locs,d1,barWidth,label<span class="op" style="color: #5E5E5E;">=</span><span class="st" style="color: #20794D;">"r=1"</span>)</span>
-<span id="cb13-24">    bar(locs<span class="op" style="color: #5E5E5E;">+</span>barWidth,d2,barWidth,label<span class="op" style="color: #5E5E5E;">=</span><span class="st" style="color: #20794D;">"r=2"</span>)</span>
-<span id="cb13-25">    bar(locs<span class="op" style="color: #5E5E5E;">+</span><span class="dv" style="color: #AD0000;">2</span><span class="op" style="color: #5E5E5E;">*</span>barWidth,d3,barWidth,label<span class="op" style="color: #5E5E5E;">=</span><span class="st" style="color: #20794D;">"r=3"</span>)</span>
-<span id="cb13-26">    </span>
-<span id="cb13-27">    <span class="co" style="color: #5E5E5E;">#_=hist((d1,d2,d3),bins=20,log=True,label=("r=1","r=2","r=3"))</span></span>
-<span id="cb13-28">    title(<span class="st" style="color: #20794D;">'</span><span class="sc" style="color: #5E5E5E;">%d</span><span class="st" style="color: #20794D;"> bits'</span><span class="op" style="color: #5E5E5E;">%</span>nbits)</span>
-<span id="cb13-29">    _<span class="op" style="color: #5E5E5E;">=</span>yscale(<span class="st" style="color: #20794D;">"log"</span>)</span>
-<span id="cb13-30">    _<span class="op" style="color: #5E5E5E;">=</span>legend()</span>
-<span id="cb13-31">    <span class="cf" style="color: #003B4F;">if</span> nbits <span class="op" style="color: #5E5E5E;">==</span> allCounts[<span class="op" style="color: #5E5E5E;">-</span><span class="dv" style="color: #AD0000;">1</span>]:</span>
-<span id="cb13-32">        xlabel(<span class="st" style="color: #20794D;">'num collisions'</span>)</span>
-<span id="cb13-33">    </span>
-<span id="cb13-34">    subplot(<span class="bu" style="color: null;">len</span>(allCounts),<span class="dv" style="color: #AD0000;">2</span>,pidx)</span>
-<span id="cb13-35">    pidx<span class="op" style="color: #5E5E5E;">+=</span><span class="dv" style="color: #AD0000;">1</span></span>
-<span id="cb13-36">    itms <span class="op" style="color: #5E5E5E;">=</span> <span class="bu" style="color: null;">list</span>(<span class="bu" style="color: null;">sorted</span>(counts[<span class="st" style="color: #20794D;">'mfp1'</span>].items()))</span>
-<span id="cb13-37">    plot([x <span class="cf" style="color: #003B4F;">for</span> x,y <span class="kw" style="color: #003B4F;">in</span> itms],[y <span class="cf" style="color: #003B4F;">for</span> x,y <span class="kw" style="color: #003B4F;">in</span> itms],<span class="st" style="color: #20794D;">'.-'</span>,label<span class="op" style="color: #5E5E5E;">=</span></span>
-<span id="cb13-38">        <span class="st" style="color: #20794D;">"r=1"</span>)</span>
-<span id="cb13-39">    itms <span class="op" style="color: #5E5E5E;">=</span> <span class="bu" style="color: null;">list</span>(<span class="bu" style="color: null;">sorted</span>(counts[<span class="st" style="color: #20794D;">'mfp2'</span>].items()))</span>
-<span id="cb13-40">    plot([x <span class="cf" style="color: #003B4F;">for</span> x,y <span class="kw" style="color: #003B4F;">in</span> itms],[y <span class="cf" style="color: #003B4F;">for</span> x,y <span class="kw" style="color: #003B4F;">in</span> itms],<span class="st" style="color: #20794D;">'.-'</span>,label<span class="op" style="color: #5E5E5E;">=</span></span>
-<span id="cb13-41">        <span class="st" style="color: #20794D;">"r=2"</span>)</span>
-<span id="cb13-42">    itms <span class="op" style="color: #5E5E5E;">=</span> <span class="bu" style="color: null;">list</span>(<span class="bu" style="color: null;">sorted</span>(counts[<span class="st" style="color: #20794D;">'mfp3'</span>].items()))</span>
-<span id="cb13-43">    plot([x <span class="cf" style="color: #003B4F;">for</span> x,y <span class="kw" style="color: #003B4F;">in</span> itms],[y <span class="cf" style="color: #003B4F;">for</span> x,y <span class="kw" style="color: #003B4F;">in</span> itms],<span class="st" style="color: #20794D;">'.-'</span>,label<span class="op" style="color: #5E5E5E;">=</span></span>
-<span id="cb13-44">        <span class="st" style="color: #20794D;">"r=3"</span>)</span>
-<span id="cb13-45">    <span class="cf" style="color: #003B4F;">if</span> nbits <span class="op" style="color: #5E5E5E;">==</span> allCounts[<span class="op" style="color: #5E5E5E;">-</span><span class="dv" style="color: #AD0000;">1</span>]:</span>
-<span id="cb13-46">        _<span class="op" style="color: #5E5E5E;">=</span>xlabel(<span class="st" style="color: #20794D;">"num bits set"</span>)</span>
-<span id="cb13-47">    _<span class="op" style="color: #5E5E5E;">=</span>ylabel(<span class="st" style="color: #20794D;">"count"</span>)</span>
-<span id="cb13-48">    _<span class="op" style="color: #5E5E5E;">=</span>legend()</span>
-<span id="cb13-49">    </span>
-<span id="cb13-50">    </span></code></pre></div>
-<div class="cell-output cell-output-display">
-<p><img src="https://greglandrum.github.io/rdkit-blog/posts/2023-01-23-colliding-bits-iii-expanded_files/figure-html/cell-10-output-1.png" class="img-fluid"></p>
-</div>
-</div>
-<p>So, there are definitely some collisions, particularly with radius 3 fingerprints with 1K bits.</p>
-<p>The bimodal character of the mfp2 and mfp3 fingerprints is worth following up on: that wasn’t observed in the <a href="http://rdkit.blogspot.com/2016/02/colliding-bits-iii.html">earlier post</a>, which used a set of compounds from ZINC</p>
-<p>Look the short Morgan fingerprints</p>
-<div class="cell" data-executetime="{&quot;end_time&quot;:&quot;2023-01-18T12:23:10.029963Z&quot;,&quot;start_time&quot;:&quot;2023-01-18T12:23:07.100819Z&quot;}" data-execution_count="26">
-<div class="sourceCode cell-code" id="cb14" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb14-1">allCounts <span class="op" style="color: #5E5E5E;">=</span> (<span class="dv" style="color: #AD0000;">512</span>,<span class="dv" style="color: #AD0000;">256</span>,<span class="dv" style="color: #AD0000;">128</span>,<span class="dv" style="color: #AD0000;">64</span>)</span>
-<span id="cb14-2"></span>
-<span id="cb14-3">figure(figsize<span class="op" style="color: #5E5E5E;">=</span>(<span class="dv" style="color: #AD0000;">16</span>,<span class="dv" style="color: #AD0000;">5</span><span class="op" style="color: #5E5E5E;">*</span><span class="bu" style="color: null;">len</span>(allCounts)))</span>
-<span id="cb14-4"></span>
-<span id="cb14-5">pidx<span class="op" style="color: #5E5E5E;">=</span><span class="dv" style="color: #AD0000;">1</span></span>
-<span id="cb14-6"><span class="co" style="color: #5E5E5E;">#----------------------------</span></span>
-<span id="cb14-7"><span class="cf" style="color: #003B4F;">for</span> nbits <span class="kw" style="color: #003B4F;">in</span> allCounts:</span>
-<span id="cb14-8">    subplot(<span class="bu" style="color: null;">len</span>(allCounts),<span class="dv" style="color: #AD0000;">2</span>,pidx)</span>
-<span id="cb14-9">    pidx<span class="op" style="color: #5E5E5E;">+=</span><span class="dv" style="color: #AD0000;">1</span></span>
-<span id="cb14-10">    maxCollisions <span class="op" style="color: #5E5E5E;">=</span> <span class="bu" style="color: null;">max</span>(counts[<span class="ss" style="color: #20794D;">f'mfp3-</span><span class="sc" style="color: #5E5E5E;">{</span>allCounts[<span class="op" style="color: #5E5E5E;">-</span><span class="dv" style="color: #AD0000;">1</span>]<span class="sc" style="color: #5E5E5E;">}</span><span class="ss" style="color: #20794D;">'</span>].keys())<span class="op" style="color: #5E5E5E;">+</span><span class="dv" style="color: #AD0000;">1</span></span>
-<span id="cb14-11">    d1<span class="op" style="color: #5E5E5E;">=</span>np.zeros(maxCollisions,<span class="bu" style="color: null;">int</span>)</span>
-<span id="cb14-12">    <span class="cf" style="color: #003B4F;">for</span> k,v <span class="kw" style="color: #003B4F;">in</span> counts[<span class="ss" style="color: #20794D;">f'mfp1-</span><span class="sc" style="color: #5E5E5E;">{</span>nbits<span class="sc" style="color: #5E5E5E;">}</span><span class="ss" style="color: #20794D;">'</span>].items():</span>
-<span id="cb14-13">        d1[k]<span class="op" style="color: #5E5E5E;">=</span>v</span>
-<span id="cb14-14">    d2<span class="op" style="color: #5E5E5E;">=</span>np.zeros(maxCollisions,<span class="bu" style="color: null;">int</span>)</span>
-<span id="cb14-15">    <span class="cf" style="color: #003B4F;">for</span> k,v <span class="kw" style="color: #003B4F;">in</span> counts[<span class="ss" style="color: #20794D;">f'mfp2-</span><span class="sc" style="color: #5E5E5E;">{</span>nbits<span class="sc" style="color: #5E5E5E;">}</span><span class="ss" style="color: #20794D;">'</span>].items():</span>
-<span id="cb14-16">        d2[k]<span class="op" style="color: #5E5E5E;">=</span>v</span>
-<span id="cb14-17">    d3<span class="op" style="color: #5E5E5E;">=</span>np.zeros(maxCollisions,<span class="bu" style="color: null;">int</span>)</span>
-<span id="cb14-18">    <span class="cf" style="color: #003B4F;">for</span> k,v <span class="kw" style="color: #003B4F;">in</span> counts[<span class="ss" style="color: #20794D;">f'mfp3-</span><span class="sc" style="color: #5E5E5E;">{</span>nbits<span class="sc" style="color: #5E5E5E;">}</span><span class="ss" style="color: #20794D;">'</span>].items():</span>
-<span id="cb14-19">        d3[k]<span class="op" style="color: #5E5E5E;">=</span>v</span>
-<span id="cb14-20">    barWidth<span class="op" style="color: #5E5E5E;">=</span><span class="fl" style="color: #AD0000;">.25</span></span>
-<span id="cb14-21">    locs <span class="op" style="color: #5E5E5E;">=</span> np.array(<span class="bu" style="color: null;">range</span>(maxCollisions))</span>
-<span id="cb14-22"></span>
-<span id="cb14-23">    bar(locs,d1,barWidth,label<span class="op" style="color: #5E5E5E;">=</span><span class="st" style="color: #20794D;">"r=1"</span>)</span>
-<span id="cb14-24">    bar(locs<span class="op" style="color: #5E5E5E;">+</span>barWidth,d2,barWidth,label<span class="op" style="color: #5E5E5E;">=</span><span class="st" style="color: #20794D;">"r=2"</span>)</span>
-<span id="cb14-25">    bar(locs<span class="op" style="color: #5E5E5E;">+</span><span class="dv" style="color: #AD0000;">2</span><span class="op" style="color: #5E5E5E;">*</span>barWidth,d3,barWidth,label<span class="op" style="color: #5E5E5E;">=</span><span class="st" style="color: #20794D;">"r=3"</span>)</span>
-<span id="cb14-26">    </span>
-<span id="cb14-27">    <span class="co" style="color: #5E5E5E;">#_=hist((d1,d2,d3),bins=20,log=True,label=("r=1","r=2","r=3"))</span></span>
-<span id="cb14-28">    title(<span class="st" style="color: #20794D;">'</span><span class="sc" style="color: #5E5E5E;">%d</span><span class="st" style="color: #20794D;"> bits'</span><span class="op" style="color: #5E5E5E;">%</span>nbits)</span>
-<span id="cb14-29">    _<span class="op" style="color: #5E5E5E;">=</span>yscale(<span class="st" style="color: #20794D;">"log"</span>)</span>
-<span id="cb14-30">    _<span class="op" style="color: #5E5E5E;">=</span>legend()</span>
-<span id="cb14-31">    <span class="cf" style="color: #003B4F;">if</span> nbits <span class="op" style="color: #5E5E5E;">==</span> allCounts[<span class="op" style="color: #5E5E5E;">-</span><span class="dv" style="color: #AD0000;">1</span>]:</span>
-<span id="cb14-32">        xlabel(<span class="st" style="color: #20794D;">'num collisions'</span>)</span>
-<span id="cb14-33"></span>
-<span id="cb14-34">    subplot(<span class="bu" style="color: null;">len</span>(allCounts),<span class="dv" style="color: #AD0000;">2</span>,pidx)</span>
-<span id="cb14-35">    pidx<span class="op" style="color: #5E5E5E;">+=</span><span class="dv" style="color: #AD0000;">1</span></span>
-<span id="cb14-36">    itms <span class="op" style="color: #5E5E5E;">=</span> <span class="bu" style="color: null;">list</span>(<span class="bu" style="color: null;">sorted</span>(counts[<span class="st" style="color: #20794D;">'mfp1'</span>].items()))</span>
-<span id="cb14-37">    plot([x <span class="cf" style="color: #003B4F;">for</span> x,y <span class="kw" style="color: #003B4F;">in</span> itms],[y <span class="cf" style="color: #003B4F;">for</span> x,y <span class="kw" style="color: #003B4F;">in</span> itms],<span class="st" style="color: #20794D;">'.-'</span>,label<span class="op" style="color: #5E5E5E;">=</span></span>
-<span id="cb14-38">        <span class="st" style="color: #20794D;">"r=1"</span>)</span>
-<span id="cb14-39">    itms <span class="op" style="color: #5E5E5E;">=</span> <span class="bu" style="color: null;">list</span>(<span class="bu" style="color: null;">sorted</span>(counts[<span class="st" style="color: #20794D;">'mfp2'</span>].items()))</span>
-<span id="cb14-40">    plot([x <span class="cf" style="color: #003B4F;">for</span> x,y <span class="kw" style="color: #003B4F;">in</span> itms],[y <span class="cf" style="color: #003B4F;">for</span> x,y <span class="kw" style="color: #003B4F;">in</span> itms],<span class="st" style="color: #20794D;">'.-'</span>,label<span class="op" style="color: #5E5E5E;">=</span></span>
-<span id="cb14-41">        <span class="st" style="color: #20794D;">"r=2"</span>)</span>
-<span id="cb14-42">    itms <span class="op" style="color: #5E5E5E;">=</span> <span class="bu" style="color: null;">list</span>(<span class="bu" style="color: null;">sorted</span>(counts[<span class="st" style="color: #20794D;">'mfp3'</span>].items()))</span>
-<span id="cb14-43">    plot([x <span class="cf" style="color: #003B4F;">for</span> x,y <span class="kw" style="color: #003B4F;">in</span> itms],[y <span class="cf" style="color: #003B4F;">for</span> x,y <span class="kw" style="color: #003B4F;">in</span> itms],<span class="st" style="color: #20794D;">'.-'</span>,label<span class="op" style="color: #5E5E5E;">=</span></span>
-<span id="cb14-44">        <span class="st" style="color: #20794D;">"r=3"</span>)</span>
-<span id="cb14-45">    <span class="cf" style="color: #003B4F;">if</span> nbits <span class="op" style="color: #5E5E5E;">==</span> allCounts[<span class="op" style="color: #5E5E5E;">-</span><span class="dv" style="color: #AD0000;">1</span>]:</span>
-<span id="cb14-46">        _<span class="op" style="color: #5E5E5E;">=</span>xlabel(<span class="st" style="color: #20794D;">"num bits set"</span>)</span>
-<span id="cb14-47">    _<span class="op" style="color: #5E5E5E;">=</span>ylabel(<span class="st" style="color: #20794D;">"count"</span>)</span>
-<span id="cb14-48">    _<span class="op" style="color: #5E5E5E;">=</span>legend()</span>
-<span id="cb14-49">    </span>
-<span id="cb14-50">    </span></code></pre></div>
-<div class="cell-output cell-output-display">
-<p><img src="https://greglandrum.github.io/rdkit-blog/posts/2023-01-23-colliding-bits-iii-expanded_files/figure-html/cell-11-output-1.png" class="img-fluid"></p>
-</div>
-</div>
-<p>Look at the other fingerprint types. We’ll do this a little differently because of the scales.</p>
-<p>Start with the number of bits set:</p>
-<div class="cell" data-executetime="{&quot;end_time&quot;:&quot;2023-01-18T12:23:10.147630Z&quot;,&quot;start_time&quot;:&quot;2023-01-18T12:23:10.031264Z&quot;}" data-execution_count="27">
-<div class="sourceCode cell-code" id="cb15" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb15-1">figsize(<span class="dv" style="color: #AD0000;">8</span>,<span class="dv" style="color: #AD0000;">5</span>)</span>
-<span id="cb15-2"></span>
-<span id="cb15-3">itms <span class="op" style="color: #5E5E5E;">=</span> <span class="bu" style="color: null;">list</span>(<span class="bu" style="color: null;">sorted</span>(counts[<span class="st" style="color: #20794D;">'hashtt'</span>].items()))</span>
-<span id="cb15-4">plot([x <span class="cf" style="color: #003B4F;">for</span> x,y <span class="kw" style="color: #003B4F;">in</span> itms],[y <span class="cf" style="color: #003B4F;">for</span> x,y <span class="kw" style="color: #003B4F;">in</span> itms],<span class="st" style="color: #20794D;">'.-'</span>,label<span class="op" style="color: #5E5E5E;">=</span></span>
-<span id="cb15-5">    <span class="st" style="color: #20794D;">"hashtt"</span>)</span>
-<span id="cb15-6">itms <span class="op" style="color: #5E5E5E;">=</span> <span class="bu" style="color: null;">list</span>(<span class="bu" style="color: null;">sorted</span>(counts[<span class="st" style="color: #20794D;">'hashap'</span>].items()))</span>
-<span id="cb15-7">plot([x <span class="cf" style="color: #003B4F;">for</span> x,y <span class="kw" style="color: #003B4F;">in</span> itms],[y <span class="cf" style="color: #003B4F;">for</span> x,y <span class="kw" style="color: #003B4F;">in</span> itms],<span class="st" style="color: #20794D;">'.-'</span>,label<span class="op" style="color: #5E5E5E;">=</span></span>
-<span id="cb15-8">    <span class="st" style="color: #20794D;">"hashap"</span>)</span>
-<span id="cb15-9">itms <span class="op" style="color: #5E5E5E;">=</span> <span class="bu" style="color: null;">list</span>(<span class="bu" style="color: null;">sorted</span>(counts[<span class="st" style="color: #20794D;">'rdk5'</span>].items()))</span>
-<span id="cb15-10">plot([x <span class="cf" style="color: #003B4F;">for</span> x,y <span class="kw" style="color: #003B4F;">in</span> itms],[y <span class="cf" style="color: #003B4F;">for</span> x,y <span class="kw" style="color: #003B4F;">in</span> itms],<span class="st" style="color: #20794D;">'.-'</span>,label<span class="op" style="color: #5E5E5E;">=</span></span>
-<span id="cb15-11">    <span class="st" style="color: #20794D;">"rdk5"</span>)</span>
-<span id="cb15-12"><span class="cf" style="color: #003B4F;">if</span> nbits <span class="op" style="color: #5E5E5E;">==</span> allCounts[<span class="op" style="color: #5E5E5E;">-</span><span class="dv" style="color: #AD0000;">1</span>]:</span>
-<span id="cb15-13">    _<span class="op" style="color: #5E5E5E;">=</span>xlabel(<span class="st" style="color: #20794D;">"num bits set"</span>)</span>
-<span id="cb15-14">_<span class="op" style="color: #5E5E5E;">=</span>ylabel(<span class="st" style="color: #20794D;">"count"</span>)</span>
-<span id="cb15-15">_<span class="op" style="color: #5E5E5E;">=</span>legend()</span>
-<span id="cb15-16">    </span>
-<span id="cb15-17">    </span></code></pre></div>
-<div class="cell-output cell-output-display">
-<p><img src="https://greglandrum.github.io/rdkit-blog/posts/2023-01-23-colliding-bits-iii-expanded_files/figure-html/cell-12-output-1.png" class="img-fluid"></p>
-</div>
-</div>
-<p>Both the hashap and hadhtt distributions show more than one peak. Another thing to follow up on…</p>
-<div class="cell" data-executetime="{&quot;end_time&quot;:&quot;2023-01-18T12:23:25.275234Z&quot;,&quot;start_time&quot;:&quot;2023-01-18T12:23:12.053531Z&quot;}" data-execution_count="28">
-<div class="sourceCode cell-code" id="cb16" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb16-1">allCounts <span class="op" style="color: #5E5E5E;">=</span> (<span class="dv" style="color: #AD0000;">16384</span>, <span class="dv" style="color: #AD0000;">8192</span>,<span class="dv" style="color: #AD0000;">4096</span>,<span class="dv" style="color: #AD0000;">2048</span>,<span class="dv" style="color: #AD0000;">1024</span>,) <span class="co" style="color: #5E5E5E;">#512,256,128,64)</span></span>
-<span id="cb16-2"></span>
-<span id="cb16-3">figure(figsize<span class="op" style="color: #5E5E5E;">=</span>(<span class="dv" style="color: #AD0000;">16</span>,<span class="dv" style="color: #AD0000;">5</span><span class="op" style="color: #5E5E5E;">*</span><span class="bu" style="color: null;">len</span>(allCounts)))</span>
-<span id="cb16-4"></span>
-<span id="cb16-5">pidx<span class="op" style="color: #5E5E5E;">=</span><span class="dv" style="color: #AD0000;">1</span></span>
-<span id="cb16-6"><span class="co" style="color: #5E5E5E;">#----------------------------</span></span>
-<span id="cb16-7"><span class="cf" style="color: #003B4F;">for</span> nbits <span class="kw" style="color: #003B4F;">in</span> allCounts:</span>
-<span id="cb16-8">    <span class="cf" style="color: #003B4F;">for</span> fpt <span class="kw" style="color: #003B4F;">in</span> (<span class="st" style="color: #20794D;">'hashtt'</span>,<span class="st" style="color: #20794D;">'hashap'</span>,<span class="st" style="color: #20794D;">'rdk5'</span>):</span>
-<span id="cb16-9">        subplot(<span class="bu" style="color: null;">len</span>(allCounts),<span class="dv" style="color: #AD0000;">3</span>,pidx)</span>
-<span id="cb16-10">        pidx<span class="op" style="color: #5E5E5E;">+=</span><span class="dv" style="color: #AD0000;">1</span></span>
-<span id="cb16-11">        maxCollisions <span class="op" style="color: #5E5E5E;">=</span> <span class="bu" style="color: null;">max</span>(counts[<span class="ss" style="color: #20794D;">f'</span><span class="sc" style="color: #5E5E5E;">{</span>fpt<span class="sc" style="color: #5E5E5E;">}</span><span class="ss" style="color: #20794D;">-</span><span class="sc" style="color: #5E5E5E;">{</span>allCounts[<span class="op" style="color: #5E5E5E;">-</span><span class="dv" style="color: #AD0000;">1</span>]<span class="sc" style="color: #5E5E5E;">}</span><span class="ss" style="color: #20794D;">'</span>].keys())<span class="op" style="color: #5E5E5E;">+</span><span class="dv" style="color: #AD0000;">1</span></span>
-<span id="cb16-12">        d1<span class="op" style="color: #5E5E5E;">=</span>np.zeros(maxCollisions,<span class="bu" style="color: null;">int</span>)</span>
-<span id="cb16-13">        <span class="cf" style="color: #003B4F;">for</span> k,v <span class="kw" style="color: #003B4F;">in</span> counts[<span class="ss" style="color: #20794D;">f'</span><span class="sc" style="color: #5E5E5E;">{</span>fpt<span class="sc" style="color: #5E5E5E;">}</span><span class="ss" style="color: #20794D;">-</span><span class="sc" style="color: #5E5E5E;">{</span>nbits<span class="sc" style="color: #5E5E5E;">}</span><span class="ss" style="color: #20794D;">'</span>].items():</span>
-<span id="cb16-14">            d1[k]<span class="op" style="color: #5E5E5E;">=</span>v</span>
-<span id="cb16-15">        barWidth<span class="op" style="color: #5E5E5E;">=</span><span class="fl" style="color: #AD0000;">.25</span></span>
-<span id="cb16-16">        locs <span class="op" style="color: #5E5E5E;">=</span> np.array(<span class="bu" style="color: null;">range</span>(maxCollisions))</span>
-<span id="cb16-17"></span>
-<span id="cb16-18">        bar(locs,d1,barWidth,label<span class="op" style="color: #5E5E5E;">=</span>fpt)    </span>
-<span id="cb16-19">        title(<span class="ss" style="color: #20794D;">f'</span><span class="sc" style="color: #5E5E5E;">{</span>fpt<span class="sc" style="color: #5E5E5E;">}</span><span class="ss" style="color: #20794D;">-</span><span class="sc" style="color: #5E5E5E;">{</span>nbits<span class="sc" style="color: #5E5E5E;">}</span><span class="ss" style="color: #20794D;">'</span>)</span>
-<span id="cb16-20">        _<span class="op" style="color: #5E5E5E;">=</span>yscale(<span class="st" style="color: #20794D;">"log"</span>)</span>
-<span id="cb16-21">        _<span class="op" style="color: #5E5E5E;">=</span>legend()</span>
-<span id="cb16-22">        <span class="cf" style="color: #003B4F;">if</span> nbits <span class="op" style="color: #5E5E5E;">==</span> allCounts[<span class="op" style="color: #5E5E5E;">-</span><span class="dv" style="color: #AD0000;">1</span>]:</span>
-<span id="cb16-23">            xlabel(<span class="st" style="color: #20794D;">'num collisions'</span>)</span></code></pre></div>
-<div class="cell-output cell-output-display">
-<p><img src="https://greglandrum.github.io/rdkit-blog/posts/2023-01-23-colliding-bits-iii-expanded_files/figure-html/cell-13-output-1.png" class="img-fluid"></p>
-</div>
-</div>
-<p>The topological torsion FPs don’t have a huge number of collisions, but both atom pair and RDKit fingerprints really do have collisions, as one would expect given the number of set bits.</p>
-<p>Look at the percentage of compounds with &lt;= a particular number of collisions</p>
-<div class="cell" data-executetime="{&quot;end_time&quot;:&quot;2023-01-16T05:30:46.349454Z&quot;,&quot;start_time&quot;:&quot;2023-01-16T05:30:46.341526Z&quot;}" data-execution_count="59">
-<div class="sourceCode cell-code" id="cb17" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb17-1">bcounts <span class="op" style="color: #5E5E5E;">=</span> (<span class="dv" style="color: #AD0000;">64</span>,<span class="dv" style="color: #AD0000;">128</span>,<span class="dv" style="color: #AD0000;">256</span>,<span class="dv" style="color: #AD0000;">512</span>,<span class="dv" style="color: #AD0000;">1024</span>,<span class="dv" style="color: #AD0000;">2048</span>,<span class="dv" style="color: #AD0000;">4096</span>,<span class="dv" style="color: #AD0000;">8192</span>,<span class="dv" style="color: #AD0000;">16384</span>)</span>
-<span id="cb17-2">ccounts <span class="op" style="color: #5E5E5E;">=</span> <span class="bu" style="color: null;">list</span>(<span class="bu" style="color: null;">range</span>(<span class="dv" style="color: #AD0000;">11</span>))</span>
-<span id="cb17-3"></span>
-<span id="cb17-4"></span>
-<span id="cb17-5">row <span class="op" style="color: #5E5E5E;">=</span> (<span class="st" style="color: #20794D;">'length'</span>,<span class="st" style="color: #20794D;">'fingerprint'</span>,)<span class="op" style="color: #5E5E5E;">+</span><span class="bu" style="color: null;">tuple</span>(<span class="bu" style="color: null;">str</span>(x) <span class="cf" style="color: #003B4F;">for</span> x <span class="kw" style="color: #003B4F;">in</span> ccounts)</span>
-<span id="cb17-6">divider <span class="op" style="color: #5E5E5E;">=</span> [<span class="st" style="color: #20794D;">'-'</span><span class="op" style="color: #5E5E5E;">*</span><span class="bu" style="color: null;">len</span>(k) <span class="cf" style="color: #003B4F;">for</span> k <span class="kw" style="color: #003B4F;">in</span> row]</span>
-<span id="cb17-7"><span class="bu" style="color: null;">print</span>(<span class="st" style="color: #20794D;">'| '</span><span class="op" style="color: #5E5E5E;">+</span><span class="st" style="color: #20794D;">' | '</span>.join(row)<span class="op" style="color: #5E5E5E;">+</span><span class="st" style="color: #20794D;">' |'</span>)</span>
-<span id="cb17-8"><span class="bu" style="color: null;">print</span>(<span class="st" style="color: #20794D;">'| '</span><span class="op" style="color: #5E5E5E;">+</span><span class="st" style="color: #20794D;">' | '</span>.join(divider)<span class="op" style="color: #5E5E5E;">+</span><span class="st" style="color: #20794D;">' |'</span>)</span>
-<span id="cb17-9"></span>
-<span id="cb17-10"><span class="cf" style="color: #003B4F;">for</span> bc <span class="kw" style="color: #003B4F;">in</span> <span class="bu" style="color: null;">reversed</span>(bcounts):</span>
-<span id="cb17-11">    <span class="cf" style="color: #003B4F;">for</span> nm,fpg <span class="kw" style="color: #003B4F;">in</span> gens:</span>
-<span id="cb17-12">        row <span class="op" style="color: #5E5E5E;">=</span> [<span class="bu" style="color: null;">str</span>(bc),nm]</span>
-<span id="cb17-13">        fpn <span class="op" style="color: #5E5E5E;">=</span> <span class="ss" style="color: #20794D;">f'</span><span class="sc" style="color: #5E5E5E;">{</span>nm<span class="sc" style="color: #5E5E5E;">}</span><span class="ss" style="color: #20794D;">-</span><span class="sc" style="color: #5E5E5E;">{</span>bc<span class="sc" style="color: #5E5E5E;">}</span><span class="ss" style="color: #20794D;">'</span></span>
-<span id="cb17-14">        nmols <span class="op" style="color: #5E5E5E;">=</span> np.<span class="bu" style="color: null;">sum</span>(np.fromiter((x <span class="cf" style="color: #003B4F;">for</span> x <span class="kw" style="color: #003B4F;">in</span> counts[fpn].values()),<span class="bu" style="color: null;">int</span>))</span>
-<span id="cb17-15">        accum <span class="op" style="color: #5E5E5E;">=</span> <span class="dv" style="color: #AD0000;">0</span></span>
-<span id="cb17-16">        <span class="cf" style="color: #003B4F;">for</span> ccount <span class="kw" style="color: #003B4F;">in</span> ccounts:</span>
-<span id="cb17-17">            accum <span class="op" style="color: #5E5E5E;">+=</span> counts[fpn].get(ccount,<span class="dv" style="color: #AD0000;">0</span>)</span>
-<span id="cb17-18">            row.append(<span class="ss" style="color: #20794D;">f'</span><span class="sc" style="color: #5E5E5E;">{</span>accum<span class="op" style="color: #5E5E5E;">/</span>nmols<span class="sc" style="color: #5E5E5E;">:.3f}</span><span class="ss" style="color: #20794D;">'</span>)</span>
-<span id="cb17-19">        <span class="bu" style="color: null;">print</span>(<span class="st" style="color: #20794D;">'| '</span><span class="op" style="color: #5E5E5E;">+</span><span class="st" style="color: #20794D;">' | '</span>.join(row)<span class="op" style="color: #5E5E5E;">+</span><span class="st" style="color: #20794D;">' |'</span>)</span>
-<span id="cb17-20">            </span></code></pre></div>
-<div class="cell-output cell-output-stdout">
-<pre><code>| length | fingerprint | 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 |
-| ------ | ----------- | - | - | - | - | - | - | - | - | - | - | -- |
-| 16384 | mfp1 | 0.991 | 1.000 | 1.000 | 1.000 | 1.000 | 1.000 | 1.000 | 1.000 | 1.000 | 1.000 | 1.000 |
-| 16384 | mfp2 | 0.956 | 0.999 | 1.000 | 1.000 | 1.000 | 1.000 | 1.000 | 1.000 | 1.000 | 1.000 | 1.000 |
-| 16384 | mfp3 | 0.900 | 0.993 | 1.000 | 1.000 | 1.000 | 1.000 | 1.000 | 1.000 | 1.000 | 1.000 | 1.000 |
-| 16384 | rdk5 | 0.181 | 0.332 | 0.460 | 0.566 | 0.654 | 0.724 | 0.780 | 0.826 | 0.863 | 0.892 | 0.916 |
-| 16384 | hashap | 0.335 | 0.519 | 0.651 | 0.746 | 0.816 | 0.867 | 0.905 | 0.931 | 0.950 | 0.964 | 0.974 |
-| 16384 | hashtt | 0.898 | 0.988 | 0.999 | 1.000 | 1.000 | 1.000 | 1.000 | 1.000 | 1.000 | 1.000 | 1.000 |
-| 8192 | mfp1 | 0.969 | 1.000 | 1.000 | 1.000 | 1.000 | 1.000 | 1.000 | 1.000 | 1.000 | 1.000 | 1.000 |
-| 8192 | mfp2 | 0.906 | 0.994 | 1.000 | 1.000 | 1.000 | 1.000 | 1.000 | 1.000 | 1.000 | 1.000 | 1.000 |
-| 8192 | mfp3 | 0.808 | 0.974 | 0.997 | 1.000 | 1.000 | 1.000 | 1.000 | 1.000 | 1.000 | 1.000 | 1.000 |
-| 8192 | rdk5 | 0.076 | 0.177 | 0.266 | 0.346 | 0.420 | 0.486 | 0.545 | 0.597 | 0.645 | 0.687 | 0.725 |
-| 8192 | hashap | 0.295 | 0.467 | 0.594 | 0.692 | 0.766 | 0.822 | 0.865 | 0.897 | 0.921 | 0.939 | 0.952 |
-| 8192 | hashtt | 0.825 | 0.971 | 0.996 | 0.999 | 1.000 | 1.000 | 1.000 | 1.000 | 1.000 | 1.000 | 1.000 |
-| 4096 | mfp1 | 0.950 | 0.998 | 1.000 | 1.000 | 1.000 | 1.000 | 1.000 | 1.000 | 1.000 | 1.000 | 1.000 |
-| 4096 | mfp2 | 0.829 | 0.980 | 0.998 | 1.000 | 1.000 | 1.000 | 1.000 | 1.000 | 1.000 | 1.000 | 1.000 |
-| 4096 | mfp3 | 0.673 | 0.922 | 0.985 | 0.997 | 1.000 | 1.000 | 1.000 | 1.000 | 1.000 | 1.000 | 1.000 |
-| 4096 | rdk5 | 0.034 | 0.077 | 0.122 | 0.166 | 0.210 | 0.254 | 0.296 | 0.336 | 0.375 | 0.412 | 0.447 |
-| 4096 | hashap | 0.156 | 0.270 | 0.370 | 0.455 | 0.529 | 0.592 | 0.646 | 0.693 | 0.733 | 0.768 | 0.798 |
-| 4096 | hashtt | 0.765 | 0.951 | 0.992 | 0.999 | 1.000 | 1.000 | 1.000 | 1.000 | 1.000 | 1.000 | 1.000 |
-| 2048 | mfp1 | 0.740 | 0.975 | 0.998 | 1.000 | 1.000 | 1.000 | 1.000 | 1.000 | 1.000 | 1.000 | 1.000 |
-| 2048 | mfp2 | 0.564 | 0.874 | 0.971 | 0.994 | 0.999 | 1.000 | 1.000 | 1.000 | 1.000 | 1.000 | 1.000 |
-| 2048 | mfp3 | 0.385 | 0.720 | 0.892 | 0.963 | 0.988 | 0.996 | 0.999 | 1.000 | 1.000 | 1.000 | 1.000 |
-| 2048 | rdk5 | 0.017 | 0.037 | 0.058 | 0.080 | 0.101 | 0.124 | 0.146 | 0.169 | 0.191 | 0.214 | 0.236 |
-| 2048 | hashap | 0.076 | 0.132 | 0.185 | 0.235 | 0.281 | 0.323 | 0.362 | 0.397 | 0.429 | 0.459 | 0.487 |
-| 2048 | hashtt | 0.662 | 0.900 | 0.974 | 0.994 | 0.999 | 1.000 | 1.000 | 1.000 | 1.000 | 1.000 | 1.000 |
-| 1024 | mfp1 | 0.674 | 0.942 | 0.992 | 0.999 | 1.000 | 1.000 | 1.000 | 1.000 | 1.000 | 1.000 | 1.000 |
-| 1024 | mfp2 | 0.393 | 0.728 | 0.898 | 0.965 | 0.989 | 0.997 | 0.999 | 1.000 | 1.000 | 1.000 | 1.000 |
-| 1024 | mfp3 | 0.207 | 0.476 | 0.694 | 0.835 | 0.917 | 0.960 | 0.981 | 0.991 | 0.996 | 0.998 | 0.999 |
-| 1024 | rdk5 | 0.007 | 0.017 | 0.026 | 0.037 | 0.047 | 0.057 | 0.067 | 0.077 | 0.088 | 0.098 | 0.109 |
-| 1024 | hashap | 0.037 | 0.066 | 0.095 | 0.122 | 0.148 | 0.174 | 0.199 | 0.223 | 0.246 | 0.269 | 0.291 |
-| 1024 | hashtt | 0.448 | 0.724 | 0.872 | 0.944 | 0.977 | 0.991 | 0.996 | 0.999 | 0.999 | 1.000 | 1.000 |
-| 512 | mfp1 | 0.501 | 0.835 | 0.956 | 0.989 | 0.998 | 1.000 | 1.000 | 1.000 | 1.000 | 1.000 | 1.000 |
-| 512 | mfp2 | 0.184 | 0.445 | 0.671 | 0.824 | 0.911 | 0.957 | 0.980 | 0.991 | 0.996 | 0.999 | 0.999 |
-| 512 | mfp3 | 0.074 | 0.209 | 0.371 | 0.527 | 0.662 | 0.767 | 0.844 | 0.899 | 0.936 | 0.960 | 0.976 |
-| 512 | rdk5 | 0.004 | 0.009 | 0.013 | 0.018 | 0.024 | 0.029 | 0.035 | 0.040 | 0.046 | 0.051 | 0.056 |
-| 512 | hashap | 0.013 | 0.025 | 0.037 | 0.050 | 0.063 | 0.077 | 0.091 | 0.105 | 0.119 | 0.133 | 0.147 |
-| 512 | hashtt | 0.286 | 0.537 | 0.721 | 0.839 | 0.911 | 0.951 | 0.973 | 0.985 | 0.992 | 0.996 | 0.998 |
-| 256 | mfp1 | 0.312 | 0.659 | 0.864 | 0.952 | 0.984 | 0.995 | 0.999 | 1.000 | 1.000 | 1.000 | 1.000 |
-| 256 | mfp2 | 0.060 | 0.186 | 0.348 | 0.511 | 0.653 | 0.764 | 0.846 | 0.902 | 0.939 | 0.963 | 0.978 |
-| 256 | mfp3 | 0.022 | 0.066 | 0.134 | 0.220 | 0.314 | 0.409 | 0.500 | 0.584 | 0.659 | 0.726 | 0.783 |
-| 256 | rdk5 | 0.003 | 0.005 | 0.007 | 0.009 | 0.011 | 0.014 | 0.016 | 0.019 | 0.021 | 0.024 | 0.027 |
-| 256 | hashap | 0.004 | 0.007 | 0.010 | 0.013 | 0.017 | 0.021 | 0.025 | 0.030 | 0.034 | 0.039 | 0.045 |
-| 256 | hashtt | 0.105 | 0.234 | 0.373 | 0.501 | 0.612 | 0.706 | 0.782 | 0.842 | 0.887 | 0.920 | 0.944 |
-| 128 | mfp1 | 0.117 | 0.324 | 0.546 | 0.726 | 0.846 | 0.918 | 0.958 | 0.980 | 0.991 | 0.996 | 0.998 |
-| 128 | mfp2 | 0.015 | 0.049 | 0.106 | 0.184 | 0.275 | 0.373 | 0.469 | 0.560 | 0.642 | 0.714 | 0.777 |
-| 128 | mfp3 | 0.007 | 0.018 | 0.036 | 0.062 | 0.095 | 0.136 | 0.183 | 0.235 | 0.290 | 0.345 | 0.399 |
-| 128 | rdk5 | 0.002 | 0.002 | 0.003 | 0.004 | 0.005 | 0.006 | 0.007 | 0.008 | 0.009 | 0.010 | 0.011 |
-| 128 | hashap | 0.002 | 0.003 | 0.005 | 0.006 | 0.008 | 0.010 | 0.012 | 0.014 | 0.016 | 0.018 | 0.021 |
-| 128 | hashtt | 0.035 | 0.079 | 0.139 | 0.208 | 0.283 | 0.357 | 0.429 | 0.497 | 0.561 | 0.620 | 0.675 |
-| 64 | mfp1 | 0.024 | 0.083 | 0.179 | 0.302 | 0.435 | 0.564 | 0.677 | 0.771 | 0.843 | 0.896 | 0.932 |
-| 64 | mfp2 | 0.004 | 0.011 | 0.025 | 0.044 | 0.072 | 0.107 | 0.149 | 0.199 | 0.254 | 0.312 | 0.371 |
-| 64 | mfp3 | 0.003 | 0.006 | 0.011 | 0.017 | 0.026 | 0.037 | 0.050 | 0.066 | 0.084 | 0.105 | 0.129 |
-| 64 | rdk5 | 0.001 | 0.002 | 0.002 | 0.002 | 0.003 | 0.003 | 0.004 | 0.004 | 0.005 | 0.005 | 0.006 |
-| 64 | hashap | 0.001 | 0.002 | 0.003 | 0.004 | 0.004 | 0.005 | 0.006 | 0.007 | 0.008 | 0.009 | 0.010 |
-| 64 | hashtt | 0.016 | 0.034 | 0.059 | 0.092 | 0.132 | 0.177 | 0.227 | 0.279 | 0.331 | 0.382 | 0.431 |</code></pre>
-</div>
-</div>
-<p>Notice that the high-density fingerprints - rdk5 and hashap - have collisions for the majority of the compounds even with a 16K fingerprint.</p>
-</section>
-<section id="impact-on-similarity" class="level1">
-<h1>Impact on similarity</h1>
-<p>Now that we have a sense of how many collisions there are, lets look at the impact those collisions have on molecular similarity.</p>
-<p>As a data set we’ll use a set of 50000 pairs of ChEMBL30 molecules with a similarity of at least 0.55 using a count-based morgan fingerprint with radius 1 (MFP1). The jupyter notebook used to generate this data can be <a href="https://github.com/greglandrum/rdkit_blog/blob/master/notebooks/Building%20a%20Similarity%20Comparison%20Set%20Revisited-2023.ipynb">found here</a>.</p>
-<div class="cell" data-executetime="{&quot;end_time&quot;:&quot;2023-01-18T12:07:07.185354Z&quot;,&quot;start_time&quot;:&quot;2023-01-18T12:06:54.851363Z&quot;}" data-scrolled="true" data-execution_count="16">
-<div class="sourceCode cell-code" id="cb19" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb19-1">pairs <span class="op" style="color: #5E5E5E;">=</span> []</span>
-<span id="cb19-2"><span class="cf" style="color: #003B4F;">for</span> l <span class="kw" style="color: #003B4F;">in</span> gzip.<span class="bu" style="color: null;">open</span>(<span class="st" style="color: #20794D;">'../data/chembl30_50K.mfp1.pairs.txt.gz'</span>,<span class="st" style="color: #20794D;">'rt'</span>):</span>
-<span id="cb19-3">    l <span class="op" style="color: #5E5E5E;">=</span> l.split(<span class="st" style="color: #20794D;">'</span><span class="ch" style="color: #20794D;">\t</span><span class="st" style="color: #20794D;">'</span>)</span>
-<span id="cb19-4">    pairs.append([Chem.MolFromSmiles(l[<span class="dv" style="color: #AD0000;">1</span>]),Chem.MolFromSmiles(l[<span class="dv" style="color: #AD0000;">3</span>])])</span></code></pre></div>
-</div>
-<div class="cell" data-executetime="{&quot;end_time&quot;:&quot;2023-01-18T12:17:12.430316Z&quot;,&quot;start_time&quot;:&quot;2023-01-18T12:07:15.674749Z&quot;}" data-execution_count="17">
-<div class="sourceCode cell-code" id="cb20" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb20-1">sims <span class="op" style="color: #5E5E5E;">=</span> defaultdict(<span class="bu" style="color: null;">list</span>)</span>
-<span id="cb20-2"><span class="cf" style="color: #003B4F;">for</span> nm,fpgen <span class="kw" style="color: #003B4F;">in</span> gens:</span>
-<span id="cb20-3">    <span class="bu" style="color: null;">print</span>(<span class="ss" style="color: #20794D;">f'Doing </span><span class="sc" style="color: #5E5E5E;">{</span>nm<span class="sc" style="color: #5E5E5E;">}</span><span class="ss" style="color: #20794D;">'</span>)</span>
-<span id="cb20-4">    fpg <span class="op" style="color: #5E5E5E;">=</span> fpgen(<span class="dv" style="color: #AD0000;">1024</span>) <span class="co" style="color: #5E5E5E;"># size is irrelevant here</span></span>
-<span id="cb20-5">    <span class="cf" style="color: #003B4F;">for</span> m1,m2 <span class="kw" style="color: #003B4F;">in</span> pairs:</span>
-<span id="cb20-6">        fp1 <span class="op" style="color: #5E5E5E;">=</span> fpg.GetSparseFingerprint(m1)</span>
-<span id="cb20-7">        fp2 <span class="op" style="color: #5E5E5E;">=</span> fpg.GetSparseFingerprint(m2)</span>
-<span id="cb20-8">        sims[nm].append(DataStructs.TanimotoSimilarity(fp1,fp2))</span>
-<span id="cb20-9">    <span class="cf" style="color: #003B4F;">for</span> l <span class="kw" style="color: #003B4F;">in</span> <span class="dv" style="color: #AD0000;">64</span>,<span class="dv" style="color: #AD0000;">128</span>,<span class="dv" style="color: #AD0000;">256</span>,<span class="dv" style="color: #AD0000;">512</span>,<span class="dv" style="color: #AD0000;">1024</span>,<span class="dv" style="color: #AD0000;">2048</span>,<span class="dv" style="color: #AD0000;">4096</span>,<span class="dv" style="color: #AD0000;">8192</span>,<span class="dv" style="color: #AD0000;">16384</span>:</span>
-<span id="cb20-10">        fpn <span class="op" style="color: #5E5E5E;">=</span> <span class="ss" style="color: #20794D;">f'</span><span class="sc" style="color: #5E5E5E;">{</span>nm<span class="sc" style="color: #5E5E5E;">}</span><span class="ss" style="color: #20794D;">-</span><span class="sc" style="color: #5E5E5E;">{</span>l<span class="sc" style="color: #5E5E5E;">}</span><span class="ss" style="color: #20794D;">'</span></span>
-<span id="cb20-11">        fpg <span class="op" style="color: #5E5E5E;">=</span> fpgen(l)</span>
-<span id="cb20-12">        <span class="cf" style="color: #003B4F;">for</span> m1,m2 <span class="kw" style="color: #003B4F;">in</span> pairs:</span>
-<span id="cb20-13">            fp1 <span class="op" style="color: #5E5E5E;">=</span> fpg.GetFingerprint(m1)</span>
-<span id="cb20-14">            fp2 <span class="op" style="color: #5E5E5E;">=</span> fpg.GetFingerprint(m2)</span>
-<span id="cb20-15">            sims[fpn].append(DataStructs.TanimotoSimilarity(fp1,fp2))</span></code></pre></div>
-<div class="cell-output cell-output-stdout">
-<pre><code>Doing mfp1
-Doing mfp2
-Doing mfp3
-Doing rdk5
-Doing hashap
-Doing hashtt</code></pre>
-</div>
-</div>
-<div class="cell" data-executetime="{&quot;end_time&quot;:&quot;2023-01-18T12:17:14.239760Z&quot;,&quot;start_time&quot;:&quot;2023-01-18T12:17:12.433791Z&quot;}" data-execution_count="18">
-<div class="sourceCode cell-code" id="cb22" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb22-1">pickle.dump(<span class="bu" style="color: null;">dict</span>(sims),gzip.<span class="bu" style="color: null;">open</span>(<span class="st" style="color: #20794D;">'../data/fp_collision_sims.pkl.gz'</span>,<span class="st" style="color: #20794D;">'wb+'</span>))</span></code></pre></div>
-</div>
-<div class="cell" data-executetime="{&quot;end_time&quot;:&quot;2023-01-18T11:53:53.106700Z&quot;,&quot;start_time&quot;:&quot;2023-01-18T11:53:53.016537Z&quot;}" data-execution_count="4">
-<div class="sourceCode cell-code" id="cb23" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb23-1">sims <span class="op" style="color: #5E5E5E;">=</span> pickle.load(gzip.<span class="bu" style="color: null;">open</span>(<span class="st" style="color: #20794D;">'../data/fp_collision_sims.pkl.gz'</span>,<span class="st" style="color: #20794D;">'rb'</span>))</span></code></pre></div>
-</div>
-<div class="cell" data-executetime="{&quot;end_time&quot;:&quot;2023-01-18T12:23:42.445016Z&quot;,&quot;start_time&quot;:&quot;2023-01-18T12:23:38.260710Z&quot;}" data-execution_count="29">
-<div class="sourceCode cell-code" id="cb24" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb24-1">rads <span class="op" style="color: #5E5E5E;">=</span> (<span class="dv" style="color: #AD0000;">1</span>,<span class="dv" style="color: #AD0000;">2</span>,<span class="dv" style="color: #AD0000;">3</span>)</span>
-<span id="cb24-2">bcounts <span class="op" style="color: #5E5E5E;">=</span> (<span class="dv" style="color: #AD0000;">64</span>,<span class="dv" style="color: #AD0000;">128</span>,<span class="dv" style="color: #AD0000;">256</span>,<span class="dv" style="color: #AD0000;">512</span>,<span class="dv" style="color: #AD0000;">1024</span>,<span class="dv" style="color: #AD0000;">2048</span>,<span class="dv" style="color: #AD0000;">4096</span>,<span class="dv" style="color: #AD0000;">8192</span>,<span class="dv" style="color: #AD0000;">16384</span>)</span>
-<span id="cb24-3">figsize(<span class="dv" style="color: #AD0000;">3</span><span class="op" style="color: #5E5E5E;">*</span><span class="dv" style="color: #AD0000;">6</span>,<span class="bu" style="color: null;">len</span>(bcounts)<span class="op" style="color: #5E5E5E;">*</span><span class="dv" style="color: #AD0000;">6</span>)</span>
-<span id="cb24-4"></span>
-<span id="cb24-5">plt <span class="op" style="color: #5E5E5E;">=</span> <span class="dv" style="color: #AD0000;">1</span></span>
-<span id="cb24-6"><span class="cf" style="color: #003B4F;">for</span> i,cnt <span class="kw" style="color: #003B4F;">in</span> <span class="bu" style="color: null;">enumerate</span>(<span class="bu" style="color: null;">reversed</span>(bcounts)):</span>
-<span id="cb24-7">    <span class="cf" style="color: #003B4F;">for</span> j,rad <span class="kw" style="color: #003B4F;">in</span> <span class="bu" style="color: null;">enumerate</span>(rads):</span>
-<span id="cb24-8">        subplot(<span class="bu" style="color: null;">len</span>(bcounts),<span class="dv" style="color: #AD0000;">3</span>,plt)</span>
-<span id="cb24-9">        plt <span class="op" style="color: #5E5E5E;">+=</span> <span class="dv" style="color: #AD0000;">1</span></span>
-<span id="cb24-10">        plot((<span class="dv" style="color: #AD0000;">0</span>,<span class="dv" style="color: #AD0000;">1</span>),(<span class="dv" style="color: #AD0000;">0</span>,<span class="dv" style="color: #AD0000;">1</span>),<span class="st" style="color: #20794D;">'k-'</span>)</span>
-<span id="cb24-11">        hexbin(sims[<span class="ss" style="color: #20794D;">f'mfp</span><span class="sc" style="color: #5E5E5E;">{</span>rad<span class="sc" style="color: #5E5E5E;">}</span><span class="ss" style="color: #20794D;">'</span>],sims[<span class="ss" style="color: #20794D;">f'mfp</span><span class="sc" style="color: #5E5E5E;">{</span>rad<span class="sc" style="color: #5E5E5E;">}</span><span class="ss" style="color: #20794D;">-</span><span class="sc" style="color: #5E5E5E;">{</span>cnt<span class="sc" style="color: #5E5E5E;">}</span><span class="ss" style="color: #20794D;">'</span>],bins<span class="op" style="color: #5E5E5E;">=</span><span class="st" style="color: #20794D;">'log'</span>)</span>
-<span id="cb24-12">        xlabel(<span class="st" style="color: #20794D;">'no collisions'</span>)</span>
-<span id="cb24-13">        ylabel(<span class="ss" style="color: #20794D;">f'</span><span class="sc" style="color: #5E5E5E;">{</span>cnt<span class="sc" style="color: #5E5E5E;">}</span><span class="ss" style="color: #20794D;"> bits'</span>)</span>
-<span id="cb24-14">        title(<span class="ss" style="color: #20794D;">f'radius = </span><span class="sc" style="color: #5E5E5E;">{</span>rad<span class="sc" style="color: #5E5E5E;">}</span><span class="ss" style="color: #20794D;">'</span>)</span></code></pre></div>
-<div class="cell-output cell-output-display">
-<p><img src="https://greglandrum.github.io/rdkit-blog/posts/2023-01-23-colliding-bits-iii-expanded_files/figure-html/cell-19-output-1.png" class="img-fluid"></p>
-</div>
-</div>
-<div class="cell" data-executetime="{&quot;end_time&quot;:&quot;2023-01-18T12:23:46.760476Z&quot;,&quot;start_time&quot;:&quot;2023-01-18T12:23:42.446535Z&quot;}" data-execution_count="30">
-<div class="sourceCode cell-code" id="cb25" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb25-1">bcounts <span class="op" style="color: #5E5E5E;">=</span> (<span class="dv" style="color: #AD0000;">64</span>,<span class="dv" style="color: #AD0000;">128</span>,<span class="dv" style="color: #AD0000;">256</span>,<span class="dv" style="color: #AD0000;">512</span>,<span class="dv" style="color: #AD0000;">1024</span>,<span class="dv" style="color: #AD0000;">2048</span>,<span class="dv" style="color: #AD0000;">4096</span>,<span class="dv" style="color: #AD0000;">8192</span>,<span class="dv" style="color: #AD0000;">16384</span>)</span>
-<span id="cb25-2">figsize(<span class="dv" style="color: #AD0000;">3</span><span class="op" style="color: #5E5E5E;">*</span><span class="dv" style="color: #AD0000;">6</span>,<span class="bu" style="color: null;">len</span>(bcounts)<span class="op" style="color: #5E5E5E;">*</span><span class="dv" style="color: #AD0000;">6</span>)</span>
-<span id="cb25-3"></span>
-<span id="cb25-4">plt <span class="op" style="color: #5E5E5E;">=</span> <span class="dv" style="color: #AD0000;">1</span></span>
-<span id="cb25-5"><span class="cf" style="color: #003B4F;">for</span> i,cnt <span class="kw" style="color: #003B4F;">in</span> <span class="bu" style="color: null;">enumerate</span>(<span class="bu" style="color: null;">reversed</span>(bcounts)):</span>
-<span id="cb25-6">    <span class="cf" style="color: #003B4F;">for</span> j,nm <span class="kw" style="color: #003B4F;">in</span> <span class="bu" style="color: null;">enumerate</span>((<span class="st" style="color: #20794D;">'hashtt'</span>,<span class="st" style="color: #20794D;">'hashap'</span>,<span class="st" style="color: #20794D;">'rdk5'</span>)):</span>
-<span id="cb25-7">        subplot(<span class="bu" style="color: null;">len</span>(bcounts),<span class="dv" style="color: #AD0000;">3</span>,plt)</span>
-<span id="cb25-8">        plt <span class="op" style="color: #5E5E5E;">+=</span> <span class="dv" style="color: #AD0000;">1</span></span>
-<span id="cb25-9">        plot((<span class="dv" style="color: #AD0000;">0</span>,<span class="dv" style="color: #AD0000;">1</span>),(<span class="dv" style="color: #AD0000;">0</span>,<span class="dv" style="color: #AD0000;">1</span>),<span class="st" style="color: #20794D;">'k-'</span>)</span>
-<span id="cb25-10">        hexbin(sims[<span class="ss" style="color: #20794D;">f'</span><span class="sc" style="color: #5E5E5E;">{</span>nm<span class="sc" style="color: #5E5E5E;">}</span><span class="ss" style="color: #20794D;">'</span>],sims[<span class="ss" style="color: #20794D;">f'</span><span class="sc" style="color: #5E5E5E;">{</span>nm<span class="sc" style="color: #5E5E5E;">}</span><span class="ss" style="color: #20794D;">-</span><span class="sc" style="color: #5E5E5E;">{</span>cnt<span class="sc" style="color: #5E5E5E;">}</span><span class="ss" style="color: #20794D;">'</span>],bins<span class="op" style="color: #5E5E5E;">=</span><span class="st" style="color: #20794D;">'log'</span>)       </span>
-<span id="cb25-11">        xlabel(<span class="st" style="color: #20794D;">'no collisions'</span>)</span>
-<span id="cb25-12">        ylabel(<span class="ss" style="color: #20794D;">f'</span><span class="sc" style="color: #5E5E5E;">{</span>cnt<span class="sc" style="color: #5E5E5E;">}</span><span class="ss" style="color: #20794D;"> bits'</span>)</span>
-<span id="cb25-13">        title(<span class="ss" style="color: #20794D;">f'</span><span class="sc" style="color: #5E5E5E;">{</span>nm<span class="sc" style="color: #5E5E5E;">}</span><span class="ss" style="color: #20794D;">'</span>)</span></code></pre></div>
-<div class="cell-output cell-output-display">
-<p><img src="https://greglandrum.github.io/rdkit-blog/posts/2023-01-23-colliding-bits-iii-expanded_files/figure-html/cell-20-output-1.png" class="img-fluid"></p>
-</div>
-</div>
-<p>Do a statistical comparison of the similarity distributions</p>
-<div class="cell" data-executetime="{&quot;end_time&quot;:&quot;2023-01-18T12:17:31.220100Z&quot;,&quot;start_time&quot;:&quot;2023-01-18T12:17:30.617034Z&quot;}" data-execution_count="21">
-<div class="sourceCode cell-code" id="cb26" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb26-1"><span class="im" style="color: #00769E;">from</span> scipy.stats <span class="im" style="color: #00769E;">import</span> spearmanr</span>
-<span id="cb26-2"></span>
-<span id="cb26-3">row <span class="op" style="color: #5E5E5E;">=</span> (<span class="st" style="color: #20794D;">'nBits'</span>,<span class="st" style="color: #20794D;">'fingerprint'</span>,<span class="st" style="color: #20794D;">'SpearmanR'</span>,<span class="st" style="color: #20794D;">'mean(d)'</span>,<span class="st" style="color: #20794D;">'std(d)'</span>,<span class="st" style="color: #20794D;">'90% </span><span class="ch" style="color: #20794D;">\\</span><span class="st" style="color: #20794D;">|d</span><span class="ch" style="color: #20794D;">\\</span><span class="st" style="color: #20794D;">|'</span>)</span>
-<span id="cb26-4">divider <span class="op" style="color: #5E5E5E;">=</span> [<span class="st" style="color: #20794D;">'-'</span><span class="op" style="color: #5E5E5E;">*</span><span class="bu" style="color: null;">len</span>(k) <span class="cf" style="color: #003B4F;">for</span> k <span class="kw" style="color: #003B4F;">in</span> row]</span>
-<span id="cb26-5"><span class="bu" style="color: null;">print</span>(<span class="st" style="color: #20794D;">'| '</span><span class="op" style="color: #5E5E5E;">+</span><span class="st" style="color: #20794D;">' | '</span>.join(row)<span class="op" style="color: #5E5E5E;">+</span><span class="st" style="color: #20794D;">' |'</span>)</span>
-<span id="cb26-6"><span class="bu" style="color: null;">print</span>(<span class="st" style="color: #20794D;">'| '</span><span class="op" style="color: #5E5E5E;">+</span><span class="st" style="color: #20794D;">' | '</span>.join(divider)<span class="op" style="color: #5E5E5E;">+</span><span class="st" style="color: #20794D;">' |'</span>)</span>
-<span id="cb26-7">        </span>
-<span id="cb26-8"></span>
-<span id="cb26-9">rads <span class="op" style="color: #5E5E5E;">=</span> (<span class="dv" style="color: #AD0000;">1</span>,<span class="dv" style="color: #AD0000;">2</span>,<span class="dv" style="color: #AD0000;">3</span>)</span>
-<span id="cb26-10">bcounts <span class="op" style="color: #5E5E5E;">=</span> (<span class="dv" style="color: #AD0000;">64</span>,<span class="dv" style="color: #AD0000;">128</span>,<span class="dv" style="color: #AD0000;">256</span>,<span class="dv" style="color: #AD0000;">512</span>,<span class="dv" style="color: #AD0000;">1024</span>,<span class="dv" style="color: #AD0000;">2048</span>,<span class="dv" style="color: #AD0000;">4096</span>,<span class="dv" style="color: #AD0000;">8192</span>,<span class="dv" style="color: #AD0000;">16384</span>)</span>
-<span id="cb26-11"><span class="cf" style="color: #003B4F;">for</span> i,cnt <span class="kw" style="color: #003B4F;">in</span> <span class="bu" style="color: null;">enumerate</span>(<span class="bu" style="color: null;">reversed</span>(bcounts)):</span>
-<span id="cb26-12">    <span class="cf" style="color: #003B4F;">for</span> j,(nm,fpg) <span class="kw" style="color: #003B4F;">in</span> <span class="bu" style="color: null;">enumerate</span>(gens):</span>
-<span id="cb26-13">        d1 <span class="op" style="color: #5E5E5E;">=</span> numpy.array(sims[nm])</span>
-<span id="cb26-14">        d2 <span class="op" style="color: #5E5E5E;">=</span> numpy.array(sims[<span class="ss" style="color: #20794D;">f'</span><span class="sc" style="color: #5E5E5E;">{</span>nm<span class="sc" style="color: #5E5E5E;">}</span><span class="ss" style="color: #20794D;">-</span><span class="sc" style="color: #5E5E5E;">{</span>cnt<span class="sc" style="color: #5E5E5E;">}</span><span class="ss" style="color: #20794D;">'</span>])</span>
-<span id="cb26-15">        delt <span class="op" style="color: #5E5E5E;">=</span> d2<span class="op" style="color: #5E5E5E;">-</span>d1</span>
-<span id="cb26-16">        row <span class="op" style="color: #5E5E5E;">=</span> [<span class="bu" style="color: null;">str</span>(cnt),nm,<span class="ss" style="color: #20794D;">f'</span><span class="sc" style="color: #5E5E5E;">{</span>spearmanr(d1,d2)<span class="sc" style="color: #5E5E5E;">.</span>correlation<span class="sc" style="color: #5E5E5E;">:.3f}</span><span class="ss" style="color: #20794D;">'</span>,<span class="ss" style="color: #20794D;">f'</span><span class="sc" style="color: #5E5E5E;">{</span>np<span class="sc" style="color: #5E5E5E;">.</span>mean(delt)<span class="sc" style="color: #5E5E5E;">:.2g}</span><span class="ss" style="color: #20794D;">'</span>,</span>
-<span id="cb26-17">               <span class="ss" style="color: #20794D;">f'</span><span class="sc" style="color: #5E5E5E;">{</span>np<span class="sc" style="color: #5E5E5E;">.</span>std(delt)<span class="sc" style="color: #5E5E5E;">:.2g}</span><span class="ss" style="color: #20794D;">'</span>,<span class="ss" style="color: #20794D;">f'</span><span class="sc" style="color: #5E5E5E;">{</span>np<span class="sc" style="color: #5E5E5E;">.</span>quantile(np.<span class="bu" style="color: null;">abs</span>(delt),<span class="fl" style="color: #AD0000;">0.9</span>)<span class="sc" style="color: #5E5E5E;">:.2g}</span><span class="ss" style="color: #20794D;">'</span>]</span>
-<span id="cb26-18">        <span class="bu" style="color: null;">print</span>(<span class="st" style="color: #20794D;">'| '</span><span class="op" style="color: #5E5E5E;">+</span><span class="st" style="color: #20794D;">' | '</span>.join(row)<span class="op" style="color: #5E5E5E;">+</span><span class="st" style="color: #20794D;">' |'</span>)</span></code></pre></div>
-<div class="cell-output cell-output-stdout">
-<pre><code>| nBits | fingerprint | SpearmanR | mean(d) | std(d) | 90% \|d\| |
-| ----- | ----------- | --------- | ------- | ------ | --------- |
-| 16384 | mfp1 | 1.000 | 0.00023 | 0.0025 | 0 |
-| 16384 | mfp2 | 0.999 | 0.00085 | 0.0036 | 0.0034 |
-| 16384 | mfp3 | 0.999 | 0.0014 | 0.0038 | 0.0056 |
-| 16384 | rdk5 | 1.000 | 0.0054 | 0.0046 | 0.012 |
-| 16384 | hashap | 0.997 | 0.0066 | 0.0072 | 0.016 |
-| 16384 | hashtt | 0.999 | 0.0024 | 0.0074 | 0.011 |
-| 8192 | mfp1 | 0.999 | 0.00089 | 0.005 | 0 |
-| 8192 | mfp2 | 0.999 | 0.0017 | 0.0051 | 0.007 |
-| 8192 | mfp3 | 0.999 | 0.0027 | 0.0054 | 0.011 |
-| 8192 | rdk5 | 0.999 | 0.011 | 0.008 | 0.022 |
-| 8192 | hashap | 0.996 | 0.0089 | 0.0084 | 0.02 |
-| 8192 | hashtt | 0.997 | 0.0046 | 0.01 | 0.019 |
-| 4096 | mfp1 | 0.998 | 0.0016 | 0.0069 | 0.0079 |
-| 4096 | mfp2 | 0.998 | 0.0033 | 0.0073 | 0.014 |
-| 4096 | mfp3 | 0.997 | 0.0054 | 0.0077 | 0.016 |
-| 4096 | rdk5 | 0.998 | 0.022 | 0.014 | 0.041 |
-| 4096 | hashap | 0.988 | 0.022 | 0.015 | 0.042 |
-| 4096 | hashtt | 0.996 | 0.0068 | 0.013 | 0.024 |
-| 2048 | mfp1 | 0.993 | 0.0042 | 0.013 | 0.02 |
-| 2048 | mfp2 | 0.995 | 0.0069 | 0.012 | 0.023 |
-| 2048 | mfp3 | 0.994 | 0.011 | 0.012 | 0.027 |
-| 2048 | rdk5 | 0.995 | 0.044 | 0.026 | 0.08 |
-| 2048 | hashap | 0.956 | 0.05 | 0.029 | 0.088 |
-| 2048 | hashtt | 0.993 | 0.011 | 0.016 | 0.034 |
-| 1024 | mfp1 | 0.989 | 0.0067 | 0.016 | 0.028 |
-| 1024 | mfp2 | 0.990 | 0.014 | 0.016 | 0.036 |
-| 1024 | mfp3 | 0.987 | 0.022 | 0.017 | 0.044 |
-| 1024 | rdk5 | 0.981 | 0.085 | 0.049 | 0.15 |
-| 1024 | hashap | 0.874 | 0.1 | 0.051 | 0.17 |
-| 1024 | hashtt | 0.983 | 0.025 | 0.026 | 0.061 |
-| 512 | mfp1 | 0.980 | 0.013 | 0.021 | 0.044 |
-| 512 | mfp2 | 0.979 | 0.028 | 0.023 | 0.059 |
-| 512 | mfp3 | 0.972 | 0.044 | 0.026 | 0.078 |
-| 512 | rdk5 | 0.929 | 0.16 | 0.09 | 0.28 |
-| 512 | hashap | 0.702 | 0.19 | 0.083 | 0.3 |
-| 512 | hashtt | 0.967 | 0.046 | 0.037 | 0.096 |
-| 256 | mfp1 | 0.962 | 0.026 | 0.029 | 0.065 |
-| 256 | mfp2 | 0.954 | 0.057 | 0.035 | 0.1 |
-| 256 | mfp3 | 0.932 | 0.087 | 0.041 | 0.14 |
-| 256 | rdk5 | 0.785 | 0.28 | 0.15 | 0.48 |
-| 256 | hashap | 0.539 | 0.3 | 0.11 | 0.43 |
-| 256 | hashtt | 0.921 | 0.092 | 0.057 | 0.17 |
-| 128 | mfp1 | 0.918 | 0.049 | 0.043 | 0.11 |
-| 128 | mfp2 | 0.897 | 0.11 | 0.054 | 0.18 |
-| 128 | mfp3 | 0.839 | 0.17 | 0.066 | 0.25 |
-| 128 | rdk5 | 0.528 | 0.42 | 0.2 | 0.68 |
-| 128 | hashap | 0.343 | 0.42 | 0.12 | 0.57 |
-| 128 | hashtt | 0.828 | 0.17 | 0.085 | 0.28 |
-| 64 | mfp1 | 0.832 | 0.099 | 0.064 | 0.18 |
-| 64 | mfp2 | 0.771 | 0.2 | 0.083 | 0.31 |
-| 64 | mfp3 | 0.642 | 0.31 | 0.1 | 0.44 |
-| 64 | rdk5 | 0.235 | 0.5 | 0.22 | 0.77 |
-| 64 | hashap | 0.158 | 0.51 | 0.13 | 0.65 |
-| 64 | hashtt | 0.672 | 0.28 | 0.12 | 0.43 |</code></pre>
-</div>
-</div>
-
-
-</section>
-
- ]]></description>
-  <category>reference</category>
-  <category>fingerprints</category>
-  <guid>https://greglandrum.github.io/rdkit-blog/posts/2023-01-23-colliding-bits-iii-expanded.html</guid>
-  <pubDate>Sun, 22 Jan 2023 23:00:00 GMT</pubDate>
-  <media:content url="https://greglandrum.github.io/rdkit-blog/posts/images/blog/colliding-bits-iii-1.png" medium="image" type="image/png" height="134" width="144"/>
 </item>
 </channel>
 </rss>
