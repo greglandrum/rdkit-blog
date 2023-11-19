@@ -10,7 +10,233 @@
 <atom:link href="https://greglandrum.github.io/rdkit-blog/index.xml" rel="self" type="application/rss+xml"/>
 <description>RDKit experiments, tips, and tutorials</description>
 <generator>quarto-1.2.269</generator>
-<lastBuildDate>Fri, 10 Nov 2023 23:00:00 GMT</lastBuildDate>
+<lastBuildDate>Sat, 18 Nov 2023 23:00:00 GMT</lastBuildDate>
+<item>
+  <title>Intro to Stereo Groups and Enhanced Stereochemistry</title>
+  <link>https://greglandrum.github.io/rdkit-blog/posts/2023-11-19-explaining-stereo-groups.html</link>
+  <description><![CDATA[ 
+
+
+
+<section id="basics-of-enhanced-stereochemistry" class="level1">
+<h1>Basics of enhanced stereochemistry</h1>
+<div class="cell" data-executetime="{&quot;end_time&quot;:&quot;2023-11-19T05:43:02.382475Z&quot;,&quot;start_time&quot;:&quot;2023-11-19T05:43:02.243337Z&quot;}" data-execution_count="1">
+<div class="sourceCode cell-code" id="cb1" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb1-1"><span class="im" style="color: #00769E;">from</span> rdkit <span class="im" style="color: #00769E;">import</span> Chem</span>
+<span id="cb1-2"><span class="im" style="color: #00769E;">from</span> rdkit.Chem.Draw <span class="im" style="color: #00769E;">import</span> IPythonConsole</span>
+<span id="cb1-3">IPythonConsole.molSize <span class="op" style="color: #5E5E5E;">=</span> <span class="dv" style="color: #AD0000;">350</span>,<span class="dv" style="color: #AD0000;">300</span></span>
+<span id="cb1-4">IPythonConsole.drawOptions.addStereoAnnotation <span class="op" style="color: #5E5E5E;">=</span> <span class="va" style="color: #111111;">True</span></span>
+<span id="cb1-5"><span class="im" style="color: #00769E;">from</span> rdkit.Chem <span class="im" style="color: #00769E;">import</span> Draw</span>
+<span id="cb1-6"><span class="im" style="color: #00769E;">import</span> rdkit</span>
+<span id="cb1-7"><span class="bu" style="color: null;">print</span>(rdkit.__version__)</span></code></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>2023.09.2</code></pre>
+</div>
+</div>
+<p>Let’s start with four versions of a molecule with a single chiral center (alanine):</p>
+<div class="cell" data-executetime="{&quot;end_time&quot;:&quot;2023-11-19T05:43:02.399036Z&quot;,&quot;start_time&quot;:&quot;2023-11-19T05:43:02.383907Z&quot;}" data-execution_count="2">
+<div class="sourceCode cell-code" id="cb3" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb3-1">m <span class="op" style="color: #5E5E5E;">=</span> Chem.MolFromSmiles(<span class="st" style="color: #20794D;">'NC(C)C(=O)O'</span>)</span>
+<span id="cb3-2">m_ccw <span class="op" style="color: #5E5E5E;">=</span> Chem.MolFromSmiles(<span class="st" style="color: #20794D;">'N[C@H](C)C(=O)O'</span>)</span>
+<span id="cb3-3">m_cw <span class="op" style="color: #5E5E5E;">=</span> Chem.MolFromSmiles(<span class="st" style="color: #20794D;">'N[C@@H](C)C(=O)O'</span>)</span>
+<span id="cb3-4">m_unk <span class="op" style="color: #5E5E5E;">=</span> Chem.MolFromSmiles(<span class="st" style="color: #20794D;">'N[C@@H](C)C(=O)O |w:1.1|'</span>)</span>
+<span id="cb3-5">Chem.ReapplyMolBlockWedging(m_unk)</span>
+<span id="cb3-6">Draw.MolsToGridImage([m,m_ccw,m_cw,m_unk],legends<span class="op" style="color: #5E5E5E;">=</span>[<span class="st" style="color: #20794D;">''</span>,<span class="st" style="color: #20794D;">'R'</span>,<span class="st" style="color: #20794D;">'S'</span>,<span class="st" style="color: #20794D;">'unknown'</span>],molsPerRow<span class="op" style="color: #5E5E5E;">=</span><span class="dv" style="color: #AD0000;">4</span>)</span></code></pre></div>
+<div class="cell-output cell-output-display" data-execution_count="2">
+<p><img src="https://greglandrum.github.io/rdkit-blog/posts/2023-11-19-explaining-stereo-groups_files/figure-html/cell-3-output-1.png" class="img-fluid"></p>
+</div>
+</div>
+<p>Understanding what is meant by the second two SMILES is straightforward: in each case we’re dealing with a single stereoisomer. The last molecule is also reasonably clear: by providing a squiggle (or wavy) bond to one of the neighbors of the chiral center we have been explicit that we don’t know its stereochemistry.</p>
+<blockquote class="blockquote">
+<p><em>Note</em> that being explicit about what we don’t know by providing the squiggle bond requires us to use CXSMILES, an extension to SMILES developed by ChemAxon.</p>
+</blockquote>
+<p>But what does the first SMILES mean? Here no information is provided about stereochemistry, so we have to either guess or assume some convention like “unspecified chiral centers indicate a 50/50 mixture of the two possible local chiralities”. This is fine if we produce all of the SMILES that we need to work with and either never provide SMILES to anyone else or let them know about our conventions, but both of those are pretty strong assumptions/requirements.</p>
+<p>Fortunately we can do better than this by taking advantage of stereo groups, a.k.a. enhanced stereochemistry. This was introduced, I believe (the horrors of link rot and the modern internet makes it hard to be sure), by the team at MDL Information Systems back at the beginning of the ’00s. It’s supported in V3000 Mol/SDF files as well as CXSMILES.</p>
+<blockquote class="blockquote">
+<p><em>Aside</em> While writing this post I ran across a nice <a href="https://www.acdlabs.com/blog/enhanced-stereochemistry-labels-advanced-techniques-for-indicating-stereoconfigurations/">blog post</a> by the team at ACD/Labs which also discusses enhanced stereo and the ways they support it.</p>
+</blockquote>
+<p>We can use stereo groups to label what we know about each stereo center (or group of related stereo centers). There are three types of stereo groups:</p>
+<ol type="1">
+<li>abs: indicates that the absolute stereo of the centers is known</li>
+<li>and: indicates that the molecule represents a 50/50 mixture of the stereoisomer as drawn and its mirror image</li>
+<li>or: indicates that the molecule represents either the stereoisomer as drawn or its mirror image</li>
+</ol>
+<p>Here’s the application of that to alanine:</p>
+<div class="cell" data-executetime="{&quot;end_time&quot;:&quot;2023-11-19T05:43:02.510492Z&quot;,&quot;start_time&quot;:&quot;2023-11-19T05:43:02.400194Z&quot;}" data-execution_count="3">
+<div class="sourceCode cell-code" id="cb4" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb4-1">m_ccw_abs <span class="op" style="color: #5E5E5E;">=</span> Chem.MolFromSmiles(<span class="st" style="color: #20794D;">'N[C@H](C)C(=O)O |a:1|'</span>)</span>
+<span id="cb4-2">m_and <span class="op" style="color: #5E5E5E;">=</span> Chem.MolFromSmiles(<span class="st" style="color: #20794D;">'N[C@H](C)C(=O)O |&amp;1:1|'</span>)</span>
+<span id="cb4-3">m_or <span class="op" style="color: #5E5E5E;">=</span> Chem.MolFromSmiles(<span class="st" style="color: #20794D;">'N[C@H](C)C(=O)O |o1:1|'</span>)</span>
+<span id="cb4-4">Draw.MolsToGridImage([m_ccw_abs,m_and,m_or],legends<span class="op" style="color: #5E5E5E;">=</span>[<span class="st" style="color: #20794D;">'R'</span>, <span class="st" style="color: #20794D;">'R and S'</span>,<span class="st" style="color: #20794D;">'R or S'</span>])</span></code></pre></div>
+<div class="cell-output cell-output-display" data-execution_count="3">
+<p><img src="https://greglandrum.github.io/rdkit-blog/posts/2023-11-19-explaining-stereo-groups_files/figure-html/cell-4-output-1.png" class="img-fluid"></p>
+</div>
+</div>
+<p>Let’s look at the AND example:</p>
+<div class="cell" data-executetime="{&quot;end_time&quot;:&quot;2023-11-19T05:43:02.661421Z&quot;,&quot;start_time&quot;:&quot;2023-11-19T05:43:02.512400Z&quot;}" data-execution_count="4">
+<div class="sourceCode cell-code" id="cb5" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb5-1">m_and <span class="op" style="color: #5E5E5E;">=</span> Chem.MolFromSmiles(<span class="st" style="color: #20794D;">'N[C@H](C)C(=O)O |&amp;1:1|'</span>)</span>
+<span id="cb5-2">m_and_1 <span class="op" style="color: #5E5E5E;">=</span> Chem.MolFromSmiles(<span class="st" style="color: #20794D;">'N[C@H](C)C(=O)O |a:1|'</span>)</span>
+<span id="cb5-3">m_and_2 <span class="op" style="color: #5E5E5E;">=</span> Chem.MolFromSmiles(<span class="st" style="color: #20794D;">'N[C@@H](C)C(=O)O |a:1|'</span>)</span>
+<span id="cb5-4">Draw.MolsToGridImage([m_and,m_and_1,m_and_2])</span></code></pre></div>
+<div class="cell-output cell-output-display" data-execution_count="4">
+<p><img src="https://greglandrum.github.io/rdkit-blog/posts/2023-11-19-explaining-stereo-groups_files/figure-html/cell-5-output-1.png" class="img-fluid"></p>
+</div>
+</div>
+<p>Here the first entry shows the molecule with stereo group while the second two entries show the two molecules contained in that mixture. If we used an OR stereo group instead of AND we’d be describing a sample with one of the two stereoisomers.</p>
+</section>
+<section id="multiple-stereocenters" class="level1">
+<h1>Multiple stereocenters</h1>
+<p>Stereo groups are even more useful if there are multiple chiral centers since they allow us to express relative stereochemistry.</p>
+<p>We’ll use this molecule with two chiral centers as an example:</p>
+<div class="cell" data-executetime="{&quot;end_time&quot;:&quot;2023-11-19T05:43:02.791774Z&quot;,&quot;start_time&quot;:&quot;2023-11-19T05:43:02.663033Z&quot;}" data-execution_count="5">
+<div class="sourceCode cell-code" id="cb6" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb6-1">m <span class="op" style="color: #5E5E5E;">=</span> Chem.MolFromSmiles(<span class="st" style="color: #20794D;">'OC1CCC1N'</span>)</span>
+<span id="cb6-2">m</span></code></pre></div>
+<div class="cell-output cell-output-display" data-execution_count="5">
+<p><img src="https://greglandrum.github.io/rdkit-blog/posts/2023-11-19-explaining-stereo-groups_files/figure-html/cell-6-output-1.png" class="img-fluid"></p>
+</div>
+</div>
+<p>We can obviously have examples of this where one or both chiral centers are fully specified, just as we saw above, but using stereo groups lets us do something new: express that the relative stereochemistry of the two centers is known:</p>
+<div class="cell" data-executetime="{&quot;end_time&quot;:&quot;2023-11-19T05:43:02.917957Z&quot;,&quot;start_time&quot;:&quot;2023-11-19T05:43:02.797566Z&quot;}" data-execution_count="6">
+<div class="sourceCode cell-code" id="cb7" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb7-1">m2_cis <span class="op" style="color: #5E5E5E;">=</span> Chem.MolFromSmiles(<span class="st" style="color: #20794D;">'O[C@H]1CC[C@H]1N |&amp;1:1,4|'</span>)</span>
+<span id="cb7-2">m2_cis_1 <span class="op" style="color: #5E5E5E;">=</span> Chem.MolFromSmiles(<span class="st" style="color: #20794D;">'O[C@H]1CC[C@H]1N |a:1,4|'</span>)</span>
+<span id="cb7-3">m2_cis_2 <span class="op" style="color: #5E5E5E;">=</span> Chem.MolFromSmiles(<span class="st" style="color: #20794D;">'O[C@@H]1CC[C@@H]1N |a:1,4|'</span>)</span>
+<span id="cb7-4"></span>
+<span id="cb7-5">m2_trans <span class="op" style="color: #5E5E5E;">=</span> Chem.MolFromSmiles(<span class="st" style="color: #20794D;">'O[C@H]1CC[C@@H]1N |&amp;1:1,4|'</span>)</span>
+<span id="cb7-6">m2_trans_1 <span class="op" style="color: #5E5E5E;">=</span> Chem.MolFromSmiles(<span class="st" style="color: #20794D;">'O[C@H]1CC[C@@H]1N |a:1,4|'</span>)</span>
+<span id="cb7-7">m2_trans_2 <span class="op" style="color: #5E5E5E;">=</span> Chem.MolFromSmiles(<span class="st" style="color: #20794D;">'O[C@@H]1CC[C@H]1N |a:1,4|'</span>)</span>
+<span id="cb7-8"></span>
+<span id="cb7-9">Draw.MolsToGridImage([m2_cis,m2_cis_1,m2_cis_2,m2_trans,m2_trans_1,m2_trans_2],legends<span class="op" style="color: #5E5E5E;">=</span>[<span class="st" style="color: #20794D;">'"cis"'</span>,<span class="st" style="color: #20794D;">''</span>,<span class="st" style="color: #20794D;">''</span>,<span class="st" style="color: #20794D;">'"trans"'</span>,<span class="st" style="color: #20794D;">''</span>,<span class="st" style="color: #20794D;">''</span>],molsPerRow<span class="op" style="color: #5E5E5E;">=</span><span class="dv" style="color: #AD0000;">3</span>)</span></code></pre></div>
+<div class="cell-output cell-output-display" data-execution_count="6">
+<p><img src="https://greglandrum.github.io/rdkit-blog/posts/2023-11-19-explaining-stereo-groups_files/figure-html/cell-7-output-1.png" class="img-fluid"></p>
+</div>
+</div>
+<p>In each row above the first entry shows the molecule with stereo groups while the second two entries show the two molecules contained in the mixture that representation describes.</p>
+</section>
+<section id="a-slightly-more-complicated-example" class="level1">
+<h1>A slightly more complicated example</h1>
+<p>Here we’ll invent some enhanced stereo information for this molecule from ChEMBL:</p>
+<div class="cell" data-executetime="{&quot;end_time&quot;:&quot;2023-11-19T05:43:03.011393Z&quot;,&quot;start_time&quot;:&quot;2023-11-19T05:43:02.919442Z&quot;}" data-execution_count="7">
+<div class="sourceCode cell-code" id="cb8" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb8-1">m <span class="op" style="color: #5E5E5E;">=</span> Chem.MolFromSmiles(<span class="st" style="color: #20794D;">'OC[C@H]1OC=C[C@@H](O)[C@@H]1O'</span>) <span class="co" style="color: #5E5E5E;"># CHEMBL2115567</span></span>
+<span id="cb8-2">m</span></code></pre></div>
+<div class="cell-output cell-output-display" data-execution_count="7">
+<p><img src="https://greglandrum.github.io/rdkit-blog/posts/2023-11-19-explaining-stereo-groups_files/figure-html/cell-8-output-1.png" class="img-fluid"></p>
+</div>
+</div>
+<div class="cell" data-executetime="{&quot;end_time&quot;:&quot;2023-11-19T05:43:03.092938Z&quot;,&quot;start_time&quot;:&quot;2023-11-19T05:43:03.013422Z&quot;}" data-execution_count="8">
+<div class="sourceCode cell-code" id="cb9" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb9-1">three_centers <span class="op" style="color: #5E5E5E;">=</span> Chem.MolFromSmiles(<span class="st" style="color: #20794D;">'OC[C@H]1OC=C[C@@H](O)[C@@H]1O |&amp;1:2,o2:6,8|'</span>) </span>
+<span id="cb9-2">three_centers</span></code></pre></div>
+<div class="cell-output cell-output-display" data-execution_count="8">
+<p><img src="https://greglandrum.github.io/rdkit-blog/posts/2023-11-19-explaining-stereo-groups_files/figure-html/cell-9-output-1.png" class="img-fluid"></p>
+</div>
+</div>
+<p>There are both “and” and “or” groups present, so this represents one of two mixtures.</p>
+<p>We have a mixture which contains either these two molecules:</p>
+<div class="cell" data-executetime="{&quot;end_time&quot;:&quot;2023-11-19T05:43:03.201699Z&quot;,&quot;start_time&quot;:&quot;2023-11-19T05:43:03.095369Z&quot;}" data-execution_count="9">
+<div class="sourceCode cell-code" id="cb10" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb10-1">mix1_1 <span class="op" style="color: #5E5E5E;">=</span> Chem.MolFromSmiles(<span class="st" style="color: #20794D;">'OC[C@H]1OC=C[C@@H](O)[C@@H]1O'</span>) </span>
+<span id="cb10-2">mix1_2 <span class="op" style="color: #5E5E5E;">=</span> Chem.MolFromSmiles(<span class="st" style="color: #20794D;">'OC[C@@H]1OC=C[C@@H](O)[C@@H]1O'</span>) </span>
+<span id="cb10-3">Draw.MolsToGridImage([mix1_1,mix1_2])</span></code></pre></div>
+<div class="cell-output cell-output-display" data-execution_count="9">
+<p><img src="https://greglandrum.github.io/rdkit-blog/posts/2023-11-19-explaining-stereo-groups_files/figure-html/cell-10-output-1.png" class="img-fluid"></p>
+</div>
+</div>
+<p>or these two molecules:</p>
+<div class="cell" data-executetime="{&quot;end_time&quot;:&quot;2023-11-19T05:43:03.321363Z&quot;,&quot;start_time&quot;:&quot;2023-11-19T05:43:03.206021Z&quot;}" data-execution_count="10">
+<div class="sourceCode cell-code" id="cb11" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb11-1">mix2_1 <span class="op" style="color: #5E5E5E;">=</span> Chem.MolFromSmiles(<span class="st" style="color: #20794D;">'OC[C@H]1OC=C[C@H](O)[C@H]1O'</span>) </span>
+<span id="cb11-2">mix2_2 <span class="op" style="color: #5E5E5E;">=</span> Chem.MolFromSmiles(<span class="st" style="color: #20794D;">'OC[C@@H]1OC=C[C@H](O)[C@H]1O'</span>) </span>
+<span id="cb11-3">Draw.MolsToGridImage([mix2_1,mix2_2])</span></code></pre></div>
+<div class="cell-output cell-output-display" data-execution_count="10">
+<p><img src="https://greglandrum.github.io/rdkit-blog/posts/2023-11-19-explaining-stereo-groups_files/figure-html/cell-11-output-1.png" class="img-fluid"></p>
+</div>
+</div>
+</section>
+<section id="enumerating-stereo-groups" class="level1">
+<h1>Enumerating stereo groups</h1>
+<p>The RDKit’s stereoisomer enumeration code can take stereo groups into account. This is a useful way to see all of the possible molecules encoded in a structure with stereo groups.</p>
+<div class="cell" data-executetime="{&quot;end_time&quot;:&quot;2023-11-19T05:43:03.471652Z&quot;,&quot;start_time&quot;:&quot;2023-11-19T05:43:03.323864Z&quot;}" data-execution_count="11">
+<div class="sourceCode cell-code" id="cb12" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb12-1"><span class="im" style="color: #00769E;">from</span> rdkit.Chem <span class="im" style="color: #00769E;">import</span> EnumerateStereoisomers</span></code></pre></div>
+</div>
+<div class="cell" data-executetime="{&quot;end_time&quot;:&quot;2023-11-19T05:43:03.749923Z&quot;,&quot;start_time&quot;:&quot;2023-11-19T05:43:03.472760Z&quot;}" data-execution_count="12">
+<div class="sourceCode cell-code" id="cb13" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb13-1">opts <span class="op" style="color: #5E5E5E;">=</span> EnumerateStereoisomers.StereoEnumerationOptions()</span>
+<span id="cb13-2">opts.onlyStereoGroups <span class="op" style="color: #5E5E5E;">=</span> <span class="va" style="color: #111111;">True</span></span>
+<span id="cb13-3">enumerated <span class="op" style="color: #5E5E5E;">=</span> EnumerateStereoisomers.EnumerateStereoisomers(three_centers)</span>
+<span id="cb13-4">Draw.MolsToGridImage(<span class="bu" style="color: null;">list</span>(enumerated))</span></code></pre></div>
+<div class="cell-output cell-output-display" data-execution_count="12">
+<p><img src="https://greglandrum.github.io/rdkit-blog/posts/2023-11-19-explaining-stereo-groups_files/figure-html/cell-13-output-1.png" class="img-fluid"></p>
+</div>
+</div>
+<p>Note that <code>EnumerateStereoisomers()</code> currently has no way of indicating AND and OR relationships, so we see all stereoisomers which could be present.</p>
+</section>
+<section id="stereo-groups-and-canonicalization" class="level1">
+<h1>Stereo groups and canonicalization</h1>
+<p>These four representations all describe the same thing:</p>
+<div class="cell" data-executetime="{&quot;end_time&quot;:&quot;2023-11-19T05:43:03.858300Z&quot;,&quot;start_time&quot;:&quot;2023-11-19T05:43:03.752107Z&quot;}" data-execution_count="13">
+<div class="sourceCode cell-code" id="cb14" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb14-1">m1 <span class="op" style="color: #5E5E5E;">=</span> Chem.MolFromSmiles(<span class="st" style="color: #20794D;">'OC[C@H]1OC=C[C@@H](O)[C@@H]1O |&amp;1:2,o2:6,8|'</span>) </span>
+<span id="cb14-2">m2 <span class="op" style="color: #5E5E5E;">=</span> Chem.MolFromSmiles(<span class="st" style="color: #20794D;">'OC[C@@H]1OC=C[C@@H](O)[C@@H]1O |&amp;1:2,o2:6,8|'</span>) </span>
+<span id="cb14-3">m3 <span class="op" style="color: #5E5E5E;">=</span> Chem.MolFromSmiles(<span class="st" style="color: #20794D;">'OC[C@H]1OC=C[C@H](O)[C@H]1O |&amp;1:2,o2:6,8|'</span>) </span>
+<span id="cb14-4">m4 <span class="op" style="color: #5E5E5E;">=</span> Chem.MolFromSmiles(<span class="st" style="color: #20794D;">'OC[C@@H]1OC=C[C@H](O)[C@H]1O |&amp;1:2,o2:6,8|'</span>) </span>
+<span id="cb14-5"></span>
+<span id="cb14-6">Draw.MolsToGridImage([m1,m2,m3,m4],molsPerRow<span class="op" style="color: #5E5E5E;">=</span><span class="dv" style="color: #AD0000;">2</span>,subImgSize<span class="op" style="color: #5E5E5E;">=</span>(<span class="dv" style="color: #AD0000;">250</span>,<span class="dv" style="color: #AD0000;">250</span>))</span></code></pre></div>
+<div class="cell-output cell-output-display" data-execution_count="13">
+<p><img src="https://greglandrum.github.io/rdkit-blog/posts/2023-11-19-explaining-stereo-groups_files/figure-html/cell-14-output-1.png" class="img-fluid"></p>
+</div>
+</div>
+<p>We see that when we generate canonical CXSMILES for the molecules:</p>
+<div class="cell" data-executetime="{&quot;end_time&quot;:&quot;2023-11-19T05:43:03.930702Z&quot;,&quot;start_time&quot;:&quot;2023-11-19T05:43:03.859581Z&quot;}" data-execution_count="14">
+<div class="sourceCode cell-code" id="cb15" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb15-1"><span class="cf" style="color: #003B4F;">for</span> m <span class="kw" style="color: #003B4F;">in</span> (m1,m2,m3,m4):</span>
+<span id="cb15-2">    <span class="bu" style="color: null;">print</span>(Chem.MolToCXSmiles(m))</span></code></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>OC[C@H]1OC=C[C@H](O)[C@H]1O |o1:6,8,&amp;1:2|
+OC[C@H]1OC=C[C@H](O)[C@H]1O |o1:6,8,&amp;1:2|
+OC[C@H]1OC=C[C@H](O)[C@H]1O |o1:6,8,&amp;1:2|
+OC[C@H]1OC=C[C@H](O)[C@H]1O |o1:6,8,&amp;1:2|</code></pre>
+</div>
+</div>
+<p>Note that this <em>not</em> true if we generate standard canonical SMILES for the molecule:</p>
+<div class="cell" data-executetime="{&quot;end_time&quot;:&quot;2023-11-19T05:43:04.005151Z&quot;,&quot;start_time&quot;:&quot;2023-11-19T05:43:03.932637Z&quot;}" data-execution_count="15">
+<div class="sourceCode cell-code" id="cb17" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb17-1"><span class="cf" style="color: #003B4F;">for</span> m <span class="kw" style="color: #003B4F;">in</span> (m1,m2,m3,m4):</span>
+<span id="cb17-2">    <span class="bu" style="color: null;">print</span>(Chem.MolToSmiles(m))</span></code></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>OC[C@H]1OC=C[C@@H](O)[C@@H]1O
+OC[C@@H]1OC=C[C@@H](O)[C@@H]1O
+OC[C@H]1OC=C[C@H](O)[C@H]1O
+OC[C@@H]1OC=C[C@H](O)[C@H]1O</code></pre>
+</div>
+</div>
+<p>This is a bit confusing at first. The reasoning behind the behavior is that the stereo groups should not be used in the canonicalization since no information about them will be included in the output.</p>
+</section>
+<section id="creating-your-own-stereo-groups" class="level1">
+<h1>Creating your own stereo groups</h1>
+<p>You can also add your own stereo groups to molecules:</p>
+<div class="cell" data-executetime="{&quot;end_time&quot;:&quot;2023-11-19T05:43:04.111094Z&quot;,&quot;start_time&quot;:&quot;2023-11-19T05:43:04.010953Z&quot;}" data-execution_count="16">
+<div class="sourceCode cell-code" id="cb19" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb19-1">m <span class="op" style="color: #5E5E5E;">=</span> Chem.MolFromSmiles(<span class="st" style="color: #20794D;">'OC[C@H]1OC=C[C@@H](O)[C@@H]1O'</span>) <span class="co" style="color: #5E5E5E;"># CHEMBL2115567</span></span>
+<span id="cb19-2">IPythonConsole.drawOptions.addAtomIndices <span class="op" style="color: #5E5E5E;">=</span> <span class="va" style="color: #111111;">True</span></span>
+<span id="cb19-3">m</span></code></pre></div>
+<div class="cell-output cell-output-display" data-execution_count="16">
+<p><img src="https://greglandrum.github.io/rdkit-blog/posts/2023-11-19-explaining-stereo-groups_files/figure-html/cell-17-output-1.png" class="img-fluid"></p>
+</div>
+</div>
+<div class="cell" data-executetime="{&quot;end_time&quot;:&quot;2023-11-19T05:43:04.181307Z&quot;,&quot;start_time&quot;:&quot;2023-11-19T05:43:04.114584Z&quot;}" data-execution_count="17">
+<div class="sourceCode cell-code" id="cb20" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb20-1">IPythonConsole.drawOptions.addAtomIndices <span class="op" style="color: #5E5E5E;">=</span> <span class="va" style="color: #111111;">False</span></span></code></pre></div>
+</div>
+<p>The function to do this is <code>CreateStereoGroup()</code>:</p>
+<div class="cell" data-executetime="{&quot;end_time&quot;:&quot;2023-11-19T05:43:04.281239Z&quot;,&quot;start_time&quot;:&quot;2023-11-19T05:43:04.184268Z&quot;}" data-execution_count="18">
+<div class="sourceCode cell-code" id="cb21" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb21-1">sgmol <span class="op" style="color: #5E5E5E;">=</span> Chem.RWMol(m)</span>
+<span id="cb21-2">sg <span class="op" style="color: #5E5E5E;">=</span> Chem.CreateStereoGroup(Chem.StereoGroupType.STEREO_AND, sgmol, [<span class="dv" style="color: #AD0000;">6</span>,<span class="dv" style="color: #AD0000;">8</span>])</span>
+<span id="cb21-3">sgmol.SetStereoGroups([sg])</span>
+<span id="cb21-4">sgmol</span></code></pre></div>
+<div class="cell-output cell-output-display" data-execution_count="18">
+<p><img src="https://greglandrum.github.io/rdkit-blog/posts/2023-11-19-explaining-stereo-groups_files/figure-html/cell-19-output-1.png" class="img-fluid"></p>
+</div>
+</div>
+
+
+</section>
+
+ ]]></description>
+  <category>tutorial</category>
+  <category>stereochemistry</category>
+  <category>documentation</category>
+  <guid>https://greglandrum.github.io/rdkit-blog/posts/2023-11-19-explaining-stereo-groups.html</guid>
+  <pubDate>Sat, 18 Nov 2023 23:00:00 GMT</pubDate>
+  <media:content url="https://greglandrum.github.io/rdkit-blog/posts/images/blog/stereogroups-1.png" medium="image" type="image/png" height="123" width="144"/>
+</item>
 <item>
   <title>Using the Multithreaded Mol Readers</title>
   <link>https://greglandrum.github.io/rdkit-blog/posts/2023-11-11-usingmultithreadedreaders.html</link>
@@ -2027,7 +2253,7 @@ Q 174.3 83.2, 175.8 83.2
 <p>These boxplots look at Cohen’s kappa (left plot) and AUROC (right plot) for classifiers built on the MDCK dataset. The left pair of bars in each plot show the distribution of values for 100 random splits, the right pair show distributions for 50 different 5-fold cross validations. The left bar in each pair has the results for XGB, the right bar for RF.</p>
 <div class="quarto-figure quarto-figure-center">
 <figure class="figure">
-<p><img src="https://greglandrum.github.io/rdkit-blog/posts/2023-08-13-xval-variability1_files/figure-html/3683e816-1-image-2.png" class="img-fluid figure-img"></p>
+<p><img src="https://greglandrum.github.io/rdkit-blog/posts/2023-08-13-xval-variability1_files/figure-html/a654f820-1-image-2.png" class="img-fluid figure-img"></p>
 <p></p><figcaption class="figure-caption">image-2.png</figcaption><p></p>
 </figure>
 </div>
@@ -3068,7 +3294,7 @@ AUC fraction&gt;0: 1.00</code></pre>
 <p>The TL;DR summary: if we’re careful about using as much metadata as possible to ascertain which assays can be combined, we get quite good agreement between Ki assays:</p>
 <div class="quarto-figure quarto-figure-center">
 <figure class="figure">
-<p><img src="https://greglandrum.github.io/rdkit-blog/posts/2023-06-17-overlapping-Ki-assays1_files/figure-html/5ebadf78-1-image.png" class="img-fluid figure-img"></p>
+<p><img src="https://greglandrum.github.io/rdkit-blog/posts/2023-06-17-overlapping-Ki-assays1_files/figure-html/69ddaf0b-1-image.png" class="img-fluid figure-img"></p>
 <p></p><figcaption class="figure-caption">results summary</figcaption><p></p>
 </figure>
 </div>
@@ -8302,7 +8528,7 @@ CHEMBL1019596  CHEMBL828284    0.00 22</code></pre>
 <p>If I am careful about which xC50 assays I combine, making sure as much available metadata as possible matches, and then plot the pchembl values for duplicate compounds, I get the following:</p>
 <div class="quarto-figure quarto-figure-center">
 <figure class="figure">
-<p><img src="https://greglandrum.github.io/rdkit-blog/posts/2023-06-12-overlapping-ic50-assays1_files/figure-html/639cfc95-1-image-6.png" class="img-fluid figure-img"></p>
+<p><img src="https://greglandrum.github.io/rdkit-blog/posts/2023-06-12-overlapping-ic50-assays1_files/figure-html/eb9dbfc2-1-image-6.png" class="img-fluid figure-img"></p>
 <p></p><figcaption class="figure-caption">image-6.png</figcaption><p></p>
 </figure>
 </div>
@@ -8311,7 +8537,7 @@ CHEMBL1019596  CHEMBL828284    0.00 22</code></pre>
 <p>If I’m not careful at all, and just combine using the target ID and the type of the result (so that I’m not combining IC50 and EC50), I get the following (this time it’s a hexbin plot, because otherwise you can’t see anything):</p>
 <div class="quarto-figure quarto-figure-center">
 <figure class="figure">
-<p><img src="https://greglandrum.github.io/rdkit-blog/posts/2023-06-12-overlapping-ic50-assays1_files/figure-html/639cfc95-2-image-7.png" class="img-fluid figure-img"></p>
+<p><img src="https://greglandrum.github.io/rdkit-blog/posts/2023-06-12-overlapping-ic50-assays1_files/figure-html/eb9dbfc2-2-image-7.png" class="img-fluid figure-img"></p>
 <p></p><figcaption class="figure-caption">image-7.png</figcaption><p></p>
 </figure>
 </div>
@@ -37564,507 +37790,6 @@ viewer_16777813103808172.render();
   <guid>https://greglandrum.github.io/rdkit-blog/posts/2023-03-02-clustering-conformers.html</guid>
   <pubDate>Wed, 01 Mar 2023 23:00:00 GMT</pubDate>
   <media:content url="https://greglandrum.github.io/rdkit-blog/posts/images/blog/clustering-conformers-1.png" medium="image" type="image/png" height="125" width="144"/>
-</item>
-<item>
-  <title>Using Feature Maps</title>
-  <link>https://greglandrum.github.io/rdkit-blog/posts/2023-02-24-using-feature-maps.html</link>
-  <description><![CDATA[ 
-
-
-
-<p>This is a revised and updated version of an <a href="http://rdkit.blogspot.com/2017/11/using-feature-maps.html">older post</a>.</p>
-<p>This post provides a short demonstration of how to use the RDKit’s feature map implementation to score aligned 3D conformations against each other based on the overlap of their pharmacophoric features. The idea of the feature map is not a new one and there are numerous publications on the topic. These two come closest to describing the RDKit implementation:</p>
-<ol type="1">
-<li>Putta, S., Landrum, G. A. &amp; Penzotti, J. E. “Conformation mining: An algorithm for finding biologically relevant conformations.” <em>J. Med. Chem.</em> <strong>48</strong>, 3313–3318 (2005). http://pubs.acs.org/doi/abs/10.1021/jm049066l</li>
-<li>Landrum, G. A., Penzotti, J. E. &amp; Putta, S. “Feature-map vectors: a new class of informative descriptors for computational drug discovery.” <em>J. Comput. Aided. Mol. Des.</em> <strong>20</strong>, 751–762 (2007). https://link.springer.com/article/10.1007/s10822-006-9085-8</li>
-</ol>
-<div class="cell" data-executetime="{&quot;end_time&quot;:&quot;2023-02-24T08:44:30.011994Z&quot;,&quot;start_time&quot;:&quot;2023-02-24T08:44:29.922201Z&quot;}" data-execution_count="1">
-<div class="sourceCode cell-code" id="cb1" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb1-1"><span class="im" style="color: #00769E;">from</span> rdkit.Chem <span class="im" style="color: #00769E;">import</span> AllChem</span>
-<span id="cb1-2"><span class="im" style="color: #00769E;">from</span> rdkit <span class="im" style="color: #00769E;">import</span> Chem</span>
-<span id="cb1-3"><span class="im" style="color: #00769E;">from</span> rdkit.Chem.Draw <span class="im" style="color: #00769E;">import</span> IPythonConsole</span>
-<span id="cb1-4">IPythonConsole.ipython_3d <span class="op" style="color: #5E5E5E;">=</span> <span class="va" style="color: #111111;">True</span></span>
-<span id="cb1-5"><span class="im" style="color: #00769E;">from</span> rdkit.Chem <span class="im" style="color: #00769E;">import</span> Draw</span>
-<span id="cb1-6"><span class="im" style="color: #00769E;">import</span> time</span>
-<span id="cb1-7"><span class="bu" style="color: null;">print</span>(time.asctime())</span>
-<span id="cb1-8"><span class="im" style="color: #00769E;">from</span> rdkit <span class="im" style="color: #00769E;">import</span> rdBase</span>
-<span id="cb1-9"><span class="bu" style="color: null;">print</span>(rdBase.rdkitVersion)</span></code></pre></div>
-<div class="cell-output cell-output-stdout">
-<pre><code>Fri Feb 24 09:44:30 2023
-2022.09.4</code></pre>
-</div>
-</div>
-<p>For this post we’ll use a set of three 5HT-3 ligands.</p>
-<div class="cell" data-executetime="{&quot;end_time&quot;:&quot;2023-02-24T08:44:30.025797Z&quot;,&quot;start_time&quot;:&quot;2023-02-24T08:44:30.012866Z&quot;}" data-execution_count="2">
-<div class="sourceCode cell-code" id="cb3" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb3-1">smis <span class="op" style="color: #5E5E5E;">=</span> [<span class="st" style="color: #20794D;">'CC(OC(=O)c1c[nH]c2ccccc12)C1CCCCN1C'</span>,</span>
-<span id="cb3-2"> <span class="st" style="color: #20794D;">'CN1CCOc2c(C(=O)NC3CC4CCC(C3)N4C)cc(Cl)cc21'</span>,</span>
-<span id="cb3-3"> <span class="st" style="color: #20794D;">'CN1CC2CCC1CC2n1nnc2ccc(Cl)cc2c1=O'</span>]</span>
-<span id="cb3-4">ms <span class="op" style="color: #5E5E5E;">=</span> [Chem.MolFromSmiles(x) <span class="cf" style="color: #003B4F;">for</span> x <span class="kw" style="color: #003B4F;">in</span> smis]</span>
-<span id="cb3-5">Draw.MolsToGridImage(ms)</span></code></pre></div>
-<div class="cell-output cell-output-display" data-execution_count="2">
-<p><img src="https://greglandrum.github.io/rdkit-blog/posts/2023-02-24-using-feature-maps_files/figure-html/cell-3-output-1.png" class="img-fluid"></p>
-</div>
-</div>
-<p>Start by generating a conformation for each:</p>
-<div class="cell" data-executetime="{&quot;end_time&quot;:&quot;2023-02-24T08:44:30.222184Z&quot;,&quot;start_time&quot;:&quot;2023-02-24T08:44:30.026758Z&quot;}" data-execution_count="3">
-<div class="sourceCode cell-code" id="cb4" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb4-1">ms <span class="op" style="color: #5E5E5E;">=</span> [Chem.AddHs(m) <span class="cf" style="color: #003B4F;">for</span> m <span class="kw" style="color: #003B4F;">in</span> ms]</span>
-<span id="cb4-2">ps <span class="op" style="color: #5E5E5E;">=</span> AllChem.ETKDGv3()</span>
-<span id="cb4-3">ps.randomSeed <span class="op" style="color: #5E5E5E;">=</span> <span class="bn" style="color: #AD0000;">0xf00d</span>  <span class="co" style="color: #5E5E5E;"># we seed the RNG so that this is reproducible</span></span>
-<span id="cb4-4"><span class="cf" style="color: #003B4F;">for</span> m <span class="kw" style="color: #003B4F;">in</span> ms:</span>
-<span id="cb4-5">    AllChem.EmbedMolecule(m,ps)</span></code></pre></div>
-</div>
-<p>To get sensible scores for the feature maps, we need to start from aligned structures. For this example we’ll just use the RDKit’s Open3D Align implementation:</p>
-<div class="cell" data-executetime="{&quot;end_time&quot;:&quot;2023-02-24T08:44:30.240878Z&quot;,&quot;start_time&quot;:&quot;2023-02-24T08:44:30.223286Z&quot;}" data-execution_count="4">
-<div class="sourceCode cell-code" id="cb5" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb5-1"><span class="im" style="color: #00769E;">from</span> rdkit.Chem <span class="im" style="color: #00769E;">import</span> rdMolAlign</span>
-<span id="cb5-2">o3d <span class="op" style="color: #5E5E5E;">=</span> rdMolAlign.GetO3A(ms[<span class="dv" style="color: #AD0000;">1</span>],ms[<span class="dv" style="color: #AD0000;">0</span>])</span>
-<span id="cb5-3">o3d.Align()</span></code></pre></div>
-<div class="cell-output cell-output-display" data-execution_count="4">
-<pre><code>0.2892771161742461</code></pre>
-</div>
-</div>
-<div class="cell" data-executetime="{&quot;end_time&quot;:&quot;2023-02-24T08:44:30.323227Z&quot;,&quot;start_time&quot;:&quot;2023-02-24T08:44:30.241696Z&quot;}" data-execution_count="5">
-<div class="sourceCode cell-code" id="cb7" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb7-1">o3d <span class="op" style="color: #5E5E5E;">=</span> rdMolAlign.GetO3A(ms[<span class="dv" style="color: #AD0000;">2</span>],ms[<span class="dv" style="color: #AD0000;">0</span>])</span>
-<span id="cb7-2">o3d.Align()</span></code></pre></div>
-<div class="cell-output cell-output-display" data-execution_count="5">
-<pre><code>0.5564120832536971</code></pre>
-</div>
-</div>
-<div class="cell" data-executetime="{&quot;end_time&quot;:&quot;2023-02-24T08:44:30.394260Z&quot;,&quot;start_time&quot;:&quot;2023-02-24T08:44:30.323955Z&quot;}" data-execution_count="6">
-<div class="sourceCode cell-code" id="cb9" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb9-1"><span class="im" style="color: #00769E;">import</span> py3Dmol</span>
-<span id="cb9-2"><span class="kw" style="color: #003B4F;">def</span> drawit(ms, p<span class="op" style="color: #5E5E5E;">=</span><span class="va" style="color: #111111;">None</span>, confId<span class="op" style="color: #5E5E5E;">=-</span><span class="dv" style="color: #AD0000;">1</span>, removeHs<span class="op" style="color: #5E5E5E;">=</span><span class="va" style="color: #111111;">True</span>,colors<span class="op" style="color: #5E5E5E;">=</span>(<span class="st" style="color: #20794D;">'cyanCarbon'</span>,<span class="st" style="color: #20794D;">'redCarbon'</span>,<span class="st" style="color: #20794D;">'blueCarbon'</span>)):</span>
-<span id="cb9-3">        <span class="cf" style="color: #003B4F;">if</span> p <span class="kw" style="color: #003B4F;">is</span> <span class="va" style="color: #111111;">None</span>:</span>
-<span id="cb9-4">            p <span class="op" style="color: #5E5E5E;">=</span> py3Dmol.view(width<span class="op" style="color: #5E5E5E;">=</span><span class="dv" style="color: #AD0000;">400</span>, height<span class="op" style="color: #5E5E5E;">=</span><span class="dv" style="color: #AD0000;">400</span>)</span>
-<span id="cb9-5">        p.removeAllModels()</span>
-<span id="cb9-6">        <span class="cf" style="color: #003B4F;">for</span> i,m <span class="kw" style="color: #003B4F;">in</span> <span class="bu" style="color: null;">enumerate</span>(ms):</span>
-<span id="cb9-7">            <span class="cf" style="color: #003B4F;">if</span> removeHs:</span>
-<span id="cb9-8">                m <span class="op" style="color: #5E5E5E;">=</span> Chem.RemoveHs(m)</span>
-<span id="cb9-9">            IPythonConsole.addMolToView(m,p,confId<span class="op" style="color: #5E5E5E;">=</span>confId)</span>
-<span id="cb9-10">        <span class="cf" style="color: #003B4F;">for</span> i,m <span class="kw" style="color: #003B4F;">in</span> <span class="bu" style="color: null;">enumerate</span>(ms):</span>
-<span id="cb9-11">            p.setStyle({<span class="st" style="color: #20794D;">'model'</span>:i,},</span>
-<span id="cb9-12">                            {<span class="st" style="color: #20794D;">'stick'</span>:{<span class="st" style="color: #20794D;">'colorscheme'</span>:colors[i<span class="op" style="color: #5E5E5E;">%</span><span class="bu" style="color: null;">len</span>(colors)]}})</span>
-<span id="cb9-13">        p.zoomTo()</span>
-<span id="cb9-14">        <span class="cf" style="color: #003B4F;">return</span> p.show()</span></code></pre></div>
-</div>
-<div class="cell" data-executetime="{&quot;end_time&quot;:&quot;2023-02-24T08:44:30.505393Z&quot;,&quot;start_time&quot;:&quot;2023-02-24T08:44:30.398512Z&quot;}" data-execution_count="7">
-<div class="sourceCode cell-code" id="cb10" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb10-1">drawit(ms)</span></code></pre></div>
-<div class="cell-output cell-output-display">
-<div id="3dmolviewer_16772282704996767" style="position: relative; width: 400px; height: 400px">
-        <p id="3dmolwarning_16772282704996767" style="background-color:#ffcccc;color:black">You appear to be running in JupyterLab (or JavaScript failed to load for some other reason).  You need to install the 3dmol extension: <br>
-        <tt>jupyter labextension install jupyterlab_3dmol</tt></p>
-        </div>
-<script>
-
-var loadScriptAsync = function(uri){
-  return new Promise((resolve, reject) => {
-    //this is to ignore the existence of requirejs amd
-    var savedexports, savedmodule;
-    if (typeof exports !== 'undefined') savedexports = exports;
-    else exports = {}
-    if (typeof module !== 'undefined') savedmodule = module;
-    else module = {}
-
-    var tag = document.createElement('script');
-    tag.src = uri;
-    tag.async = true;
-    tag.onload = () => {
-        exports = savedexports;
-        module = savedmodule;
-        resolve();
-    };
-  var firstScriptTag = document.getElementsByTagName('script')[0];
-  firstScriptTag.parentNode.insertBefore(tag, firstScriptTag);
-});
-};
-
-if(typeof $3Dmolpromise === 'undefined') {
-$3Dmolpromise = null;
-  $3Dmolpromise = loadScriptAsync('https://cdn.jsdelivr.net/npm/3dmol@latest/build/3Dmol-min.min.js');
-}
-
-var viewer_16772282704996767 = null;
-var warn = document.getElementById("3dmolwarning_16772282704996767");
-if(warn) {
-    warn.parentNode.removeChild(warn);
-}
-$3Dmolpromise.then(function() {
-viewer_16772282704996767 = $3Dmol.createViewer(document.getElementById("3dmolviewer_16772282704996767"),{backgroundColor:"white"});
-viewer_16772282704996767.zoomTo();
-    viewer_16772282704996767.removeAllModels();
-    viewer_16772282704996767.addModel("\n     RDKit          3D\n\n 21 23  0  0  0  0  0  0  0  0999 V2000\n   -1.7517   -1.1720   -2.1292 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -1.0891   -0.1338   -1.2821 C   0  0  0  0  0  0  0  0  0  0  0  0\n    0.1046   -0.5942   -0.6815 O   0  0  0  0  0  0  0  0  0  0  0  0\n    1.3526   -0.1011   -0.9261 C   0  0  0  0  0  0  0  0  0  0  0  0\n    1.4889    0.8292   -1.7374 O   0  0  0  0  0  0  0  0  0  0  0  0\n    2.4914   -0.6788   -0.2293 C   0  0  0  0  0  0  0  0  0  0  0  0\n    2.4807   -1.7076    0.6896 C   0  0  0  0  0  0  0  0  0  0  0  0\n    3.7031   -1.9796    1.1257 N   0  0  0  0  0  0  0  0  0  0  0  0\n    4.5367   -1.1170    0.4852 C   0  0  0  0  0  0  0  0  0  0  0  0\n    5.9062   -0.9768    0.5755 C   0  0  0  0  0  0  0  0  0  0  0  0\n    6.5566   -0.0069   -0.1902 C   0  0  0  0  0  0  0  0  0  0  0  0\n    5.8470    0.8163   -1.0387 C   0  0  0  0  0  0  0  0  0  0  0  0\n    4.4789    0.6624   -1.1165 C   0  0  0  0  0  0  0  0  0  0  0  0\n    3.8163   -0.3051   -0.3549 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -1.9923    0.5031   -0.2670 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -3.1849    1.1816   -0.8998 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -3.7780    2.1002    0.1429 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -3.9585    1.4632    1.4792 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -2.8102    0.5794    1.9024 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -2.4152   -0.3181    0.7979 N   0  0  0  0  0  0  0  0  0  0  0  0\n   -3.5375   -1.1597    0.5636 C   0  0  0  0  0  0  0  0  0  0  0  0\n  1  2  1  0\n  2  3  1  0\n  3  4  1  0\n  4  5  2  0\n  4  6  1  0\n  6  7  2  0\n  7  8  1  0\n  8  9  1  0\n  9 10  2  0\n 10 11  1  0\n 11 12  2  0\n 12 13  1  0\n 13 14  2  0\n  2 15  1  0\n 15 16  1  0\n 16 17  1  0\n 17 18  1  0\n 18 19  1  0\n 19 20  1  0\n 20 21  1  0\n 14  6  1  0\n 20 15  1  0\n 14  9  1  0\nM  END\n","sdf");
-    viewer_16772282704996767.setStyle({"stick": {}});
-    viewer_16772282704996767.addModel("\n     RDKit          3D\n\n 24 27  0  0  0  0  0  0  0  0999 V2000\n    5.0325   -3.8374    2.6234 C   0  0  0  0  0  0  0  0  0  0  0  0\n    3.7944   -3.2238    2.1889 N   0  0  0  0  0  0  0  0  0  0  0  0\n    2.5490   -3.7225    2.7371 C   0  0  0  0  0  0  0  0  0  0  0  0\n    1.3849   -2.8334    2.3990 C   0  0  0  0  0  0  0  0  0  0  0  0\n    1.4545   -2.3373    1.0770 O   0  0  0  0  0  0  0  0  0  0  0  0\n    2.5976   -1.6923    0.6716 C   0  0  0  0  0  0  0  0  0  0  0  0\n    2.5398   -0.6644   -0.2417 C   0  0  0  0  0  0  0  0  0  0  0  0\n    1.3381   -0.1530   -0.8620 C   0  0  0  0  0  0  0  0  0  0  0  0\n    1.4697    0.8127   -1.6939 O   0  0  0  0  0  0  0  0  0  0  0  0\n    0.0241   -0.5915   -0.6617 N   0  0  0  0  0  0  0  0  0  0  0  0\n   -1.1070    0.0323   -1.3710 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -2.0263    0.7001   -0.3754 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -3.3332    1.0021   -1.0541 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -3.1253    1.6978   -2.3886 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -3.2536    0.5968   -3.4181 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -3.1990   -0.6537   -2.5771 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -1.7843   -1.0173   -2.1879 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -3.9476   -0.2706   -1.3977 N   0  0  0  0  0  0  0  0  0  0  0  0\n   -5.3516   -0.0896   -1.7734 C   0  0  0  0  0  0  0  0  0  0  0  0\n    3.7681   -0.0845   -0.5785 C   0  0  0  0  0  0  0  0  0  0  0  0\n    4.9452   -0.5323   -0.0175 C   0  0  0  0  0  0  0  0  0  0  0  0\n    6.4474    0.2320   -0.4779 Cl  0  0  0  0  0  0  0  0  0  0  0  0\n    4.9726   -1.5636    0.8946 C   0  0  0  0  0  0  0  0  0  0  0  0\n    3.7804   -2.1541    1.2458 C   0  0  0  0  0  0  0  0  0  0  0  0\n  1  2  1  0\n  2  3  1  0\n  3  4  1  0\n  4  5  1  0\n  5  6  1  0\n  6  7  2  0\n  7  8  1  0\n  8  9  2  0\n  8 10  1  0\n 10 11  1  0\n 11 12  1  0\n 12 13  1  0\n 13 14  1  0\n 14 15  1  0\n 15 16  1  0\n 16 17  1  0\n 16 18  1  0\n 18 19  1  0\n  7 20  1  0\n 20 21  2  0\n 21 22  1  0\n 21 23  1  0\n 23 24  2  0\n 24  2  1  0\n 24  6  1  0\n 17 11  1  0\n 18 13  1  0\nM  END\n","sdf");
-    viewer_16772282704996767.setStyle({"stick": {}});
-    viewer_16772282704996767.addModel("\n     RDKit          3D\n\n 21 24  0  0  0  0  0  0  0  0999 V2000\n   -3.8307   -1.0120    0.5984 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -2.4455   -0.6326    0.7254 N   0  0  0  0  0  0  0  0  0  0  0  0\n   -1.8823   -0.1584   -0.5004 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -0.4146   -0.5134   -0.6505 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -0.3308   -2.0247   -0.8724 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -1.3355   -2.6516    0.0714 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -1.6252   -1.7212    1.2209 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -0.3257   -1.1045    1.7084 C   0  0  0  0  0  0  0  0  0  0  0  0\n    0.2624   -0.1734    0.6476 C   0  0  0  0  0  0  0  0  0  0  0  0\n    1.6959   -0.4084    0.5989 N   0  0  0  0  0  0  0  0  0  0  0  0\n    2.2824   -1.2818    1.4055 N   0  0  0  0  0  0  0  0  0  0  0  0\n    3.5820   -1.5233    1.3917 N   0  0  0  0  0  0  0  0  0  0  0  0\n    4.4001   -0.8814    0.5388 C   0  0  0  0  0  0  0  0  0  0  0  0\n    5.7544   -1.1060    0.4956 C   0  0  0  0  0  0  0  0  0  0  0  0\n    6.5096   -0.4056   -0.4064 C   0  0  0  0  0  0  0  0  0  0  0  0\n    5.9629    0.5247   -1.2816 C   0  0  0  0  0  0  0  0  0  0  0  0\n    6.9935    1.3900   -2.4161 Cl  0  0  0  0  0  0  0  0  0  0  0  0\n    4.6034    0.7487   -1.2367 C   0  0  0  0  0  0  0  0  0  0  0  0\n    3.8311    0.0491   -0.3320 C   0  0  0  0  0  0  0  0  0  0  0  0\n    2.4696    0.2639   -0.2770 C   0  0  0  0  0  0  0  0  0  0  0  0\n    1.9931    1.1100   -1.0774 O   0  0  0  0  0  0  0  0  0  0  0  0\n  1  2  1  0\n  2  3  1  0\n  3  4  1  0\n  4  5  1  0\n  5  6  1  0\n  6  7  1  0\n  7  8  1  0\n  8  9  1  0\n  9 10  1  0\n 10 11  1  0\n 11 12  2  0\n 12 13  1  0\n 13 14  2  0\n 14 15  1  0\n 15 16  2  0\n 16 17  1  0\n 16 18  1  0\n 18 19  2  0\n 19 20  1  0\n 20 21  2  0\n  7  2  1  0\n 20 10  1  0\n  9  4  1  0\n 19 13  1  0\nM  END\n","sdf");
-    viewer_16772282704996767.setStyle({"stick": {}});
-    viewer_16772282704996767.setStyle({"model": 0},{"stick": {"colorscheme": "cyanCarbon"}});
-    viewer_16772282704996767.setStyle({"model": 1},{"stick": {"colorscheme": "redCarbon"}});
-    viewer_16772282704996767.setStyle({"model": 2},{"stick": {"colorscheme": "blueCarbon"}});
-    viewer_16772282704996767.zoomTo();
-viewer_16772282704996767.render();
-});
-</script>
-</div>
-</div>
-<p>Now let’s build a feature map.</p>
-<p>We need to start by building a <code>FeatureFactory</code> object which defines the set of pharmacophore features being used. We’ll use this to find features on the molecules.</p>
-<div class="cell" data-executetime="{&quot;end_time&quot;:&quot;2023-02-24T08:44:30.613333Z&quot;,&quot;start_time&quot;:&quot;2023-02-24T08:44:30.512752Z&quot;}" data-execution_count="8">
-<div class="sourceCode cell-code" id="cb11" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb11-1"><span class="im" style="color: #00769E;">import</span> os</span>
-<span id="cb11-2"><span class="im" style="color: #00769E;">from</span> rdkit <span class="im" style="color: #00769E;">import</span> RDConfig</span>
-<span id="cb11-3"><span class="im" style="color: #00769E;">from</span> rdkit.Chem.FeatMaps <span class="im" style="color: #00769E;">import</span> FeatMaps</span>
-<span id="cb11-4">fdef <span class="op" style="color: #5E5E5E;">=</span> AllChem.BuildFeatureFactory(os.path.join(RDConfig.RDDataDir,<span class="st" style="color: #20794D;">'BaseFeatures.fdef'</span>))</span>
-<span id="cb11-5"><span class="bu" style="color: null;">print</span>(fdef.GetFeatureFamilies())</span></code></pre></div>
-<div class="cell-output cell-output-stdout">
-<pre><code>('Donor', 'Acceptor', 'NegIonizable', 'PosIonizable', 'ZnBinder', 'Aromatic', 'Hydrophobe', 'LumpedHydrophobe')</code></pre>
-</div>
-</div>
-<p>We also need the parameters for the points used to make up the feature map. The feature points are defined by - a <code>FeatProfile</code> - <code>Gaussian</code>, <code>Triangle</code>, or <code>Box</code>. <code>Gaussian</code> is the default. - a width - the precise meaning is determined by the profile, but this is the <code>sigma</code> factor for the <code>Gaussian</code>. The default value is 1.0. - a cutoff radius - Feature-feature overlaps at a distance longer than this will not be considered. The default is 2.5.</p>
-<p>Here we’ll take the defaults.</p>
-<div class="cell" data-executetime="{&quot;end_time&quot;:&quot;2023-02-24T08:44:30.666727Z&quot;,&quot;start_time&quot;:&quot;2023-02-24T08:44:30.618638Z&quot;}" data-execution_count="9">
-<div class="sourceCode cell-code" id="cb13" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb13-1">fmParams <span class="op" style="color: #5E5E5E;">=</span> {}</span>
-<span id="cb13-2"><span class="cf" style="color: #003B4F;">for</span> k <span class="kw" style="color: #003B4F;">in</span> fdef.GetFeatureFamilies():</span>
-<span id="cb13-3">    fparams <span class="op" style="color: #5E5E5E;">=</span> FeatMaps.FeatMapParams()</span>
-<span id="cb13-4">    fmParams[k] <span class="op" style="color: #5E5E5E;">=</span> fparams</span></code></pre></div>
-</div>
-<p>Next go through and find the features on each molecule. We’ll only consider a subset of the features defined by the <code>FeatureFactory</code>. In “real” use we’d more likely use a <code>FeatureFactory</code> that only defines the features we are interested in, but this example of how to limit the features returned may still be interesting:</p>
-<div class="cell" data-executetime="{&quot;end_time&quot;:&quot;2023-02-24T08:44:30.778671Z&quot;,&quot;start_time&quot;:&quot;2023-02-24T08:44:30.667827Z&quot;}" data-execution_count="10">
-<div class="sourceCode cell-code" id="cb14" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb14-1">keep <span class="op" style="color: #5E5E5E;">=</span> (<span class="st" style="color: #20794D;">'Donor'</span>,<span class="st" style="color: #20794D;">'Acceptor'</span>,<span class="st" style="color: #20794D;">'NegIonizable'</span>,<span class="st" style="color: #20794D;">'PosIonizable'</span>,<span class="st" style="color: #20794D;">'Aromatic'</span>)</span>
-<span id="cb14-2">featLists <span class="op" style="color: #5E5E5E;">=</span> []</span>
-<span id="cb14-3"><span class="cf" style="color: #003B4F;">for</span> m <span class="kw" style="color: #003B4F;">in</span> ms:</span>
-<span id="cb14-4">    rawFeats <span class="op" style="color: #5E5E5E;">=</span> fdef.GetFeaturesForMol(m)</span>
-<span id="cb14-5">    <span class="co" style="color: #5E5E5E;"># filter that list down to only include the ones we're intereted in </span></span>
-<span id="cb14-6">    featLists.append([f <span class="cf" style="color: #003B4F;">for</span> f <span class="kw" style="color: #003B4F;">in</span> rawFeats <span class="cf" style="color: #003B4F;">if</span> f.GetFamily() <span class="kw" style="color: #003B4F;">in</span> keep])</span></code></pre></div>
-</div>
-<p>Let’s look at the features:</p>
-<div class="cell" data-executetime="{&quot;end_time&quot;:&quot;2023-02-24T08:44:30.851566Z&quot;,&quot;start_time&quot;:&quot;2023-02-24T08:44:30.780172Z&quot;}" data-execution_count="11">
-<div class="sourceCode cell-code" id="cb15" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb15-1"><span class="im" style="color: #00769E;">import</span> py3Dmol</span>
-<span id="cb15-2"><span class="im" style="color: #00769E;">from</span> rdkit.Chem.Features.ShowFeats <span class="im" style="color: #00769E;">import</span> _featColors <span class="im" style="color: #00769E;">as</span> featColors</span>
-<span id="cb15-3"><span class="kw" style="color: #003B4F;">def</span> colorToHex(rgb):</span>
-<span id="cb15-4">    rgb <span class="op" style="color: #5E5E5E;">=</span> [<span class="ss" style="color: #20794D;">f'</span><span class="sc" style="color: #5E5E5E;">{</span><span class="bu" style="color: null;">int</span>(<span class="dv" style="color: #AD0000;">255</span><span class="op" style="color: #5E5E5E;">*</span>x)<span class="sc" style="color: #5E5E5E;">:x}</span><span class="ss" style="color: #20794D;">'</span> <span class="cf" style="color: #003B4F;">for</span> x <span class="kw" style="color: #003B4F;">in</span> rgb]</span>
-<span id="cb15-5">    <span class="cf" style="color: #003B4F;">return</span> <span class="st" style="color: #20794D;">'0x'</span><span class="op" style="color: #5E5E5E;">+</span><span class="st" style="color: #20794D;">''</span>.join(rgb)</span>
-<span id="cb15-6"><span class="kw" style="color: #003B4F;">def</span> drawit(m, feats, p<span class="op" style="color: #5E5E5E;">=</span><span class="va" style="color: #111111;">None</span>, confId<span class="op" style="color: #5E5E5E;">=-</span><span class="dv" style="color: #AD0000;">1</span>, removeHs<span class="op" style="color: #5E5E5E;">=</span><span class="va" style="color: #111111;">True</span>):</span>
-<span id="cb15-7">        <span class="cf" style="color: #003B4F;">if</span> p <span class="kw" style="color: #003B4F;">is</span> <span class="va" style="color: #111111;">None</span>:</span>
-<span id="cb15-8">            p <span class="op" style="color: #5E5E5E;">=</span> py3Dmol.view(width<span class="op" style="color: #5E5E5E;">=</span><span class="dv" style="color: #AD0000;">400</span>, height<span class="op" style="color: #5E5E5E;">=</span><span class="dv" style="color: #AD0000;">400</span>)</span>
-<span id="cb15-9">        p.removeAllModels()</span>
-<span id="cb15-10">        <span class="cf" style="color: #003B4F;">if</span> removeHs:</span>
-<span id="cb15-11">            m <span class="op" style="color: #5E5E5E;">=</span> Chem.RemoveHs(m)</span>
-<span id="cb15-12">        IPythonConsole.addMolToView(m,p,confId<span class="op" style="color: #5E5E5E;">=</span>confId)</span>
-<span id="cb15-13">        <span class="cf" style="color: #003B4F;">for</span> feat <span class="kw" style="color: #003B4F;">in</span> feats:</span>
-<span id="cb15-14">            pos <span class="op" style="color: #5E5E5E;">=</span> feat.GetPos()</span>
-<span id="cb15-15">            clr <span class="op" style="color: #5E5E5E;">=</span> featColors.get(feat.GetFamily(),(<span class="fl" style="color: #AD0000;">.5</span>,<span class="fl" style="color: #AD0000;">.5</span>,<span class="fl" style="color: #AD0000;">.5</span>))</span>
-<span id="cb15-16">            p.addSphere({<span class="st" style="color: #20794D;">'center'</span>:{<span class="st" style="color: #20794D;">'x'</span>:pos.x,<span class="st" style="color: #20794D;">'y'</span>:pos.y,<span class="st" style="color: #20794D;">'z'</span>:pos.z},<span class="st" style="color: #20794D;">'radius'</span>:<span class="fl" style="color: #AD0000;">.5</span>,<span class="st" style="color: #20794D;">'color'</span>:colorToHex(clr)})<span class="op" style="color: #5E5E5E;">;</span></span>
-<span id="cb15-17">        p.zoomTo()</span>
-<span id="cb15-18">        <span class="cf" style="color: #003B4F;">return</span> p.show()</span></code></pre></div>
-</div>
-<div class="cell" data-executetime="{&quot;end_time&quot;:&quot;2023-02-24T08:44:30.924161Z&quot;,&quot;start_time&quot;:&quot;2023-02-24T08:44:30.856183Z&quot;}" data-execution_count="12">
-<div class="sourceCode cell-code" id="cb16" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb16-1">drawit(ms[<span class="dv" style="color: #AD0000;">0</span>],featLists[<span class="dv" style="color: #AD0000;">0</span>])</span></code></pre></div>
-<div class="cell-output cell-output-display">
-<div id="3dmolviewer_16772282709182594" style="position: relative; width: 400px; height: 400px">
-        <p id="3dmolwarning_16772282709182594" style="background-color:#ffcccc;color:black">You appear to be running in JupyterLab (or JavaScript failed to load for some other reason).  You need to install the 3dmol extension: <br>
-        <tt>jupyter labextension install jupyterlab_3dmol</tt></p>
-        </div>
-<script>
-
-var loadScriptAsync = function(uri){
-  return new Promise((resolve, reject) => {
-    //this is to ignore the existence of requirejs amd
-    var savedexports, savedmodule;
-    if (typeof exports !== 'undefined') savedexports = exports;
-    else exports = {}
-    if (typeof module !== 'undefined') savedmodule = module;
-    else module = {}
-
-    var tag = document.createElement('script');
-    tag.src = uri;
-    tag.async = true;
-    tag.onload = () => {
-        exports = savedexports;
-        module = savedmodule;
-        resolve();
-    };
-  var firstScriptTag = document.getElementsByTagName('script')[0];
-  firstScriptTag.parentNode.insertBefore(tag, firstScriptTag);
-});
-};
-
-if(typeof $3Dmolpromise === 'undefined') {
-$3Dmolpromise = null;
-  $3Dmolpromise = loadScriptAsync('https://cdn.jsdelivr.net/npm/3dmol@latest/build/3Dmol-min.min.js');
-}
-
-var viewer_16772282709182594 = null;
-var warn = document.getElementById("3dmolwarning_16772282709182594");
-if(warn) {
-    warn.parentNode.removeChild(warn);
-}
-$3Dmolpromise.then(function() {
-viewer_16772282709182594 = $3Dmol.createViewer(document.getElementById("3dmolviewer_16772282709182594"),{backgroundColor:"white"});
-viewer_16772282709182594.zoomTo();
-    viewer_16772282709182594.removeAllModels();
-    viewer_16772282709182594.addModel("\n     RDKit          3D\n\n 21 23  0  0  0  0  0  0  0  0999 V2000\n   -1.7517   -1.1720   -2.1292 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -1.0891   -0.1338   -1.2821 C   0  0  0  0  0  0  0  0  0  0  0  0\n    0.1046   -0.5942   -0.6815 O   0  0  0  0  0  0  0  0  0  0  0  0\n    1.3526   -0.1011   -0.9261 C   0  0  0  0  0  0  0  0  0  0  0  0\n    1.4889    0.8292   -1.7374 O   0  0  0  0  0  0  0  0  0  0  0  0\n    2.4914   -0.6788   -0.2293 C   0  0  0  0  0  0  0  0  0  0  0  0\n    2.4807   -1.7076    0.6896 C   0  0  0  0  0  0  0  0  0  0  0  0\n    3.7031   -1.9796    1.1257 N   0  0  0  0  0  0  0  0  0  0  0  0\n    4.5367   -1.1170    0.4852 C   0  0  0  0  0  0  0  0  0  0  0  0\n    5.9062   -0.9768    0.5755 C   0  0  0  0  0  0  0  0  0  0  0  0\n    6.5566   -0.0069   -0.1902 C   0  0  0  0  0  0  0  0  0  0  0  0\n    5.8470    0.8163   -1.0387 C   0  0  0  0  0  0  0  0  0  0  0  0\n    4.4789    0.6624   -1.1165 C   0  0  0  0  0  0  0  0  0  0  0  0\n    3.8163   -0.3051   -0.3549 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -1.9923    0.5031   -0.2670 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -3.1849    1.1816   -0.8998 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -3.7780    2.1002    0.1429 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -3.9585    1.4632    1.4792 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -2.8102    0.5794    1.9024 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -2.4152   -0.3181    0.7979 N   0  0  0  0  0  0  0  0  0  0  0  0\n   -3.5375   -1.1597    0.5636 C   0  0  0  0  0  0  0  0  0  0  0  0\n  1  2  1  0\n  2  3  1  0\n  3  4  1  0\n  4  5  2  0\n  4  6  1  0\n  6  7  2  0\n  7  8  1  0\n  8  9  1  0\n  9 10  2  0\n 10 11  1  0\n 11 12  2  0\n 12 13  1  0\n 13 14  2  0\n  2 15  1  0\n 15 16  1  0\n 16 17  1  0\n 17 18  1  0\n 18 19  1  0\n 19 20  1  0\n 20 21  1  0\n 14  6  1  0\n 20 15  1  0\n 14  9  1  0\nM  END\n","sdf");
-    viewer_16772282709182594.setStyle({"stick": {}});
-    viewer_16772282709182594.addSphere({"center": {"x": 3.7030583830584276, "y": -1.9796022711037298, "z": 1.1257380506896977}, "radius": 0.5, "color": "0x0ffff"});
-    viewer_16772282709182594.addSphere({"center": {"x": -2.4152476921622847, "y": -0.3181142856489917, "z": 0.7979153974084473}, "radius": 0.5, "color": "0x0ffff"});
-    viewer_16772282709182594.addSphere({"center": {"x": 0.10461182189820079, "y": -0.5941839865743946, "z": -0.6815387153812356}, "radius": 0.5, "color": "0xff0ff"});
-    viewer_16772282709182594.addSphere({"center": {"x": 1.4888818471340608, "y": 0.8291507783526, "z": -1.737368311626531}, "radius": 0.5, "color": "0xff0ff"});
-    viewer_16772282709182594.addSphere({"center": {"x": -2.4152476921622847, "y": -0.3181142856489917, "z": 0.7979153974084473}, "radius": 0.5, "color": "0x00ff"});
-    viewer_16772282709182594.addSphere({"center": {"x": 3.405628841470898, "y": -1.157629668148325, "z": 0.34326377175255157}, "radius": 0.5, "color": "0xffcc33"});
-    viewer_16772282709182594.addSphere({"center": {"x": 5.19026997128125, "y": -0.15452569601626737, "z": -0.27327712689966754}, "radius": 0.5, "color": "0xffcc33"});
-    viewer_16772282709182594.zoomTo();
-viewer_16772282709182594.render();
-});
-</script>
-</div>
-</div>
-<div class="cell" data-executetime="{&quot;end_time&quot;:&quot;2023-02-24T08:44:31.003503Z&quot;,&quot;start_time&quot;:&quot;2023-02-24T08:44:30.928618Z&quot;}" data-execution_count="13">
-<div class="sourceCode cell-code" id="cb17" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb17-1">drawit(ms[<span class="dv" style="color: #AD0000;">1</span>],featLists[<span class="dv" style="color: #AD0000;">1</span>])</span></code></pre></div>
-<div class="cell-output cell-output-display">
-<div id="3dmolviewer_16772282710017638" style="position: relative; width: 400px; height: 400px">
-        <p id="3dmolwarning_16772282710017638" style="background-color:#ffcccc;color:black">You appear to be running in JupyterLab (or JavaScript failed to load for some other reason).  You need to install the 3dmol extension: <br>
-        <tt>jupyter labextension install jupyterlab_3dmol</tt></p>
-        </div>
-<script>
-
-var loadScriptAsync = function(uri){
-  return new Promise((resolve, reject) => {
-    //this is to ignore the existence of requirejs amd
-    var savedexports, savedmodule;
-    if (typeof exports !== 'undefined') savedexports = exports;
-    else exports = {}
-    if (typeof module !== 'undefined') savedmodule = module;
-    else module = {}
-
-    var tag = document.createElement('script');
-    tag.src = uri;
-    tag.async = true;
-    tag.onload = () => {
-        exports = savedexports;
-        module = savedmodule;
-        resolve();
-    };
-  var firstScriptTag = document.getElementsByTagName('script')[0];
-  firstScriptTag.parentNode.insertBefore(tag, firstScriptTag);
-});
-};
-
-if(typeof $3Dmolpromise === 'undefined') {
-$3Dmolpromise = null;
-  $3Dmolpromise = loadScriptAsync('https://cdn.jsdelivr.net/npm/3dmol@latest/build/3Dmol-min.min.js');
-}
-
-var viewer_16772282710017638 = null;
-var warn = document.getElementById("3dmolwarning_16772282710017638");
-if(warn) {
-    warn.parentNode.removeChild(warn);
-}
-$3Dmolpromise.then(function() {
-viewer_16772282710017638 = $3Dmol.createViewer(document.getElementById("3dmolviewer_16772282710017638"),{backgroundColor:"white"});
-viewer_16772282710017638.zoomTo();
-    viewer_16772282710017638.removeAllModels();
-    viewer_16772282710017638.addModel("\n     RDKit          3D\n\n 24 27  0  0  0  0  0  0  0  0999 V2000\n    5.0325   -3.8374    2.6234 C   0  0  0  0  0  0  0  0  0  0  0  0\n    3.7944   -3.2238    2.1889 N   0  0  0  0  0  0  0  0  0  0  0  0\n    2.5490   -3.7225    2.7371 C   0  0  0  0  0  0  0  0  0  0  0  0\n    1.3849   -2.8334    2.3990 C   0  0  0  0  0  0  0  0  0  0  0  0\n    1.4545   -2.3373    1.0770 O   0  0  0  0  0  0  0  0  0  0  0  0\n    2.5976   -1.6923    0.6716 C   0  0  0  0  0  0  0  0  0  0  0  0\n    2.5398   -0.6644   -0.2417 C   0  0  0  0  0  0  0  0  0  0  0  0\n    1.3381   -0.1530   -0.8620 C   0  0  0  0  0  0  0  0  0  0  0  0\n    1.4697    0.8127   -1.6939 O   0  0  0  0  0  0  0  0  0  0  0  0\n    0.0241   -0.5915   -0.6617 N   0  0  0  0  0  0  0  0  0  0  0  0\n   -1.1070    0.0323   -1.3710 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -2.0263    0.7001   -0.3754 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -3.3332    1.0021   -1.0541 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -3.1253    1.6978   -2.3886 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -3.2536    0.5968   -3.4181 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -3.1990   -0.6537   -2.5771 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -1.7843   -1.0173   -2.1879 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -3.9476   -0.2706   -1.3977 N   0  0  0  0  0  0  0  0  0  0  0  0\n   -5.3516   -0.0896   -1.7734 C   0  0  0  0  0  0  0  0  0  0  0  0\n    3.7681   -0.0845   -0.5785 C   0  0  0  0  0  0  0  0  0  0  0  0\n    4.9452   -0.5323   -0.0175 C   0  0  0  0  0  0  0  0  0  0  0  0\n    6.4474    0.2320   -0.4779 Cl  0  0  0  0  0  0  0  0  0  0  0  0\n    4.9726   -1.5636    0.8946 C   0  0  0  0  0  0  0  0  0  0  0  0\n    3.7804   -2.1541    1.2458 C   0  0  0  0  0  0  0  0  0  0  0  0\n  1  2  1  0\n  2  3  1  0\n  3  4  1  0\n  4  5  1  0\n  5  6  1  0\n  6  7  2  0\n  7  8  1  0\n  8  9  2  0\n  8 10  1  0\n 10 11  1  0\n 11 12  1  0\n 12 13  1  0\n 13 14  1  0\n 14 15  1  0\n 15 16  1  0\n 16 17  1  0\n 16 18  1  0\n 18 19  1  0\n  7 20  1  0\n 20 21  2  0\n 21 22  1  0\n 21 23  1  0\n 23 24  2  0\n 24  2  1  0\n 24  6  1  0\n 17 11  1  0\n 18 13  1  0\nM  END\n","sdf");
-    viewer_16772282710017638.setStyle({"stick": {}});
-    viewer_16772282710017638.addSphere({"center": {"x": 0.024058041756935836, "y": -0.591547518509357, "z": -0.6616974314090667}, "radius": 0.5, "color": "0x0ffff"});
-    viewer_16772282710017638.addSphere({"center": {"x": -3.947633192300894, "y": -0.2706013814223983, "z": -1.3977456810714146}, "radius": 0.5, "color": "0x0ffff"});
-    viewer_16772282710017638.addSphere({"center": {"x": 1.4544693141060625, "y": -2.33734200255177, "z": 1.077026790472152}, "radius": 0.5, "color": "0xff0ff"});
-    viewer_16772282710017638.addSphere({"center": {"x": 1.4696906999931945, "y": 0.8127411546419141, "z": -1.693856221455591}, "radius": 0.5, "color": "0xff0ff"});
-    viewer_16772282710017638.addSphere({"center": {"x": -3.947633192300894, "y": -0.2706013814223983, "z": -1.3977456810714146}, "radius": 0.5, "color": "0x00ff"});
-    viewer_16772282710017638.addSphere({"center": {"x": 3.767279012982093, "y": -1.1152270557903072, "z": 0.3290360039500191}, "radius": 0.5, "color": "0xffcc33"});
-    viewer_16772282710017638.zoomTo();
-viewer_16772282710017638.render();
-});
-</script>
-</div>
-</div>
-<div class="cell" data-executetime="{&quot;end_time&quot;:&quot;2023-02-24T08:44:31.096396Z&quot;,&quot;start_time&quot;:&quot;2023-02-24T08:44:31.004393Z&quot;}" data-execution_count="14">
-<div class="sourceCode cell-code" id="cb18" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb18-1">drawit(ms[<span class="dv" style="color: #AD0000;">2</span>],featLists[<span class="dv" style="color: #AD0000;">2</span>])</span></code></pre></div>
-<div class="cell-output cell-output-display">
-<div id="3dmolviewer_16772282710911655" style="position: relative; width: 400px; height: 400px">
-        <p id="3dmolwarning_16772282710911655" style="background-color:#ffcccc;color:black">You appear to be running in JupyterLab (or JavaScript failed to load for some other reason).  You need to install the 3dmol extension: <br>
-        <tt>jupyter labextension install jupyterlab_3dmol</tt></p>
-        </div>
-<script>
-
-var loadScriptAsync = function(uri){
-  return new Promise((resolve, reject) => {
-    //this is to ignore the existence of requirejs amd
-    var savedexports, savedmodule;
-    if (typeof exports !== 'undefined') savedexports = exports;
-    else exports = {}
-    if (typeof module !== 'undefined') savedmodule = module;
-    else module = {}
-
-    var tag = document.createElement('script');
-    tag.src = uri;
-    tag.async = true;
-    tag.onload = () => {
-        exports = savedexports;
-        module = savedmodule;
-        resolve();
-    };
-  var firstScriptTag = document.getElementsByTagName('script')[0];
-  firstScriptTag.parentNode.insertBefore(tag, firstScriptTag);
-});
-};
-
-if(typeof $3Dmolpromise === 'undefined') {
-$3Dmolpromise = null;
-  $3Dmolpromise = loadScriptAsync('https://cdn.jsdelivr.net/npm/3dmol@latest/build/3Dmol-min.min.js');
-}
-
-var viewer_16772282710911655 = null;
-var warn = document.getElementById("3dmolwarning_16772282710911655");
-if(warn) {
-    warn.parentNode.removeChild(warn);
-}
-$3Dmolpromise.then(function() {
-viewer_16772282710911655 = $3Dmol.createViewer(document.getElementById("3dmolviewer_16772282710911655"),{backgroundColor:"white"});
-viewer_16772282710911655.zoomTo();
-    viewer_16772282710911655.removeAllModels();
-    viewer_16772282710911655.addModel("\n     RDKit          3D\n\n 21 24  0  0  0  0  0  0  0  0999 V2000\n   -3.8307   -1.0120    0.5984 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -2.4455   -0.6326    0.7254 N   0  0  0  0  0  0  0  0  0  0  0  0\n   -1.8823   -0.1584   -0.5004 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -0.4146   -0.5134   -0.6505 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -0.3308   -2.0247   -0.8724 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -1.3355   -2.6516    0.0714 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -1.6252   -1.7212    1.2209 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -0.3257   -1.1045    1.7084 C   0  0  0  0  0  0  0  0  0  0  0  0\n    0.2624   -0.1734    0.6476 C   0  0  0  0  0  0  0  0  0  0  0  0\n    1.6959   -0.4084    0.5989 N   0  0  0  0  0  0  0  0  0  0  0  0\n    2.2824   -1.2818    1.4055 N   0  0  0  0  0  0  0  0  0  0  0  0\n    3.5820   -1.5233    1.3917 N   0  0  0  0  0  0  0  0  0  0  0  0\n    4.4001   -0.8814    0.5388 C   0  0  0  0  0  0  0  0  0  0  0  0\n    5.7544   -1.1060    0.4956 C   0  0  0  0  0  0  0  0  0  0  0  0\n    6.5096   -0.4056   -0.4064 C   0  0  0  0  0  0  0  0  0  0  0  0\n    5.9629    0.5247   -1.2816 C   0  0  0  0  0  0  0  0  0  0  0  0\n    6.9935    1.3900   -2.4161 Cl  0  0  0  0  0  0  0  0  0  0  0  0\n    4.6034    0.7487   -1.2367 C   0  0  0  0  0  0  0  0  0  0  0  0\n    3.8311    0.0491   -0.3320 C   0  0  0  0  0  0  0  0  0  0  0  0\n    2.4696    0.2639   -0.2770 C   0  0  0  0  0  0  0  0  0  0  0  0\n    1.9931    1.1100   -1.0774 O   0  0  0  0  0  0  0  0  0  0  0  0\n  1  2  1  0\n  2  3  1  0\n  3  4  1  0\n  4  5  1  0\n  5  6  1  0\n  6  7  1  0\n  7  8  1  0\n  8  9  1  0\n  9 10  1  0\n 10 11  1  0\n 11 12  2  0\n 12 13  1  0\n 13 14  2  0\n 14 15  1  0\n 15 16  2  0\n 16 17  1  0\n 16 18  1  0\n 18 19  2  0\n 19 20  1  0\n 20 21  2  0\n  7  2  1  0\n 20 10  1  0\n  9  4  1  0\n 19 13  1  0\nM  END\n","sdf");
-    viewer_16772282710911655.setStyle({"stick": {}});
-    viewer_16772282710911655.addSphere({"center": {"x": -2.445546877609724, "y": -0.632614243347905, "z": 0.7254461329676191}, "radius": 0.5, "color": "0x0ffff"});
-    viewer_16772282710911655.addSphere({"center": {"x": 1.9930725940323837, "y": 1.1100295865955054, "z": -1.077350329787604}, "radius": 0.5, "color": "0xff0ff"});
-    viewer_16772282710911655.addSphere({"center": {"x": -2.445546877609724, "y": -0.632614243347905, "z": 0.7254461329676191}, "radius": 0.5, "color": "0x00ff"});
-    viewer_16772282710911655.addSphere({"center": {"x": 5.176920885186684, "y": -0.17840771638504901, "z": -0.37038217716846755}, "radius": 0.5, "color": "0xffcc33"});
-    viewer_16772282710911655.zoomTo();
-viewer_16772282710911655.render();
-});
-</script>
-</div>
-</div>
-<p>The fact that this one has neither acceptors nor an aromatic feature in the second planar six-ring indicates that we should take a look at the feature definitions. That’s a topic for another blog post.</p>
-<p>Now it’s straightforward to create <code>FeatMap</code> objects from the feature lists:</p>
-<div class="cell" data-executetime="{&quot;end_time&quot;:&quot;2023-02-24T08:44:31.175538Z&quot;,&quot;start_time&quot;:&quot;2023-02-24T08:44:31.101037Z&quot;}" data-execution_count="15">
-<div class="sourceCode cell-code" id="cb19" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb19-1">fms <span class="op" style="color: #5E5E5E;">=</span> [FeatMaps.FeatMap(feats <span class="op" style="color: #5E5E5E;">=</span> x,weights<span class="op" style="color: #5E5E5E;">=</span>[<span class="dv" style="color: #AD0000;">1</span>]<span class="op" style="color: #5E5E5E;">*</span><span class="bu" style="color: null;">len</span>(x),params<span class="op" style="color: #5E5E5E;">=</span>fmParams) <span class="cf" style="color: #003B4F;">for</span> x <span class="kw" style="color: #003B4F;">in</span> featLists]</span></code></pre></div>
-</div>
-<p>We can, of course, draw a feature map as well. In these simple cases the feature maps look the same as drawing all of the molecule’s features:</p>
-<div class="cell" data-executetime="{&quot;end_time&quot;:&quot;2023-02-24T08:44:31.275560Z&quot;,&quot;start_time&quot;:&quot;2023-02-24T08:44:31.176604Z&quot;}" data-execution_count="16">
-<div class="sourceCode cell-code" id="cb20" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb20-1"><span class="kw" style="color: #003B4F;">def</span> drawFeatMap(m, fMap, p<span class="op" style="color: #5E5E5E;">=</span><span class="va" style="color: #111111;">None</span>, confId<span class="op" style="color: #5E5E5E;">=-</span><span class="dv" style="color: #AD0000;">1</span>, removeHs<span class="op" style="color: #5E5E5E;">=</span><span class="va" style="color: #111111;">True</span>):</span>
-<span id="cb20-2">        <span class="cf" style="color: #003B4F;">if</span> p <span class="kw" style="color: #003B4F;">is</span> <span class="va" style="color: #111111;">None</span>:</span>
-<span id="cb20-3">            p <span class="op" style="color: #5E5E5E;">=</span> py3Dmol.view(width<span class="op" style="color: #5E5E5E;">=</span><span class="dv" style="color: #AD0000;">400</span>, height<span class="op" style="color: #5E5E5E;">=</span><span class="dv" style="color: #AD0000;">400</span>)</span>
-<span id="cb20-4">        p.removeAllModels()</span>
-<span id="cb20-5">        <span class="cf" style="color: #003B4F;">if</span> removeHs:</span>
-<span id="cb20-6">            m <span class="op" style="color: #5E5E5E;">=</span> Chem.RemoveHs(m)</span>
-<span id="cb20-7">        IPythonConsole.addMolToView(m,p,confId<span class="op" style="color: #5E5E5E;">=</span>confId)</span>
-<span id="cb20-8">        <span class="cf" style="color: #003B4F;">for</span> feat <span class="kw" style="color: #003B4F;">in</span> fMap.GetFeatures():</span>
-<span id="cb20-9">            pos <span class="op" style="color: #5E5E5E;">=</span> feat.GetPos()</span>
-<span id="cb20-10">            clr <span class="op" style="color: #5E5E5E;">=</span> featColors.get(feat.GetFamily(),(<span class="fl" style="color: #AD0000;">.5</span>,<span class="fl" style="color: #AD0000;">.5</span>,<span class="fl" style="color: #AD0000;">.5</span>))</span>
-<span id="cb20-11">            p.addSphere({<span class="st" style="color: #20794D;">'center'</span>:{<span class="st" style="color: #20794D;">'x'</span>:pos.x,<span class="st" style="color: #20794D;">'y'</span>:pos.y,<span class="st" style="color: #20794D;">'z'</span>:pos.z},<span class="st" style="color: #20794D;">'radius'</span>:feat.weight<span class="op" style="color: #5E5E5E;">*</span><span class="fl" style="color: #AD0000;">.5</span>,<span class="st" style="color: #20794D;">'color'</span>:colorToHex(clr)})<span class="op" style="color: #5E5E5E;">;</span></span>
-<span id="cb20-12">        p.zoomTo()</span>
-<span id="cb20-13">        <span class="cf" style="color: #003B4F;">return</span> p.show()</span></code></pre></div>
-</div>
-<div class="cell" data-executetime="{&quot;end_time&quot;:&quot;2023-02-24T08:44:31.354914Z&quot;,&quot;start_time&quot;:&quot;2023-02-24T08:44:31.279960Z&quot;}" data-execution_count="17">
-<div class="sourceCode cell-code" id="cb21" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb21-1">drawFeatMap(ms[<span class="dv" style="color: #AD0000;">0</span>],fms[<span class="dv" style="color: #AD0000;">0</span>])</span></code></pre></div>
-<div class="cell-output cell-output-display">
-<div id="3dmolviewer_167722827134946" style="position: relative; width: 400px; height: 400px">
-        <p id="3dmolwarning_167722827134946" style="background-color:#ffcccc;color:black">You appear to be running in JupyterLab (or JavaScript failed to load for some other reason).  You need to install the 3dmol extension: <br>
-        <tt>jupyter labextension install jupyterlab_3dmol</tt></p>
-        </div>
-<script>
-
-var loadScriptAsync = function(uri){
-  return new Promise((resolve, reject) => {
-    //this is to ignore the existence of requirejs amd
-    var savedexports, savedmodule;
-    if (typeof exports !== 'undefined') savedexports = exports;
-    else exports = {}
-    if (typeof module !== 'undefined') savedmodule = module;
-    else module = {}
-
-    var tag = document.createElement('script');
-    tag.src = uri;
-    tag.async = true;
-    tag.onload = () => {
-        exports = savedexports;
-        module = savedmodule;
-        resolve();
-    };
-  var firstScriptTag = document.getElementsByTagName('script')[0];
-  firstScriptTag.parentNode.insertBefore(tag, firstScriptTag);
-});
-};
-
-if(typeof $3Dmolpromise === 'undefined') {
-$3Dmolpromise = null;
-  $3Dmolpromise = loadScriptAsync('https://cdn.jsdelivr.net/npm/3dmol@latest/build/3Dmol-min.min.js');
-}
-
-var viewer_167722827134946 = null;
-var warn = document.getElementById("3dmolwarning_167722827134946");
-if(warn) {
-    warn.parentNode.removeChild(warn);
-}
-$3Dmolpromise.then(function() {
-viewer_167722827134946 = $3Dmol.createViewer(document.getElementById("3dmolviewer_167722827134946"),{backgroundColor:"white"});
-viewer_167722827134946.zoomTo();
-    viewer_167722827134946.removeAllModels();
-    viewer_167722827134946.addModel("\n     RDKit          3D\n\n 21 23  0  0  0  0  0  0  0  0999 V2000\n   -1.7517   -1.1720   -2.1292 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -1.0891   -0.1338   -1.2821 C   0  0  0  0  0  0  0  0  0  0  0  0\n    0.1046   -0.5942   -0.6815 O   0  0  0  0  0  0  0  0  0  0  0  0\n    1.3526   -0.1011   -0.9261 C   0  0  0  0  0  0  0  0  0  0  0  0\n    1.4889    0.8292   -1.7374 O   0  0  0  0  0  0  0  0  0  0  0  0\n    2.4914   -0.6788   -0.2293 C   0  0  0  0  0  0  0  0  0  0  0  0\n    2.4807   -1.7076    0.6896 C   0  0  0  0  0  0  0  0  0  0  0  0\n    3.7031   -1.9796    1.1257 N   0  0  0  0  0  0  0  0  0  0  0  0\n    4.5367   -1.1170    0.4852 C   0  0  0  0  0  0  0  0  0  0  0  0\n    5.9062   -0.9768    0.5755 C   0  0  0  0  0  0  0  0  0  0  0  0\n    6.5566   -0.0069   -0.1902 C   0  0  0  0  0  0  0  0  0  0  0  0\n    5.8470    0.8163   -1.0387 C   0  0  0  0  0  0  0  0  0  0  0  0\n    4.4789    0.6624   -1.1165 C   0  0  0  0  0  0  0  0  0  0  0  0\n    3.8163   -0.3051   -0.3549 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -1.9923    0.5031   -0.2670 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -3.1849    1.1816   -0.8998 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -3.7780    2.1002    0.1429 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -3.9585    1.4632    1.4792 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -2.8102    0.5794    1.9024 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -2.4152   -0.3181    0.7979 N   0  0  0  0  0  0  0  0  0  0  0  0\n   -3.5375   -1.1597    0.5636 C   0  0  0  0  0  0  0  0  0  0  0  0\n  1  2  1  0\n  2  3  1  0\n  3  4  1  0\n  4  5  2  0\n  4  6  1  0\n  6  7  2  0\n  7  8  1  0\n  8  9  1  0\n  9 10  2  0\n 10 11  1  0\n 11 12  2  0\n 12 13  1  0\n 13 14  2  0\n  2 15  1  0\n 15 16  1  0\n 16 17  1  0\n 17 18  1  0\n 18 19  1  0\n 19 20  1  0\n 20 21  1  0\n 14  6  1  0\n 20 15  1  0\n 14  9  1  0\nM  END\n","sdf");
-    viewer_167722827134946.setStyle({"stick": {}});
-    viewer_167722827134946.addSphere({"center": {"x": 3.7030583830584276, "y": -1.9796022711037298, "z": 1.1257380506896977}, "radius": 0.5, "color": "0x0ffff"});
-    viewer_167722827134946.addSphere({"center": {"x": -2.4152476921622847, "y": -0.3181142856489917, "z": 0.7979153974084473}, "radius": 0.5, "color": "0x0ffff"});
-    viewer_167722827134946.addSphere({"center": {"x": 0.10461182189820079, "y": -0.5941839865743946, "z": -0.6815387153812356}, "radius": 0.5, "color": "0xff0ff"});
-    viewer_167722827134946.addSphere({"center": {"x": 1.4888818471340608, "y": 0.8291507783526, "z": -1.737368311626531}, "radius": 0.5, "color": "0xff0ff"});
-    viewer_167722827134946.addSphere({"center": {"x": -2.4152476921622847, "y": -0.3181142856489917, "z": 0.7979153974084473}, "radius": 0.5, "color": "0x00ff"});
-    viewer_167722827134946.addSphere({"center": {"x": 3.405628841470898, "y": -1.157629668148325, "z": 0.34326377175255157}, "radius": 0.5, "color": "0xffcc33"});
-    viewer_167722827134946.addSphere({"center": {"x": 5.19026997128125, "y": -0.15452569601626737, "z": -0.27327712689966754}, "radius": 0.5, "color": "0xffcc33"});
-    viewer_167722827134946.zoomTo();
-viewer_167722827134946.render();
-});
-</script>
-</div>
-</div>
-<p>Now let’s look at scoring the features from each molecule against the feature map. Since scores are affected by the number of features in each <code>FeatMap</code>, we’ll normalize here using the number of features in the molecule with less features.</p>
-<div class="cell" data-executetime="{&quot;end_time&quot;:&quot;2023-02-24T08:44:31.441061Z&quot;,&quot;start_time&quot;:&quot;2023-02-24T08:44:31.359450Z&quot;}" data-execution_count="18">
-<div class="sourceCode cell-code" id="cb22" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb22-1">fms[<span class="dv" style="color: #AD0000;">0</span>].ScoreFeats(fms[<span class="dv" style="color: #AD0000;">1</span>].GetFeatures())<span class="op" style="color: #5E5E5E;">/</span><span class="bu" style="color: null;">min</span>(fms[<span class="dv" style="color: #AD0000;">0</span>].GetNumFeatures(),fms[<span class="dv" style="color: #AD0000;">1</span>].GetNumFeatures())</span></code></pre></div>
-<div class="cell-output cell-output-display" data-execution_count="18">
-<pre><code>0.31955076703314267</code></pre>
-</div>
-</div>
-<div class="cell" data-executetime="{&quot;end_time&quot;:&quot;2023-02-24T08:44:31.515270Z&quot;,&quot;start_time&quot;:&quot;2023-02-24T08:44:31.446379Z&quot;}" data-execution_count="19">
-<div class="sourceCode cell-code" id="cb24" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb24-1">fms[<span class="dv" style="color: #AD0000;">0</span>].ScoreFeats(fms[<span class="dv" style="color: #AD0000;">2</span>].GetFeatures())<span class="op" style="color: #5E5E5E;">/</span><span class="bu" style="color: null;">min</span>(fms[<span class="dv" style="color: #AD0000;">0</span>].GetNumFeatures(),fms[<span class="dv" style="color: #AD0000;">2</span>].GetNumFeatures())</span></code></pre></div>
-<div class="cell-output cell-output-display" data-execution_count="19">
-<pre><code>0.815994417450649</code></pre>
-</div>
-</div>
-<div class="cell" data-executetime="{&quot;end_time&quot;:&quot;2023-02-24T08:44:31.587616Z&quot;,&quot;start_time&quot;:&quot;2023-02-24T08:44:31.517667Z&quot;}" data-execution_count="20">
-<div class="sourceCode cell-code" id="cb26" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb26-1">fms[<span class="dv" style="color: #AD0000;">1</span>].ScoreFeats(fms[<span class="dv" style="color: #AD0000;">2</span>].GetFeatures())<span class="op" style="color: #5E5E5E;">/</span><span class="bu" style="color: null;">min</span>(fms[<span class="dv" style="color: #AD0000;">1</span>].GetNumFeatures(),fms[<span class="dv" style="color: #AD0000;">2</span>].GetNumFeatures())</span></code></pre></div>
-<div class="cell-output cell-output-display" data-execution_count="20">
-<pre><code>0.12773080957394894</code></pre>
-</div>
-</div>
-<p>An aside: since the weights on the features in <code>FeatMap</code> are all 1.0, the scoring is symmetric:</p>
-<div class="cell" data-executetime="{&quot;end_time&quot;:&quot;2023-02-24T08:44:31.683185Z&quot;,&quot;start_time&quot;:&quot;2023-02-24T08:44:31.591934Z&quot;}" data-execution_count="21">
-<div class="sourceCode cell-code" id="cb28" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb28-1">fms[<span class="dv" style="color: #AD0000;">2</span>].ScoreFeats(fms[<span class="dv" style="color: #AD0000;">1</span>].GetFeatures())<span class="op" style="color: #5E5E5E;">/</span><span class="bu" style="color: null;">min</span>(fms[<span class="dv" style="color: #AD0000;">0</span>].GetNumFeatures(),fms[<span class="dv" style="color: #AD0000;">2</span>].GetNumFeatures())</span></code></pre></div>
-<div class="cell-output cell-output-display" data-execution_count="21">
-<pre><code>0.12773080957394894</code></pre>
-</div>
-</div>
-<p>The <code>ScoreFeats()</code> method can also generate a feature map vector: the breakdown of the score by the contributions of individual features in the feature map.</p>
-<div class="cell" data-executetime="{&quot;end_time&quot;:&quot;2023-02-24T08:44:31.757030Z&quot;,&quot;start_time&quot;:&quot;2023-02-24T08:44:31.687833Z&quot;}" data-execution_count="22">
-<div class="sourceCode cell-code" id="cb30" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb30-1">scoreVect <span class="op" style="color: #5E5E5E;">=</span> [<span class="dv" style="color: #AD0000;">0</span>]<span class="op" style="color: #5E5E5E;">*</span>fms[<span class="dv" style="color: #AD0000;">2</span>].GetNumFeatures()</span>
-<span id="cb30-2">fms[<span class="dv" style="color: #AD0000;">2</span>].ScoreFeats(featLists[<span class="dv" style="color: #AD0000;">1</span>],mapScoreVect<span class="op" style="color: #5E5E5E;">=</span>scoreVect)</span>
-<span id="cb30-3">scoreVect</span></code></pre></div>
-<div class="cell-output cell-output-display" data-execution_count="22">
-<pre><code>[0.0, 0.47597567297942583, 0.0, 0.03494756531636994]</code></pre>
-</div>
-</div>
-<div class="cell" data-executetime="{&quot;end_time&quot;:&quot;2023-02-24T08:44:31.846337Z&quot;,&quot;start_time&quot;:&quot;2023-02-24T08:44:31.760686Z&quot;}" data-execution_count="23">
-<div class="sourceCode cell-code" id="cb32" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb32-1">scoreVect <span class="op" style="color: #5E5E5E;">=</span> [<span class="dv" style="color: #AD0000;">0</span>]<span class="op" style="color: #5E5E5E;">*</span>fms[<span class="dv" style="color: #AD0000;">2</span>].GetNumFeatures()</span>
-<span id="cb32-2">fms[<span class="dv" style="color: #AD0000;">2</span>].ScoreFeats(featLists[<span class="dv" style="color: #AD0000;">0</span>],mapScoreVect<span class="op" style="color: #5E5E5E;">=</span>scoreVect)</span>
-<span id="cb32-3">scoreVect</span></code></pre></div>
-<div class="cell-output cell-output-display" data-execution_count="23">
-<pre><code>[0.900252447002704, 0.4636038094112722, 0.900252447002704, 0.999868966385916]</code></pre>
-</div>
-</div>
-<p>Feature map vectors can also be used as descriptors for machine learning, as shown in the second reference mentioned above. If I find a good example system I’ll try and do a blog post on that as well.</p>
-<p>Hopefully others find this brief introduction to the RDKit’s <code>FeatMap</code> implementation useful.</p>
-
-
-
- ]]></description>
-  <category>tutorial</category>
-  <category>3d</category>
-  <guid>https://greglandrum.github.io/rdkit-blog/posts/2023-02-24-using-feature-maps.html</guid>
-  <pubDate>Thu, 23 Feb 2023 23:00:00 GMT</pubDate>
-  <media:content url="https://greglandrum.github.io/rdkit-blog/posts/images/blog/using-feature-maps-1.png" medium="image" type="image/png" height="75" width="144"/>
 </item>
 </channel>
 </rss>
