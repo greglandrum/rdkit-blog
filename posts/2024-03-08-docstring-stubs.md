@@ -7,7 +7,7 @@ title: A stub a day keeps the docstrings at bay
 description: Improving python usability
 layout: post
 toc: true
-image: images/blog/setting-up-a-cxx-dev-env2.png
+image: images/blog/docstrings-stubs-13.png
 
 ---
 This is a guest post by Paolo Tosco (GitHub: @ptosco), one of the RDKit core maintainers.
