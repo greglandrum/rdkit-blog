@@ -10,7 +10,207 @@
 <atom:link href="https://greglandrum.github.io/rdkit-blog/index.xml" rel="self" type="application/rss+xml"/>
 <description>RDKit experiments, tips, and tutorials</description>
 <generator>quarto-1.2.269</generator>
-<lastBuildDate>Thu, 22 Feb 2024 23:00:00 GMT</lastBuildDate>
+<lastBuildDate>Thu, 07 Mar 2024 23:00:00 GMT</lastBuildDate>
+<item>
+  <title>A stub a day keeps the docstrings at bay</title>
+  <link>https://greglandrum.github.io/rdkit-blog/posts/2024-03-08-docstring-stubs.html</link>
+  <description><![CDATA[ 
+
+
+
+<p>This is a guest post by Paolo Tosco (GitHub: <span class="citation" data-cites="ptosco">@ptosco</span>), one of the RDKit core maintainers.</p>
+<p>This blog post expands a bit on the topic I presented last year in Mainz during <a href="https://github.com/rdkit/UGM_2023/blob/main/Presentations/Tosco_A_stub_a_day_keeps_the_docstrings_at_bay.pdf">a lightning talk</a> at the 2023 RDKit UGM, <em>i.e.</em>, the generation of RDKit stubs and programmatic patching of existing Python docstrings.</p>
+<section id="tldr" class="level2">
+<h2 class="anchored" data-anchor-id="tldr">TL;DR</h2>
+<p>Starting with the 2023.09.6 release of the RDKit, the visibility and usability of the Python API documentation in VS Code is vastly improved. You now get things like this:</p>
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="https://greglandrum.github.io/rdkit-blog/posts/images/blog/docstrings-stubs-13.png" class="img-fluid figure-img"></p>
+<p></p><figcaption class="figure-caption">FullyFunctionalHintsVSCode</figcaption><p></p>
+</figure>
+</div>
+</section>
+<section id="background" class="level2">
+<h2 class="anchored" data-anchor-id="background">Background</h2>
+<p>I have been annoyed for a while by the fact that, when writing RDKit Python scripts in <a href="https://code.visualstudio.com/">Visual Studio Code</a> (I will it call VS Code from now on for simplicity), the familiar and helpful IntelliSense hints suggesting function or method names were either limited to a handful of functions or were not popping up at all.</p>
+<p>For example, the <code>rdkit.Chem</code> module features a range of <code>MolFrom...</code> and <code>MolTo...</code> functions to generate an RDKit molecule from several formats and export an RDKit molecule to various formats, respectively.</p>
+<p>However, when typing <code>mol = Chem.Mol</code> in VS Code, only InChI-related functions and <code>FindMolChiralCenters</code> were listed in the drop-down pop up:</p>
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="https://greglandrum.github.io/rdkit-blog/posts/images/blog/docstrings-stubs-1.png" class="img-fluid figure-img"></p>
+<p></p><figcaption class="figure-caption">VSCodeFewFunctions</figcaption><p></p>
+</figure>
+</div>
+<p>Even after manually typing <code>Chem.MolFromSmiles</code>, VS Code would still not show any tooltip with the function docstring:</p>
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="https://greglandrum.github.io/rdkit-blog/posts/images/blog/docstrings-stubs-2.png" class="img-fluid figure-img"></p>
+<p></p><figcaption class="figure-caption">VSCodeNoDocString</figcaption><p></p>
+</figure>
+</div>
+<p>Things were working much better in Jupyter Lab, as the drop-down was being populated with the expected methods while typing:</p>
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="https://greglandrum.github.io/rdkit-blog/posts/images/blog/docstrings-stubs-3.png" class="img-fluid figure-img"></p>
+<p></p><figcaption class="figure-caption">JupyterLabWorksBetter</figcaption><p></p>
+</figure>
+</div>
+<p>Also class methods seemed to work as expected:</p>
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="https://greglandrum.github.io/rdkit-blog/posts/images/blog/docstrings-stubs-4.png" class="img-fluid figure-img"></p>
+<p></p><figcaption class="figure-caption">JupyterLabClassMethodsShowUp</figcaption><p></p>
+</figure>
+</div>
+<p>However, something was still not quite right, as Jupyter Lab was not able to figure out the methods for the <code>Atom</code> instance returned by the <code>Mol.GetAtomWithIdx</code> method, and the dropdown was not showing any of the expected <code>Atom</code> methods:</p>
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="https://greglandrum.github.io/rdkit-blog/posts/images/blog/docstrings-stubs-5.png" class="img-fluid figure-img"></p>
+<p></p><figcaption class="figure-caption">JupyterLabAtomMethodsMissing</figcaption><p></p>
+</figure>
+</div>
+<p>At some point I was sufficiently annoyed by all of the above that I decided to invest a bit of time in figuring out why it was happening. I learnt that VS Code hints are powered by <a href="https://microsoft.github.io/pyright/#/">Pyright</a>, which in turn requires <a href="https://mypy.readthedocs.io/en/stable/stubs.html">stubs</a> to do its job, and RDKit does not have them. In the absence of stubs, the only available hints are those that can be obtained by introspection, which is the mechanism used by Jupyter Lab. In VS Code, introspection only works for functions defined in Python files, such as <code>FindMolChiralCenters</code> (<code>rdkit/Chem/__init__.py</code>) or InChI-related functions (<code>rdkit/Chem/inchi.py</code>). Since the large majority of RDKit functions and classes are defined in binary modules (<em>i.e.</em>, files bearing a <code>.so</code>, <code>.dylib</code> or <code>.pyd</code> extension, depending on the platform), now we know why most of the RDKit API is unknown to VS Code.</p>
+<p>Stubs are Python files (though with a different extension, <code>.pyi</code>) containing class and free function definitions; docstrings associated to classes and functions are also included as triple-quoted comments. Function and method signatures are usually associated with parameter types and return types. Types are used by static type checkers such as <a href="https://mypy.readthedocs.io/en/stable/index.html"><code>mypy</code></a>, and by VS Code to figure out that the object returned by a function or class constructor is a class instance. Hovering on the object will show up the docstring associated to the class, and typing a dot after the object will trigger a pop up with all methods and properties available on that object. Once the user selects one of the available methods, VSCode will present a tooltip with the docstring associated to the method, as it had previously done with the class instance.<br></p>
+<p>This works great for Python modules that come with stubs:</p>
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="https://greglandrum.github.io/rdkit-blog/posts/images/blog/docstrings-stubs-6.png" class="img-fluid figure-img"></p>
+<p></p><figcaption class="figure-caption">VSCodeReHints</figcaption><p></p>
+</figure>
+</div>
+<p>Interestingly, Jupyter Lab seems to know that <code>re.compile</code> returns a <code>re.Pattern</code> instance, and presents us with the available methods, contrary to what happened with <code>Mol.GetAtomWithIdx</code>:</p>
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="https://greglandrum.github.io/rdkit-blog/posts/images/blog/docstrings-stubs-7.png" class="img-fluid figure-img"></p>
+<p></p><figcaption class="figure-caption">reCompileKnowsAboutPatternMethods</figcaption><p></p>
+</figure>
+</div>
+<p>In summary, there seemed to be two different issues here:</p>
+<ol type="1">
+<li>The lack of stubs prevented hints from popping up in VS Code</li>
+<li>Something else prevented correct introspection of the class method return type in jupyter Lab</li>
+</ol>
+</section>
+<section id="generating-stubs-for-rdkit" class="level2">
+<h2 class="anchored" data-anchor-id="generating-stubs-for-rdkit">Generating stubs for RDKit</h2>
+<p><code>Mypy</code> comes with a tool for automatic stub generation, <a href="https://mypy.readthedocs.io/en/stable/stubgen.html"><code>stubgen</code></a>. Generating stubs for a Python package is super-simple:</p>
+<pre><code>$ stubgen -p rdkit
+$ ls out/rdkit
+Avalon  Chem  DataManip  DataStructs  Dbase  DistanceGeometry  ForceField  Geometry  __init__.pyi  ML  Numerics  rdBase.pyi  RDConfig.pyi  RDLogger.pyi  RDPaths.pyi  RDRandom.pyi  SimDivFilters  sping  TestRunner.pyi  utils  VLib</code></pre>
+<p>At first glance, <code>stubgen</code> seems to be able to process RDKIt’s binary extension modules and generate stubs. However, upon closer inspection, it proves unable to extract types, parameters and docstrings. Therefore, the generated stubs are <em>really</em> basic and not very useful, as they provide no hints about how to use the various functions and methods, nor any dosctrings:</p>
+<pre><code>$ grep -A3 MolFromSmiles -r out/rdkit
+out/rdkit/Chem/rdmolfiles.pyi:def MolFromSmiles(*args, **kwargs) -&gt; Any: ...
+out/rdkit/Chem/rdmolfiles.pyi-def MolFromTPLBlock(boost) -&gt; Any: ...
+out/rdkit/Chem/rdmolfiles.pyi-def MolFromTPLFile(*args, **kwargs) -&gt; Any: ...
+out/rdkit/Chem/rdmolfiles.pyi-def MolFromXYZBlock(boost) -&gt; Any: ...</code></pre>
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="https://greglandrum.github.io/rdkit-blog/posts/images/blog/docstrings-stubs-8.png" class="img-fluid figure-img"></p>
+<p></p><figcaption class="figure-caption">stubgenStubsAreVeryBasic</figcaption><p></p>
+</figure>
+</div>
+<p>Fortunately, there is another package, <a href="https://pypi.org/project/pybind11-stubgen/"><code>pybind11-stubgen</code></a>, which does a much better job with RDKit’s binary modules, and with a little bit of help can even figure out function parameters and types. I wrote a small Python module, <a href="https://github.com/rdkit/rdkit/tree/master/Scripts/gen_rdkit_stubs"><code>gen_rdkit_stubs</code></a>, which runs in parallel on multiple CPU cores and recursively generates stubs for the whole <code>rdkit</code> package in &lt; 10s:</p>
+<pre><code>$ time ( python -m Scripts.gen_rdkit_stubs )
+
+real    0m6.135s
+user    1m51.786s
+sys     0m27.283s</code></pre>
+<p>VS Code were now looking as they were supposed to, with all functions and methods populated in the dropdown pop-up, plus type hints and docstrings in the right place:</p>
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="https://greglandrum.github.io/rdkit-blog/posts/images/blog/docstrings-stubs-9.png" class="img-fluid figure-img"></p>
+<p></p><figcaption class="figure-caption">VSCodeStubsGenRDKitStubs</figcaption><p></p>
+</figure>
+</div>
+<p>Also the <code>Mol</code> methods were being suggested, and VS Code seemed aware of the fact that <code>Mol.GetAtomWithIdx</code> returns an <code>Atom</code> instance:</p>
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="https://greglandrum.github.io/rdkit-blog/posts/images/blog/docstrings-stubs-10.png" class="img-fluid figure-img"></p>
+<p></p><figcaption class="figure-caption">VSCodeChemMolMethodsPresent</figcaption><p></p>
+</figure>
+</div>
+<p>However, the <code>Atom</code> methods were still not showing up, just as I had previously observed in Jupyter Lab:</p>
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="https://greglandrum.github.io/rdkit-blog/posts/images/blog/docstrings-stubs-11.png" class="img-fluid figure-img"></p>
+<p></p><figcaption class="figure-caption">VSCodeAtomMethodDoNotShowUp</figcaption><p></p>
+</figure>
+</div>
+<p>A closer look at the stubs clarified that stubs were not quite correct yet: firstly, the <code>GetAtomWithIdx</code> method, as well as all of the <code>Mol</code> methods, were incorrectly decorated as <code>@staticmethod</code>; secondly, the <code>Atom</code> return type is not recognized, since the <code>Atom</code> object was not imported from <code>rdkit.Chem</code>, and hence is basically an unknown type:</p>
+<pre><code>$ grep -B1 'def GetAtomWithIdx' -r pybind11-stubgen_rdkit-stubs/
+pybind11-stubgen_rdkit-stubs/Chem/rdchem.pyi-    @staticmethod
+pybind11-stubgen_rdkit-stubs/Chem/rdchem.pyi:    def GetAtomWithIdx(arg1: Mol, arg2: int) -&gt; Atom:</code></pre>
+<p>Manually correcting the stub to the following:</p>
+<pre><code>pybind11-stubgen_rdkit-stubs/Chem/rdchem.pyi-    #@staticmethod
+pybind11-stubgen_rdkit-stubs/Chem/rdchem.pyi:    def GetAtomWithIdx(arg1: self, arg2: int) -&gt; rdkit.Chem.Atom:</code></pre>
+<p>indeed led to the expected hints popping up:</p>
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="https://greglandrum.github.io/rdkit-blog/posts/images/blog/docstrings-stubs-12.png" class="img-fluid figure-img"></p>
+<p></p><figcaption class="figure-caption">VSCodeManuallyCorrectedStub</figcaption><p></p>
+</figure>
+</div>
+<p>In summary, there were three residual issues:</p>
+<ol type="1">
+<li>several hundreds of class method signatures in the C++ source code of RDKit Python wrappers were missing the <code>python::arg("self")</code> parameter, causing the corresponding methods to be incorrectly decorated as <code>@staticmethod</code></li>
+<li><code>pybind11-stubgen</code> does not import objects used as return types; therefore, many return types are perceived as unknown by VS Code, and the associated class methods do not show up</li>
+<li>functions and methods missing explicit <code>python::arg</code> parameters were attributed default parameter names such as <code>arg1</code>, <code>arg2</code>, …, <code>argN</code>, which make many signatures rather obscure compared to their C++ counterparts which have more meaningful parameter names</li>
+</ol>
+<p>It was immediately clear that manually patching the whole RDKit codebase to fix these 3 issues would be a daunting task. Therefore, I explored ways to accomplish the same task programmatically, and the <a href="https://libclang.readthedocs.io/en/latest/">Clang Indexing Library Bindings</a> emerged as the most appealing option.</p>
+<p>The Clang Indexing Library can parse a C++ source file (including the headers that it references) and generate a tree-like structure which can be traversed to find the nodes of interest. Each of this nodes can in turn be related to a source code location (row and column numbers in the source file), making it possible to patch source code not just based on regular expressions, which would not be sufficient for our needs, but on some degree of actual “understanding” of the source code logic.</p>
+<p>For this purpose, I wrote another Python module, <a href="https://github.com/rdkit/rdkit/tree/master/Scripts/patch_rdkit_docstrings"><code>patch_rdkit_docstrings</code></a>, which:</p>
+<ol type="1">
+<li>identifies source code files which relate to Python wrappers and need patching</li>
+<li>generates AST files for each source code file</li>
+<li>traverses AST files to find the places in the source code that need patching</li>
+<li>adds the <code>self</code> parameter where needed to avoid that class methods are incorrectly decorated as <code>@staticmethod</code></li>
+<li>replaces the <code>argN</code> parameter names in Python functions with more meaningful parameter names extracted from the C++ functions that the Python functions are wrapping</li>
+<li>finally, runs <code>clang-format</code> on the patched sources to fix the formatting</li>
+</ol>
+<p>Also <code>patch_rdkit_docstrings</code> runs in parallel to speed up the patching, which takes a few minutes. Since docstring patching is a one-off operation, speed is not a critical factor; however, it definitely was during the development of the module. In fact, <code>patch_rdkit_docstrings</code> required several iterations to have the source code properly patched, and being able to quickly evaluate progress made between iterations was very helpful.</p>
+<p>Once Greg and I were happy with the source code patching made by <code>patch_rdkit_docstrings</code>, as well as with the stubs generated out of the patched source code by <code>gen_rdkit_stubs</code>, I submitted a <a href="https://github.com/rdkit/rdkit/pull/6919/files">PR to RDKit with the programmatic source code patches made by <code>patch_rdkit_docstrings</code></a>.</p>
+<p>The PR covered 91 files, with overall 4,076 lines of code being added and 1,088 being removed: definitely this was not a task that one would have liked to do manually: it would have probably required a comparable amount of time, some functions would have certainly being missed and some mistakes would have been made, and I would not have learnt anything about AST parsing and all the rest.</p>
+</section>
+<section id="summary" class="level2">
+<h2 class="anchored" data-anchor-id="summary">Summary</h2>
+<p>Since Release 2023.09.4, after building and installing in the usual way RDKit libraries and Python modules, stubs can be built and installed with the following command:</p>
+<pre><code>cmake --build . --target stubs</code></pre>
+<p>or, on Linux and macOS platforms, running</p>
+<pre><code>make stubs</code></pre>
+<p>The stubs enable fully functional hints in VS Code:</p>
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="https://greglandrum.github.io/rdkit-blog/posts/images/blog/docstrings-stubs-13.png" class="img-fluid figure-img"></p>
+<p></p><figcaption class="figure-caption">FullyFunctionalHintsVSCode</figcaption><p></p>
+</figure>
+</div>
+<p>As a bonus, thanks to the one-off source patching, also the Jupyter Lab issue described at the beginning is solved:</p>
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="https://greglandrum.github.io/rdkit-blog/posts/images/blog/docstrings-stubs-14.png" class="img-fluid figure-img"></p>
+<p></p><figcaption class="figure-caption">JupyterLabAlsoWorks</figcaption><p></p>
+</figure>
+</div>
+<p>Finally, also <a href="https://rdkit.org/docs/source/rdkit.Chem.rdchem.html#rdkit.Chem.rdchem.Mol.GetAtomWithIdx">the online RDKit documentation</a> looks prettier: <code>argN</code> parameters are replaced by meaningful parameter names taken from the respective C++ functions, while <code>self</code> parameters are now present in non-static methods:</p>
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="https://greglandrum.github.io/rdkit-blog/posts/images/blog/docstrings-stubs-15.png" class="img-fluid figure-img"></p>
+<p></p><figcaption class="figure-caption">OnlineDocsLookBetter</figcaption><p></p>
+</figure>
+</div>
+<p>Starting from Release 2023.09.6, <code>rdkit-stubs</code> are also available as part of <code>conda-forge</code> RDKit packages.</p>
+<p>Happy coding with the new RDKit stubs!</p>
+
+
+</section>
+
+ ]]></description>
+  <category>documentation</category>
+  <category>release</category>
+  <guid>https://greglandrum.github.io/rdkit-blog/posts/2024-03-08-docstring-stubs.html</guid>
+  <pubDate>Thu, 07 Mar 2024 23:00:00 GMT</pubDate>
+  <media:content url="https://greglandrum.github.io/rdkit-blog/posts/images/blog/setting-up-a-cxx-dev-env2.png" medium="image" type="image/png" height="47" width="144"/>
+</item>
 <item>
   <title>Using custom standardization rules / Using the python logger from the RDKit</title>
   <link>https://greglandrum.github.io/rdkit-blog/posts/2024-02-23-custom-transformations-and-logging.html</link>
@@ -3674,7 +3874,7 @@ Q 174.3 83.2, 175.8 83.2
 <p>These boxplots look at Cohen’s kappa (left plot) and AUROC (right plot) for classifiers built on the MDCK dataset. The left pair of bars in each plot show the distribution of values for 100 random splits, the right pair show distributions for 50 different 5-fold cross validations. The left bar in each pair has the results for XGB, the right bar for RF.</p>
 <div class="quarto-figure quarto-figure-center">
 <figure class="figure">
-<p><img src="https://greglandrum.github.io/rdkit-blog/posts/2023-08-13-xval-variability1_files/figure-html/26028559-1-image-2.png" class="img-fluid figure-img"></p>
+<p><img src="https://greglandrum.github.io/rdkit-blog/posts/2023-08-13-xval-variability1_files/figure-html/3595e2b5-1-image-2.png" class="img-fluid figure-img"></p>
 <p></p><figcaption class="figure-caption">image-2.png</figcaption><p></p>
 </figure>
 </div>
@@ -4716,7 +4916,7 @@ AUC fraction&gt;0: 1.00</code></pre>
 <p>The TL;DR summary: if we’re careful about using as much metadata as possible to ascertain which assays can be combined, we get quite good agreement between Ki assays:</p>
 <div class="quarto-figure quarto-figure-center">
 <figure class="figure">
-<p><img src="https://greglandrum.github.io/rdkit-blog/posts/2023-06-17-overlapping-Ki-assays1_files/figure-html/d1b419b6-1-image.png" class="img-fluid figure-img"></p>
+<p><img src="https://greglandrum.github.io/rdkit-blog/posts/2023-06-17-overlapping-Ki-assays1_files/figure-html/b0b5e4a4-1-image.png" class="img-fluid figure-img"></p>
 <p></p><figcaption class="figure-caption">results summary</figcaption><p></p>
 </figure>
 </div>
@@ -9951,7 +10151,7 @@ CHEMBL1019596  CHEMBL828284    0.00 22</code></pre>
 <p>If I am careful about which xC50 assays I combine, making sure as much available metadata as possible matches, and then plot the pchembl values for duplicate compounds, I get the following:</p>
 <div class="quarto-figure quarto-figure-center">
 <figure class="figure">
-<p><img src="https://greglandrum.github.io/rdkit-blog/posts/2023-06-12-overlapping-ic50-assays1_files/figure-html/fe429d1d-1-image-6.png" class="img-fluid figure-img"></p>
+<p><img src="https://greglandrum.github.io/rdkit-blog/posts/2023-06-12-overlapping-ic50-assays1_files/figure-html/145982e9-1-image-6.png" class="img-fluid figure-img"></p>
 <p></p><figcaption class="figure-caption">image-6.png</figcaption><p></p>
 </figure>
 </div>
@@ -9960,7 +10160,7 @@ CHEMBL1019596  CHEMBL828284    0.00 22</code></pre>
 <p>If I’m not careful at all, and just combine using the target ID and the type of the result (so that I’m not combining IC50 and EC50), I get the following (this time it’s a hexbin plot, because otherwise you can’t see anything):</p>
 <div class="quarto-figure quarto-figure-center">
 <figure class="figure">
-<p><img src="https://greglandrum.github.io/rdkit-blog/posts/2023-06-12-overlapping-ic50-assays1_files/figure-html/fe429d1d-2-image-7.png" class="img-fluid figure-img"></p>
+<p><img src="https://greglandrum.github.io/rdkit-blog/posts/2023-06-12-overlapping-ic50-assays1_files/figure-html/145982e9-2-image-7.png" class="img-fluid figure-img"></p>
 <p></p><figcaption class="figure-caption">image-7.png</figcaption><p></p>
 </figure>
 </div>
@@ -37092,548 +37292,6 @@ w=None</code></pre>
   <category>exploration</category>
   <guid>https://greglandrum.github.io/rdkit-blog/posts/2023-05-07-binary-molecules-and-the-cartridge.html</guid>
   <pubDate>Sat, 06 May 2023 22:00:00 GMT</pubDate>
-</item>
-<item>
-  <title>New stuff from the 2023.03 RDKit release</title>
-  <link>https://greglandrum.github.io/rdkit-blog/posts/2023-05-03-new-release-highlights.html</link>
-  <description><![CDATA[ 
-
-
-
-<p>The 2023.03 RDKit release contains the usual long list of enhancements and bug fixes. The <a href="https://github.com/rdkit/rdkit/releases/tag/Release_2023_03_1">list in the release notes</a> is too long to cover in detail but, as usual, I wanted to do a post with a few things that I think are highlights.</p>
-<div class="cell" data-executetime="{&quot;end_time&quot;:&quot;2023-05-03T02:44:08.352058Z&quot;,&quot;start_time&quot;:&quot;2023-05-03T02:44:06.980293Z&quot;}" data-execution_count="1">
-<div class="sourceCode cell-code" id="cb1" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb1-1"><span class="im" style="color: #00769E;">from</span> rdkit <span class="im" style="color: #00769E;">import</span> Chem</span>
-<span id="cb1-2"><span class="im" style="color: #00769E;">from</span> rdkit.Chem.Draw <span class="im" style="color: #00769E;">import</span> IPythonConsole</span>
-<span id="cb1-3"><span class="im" style="color: #00769E;">from</span> rdkit.Chem <span class="im" style="color: #00769E;">import</span> Draw</span>
-<span id="cb1-4"><span class="im" style="color: #00769E;">import</span> rdkit</span>
-<span id="cb1-5"><span class="bu" style="color: null;">print</span>(rdkit.__version__)</span></code></pre></div>
-<div class="cell-output cell-output-stdout">
-<pre><code>2023.03.1</code></pre>
-</div>
-</div>
-<section id="making-it-easy-to-calculate-all-2d-descriptors" class="level1">
-<h1>Making it easy to calculate all 2D descriptors</h1>
-<p>There used to be a bit of a dance required in order to calculate all of the 2D descriptors. We’ve cleared that up in this release by adding a single function <code>Descriptors.CalcMolDescriptors()</code> which does the work.</p>
-<p>This is embarassingly simple to demonstrate:</p>
-<div class="cell" data-executetime="{&quot;end_time&quot;:&quot;2023-05-03T02:44:08.523988Z&quot;,&quot;start_time&quot;:&quot;2023-05-03T02:44:08.358844Z&quot;}" data-execution_count="2">
-<div class="sourceCode cell-code" id="cb3" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb3-1">doravirine <span class="op" style="color: #5E5E5E;">=</span> Chem.MolFromSmiles(<span class="st" style="color: #20794D;">'Cn1c(n[nH]c1=O)Cn2ccc(c(c2=O)Oc3cc(cc(c3)Cl)C#N)C(F)(F)F'</span>)</span>
-<span id="cb3-2">doravirine</span></code></pre></div>
-<div class="cell-output cell-output-display" data-execution_count="2">
-<p><img src="https://greglandrum.github.io/rdkit-blog/posts/2023-05-03-new-release-highlights_files/figure-html/cell-3-output-1.png" class="img-fluid"></p>
-</div>
-</div>
-<div class="cell" data-executetime="{&quot;end_time&quot;:&quot;2023-05-03T02:44:08.666656Z&quot;,&quot;start_time&quot;:&quot;2023-05-03T02:44:08.538473Z&quot;}" data-execution_count="3">
-<div class="sourceCode cell-code" id="cb4" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb4-1"><span class="im" style="color: #00769E;">from</span> rdkit.Chem <span class="im" style="color: #00769E;">import</span> Descriptors</span>
-<span id="cb4-2">descrs <span class="op" style="color: #5E5E5E;">=</span> Descriptors.CalcMolDescriptors(doravirine)</span>
-<span id="cb4-3">descrs</span></code></pre></div>
-<div class="cell-output cell-output-display" data-execution_count="3">
-<pre><code>{'MaxAbsEStateIndex': 13.412553309006833,
- 'MaxEStateIndex': 13.412553309006833,
- 'MinAbsEStateIndex': 0.045220418860841605,
- 'MinEStateIndex': -4.871620672188628,
- 'qed': 0.6914051268589834,
- 'MolWt': 425.754,
- 'HeavyAtomMolWt': 414.66600000000005,
- 'ExactMolWt': 425.050251552,
- 'NumValenceElectrons': 150,
- 'NumRadicalElectrons': 0,
- 'MaxPartialCharge': 0.4197525104273902,
- 'MinPartialCharge': -0.45079941098947357,
- 'MaxAbsPartialCharge': 0.45079941098947357,
- 'MinAbsPartialCharge': 0.4197525104273902,
- 'FpDensityMorgan1': 1.3103448275862069,
- 'FpDensityMorgan2': 2.0344827586206895,
- 'FpDensityMorgan3': 2.6206896551724137,
- 'BCUT2D_MWHI': 35.495691906445956,
- 'BCUT2D_MWLOW': 10.182401353178228,
- 'BCUT2D_CHGHI': 2.363442602497932,
- 'BCUT2D_CHGLO': -2.1532454345808123,
- 'BCUT2D_LOGPHI': 2.362094239067197,
- 'BCUT2D_LOGPLOW': -2.2620565247489415,
- 'BCUT2D_MRHI': 6.30376236817795,
- 'BCUT2D_MRLOW': -0.13831572005086737,
- 'AvgIpc': 2.951845570725043,
- 'BalabanJ': 2.1143058157682066,
- 'BertzCT': 1236.821427505276,
- 'Chi0': 21.344570503761737,
- 'Chi0n': 14.619315272563007,
- 'Chi0v': 15.375244218581463,
- 'Chi1': 13.595574016164479,
- 'Chi1n': 7.8933192308003095,
- 'Chi1v': 8.271283703809537,
- 'Chi2n': 5.882827756329733,
- 'Chi2v': 6.319263536801718,
- 'Chi3n': 3.9307609940961763,
- 'Chi3v': 4.148978884332168,
- 'Chi4n': 2.4772835642835087,
- 'Chi4v': 2.7023697348309867,
- 'HallKierAlpha': -3.519999999999999,
- 'Ipc': 2291995.915536308,
- 'Kappa1': 20.220355828454835,
- 'Kappa2': 7.4789147435283585,
- 'Kappa3': 4.168020338062062,
- 'LabuteASA': 164.8909024413842,
- 'PEOE_VSA1': 9.303962601591405,
- 'PEOE_VSA10': 11.3129633249809,
- 'PEOE_VSA11': 5.824404497999927,
- 'PEOE_VSA12': 5.749511833283905,
- 'PEOE_VSA13': 5.559266895052007,
- 'PEOE_VSA14': 11.86604191564695,
- 'PEOE_VSA2': 9.361636831863176,
- 'PEOE_VSA3': 9.893218992372859,
- 'PEOE_VSA4': 23.531818506063985,
- 'PEOE_VSA5': 0.0,
- 'PEOE_VSA6': 11.600939890232516,
- 'PEOE_VSA7': 24.26546827384644,
- 'PEOE_VSA8': 18.267148868031594,
- 'PEOE_VSA9': 18.177429210401844,
- 'SMR_VSA1': 17.908108096824506,
- 'SMR_VSA10': 11.600939890232516,
- 'SMR_VSA2': 5.261891554738487,
- 'SMR_VSA3': 19.331562912184786,
- 'SMR_VSA4': 7.04767198267719,
- 'SMR_VSA5': 12.72105492335605,
- 'SMR_VSA6': 0.0,
- 'SMR_VSA7': 73.27433730199388,
- 'SMR_VSA8': 0.0,
- 'SMR_VSA9': 17.568244979360085,
- 'SlogP_VSA1': 15.98587324705553,
- 'SlogP_VSA10': 13.171245143024459,
- 'SlogP_VSA11': 11.49902366656781,
- 'SlogP_VSA12': 11.600939890232516,
- 'SlogP_VSA2': 19.331562912184786,
- 'SlogP_VSA3': 19.76872690603324,
- 'SlogP_VSA4': 11.33111286753076,
- 'SlogP_VSA5': 16.95130748139392,
- 'SlogP_VSA6': 40.05138621360316,
- 'SlogP_VSA7': 5.022633313741326,
- 'SlogP_VSA8': 0.0,
- 'SlogP_VSA9': 0.0,
- 'TPSA': 105.70000000000002,
- 'EState_VSA1': 28.738272135679853,
- 'EState_VSA10': 22.760319511168106,
- 'EState_VSA11': 0.0,
- 'EState_VSA2': 28.704757542634727,
- 'EState_VSA3': 6.06636706846161,
- 'EState_VSA4': 21.397409935657397,
- 'EState_VSA5': 19.18040611960041,
- 'EState_VSA6': 6.069221312792274,
- 'EState_VSA7': 0.0,
- 'EState_VSA8': 10.197363616602075,
- 'EState_VSA9': 21.599694398771053,
- 'VSA_EState1': 47.48050639865553,
- 'VSA_EState10': 5.842061004535676,
- 'VSA_EState2': 24.16343117595945,
- 'VSA_EState3': 14.921853617262808,
- 'VSA_EState4': -2.8980189732872814,
- 'VSA_EState5': -1.0781549918202147,
- 'VSA_EState6': 6.092225491490601,
- 'VSA_EState7': -3.945179835565914,
- 'VSA_EState8': -0.2762282865821226,
- 'VSA_EState9': 1.3919488437959202,
- 'FractionCSP3': 0.17647058823529413,
- 'HeavyAtomCount': 29,
- 'NHOHCount': 1,
- 'NOCount': 8,
- 'NumAliphaticCarbocycles': 0,
- 'NumAliphaticHeterocycles': 0,
- 'NumAliphaticRings': 0,
- 'NumAromaticCarbocycles': 1,
- 'NumAromaticHeterocycles': 2,
- 'NumAromaticRings': 3,
- 'NumHAcceptors': 7,
- 'NumHDonors': 1,
- 'NumHeteroatoms': 12,
- 'NumRotatableBonds': 4,
- 'NumSaturatedCarbocycles': 0,
- 'NumSaturatedHeterocycles': 0,
- 'NumSaturatedRings': 0,
- 'RingCount': 3,
- 'MolLogP': 2.65458,
- 'MolMR': 94.87570000000002,
- 'fr_Al_COO': 0,
- 'fr_Al_OH': 0,
- 'fr_Al_OH_noTert': 0,
- 'fr_ArN': 0,
- 'fr_Ar_COO': 0,
- 'fr_Ar_N': 4,
- 'fr_Ar_NH': 1,
- 'fr_Ar_OH': 0,
- 'fr_COO': 0,
- 'fr_COO2': 0,
- 'fr_C_O': 0,
- 'fr_C_O_noCOO': 0,
- 'fr_C_S': 0,
- 'fr_HOCCN': 0,
- 'fr_Imine': 0,
- 'fr_NH0': 4,
- 'fr_NH1': 1,
- 'fr_NH2': 0,
- 'fr_N_O': 0,
- 'fr_Ndealkylation1': 0,
- 'fr_Ndealkylation2': 0,
- 'fr_Nhpyrrole': 1,
- 'fr_SH': 0,
- 'fr_aldehyde': 0,
- 'fr_alkyl_carbamate': 0,
- 'fr_alkyl_halide': 3,
- 'fr_allylic_oxid': 0,
- 'fr_amide': 0,
- 'fr_amidine': 0,
- 'fr_aniline': 0,
- 'fr_aryl_methyl': 0,
- 'fr_azide': 0,
- 'fr_azo': 0,
- 'fr_barbitur': 0,
- 'fr_benzene': 1,
- 'fr_benzodiazepine': 0,
- 'fr_bicyclic': 0,
- 'fr_diazo': 0,
- 'fr_dihydropyridine': 0,
- 'fr_epoxide': 0,
- 'fr_ester': 0,
- 'fr_ether': 1,
- 'fr_furan': 0,
- 'fr_guanido': 0,
- 'fr_halogen': 4,
- 'fr_hdrzine': 0,
- 'fr_hdrzone': 0,
- 'fr_imidazole': 0,
- 'fr_imide': 0,
- 'fr_isocyan': 0,
- 'fr_isothiocyan': 0,
- 'fr_ketone': 0,
- 'fr_ketone_Topliss': 0,
- 'fr_lactam': 0,
- 'fr_lactone': 0,
- 'fr_methoxy': 0,
- 'fr_morpholine': 0,
- 'fr_nitrile': 1,
- 'fr_nitro': 0,
- 'fr_nitro_arom': 0,
- 'fr_nitro_arom_nonortho': 0,
- 'fr_nitroso': 0,
- 'fr_oxazole': 0,
- 'fr_oxime': 0,
- 'fr_para_hydroxylation': 0,
- 'fr_phenol': 0,
- 'fr_phenol_noOrthoHbond': 0,
- 'fr_phos_acid': 0,
- 'fr_phos_ester': 0,
- 'fr_piperdine': 0,
- 'fr_piperzine': 0,
- 'fr_priamide': 0,
- 'fr_prisulfonamd': 0,
- 'fr_pyridine': 1,
- 'fr_quatN': 0,
- 'fr_sulfide': 0,
- 'fr_sulfonamd': 0,
- 'fr_sulfone': 0,
- 'fr_term_acetylene': 0,
- 'fr_tetrazole': 0,
- 'fr_thiazole': 0,
- 'fr_thiocyan': 0,
- 'fr_thiophene': 0,
- 'fr_unbrch_alkane': 0,
- 'fr_urea': 0}</code></pre>
-</div>
-</div>
-</section>
-<section id="improved-rendering-of-generic-query-atoms" class="level1">
-<h1>Improved rendering of generic query atoms</h1>
-<p>Molecules with “standard” generic query atoms (A, Q, M, X, etc.) read in from mol/SDF files are now rendered much more readably than in previous versions.</p>
-<p>Here’s an example:</p>
-<div class="cell" data-executetime="{&quot;end_time&quot;:&quot;2023-05-03T02:44:08.677168Z&quot;,&quot;start_time&quot;:&quot;2023-05-03T02:44:08.668909Z&quot;}" data-execution_count="4">
-<div class="sourceCode cell-code" id="cb6" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb6-1">qmol <span class="op" style="color: #5E5E5E;">=</span> Chem.MolFromMolBlock(<span class="st" style="color: #20794D;">'''</span></span>
-<span id="cb6-2"><span class="st" style="color: #20794D;">  Mrv2305 04202308462D          </span></span>
-<span id="cb6-3"></span>
-<span id="cb6-4"><span class="st" style="color: #20794D;">  0  0  0     0  0            999 V3000</span></span>
-<span id="cb6-5"><span class="st" style="color: #20794D;">M  V30 BEGIN CTAB</span></span>
-<span id="cb6-6"><span class="st" style="color: #20794D;">M  V30 COUNTS 8 8 0 0 0</span></span>
-<span id="cb6-7"><span class="st" style="color: #20794D;">M  V30 BEGIN ATOM</span></span>
-<span id="cb6-8"><span class="st" style="color: #20794D;">M  V30 1 C -2.6667 3.8734 0 0</span></span>
-<span id="cb6-9"><span class="st" style="color: #20794D;">M  V30 2 C -4.0003 3.1034 0 0</span></span>
-<span id="cb6-10"><span class="st" style="color: #20794D;">M  V30 3 C -4.0003 1.5633 0 0</span></span>
-<span id="cb6-11"><span class="st" style="color: #20794D;">M  V30 4 C -2.6667 0.7933 0 0</span></span>
-<span id="cb6-12"><span class="st" style="color: #20794D;">M  V30 5 C -1.333 1.5633 0 0</span></span>
-<span id="cb6-13"><span class="st" style="color: #20794D;">M  V30 6 C -1.333 3.1034 0 0</span></span>
-<span id="cb6-14"><span class="st" style="color: #20794D;">M  V30 7 A 0.0007 3.8733 0 0</span></span>
-<span id="cb6-15"><span class="st" style="color: #20794D;">M  V30 8 X -5.334 3.8733 0 0</span></span>
-<span id="cb6-16"><span class="st" style="color: #20794D;">M  V30 END ATOM</span></span>
-<span id="cb6-17"><span class="st" style="color: #20794D;">M  V30 BEGIN BOND</span></span>
-<span id="cb6-18"><span class="st" style="color: #20794D;">M  V30 1 1 1 2</span></span>
-<span id="cb6-19"><span class="st" style="color: #20794D;">M  V30 2 2 2 3</span></span>
-<span id="cb6-20"><span class="st" style="color: #20794D;">M  V30 3 1 3 4</span></span>
-<span id="cb6-21"><span class="st" style="color: #20794D;">M  V30 4 2 4 5</span></span>
-<span id="cb6-22"><span class="st" style="color: #20794D;">M  V30 5 1 5 6</span></span>
-<span id="cb6-23"><span class="st" style="color: #20794D;">M  V30 6 2 1 6</span></span>
-<span id="cb6-24"><span class="st" style="color: #20794D;">M  V30 7 1 6 7</span></span>
-<span id="cb6-25"><span class="st" style="color: #20794D;">M  V30 8 1 2 8</span></span>
-<span id="cb6-26"><span class="st" style="color: #20794D;">M  V30 END BOND</span></span>
-<span id="cb6-27"><span class="st" style="color: #20794D;">M  V30 END CTAB</span></span>
-<span id="cb6-28"><span class="st" style="color: #20794D;">M  END</span></span>
-<span id="cb6-29"><span class="st" style="color: #20794D;">'''</span>)</span>
-<span id="cb6-30">qmol</span></code></pre></div>
-<div class="cell-output cell-output-display" data-execution_count="4">
-<p><img src="https://greglandrum.github.io/rdkit-blog/posts/2023-05-03-new-release-highlights_files/figure-html/cell-5-output-1.png" class="img-fluid"></p>
-</div>
-</div>
-<p>As a reminder, this is what these looked like in previous versions:</p>
-<div class="cell" data-executetime="{&quot;end_time&quot;:&quot;2023-05-03T02:44:08.839071Z&quot;,&quot;start_time&quot;:&quot;2023-05-03T02:44:08.678073Z&quot;}" data-execution_count="5">
-<div class="sourceCode cell-code" id="cb7" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb7-1">IPythonConsole.drawOptions.useComplexQueryAtomSymbols <span class="op" style="color: #5E5E5E;">=</span> <span class="va" style="color: #111111;">False</span></span>
-<span id="cb7-2">qmol</span></code></pre></div>
-<div class="cell-output cell-output-display" data-execution_count="5">
-<p><img src="https://greglandrum.github.io/rdkit-blog/posts/2023-05-03-new-release-highlights_files/figure-html/cell-6-output-1.png" class="img-fluid"></p>
-</div>
-</div>
-<div class="cell" data-executetime="{&quot;end_time&quot;:&quot;2023-05-03T02:44:08.921321Z&quot;,&quot;start_time&quot;:&quot;2023-05-03T02:44:08.844284Z&quot;}" data-execution_count="6">
-<div class="sourceCode cell-code" id="cb8" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb8-1">IPythonConsole.drawOptions.useComplexQueryAtomSymbols <span class="op" style="color: #5E5E5E;">=</span> <span class="va" style="color: #111111;">True</span></span></code></pre></div>
-</div>
-</section>
-<section id="chembl-filter-sets-now-available-in-the-filtercatalog" class="level1">
-<h1>ChEMBL filter sets now available in the FilterCatalog</h1>
-<p>This is based on Pat Walters’ <a href="https://github.com/PatWalters/rd_filters">version of the ChEMBL filters</a></p>
-<div class="cell" data-executetime="{&quot;end_time&quot;:&quot;2023-05-03T02:44:09.058748Z&quot;,&quot;start_time&quot;:&quot;2023-05-03T02:44:08.926669Z&quot;}" data-execution_count="7">
-<div class="sourceCode cell-code" id="cb9" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb9-1"><span class="im" style="color: #00769E;">from</span> rdkit.Chem <span class="im" style="color: #00769E;">import</span> rdfiltercatalog</span>
-<span id="cb9-2"></span>
-<span id="cb9-3">fcp <span class="op" style="color: #5E5E5E;">=</span> rdfiltercatalog.FilterCatalogParams()</span>
-<span id="cb9-4">fcp.AddCatalog(rdfiltercatalog.FilterCatalogParams.FilterCatalogs.CHEMBL)</span>
-<span id="cb9-5">fc <span class="op" style="color: #5E5E5E;">=</span> rdfiltercatalog.FilterCatalog(fcp)</span>
-<span id="cb9-6">fc.GetNumEntries()</span></code></pre></div>
-<div class="cell-output cell-output-display" data-execution_count="7">
-<pre><code>770</code></pre>
-</div>
-</div>
-<div class="cell" data-executetime="{&quot;end_time&quot;:&quot;2023-05-03T02:44:09.097076Z&quot;,&quot;start_time&quot;:&quot;2023-05-03T02:44:09.060184Z&quot;}" data-execution_count="8">
-<div class="sourceCode cell-code" id="cb11" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb11-1">m <span class="op" style="color: #5E5E5E;">=</span> Chem.MolFromSmiles(<span class="st" style="color: #20794D;">'c1ccccc1CCl'</span>)</span>
-<span id="cb11-2">l <span class="op" style="color: #5E5E5E;">=</span> fc.GetMatches(m)</span>
-<span id="cb11-3"><span class="bu" style="color: null;">len</span>(l)</span></code></pre></div>
-<div class="cell-output cell-output-display" data-execution_count="8">
-<pre><code>7</code></pre>
-</div>
-</div>
-<div class="cell" data-executetime="{&quot;end_time&quot;:&quot;2023-05-03T02:44:09.191728Z&quot;,&quot;start_time&quot;:&quot;2023-05-03T02:44:09.106766Z&quot;}" data-execution_count="9">
-<div class="sourceCode cell-code" id="cb13" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb13-1"><span class="cf" style="color: #003B4F;">for</span> entry <span class="kw" style="color: #003B4F;">in</span> l:</span>
-<span id="cb13-2">    <span class="bu" style="color: null;">print</span>(entry.GetDescription())</span></code></pre></div>
-<div class="cell-output cell-output-stdout">
-<pre><code>R1 Reactive alkyl halides
-alkyl halide
-primary_halide_sulfate
-alkyl_halides
-alkyl halide
-Filter6_benzyl_halide
-alkyl halide</code></pre>
-</div>
-</div>
-<p>I’ve deliberately picked an example which demonstrates why one needs to be careful with these things. :-)</p>
-</section>
-<section id="improved-handling-of-organometallic-species" class="level1">
-<h1>Improved handling of organometallic species</h1>
-<p>This is part of an ongoing series of improvements to do a better job handling organometallic species.</p>
-<p>In this release the major changes are to support switching between two common representations of molecules like ferrocene:</p>
-<div class="cell" data-executetime="{&quot;end_time&quot;:&quot;2023-05-03T02:44:09.308646Z&quot;,&quot;start_time&quot;:&quot;2023-05-03T02:44:09.198911Z&quot;}" data-execution_count="10">
-<div class="sourceCode cell-code" id="cb15" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb15-1">IPythonConsole.kekulizeStructures <span class="op" style="color: #5E5E5E;">=</span> <span class="va" style="color: #111111;">False</span></span>
-<span id="cb15-2">ferrocene <span class="op" style="color: #5E5E5E;">=</span> Chem.MolFromMolBlock(<span class="st" style="color: #20794D;">'''</span></span>
-<span id="cb15-3"><span class="st" style="color: #20794D;">  Mrv2211 04212306592D          </span></span>
-<span id="cb15-4"></span>
-<span id="cb15-5"><span class="st" style="color: #20794D;">  0  0  0     0  0            999 V3000</span></span>
-<span id="cb15-6"><span class="st" style="color: #20794D;">M  V30 BEGIN CTAB</span></span>
-<span id="cb15-7"><span class="st" style="color: #20794D;">M  V30 COUNTS 13 12 2 0 0</span></span>
-<span id="cb15-8"><span class="st" style="color: #20794D;">M  V30 BEGIN ATOM</span></span>
-<span id="cb15-9"><span class="st" style="color: #20794D;">M  V30 1 C -4.4799 15.329 0 0 CHG=-1</span></span>
-<span id="cb15-10"><span class="st" style="color: #20794D;">M  V30 2 C -5.2994 16.3341 0 0</span></span>
-<span id="cb15-11"><span class="st" style="color: #20794D;">M  V30 3 C -8.0977 16.3517 0 0</span></span>
-<span id="cb15-12"><span class="st" style="color: #20794D;">M  V30 4 C -9.0012 15.3605 0 0</span></span>
-<span id="cb15-13"><span class="st" style="color: #20794D;">M  V30 5 C -6.794 14.7503 0 0</span></span>
-<span id="cb15-14"><span class="st" style="color: #20794D;">M  V30 6 C -4.3949 10.4304 0 0 CHG=-1</span></span>
-<span id="cb15-15"><span class="st" style="color: #20794D;">M  V30 7 C -5.2144 11.4355 0 0</span></span>
-<span id="cb15-16"><span class="st" style="color: #20794D;">M  V30 8 C -8.0127 11.4531 0 0</span></span>
-<span id="cb15-17"><span class="st" style="color: #20794D;">M  V30 9 C -8.9162 10.4619 0 0</span></span>
-<span id="cb15-18"><span class="st" style="color: #20794D;">M  V30 10 C -6.6924 9.8351 0 0</span></span>
-<span id="cb15-19"><span class="st" style="color: #20794D;">M  V30 11 Fe -6.6772 12.9717 0 0 CHG=2</span></span>
-<span id="cb15-20"><span class="st" style="color: #20794D;">M  V30 12 * -6.7645 15.6718 0 0</span></span>
-<span id="cb15-21"><span class="st" style="color: #20794D;">M  V30 13 * -6.6461 10.7232 0 0</span></span>
-<span id="cb15-22"><span class="st" style="color: #20794D;">M  V30 END ATOM</span></span>
-<span id="cb15-23"><span class="st" style="color: #20794D;">M  V30 BEGIN BOND</span></span>
-<span id="cb15-24"><span class="st" style="color: #20794D;">M  V30 1 9 12 11 ENDPTS=(5 1 2 3 4 5) ATTACH=ALL</span></span>
-<span id="cb15-25"><span class="st" style="color: #20794D;">M  V30 2 4 1 5</span></span>
-<span id="cb15-26"><span class="st" style="color: #20794D;">M  V30 3 4 4 5</span></span>
-<span id="cb15-27"><span class="st" style="color: #20794D;">M  V30 4 4 4 3</span></span>
-<span id="cb15-28"><span class="st" style="color: #20794D;">M  V30 5 4 2 3</span></span>
-<span id="cb15-29"><span class="st" style="color: #20794D;">M  V30 6 4 1 2</span></span>
-<span id="cb15-30"><span class="st" style="color: #20794D;">M  V30 7 4 6 10</span></span>
-<span id="cb15-31"><span class="st" style="color: #20794D;">M  V30 8 4 9 10</span></span>
-<span id="cb15-32"><span class="st" style="color: #20794D;">M  V30 9 4 9 8</span></span>
-<span id="cb15-33"><span class="st" style="color: #20794D;">M  V30 10 4 7 8</span></span>
-<span id="cb15-34"><span class="st" style="color: #20794D;">M  V30 11 4 6 7</span></span>
-<span id="cb15-35"><span class="st" style="color: #20794D;">M  V30 12 9 13 11 ENDPTS=(5 6 7 8 9 10) ATTACH=ALL</span></span>
-<span id="cb15-36"><span class="st" style="color: #20794D;">M  V30 END BOND</span></span>
-<span id="cb15-37"><span class="st" style="color: #20794D;">M  V30 BEGIN SGROUP</span></span>
-<span id="cb15-38"><span class="st" style="color: #20794D;">M  V30 1 DAT 0 ATOMS=(1 1) FIELDNAME=MRV_IMPLICIT_H -</span></span>
-<span id="cb15-39"><span class="st" style="color: #20794D;">M  V30 FIELDDISP="    0.0000    0.0000    DR    ALL  0       0" -</span></span>
-<span id="cb15-40"><span class="st" style="color: #20794D;">M  V30 FIELDDATA=IMPL_H1</span></span>
-<span id="cb15-41"><span class="st" style="color: #20794D;">M  V30 2 DAT 0 ATOMS=(1 6) FIELDNAME=MRV_IMPLICIT_H -</span></span>
-<span id="cb15-42"><span class="st" style="color: #20794D;">M  V30 FIELDDISP="    0.0000    0.0000    DR    ALL  0       0" -</span></span>
-<span id="cb15-43"><span class="st" style="color: #20794D;">M  V30 FIELDDATA=IMPL_H1</span></span>
-<span id="cb15-44"><span class="st" style="color: #20794D;">M  V30 END SGROUP</span></span>
-<span id="cb15-45"><span class="st" style="color: #20794D;">M  V30 END CTAB</span></span>
-<span id="cb15-46"><span class="st" style="color: #20794D;">M  END</span></span>
-<span id="cb15-47"><span class="st" style="color: #20794D;">'''</span>)</span>
-<span id="cb15-48">ferrocene</span></code></pre></div>
-<div class="cell-output cell-output-display" data-execution_count="10">
-<p><img src="https://greglandrum.github.io/rdkit-blog/posts/2023-05-03-new-release-highlights_files/figure-html/cell-11-output-1.png" class="img-fluid"></p>
-</div>
-</div>
-<p>This shows one common representation: using a coordination/dative bond from a multi-center attachment point in the middle of each ring to indicate the haptic bonding of the rings to the metal. The new drawing code highlights the atoms involved in the haptic bond.</p>
-<p>Sometimes it’s useful to have another representation of these species which has direct dative bonds from the atoms in the ring to the metal. The <code>HapticBondsToDative()</code> function does this:</p>
-<div class="cell" data-executetime="{&quot;end_time&quot;:&quot;2023-05-03T02:44:09.432545Z&quot;,&quot;start_time&quot;:&quot;2023-05-03T02:44:09.311624Z&quot;}" data-execution_count="11">
-<div class="sourceCode cell-code" id="cb16" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb16-1">dative_ferro <span class="op" style="color: #5E5E5E;">=</span> Chem.HapticBondsToDative(ferrocene)</span>
-<span id="cb16-2">Chem.SanitizeMol(dative_ferro)</span>
-<span id="cb16-3">dative_ferro</span></code></pre></div>
-<div class="cell-output cell-output-display" data-execution_count="11">
-<p><img src="https://greglandrum.github.io/rdkit-blog/posts/2023-05-03-new-release-highlights_files/figure-html/cell-12-output-1.png" class="img-fluid"></p>
-</div>
-</div>
-<p>As you might expect, you can also go from the dative representation back to the haptic one:</p>
-<div class="cell" data-executetime="{&quot;end_time&quot;:&quot;2023-05-03T02:44:09.544738Z&quot;,&quot;start_time&quot;:&quot;2023-05-03T02:44:09.439359Z&quot;}" data-execution_count="12">
-<div class="sourceCode cell-code" id="cb17" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb17-1">ferro2 <span class="op" style="color: #5E5E5E;">=</span> Chem.DativeBondsToHaptic(dative_ferro)</span>
-<span id="cb17-2">Chem.SanitizeMol(ferro2)</span>
-<span id="cb17-3">ferro2</span></code></pre></div>
-<div class="cell-output cell-output-display" data-execution_count="12">
-<p><img src="https://greglandrum.github.io/rdkit-blog/posts/2023-05-03-new-release-highlights_files/figure-html/cell-13-output-1.png" class="img-fluid"></p>
-</div>
-</div>
-<p>This, of course, also works with other haptic bonds. Here’s an example of a nickel complex with propylene:</p>
-<div class="cell" data-executetime="{&quot;end_time&quot;:&quot;2023-05-03T02:44:09.644370Z&quot;,&quot;start_time&quot;:&quot;2023-05-03T02:44:09.547115Z&quot;}" data-execution_count="13">
-<div class="sourceCode cell-code" id="cb18" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb18-1">ni_complex <span class="op" style="color: #5E5E5E;">=</span> Chem.MolFromMolBlock(<span class="st" style="color: #20794D;">'''</span></span>
-<span id="cb18-2"><span class="st" style="color: #20794D;">  Mrv2211 05012317022D          </span></span>
-<span id="cb18-3"></span>
-<span id="cb18-4"><span class="st" style="color: #20794D;">  0  0  0     0  0            999 V3000</span></span>
-<span id="cb18-5"><span class="st" style="color: #20794D;">M  V30 BEGIN CTAB</span></span>
-<span id="cb18-6"><span class="st" style="color: #20794D;">M  V30 COUNTS 9 6 0 0 0</span></span>
-<span id="cb18-7"><span class="st" style="color: #20794D;">M  V30 BEGIN ATOM</span></span>
-<span id="cb18-8"><span class="st" style="color: #20794D;">M  V30 1 C -10.7917 -1.75 0 0 CHG=-1</span></span>
-<span id="cb18-9"><span class="st" style="color: #20794D;">M  V30 2 C -9.458 -0.98 0 0</span></span>
-<span id="cb18-10"><span class="st" style="color: #20794D;">M  V30 3 C -8.1243 -1.75 0 0</span></span>
-<span id="cb18-11"><span class="st" style="color: #20794D;">M  V30 4 * -9.458 -1.4933 0 0</span></span>
-<span id="cb18-12"><span class="st" style="color: #20794D;">M  V30 5 C -10.792 -6.2983 0 0 CHG=-1</span></span>
-<span id="cb18-13"><span class="st" style="color: #20794D;">M  V30 6 C -9.4583 -5.5283 0 0</span></span>
-<span id="cb18-14"><span class="st" style="color: #20794D;">M  V30 7 C -8.1246 -6.2983 0 0</span></span>
-<span id="cb18-15"><span class="st" style="color: #20794D;">M  V30 8 * -9.4583 -6.0416 0 0</span></span>
-<span id="cb18-16"><span class="st" style="color: #20794D;">M  V30 9 Ni -9.25 -3.7083 0 0 CHG=2</span></span>
-<span id="cb18-17"><span class="st" style="color: #20794D;">M  V30 END ATOM</span></span>
-<span id="cb18-18"><span class="st" style="color: #20794D;">M  V30 BEGIN BOND</span></span>
-<span id="cb18-19"><span class="st" style="color: #20794D;">M  V30 1 1 1 2</span></span>
-<span id="cb18-20"><span class="st" style="color: #20794D;">M  V30 2 2 2 3</span></span>
-<span id="cb18-21"><span class="st" style="color: #20794D;">M  V30 3 1 5 6</span></span>
-<span id="cb18-22"><span class="st" style="color: #20794D;">M  V30 4 2 6 7</span></span>
-<span id="cb18-23"><span class="st" style="color: #20794D;">M  V30 5 9 4 9 ENDPTS=(3 1 2 3) ATTACH=ALL</span></span>
-<span id="cb18-24"><span class="st" style="color: #20794D;">M  V30 6 9 8 9 ENDPTS=(3 5 6 7) ATTACH=ALL</span></span>
-<span id="cb18-25"><span class="st" style="color: #20794D;">M  V30 END BOND</span></span>
-<span id="cb18-26"><span class="st" style="color: #20794D;">M  V30 END CTAB</span></span>
-<span id="cb18-27"><span class="st" style="color: #20794D;">M  END</span></span>
-<span id="cb18-28"><span class="st" style="color: #20794D;">'''</span>)</span>
-<span id="cb18-29">ni_complex</span></code></pre></div>
-<div class="cell-output cell-output-display" data-execution_count="13">
-<p><img src="https://greglandrum.github.io/rdkit-blog/posts/2023-05-03-new-release-highlights_files/figure-html/cell-14-output-1.png" class="img-fluid"></p>
-</div>
-</div>
-<div class="cell" data-executetime="{&quot;end_time&quot;:&quot;2023-05-03T02:44:09.755361Z&quot;,&quot;start_time&quot;:&quot;2023-05-03T02:44:09.647984Z&quot;}" data-execution_count="14">
-<div class="sourceCode cell-code" id="cb19" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb19-1">dative_ni<span class="op" style="color: #5E5E5E;">=</span> Chem.HapticBondsToDative(ni_complex)</span>
-<span id="cb19-2">Chem.SanitizeMol(dative_ni)</span>
-<span id="cb19-3">dative_ni</span></code></pre></div>
-<div class="cell-output cell-output-display" data-execution_count="14">
-<p><img src="https://greglandrum.github.io/rdkit-blog/posts/2023-05-03-new-release-highlights_files/figure-html/cell-15-output-1.png" class="img-fluid"></p>
-</div>
-</div>
-<div class="cell" data-executetime="{&quot;end_time&quot;:&quot;2023-05-03T02:44:09.866343Z&quot;,&quot;start_time&quot;:&quot;2023-05-03T02:44:09.760371Z&quot;}" data-execution_count="15">
-<div class="sourceCode cell-code" id="cb20" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb20-1">ni2 <span class="op" style="color: #5E5E5E;">=</span> Chem.DativeBondsToHaptic(dative_ni)</span>
-<span id="cb20-2">Chem.SanitizeMol(ni2)</span>
-<span id="cb20-3">ni2</span></code></pre></div>
-<div class="cell-output cell-output-display" data-execution_count="15">
-<p><img src="https://greglandrum.github.io/rdkit-blog/posts/2023-05-03-new-release-highlights_files/figure-html/cell-16-output-1.png" class="img-fluid"></p>
-</div>
-</div>
-</section>
-<section id="drawing-molecules-in-arbitrary-locations-on-a-canvas" class="level1">
-<h1>Drawing molecules in arbitrary locations on a canvas</h1>
-<p>By using the new <code>MolDraw2D.SetFlexiMode()</code> and <code>MolDraw2D.SetOffset()</code> methods, it’s now possible to draw molecules in arbitrary locations on the <code>MolDraw2D</code> canvas. This, with a bit of work, allows considerably more complex molecular graphics to be created.</p>
-<p>Here’s an example… I hope to show something more useful in a future post.</p>
-<div class="cell" data-executetime="{&quot;end_time&quot;:&quot;2023-05-03T02:44:09.938124Z&quot;,&quot;start_time&quot;:&quot;2023-05-03T02:44:09.870387Z&quot;}" data-execution_count="16">
-<div class="sourceCode cell-code" id="cb21" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb21-1"><span class="co" style="color: #5E5E5E;"># structures from: https://pubs.acs.org/doi/10.1021/acs.jmedchem.3c00210</span></span>
-<span id="cb21-2">hit <span class="op" style="color: #5E5E5E;">=</span> Chem.MolFromSmiles(<span class="st" style="color: #20794D;">'c1ccc(o1)-c1cc(n(n1)C(=O)CCC(=O)O)-c1c(Cl)nc2cc(C)ccc2c1'</span>)</span>
-<span id="cb21-3">lead <span class="op" style="color: #5E5E5E;">=</span> Chem.MolFromSmiles(<span class="st" style="color: #20794D;">'c1ccc(o1)-c1cc(nn1C(C)(C)C)-c1[nH]c2ccc(Cl)cc2n1'</span>)</span>
-<span id="cb21-4">interm <span class="op" style="color: #5E5E5E;">=</span> Chem.MolFromSmiles(<span class="st" style="color: #20794D;">'c1ccc(o1)-c1cc(nn1C(C)(C)C)-c1oc2ccccc2n1'</span>)</span></code></pre></div>
-</div>
-<div class="cell" data-executetime="{&quot;end_time&quot;:&quot;2023-05-03T02:44:10.014272Z&quot;,&quot;start_time&quot;:&quot;2023-05-03T02:44:09.943531Z&quot;}" data-execution_count="17">
-<div class="sourceCode cell-code" id="cb22" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb22-1">hitLabel <span class="op" style="color: #5E5E5E;">=</span> <span class="st" style="color: #20794D;">'Hit 1a</span><span class="ch" style="color: #20794D;">\n</span><span class="st" style="color: #20794D;">P2Y6R : 0.126 uM'</span></span>
-<span id="cb22-2">leadLabel <span class="op" style="color: #5E5E5E;">=</span> <span class="st" style="color: #20794D;">'50</span><span class="ch" style="color: #20794D;">\n</span><span class="st" style="color: #20794D;">P2Y6R : 5.9 nM'</span></span>
-<span id="cb22-3">intermLabel <span class="op" style="color: #5E5E5E;">=</span> <span class="st" style="color: #20794D;">'16</span><span class="ch" style="color: #20794D;">\n</span><span class="st" style="color: #20794D;">P2Y6R : 30.8 nM'</span></span></code></pre></div>
-</div>
-<div class="cell" data-executetime="{&quot;end_time&quot;:&quot;2023-05-03T02:44:10.262169Z&quot;,&quot;start_time&quot;:&quot;2023-05-03T02:44:10.019752Z&quot;}" data-execution_count="18">
-<div class="sourceCode cell-code" id="cb23" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb23-1"><span class="im" style="color: #00769E;">from</span> IPython.display <span class="im" style="color: #00769E;">import</span> SVG</span>
-<span id="cb23-2"></span>
-<span id="cb23-3"><span class="im" style="color: #00769E;">from</span> rdkit <span class="im" style="color: #00769E;">import</span> Geometry</span>
-<span id="cb23-4"><span class="im" style="color: #00769E;">from</span> rdkit.Chem.Draw <span class="im" style="color: #00769E;">import</span> rdMolDraw2D</span>
-<span id="cb23-5">sizer <span class="op" style="color: #5E5E5E;">=</span> rdMolDraw2D.MolDraw2DSVG(<span class="op" style="color: #5E5E5E;">-</span><span class="dv" style="color: #AD0000;">1</span>,<span class="op" style="color: #5E5E5E;">-</span><span class="dv" style="color: #AD0000;">1</span>)</span>
-<span id="cb23-6">hit_sz <span class="op" style="color: #5E5E5E;">=</span> sizer.GetMolSize(hit,legend<span class="op" style="color: #5E5E5E;">=</span>hitLabel)</span>
-<span id="cb23-7">lead_sz <span class="op" style="color: #5E5E5E;">=</span> sizer.GetMolSize(lead,legend<span class="op" style="color: #5E5E5E;">=</span>leadLabel)</span>
-<span id="cb23-8">interm_sz <span class="op" style="color: #5E5E5E;">=</span> sizer.GetMolSize(interm,legend<span class="op" style="color: #5E5E5E;">=</span>intermLabel)</span>
-<span id="cb23-9"></span>
-<span id="cb23-10">arrowLength <span class="op" style="color: #5E5E5E;">=</span> <span class="dv" style="color: #AD0000;">100</span></span>
-<span id="cb23-11">arrowPadding <span class="op" style="color: #5E5E5E;">=</span> <span class="dv" style="color: #AD0000;">10</span></span>
-<span id="cb23-12"></span>
-<span id="cb23-13">width <span class="op" style="color: #5E5E5E;">=</span> <span class="bu" style="color: null;">max</span>((lead_sz[<span class="dv" style="color: #AD0000;">0</span>]<span class="op" style="color: #5E5E5E;">+</span>interm_sz[<span class="dv" style="color: #AD0000;">0</span>]),hit_sz[<span class="dv" style="color: #AD0000;">0</span>])</span>
-<span id="cb23-14">secondRowHeight <span class="op" style="color: #5E5E5E;">=</span> <span class="bu" style="color: null;">max</span>(lead_sz[<span class="dv" style="color: #AD0000;">1</span>],interm_sz[<span class="dv" style="color: #AD0000;">1</span>])</span>
-<span id="cb23-15">height <span class="op" style="color: #5E5E5E;">=</span> secondRowHeight<span class="op" style="color: #5E5E5E;">+</span>hit_sz[<span class="dv" style="color: #AD0000;">1</span>]<span class="op" style="color: #5E5E5E;">+</span>arrowLength <span class="op" style="color: #5E5E5E;">+</span> arrowPadding</span>
-<span id="cb23-16">d2d <span class="op" style="color: #5E5E5E;">=</span> rdMolDraw2D.MolDraw2DSVG(width,height)</span>
-<span id="cb23-17">d2d.SetFlexiMode(<span class="va" style="color: #111111;">True</span>)</span>
-<span id="cb23-18">d2d.ClearDrawing()</span>
-<span id="cb23-19">d2d.drawOptions().clearBackground <span class="op" style="color: #5E5E5E;">=</span> <span class="va" style="color: #111111;">False</span></span>
-<span id="cb23-20">d2d.SetOffset(width<span class="op" style="color: #5E5E5E;">//</span><span class="dv" style="color: #AD0000;">2</span> <span class="op" style="color: #5E5E5E;">-</span> hit_sz[<span class="dv" style="color: #AD0000;">0</span>]<span class="op" style="color: #5E5E5E;">//</span><span class="dv" style="color: #AD0000;">2</span>,<span class="dv" style="color: #AD0000;">0</span>)</span>
-<span id="cb23-21">d2d.DrawMolecule(hit,legend<span class="op" style="color: #5E5E5E;">=</span>hitLabel)</span>
-<span id="cb23-22"></span>
-<span id="cb23-23">d2d.SetOffset(<span class="dv" style="color: #AD0000;">0</span>,height<span class="op" style="color: #5E5E5E;">-</span>secondRowHeight)</span>
-<span id="cb23-24">d2d.DrawMolecule(interm,legend<span class="op" style="color: #5E5E5E;">=</span>intermLabel)</span>
-<span id="cb23-25"></span>
-<span id="cb23-26">d2d.SetOffset(width <span class="op" style="color: #5E5E5E;">-</span> lead_sz[<span class="dv" style="color: #AD0000;">0</span>],height<span class="op" style="color: #5E5E5E;">-</span>secondRowHeight)</span>
-<span id="cb23-27">d2d.DrawMolecule(lead,legend<span class="op" style="color: #5E5E5E;">=</span>leadLabel)</span>
-<span id="cb23-28"></span>
-<span id="cb23-29"></span>
-<span id="cb23-30">arrowStart <span class="op" style="color: #5E5E5E;">=</span> Geometry.Point2D(width<span class="op" style="color: #5E5E5E;">//</span><span class="dv" style="color: #AD0000;">2</span>,hit_sz[<span class="dv" style="color: #AD0000;">1</span>]<span class="op" style="color: #5E5E5E;">+</span>arrowPadding<span class="op" style="color: #5E5E5E;">/</span><span class="dv" style="color: #AD0000;">2</span>)</span>
-<span id="cb23-31">arrowEnd1 <span class="op" style="color: #5E5E5E;">=</span> arrowStart <span class="op" style="color: #5E5E5E;">+</span> Geometry.Point2D(<span class="dv" style="color: #AD0000;">0</span>,arrowLength)</span>
-<span id="cb23-32">arrowEnd1.x <span class="op" style="color: #5E5E5E;">-=</span> interm_sz[<span class="dv" style="color: #AD0000;">0</span>]<span class="op" style="color: #5E5E5E;">/</span><span class="dv" style="color: #AD0000;">2</span></span>
-<span id="cb23-33">arrowEnd2 <span class="op" style="color: #5E5E5E;">=</span> arrowStart <span class="op" style="color: #5E5E5E;">+</span> Geometry.Point2D(<span class="dv" style="color: #AD0000;">0</span>,arrowLength)</span>
-<span id="cb23-34">arrowEnd2.x <span class="op" style="color: #5E5E5E;">+=</span> lead_sz[<span class="dv" style="color: #AD0000;">0</span>]<span class="op" style="color: #5E5E5E;">/</span><span class="dv" style="color: #AD0000;">2</span></span>
-<span id="cb23-35"></span>
-<span id="cb23-36">d2d.SetOffset(<span class="dv" style="color: #AD0000;">0</span>,<span class="dv" style="color: #AD0000;">0</span>)</span>
-<span id="cb23-37">d2d.SetLineWidth(<span class="dv" style="color: #AD0000;">4</span>)</span>
-<span id="cb23-38">d2d.DrawArrow(arrowStart,arrowEnd1,rawCoords<span class="op" style="color: #5E5E5E;">=</span><span class="va" style="color: #111111;">True</span>)</span>
-<span id="cb23-39">d2d.DrawArrow(arrowStart,arrowEnd2,rawCoords<span class="op" style="color: #5E5E5E;">=</span><span class="va" style="color: #111111;">True</span>)</span>
-<span id="cb23-40"></span>
-<span id="cb23-41">labelPos <span class="op" style="color: #5E5E5E;">=</span> arrowStart</span>
-<span id="cb23-42">labelPos.y <span class="op" style="color: #5E5E5E;">+=</span> arrowLength<span class="op" style="color: #5E5E5E;">/</span><span class="dv" style="color: #AD0000;">2</span></span>
-<span id="cb23-43">d2d.SetFontSize(d2d.FontSize()<span class="op" style="color: #5E5E5E;">*</span><span class="fl" style="color: #AD0000;">1.5</span>)</span>
-<span id="cb23-44">d2d.DrawString(<span class="st" style="color: #20794D;">"optimization"</span>,labelPos,<span class="dv" style="color: #AD0000;">0</span>,rawCoords<span class="op" style="color: #5E5E5E;">=</span><span class="va" style="color: #111111;">True</span>)</span>
-<span id="cb23-45"></span>
-<span id="cb23-46">d2d.FinishDrawing()</span>
-<span id="cb23-47"></span>
-<span id="cb23-48">SVG(d2d.GetDrawingText())</span></code></pre></div>
-<div class="cell-output cell-output-display" data-execution_count="18">
-<p><img src="https://greglandrum.github.io/rdkit-blog/posts/2023-05-03-new-release-highlights_files/figure-html/cell-19-output-1.svg" class="img-fluid"></p>
-</div>
-</div>
-<p>As mentioned, there is some work required to figure out where to place everything on the canvas, but I think this opens the doors to doing a bunch of cool molecular visualizations.</p>
-<p>That’s it for this post. I’ll probably do another one or two of this as other thing strike me. If you see something in the release notes that you’re curious about, leave a commet. I’ll try and do a follow up to answer whatever questions come up.</p>
-
-
-</section>
-
- ]]></description>
-  <category>release</category>
-  <guid>https://greglandrum.github.io/rdkit-blog/posts/2023-05-03-new-release-highlights.html</guid>
-  <pubDate>Tue, 02 May 2023 22:00:00 GMT</pubDate>
-  <media:content url="https://greglandrum.github.io/rdkit-blog/posts/images/blog/2023-03-release-highlights-1.png" medium="image" type="image/png" height="134" width="144"/>
 </item>
 </channel>
 </rss>
