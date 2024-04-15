@@ -1,0 +1,812 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en"><head>
+
+<meta charset="utf-8">
+<meta name="generator" content="quarto-1.2.269">
+
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+
+<meta name="dcterms.date" content="2023-10-25">
+<meta name="description" content="A new way to draw multiple molecules in a grid">
+
+<title>RDKit blog - Plotting rows and columns of molecules with MolsMatrixToGridImage</title>
+<style>
+code{white-space: pre-wrap;}
+span.smallcaps{font-variant: small-caps;}
+div.columns{display: flex; gap: min(4vw, 1.5em);}
+div.column{flex: auto; overflow-x: auto;}
+div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+ul.task-list{list-style: none;}
+ul.task-list li input[type="checkbox"] {
+  width: 0.8em;
+  margin: 0 0.8em 0.2em -1.6em;
+  vertical-align: middle;
+}
+pre > code.sourceCode { white-space: pre; position: relative; }
+pre > code.sourceCode > span { display: inline-block; line-height: 1.25; }
+pre > code.sourceCode > span:empty { height: 1.2em; }
+.sourceCode { overflow: visible; }
+code.sourceCode > span { color: inherit; text-decoration: inherit; }
+div.sourceCode { margin: 1em 0; }
+pre.sourceCode { margin: 0; }
+@media screen {
+div.sourceCode { overflow: auto; }
+}
+@media print {
+pre > code.sourceCode { white-space: pre-wrap; }
+pre > code.sourceCode > span { text-indent: -5em; padding-left: 5em; }
+}
+pre.numberSource code
+  { counter-reset: source-line 0; }
+pre.numberSource code > span
+  { position: relative; left: -4em; counter-increment: source-line; }
+pre.numberSource code > span > a:first-child::before
+  { content: counter(source-line);
+    position: relative; left: -1em; text-align: right; vertical-align: baseline;
+    border: none; display: inline-block;
+    -webkit-touch-callout: none; -webkit-user-select: none;
+    -khtml-user-select: none; -moz-user-select: none;
+    -ms-user-select: none; user-select: none;
+    padding: 0 4px; width: 4em;
+    color: #aaaaaa;
+  }
+pre.numberSource { margin-left: 3em; border-left: 1px solid #aaaaaa;  padding-left: 4px; }
+div.sourceCode
+  {   }
+@media screen {
+pre > code.sourceCode > span > a:first-child::before { text-decoration: underline; }
+}
+code span.al { color: #ff0000; font-weight: bold; } /* Alert */
+code span.an { color: #60a0b0; font-weight: bold; font-style: italic; } /* Annotation */
+code span.at { color: #7d9029; } /* Attribute */
+code span.bn { color: #40a070; } /* BaseN */
+code span.bu { color: #008000; } /* BuiltIn */
+code span.cf { color: #007020; font-weight: bold; } /* ControlFlow */
+code span.ch { color: #4070a0; } /* Char */
+code span.cn { color: #880000; } /* Constant */
+code span.co { color: #60a0b0; font-style: italic; } /* Comment */
+code span.cv { color: #60a0b0; font-weight: bold; font-style: italic; } /* CommentVar */
+code span.do { color: #ba2121; font-style: italic; } /* Documentation */
+code span.dt { color: #902000; } /* DataType */
+code span.dv { color: #40a070; } /* DecVal */
+code span.er { color: #ff0000; font-weight: bold; } /* Error */
+code span.ex { } /* Extension */
+code span.fl { color: #40a070; } /* Float */
+code span.fu { color: #06287e; } /* Function */
+code span.im { color: #008000; font-weight: bold; } /* Import */
+code span.in { color: #60a0b0; font-weight: bold; font-style: italic; } /* Information */
+code span.kw { color: #007020; font-weight: bold; } /* Keyword */
+code span.op { color: #666666; } /* Operator */
+code span.ot { color: #007020; } /* Other */
+code span.pp { color: #bc7a00; } /* Preprocessor */
+code span.sc { color: #4070a0; } /* SpecialChar */
+code span.ss { color: #bb6688; } /* SpecialString */
+code span.st { color: #4070a0; } /* String */
+code span.va { color: #19177c; } /* Variable */
+code span.vs { color: #4070a0; } /* VerbatimString */
+code span.wa { color: #60a0b0; font-weight: bold; font-style: italic; } /* Warning */
+</style>
+
+
+<script src="../site_libs/quarto-nav/quarto-nav.js"></script>
+<script src="../site_libs/quarto-nav/headroom.min.js"></script>
+<script src="../site_libs/clipboard/clipboard.min.js"></script>
+<script src="../site_libs/quarto-search/autocomplete.umd.js"></script>
+<script src="../site_libs/quarto-search/fuse.min.js"></script>
+<script src="../site_libs/quarto-search/quarto-search.js"></script>
+<meta name="quarto:offset" content="../">
+<link href="../posts/icons/favicon.ico" rel="icon">
+<script src="../site_libs/quarto-html/quarto.js"></script>
+<script src="../site_libs/quarto-html/popper.min.js"></script>
+<script src="../site_libs/quarto-html/tippy.umd.min.js"></script>
+<script src="../site_libs/quarto-html/anchor.min.js"></script>
+<link href="../site_libs/quarto-html/tippy.css" rel="stylesheet">
+<link href="../site_libs/quarto-html/quarto-syntax-highlighting.css" rel="stylesheet" class="quarto-color-scheme" id="quarto-text-highlighting-styles">
+<link href="../site_libs/quarto-html/quarto-syntax-highlighting-dark.css" rel="prefetch" class="quarto-color-scheme quarto-color-alternate" id="quarto-text-highlighting-styles">
+<script src="../site_libs/bootstrap/bootstrap.min.js"></script>
+<link href="../site_libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
+<link href="../site_libs/bootstrap/bootstrap.min.css" rel="stylesheet" class="quarto-color-scheme" id="quarto-bootstrap" data-mode="light">
+<link href="../site_libs/bootstrap/bootstrap-dark.min.css" rel="prefetch" class="quarto-color-scheme quarto-color-alternate" id="quarto-bootstrap" data-mode="dark">
+<script id="quarto-search-options" type="application/json">{
+  "location": "navbar",
+  "copy-button": false,
+  "collapse-after": 3,
+  "panel-placement": "end",
+  "type": "overlay",
+  "limit": 20,
+  "language": {
+    "search-no-results-text": "No results",
+    "search-matching-documents-text": "matching documents",
+    "search-copy-link-title": "Copy link to search",
+    "search-hide-matches-text": "Hide additional matches",
+    "search-more-match-text": "more match in this document",
+    "search-more-matches-text": "more matches in this document",
+    "search-clear-button-title": "Clear",
+    "search-detached-cancel-button-title": "Cancel",
+    "search-submit-button-title": "Submit"
+  }
+}</script>
+
+
+<link rel="stylesheet" href="../styles.css">
+</head>
+
+<body class="nav-fixed">
+
+<div id="quarto-search-results"></div>
+  <header id="quarto-header" class="headroom fixed-top">
+    <nav class="navbar navbar-expand-lg navbar-dark ">
+      <div class="navbar-container container-fluid">
+      <div class="navbar-brand-container">
+    <a class="navbar-brand" href="../index.html">
+    <span class="navbar-title">RDKit blog</span>
+    </a>
+  </div>
+          <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarCollapse" aria-controls="navbarCollapse" aria-expanded="false" aria-label="Toggle navigation" onclick="if (window.quartoToggleHeadroom) { window.quartoToggleHeadroom(); }">
+  <span class="navbar-toggler-icon"></span>
+</button>
+          <div class="collapse navbar-collapse" id="navbarCollapse">
+            <ul class="navbar-nav navbar-nav-scroll ms-auto">
+  <li class="nav-item">
+    <a class="nav-link" href="../about.html">
+ <span class="menu-text">RDKit experiments, tips, and tutorials</span></a>
+  </li>  
+  <li class="nav-item compact">
+    <a class="nav-link" href="https://github.com/rdkit/rdkit"><i class="bi bi-github" role="img">
+</i> 
+ <span class="menu-text"></span></a>
+  </li>  
+  <li class="nav-item compact">
+    <a class="nav-link" href="https://twitter.com/rdkit_org"><i class="bi bi-twitter" role="img">
+</i> 
+ <span class="menu-text"></span></a>
+  </li>  
+  <li class="nav-item compact">
+    <a class="nav-link" href="../index.xml"><i class="bi bi-rss" role="img">
+</i> 
+ <span class="menu-text"></span></a>
+  </li>  
+</ul>
+              <div class="quarto-toggle-container">
+                  <a href="" class="quarto-color-scheme-toggle nav-link" onclick="window.quartoToggleColorScheme(); return false;" title="Toggle dark mode"><i class="bi"></i></a>
+              </div>
+              <div id="quarto-search" class="" title="Search"></div>
+          </div> <!-- /navcollapse -->
+      </div> <!-- /container-fluid -->
+    </nav>
+</header>
+<!-- content -->
+<div id="quarto-content" class="quarto-container page-columns page-rows-contents page-layout-article page-navbar">
+<!-- sidebar -->
+<!-- margin-sidebar -->
+    <div id="quarto-margin-sidebar" class="sidebar margin-sidebar">
+        <nav id="TOC" role="doc-toc" class="toc-active">
+    <h2 id="toc-title">On this page</h2>
+   
+  <ul>
+  <li><a href="#comparing-molsmatrixtogridimage-to-molstogridimage" id="toc-comparing-molsmatrixtogridimage-to-molstogridimage" class="nav-link active" data-scroll-target="#comparing-molsmatrixtogridimage-to-molstogridimage">Comparing MolsMatrixToGridImage to MolsToGridImage</a>
+  <ul class="collapse">
+  <li><a href="#choosing-a-grid-image-function" id="toc-choosing-a-grid-image-function" class="nav-link" data-scroll-target="#choosing-a-grid-image-function">Choosing a grid image function</a></li>
+  </ul></li>
+  <li><a href="#use-cases" id="toc-use-cases" class="nav-link" data-scroll-target="#use-cases">Use cases</a>
+  <ul class="collapse">
+  <li><a href="#synthetic-accessibility" id="toc-synthetic-accessibility" class="nav-link" data-scroll-target="#synthetic-accessibility">Synthetic accessibility</a></li>
+  <li><a href="#find-the-maximum-common-substructure-and-groups-off-it" id="toc-find-the-maximum-common-substructure-and-groups-off-it" class="nav-link" data-scroll-target="#find-the-maximum-common-substructure-and-groups-off-it">Find the maximum common substructure and groups off it</a></li>
+  <li><a href="#retrosynthetic-analysis" id="toc-retrosynthetic-analysis" class="nav-link" data-scroll-target="#retrosynthetic-analysis">Retrosynthetic analysis</a></li>
+  </ul></li>
+  <li><a href="#molsmatrixtogridimage-parameters" id="toc-molsmatrixtogridimage-parameters" class="nav-link" data-scroll-target="#molsmatrixtogridimage-parameters">MolsMatrixToGridImage parameters</a>
+  <ul class="collapse">
+  <li><a href="#requirements-for-agreement-of-dimensions-of-per-molecule-parameters" id="toc-requirements-for-agreement-of-dimensions-of-per-molecule-parameters" class="nav-link" data-scroll-target="#requirements-for-agreement-of-dimensions-of-per-molecule-parameters">Requirements for agreement of dimensions of per-molecule parameters</a></li>
+  <li><a href="#inserting-blank-cells" id="toc-inserting-blank-cells" class="nav-link" data-scroll-target="#inserting-blank-cells">Inserting blank cells</a></li>
+  <li><a href="#example-with-all-parameters" id="toc-example-with-all-parameters" class="nav-link" data-scroll-target="#example-with-all-parameters">Example with all parameters</a></li>
+  </ul></li>
+  <li><a href="#share-your-examples" id="toc-share-your-examples" class="nav-link" data-scroll-target="#share-your-examples">Share your examples</a></li>
+  </ul>
+</nav>
+    </div>
+<!-- main -->
+<main class="content" id="quarto-document-content">
+
+<header id="title-block-header" class="quarto-title-block default">
+<div class="quarto-title">
+<h1 class="title">Plotting rows and columns of molecules with MolsMatrixToGridImage</h1>
+  <div class="quarto-categories">
+    <div class="quarto-category">release</div>
+    <div class="quarto-category">tutorial</div>
+  </div>
+  </div>
+
+<div>
+  <div class="description">
+    A new way to draw multiple molecules in a grid
+  </div>
+</div>
+
+
+<div class="quarto-title-meta">
+
+    
+    <div>
+    <div class="quarto-title-meta-heading">Published</div>
+    <div class="quarto-title-meta-contents">
+      <p class="date">October 25, 2023</p>
+    </div>
+  </div>
+  
+    
+  </div>
+  
+
+</header>
+
+<p>This guest post by Jeremy Monat (GitHub: <a href="https://github.com/bertiewooster/"><span class="citation" data-cites="bertiewooster">@bertiewooster</span></a>), who contributed <code>MolsMatrixToGridImage</code> to the RDKit, is the third of a few posts covering some of the new or improved features in the 2023.09.1 RDKit release.</p>
+<p><a href="https://www.rdkit.org/docs/source/rdkit.Chem.Draw.html#rdkit.Chem.Draw.MolsMatrixToGridImage"><code>MolsMatrixToGridImage</code></a>, new in RDKit 2023.09.1, is designed to easily plot a rectangular grid of molecules, that is, rows and columns of molecules.</p>
+<section id="comparing-molsmatrixtogridimage-to-molstogridimage" class="level2">
+<h2 class="anchored" data-anchor-id="comparing-molsmatrixtogridimage-to-molstogridimage">Comparing MolsMatrixToGridImage to MolsToGridImage</h2>
+<p><code>MolsMatrixToGridImage</code> builds on <a href="https://www.rdkit.org/docs/source/rdkit.Chem.Draw.html#rdkit.Chem.Draw.MolsToGridImage"><code>MolsToGridImage</code></a>. In fact, <code>MolsMatrixToGridImage</code> internally calls <code>MolsToGridImage</code>, so they can output the same images and formats.</p>
+<p>The difference is that <code>MolsMatrixToGridImage</code> creates a rectangular row-and-column format by using nested input data structures. Each data substructure represents a row of molecules. <code>MolsMatrixToGridImage</code> automatically pads rows as needed so all rows are the length of the longest row, making it easy to plot molecules in a matrix without having to think about the length of each row.</p>
+<p>As a minimal example, if we want to plot a single interhalogen molecule at various cells in a grid, for example to represent a spatial arrangement:</p>
+<div class="cell" data-execution_count="92">
+<div class="sourceCode cell-code" id="cb1"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="op">%%</span>capture</span>
+<span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> rdkit.Chem.Draw <span class="im">import</span> IPythonConsole</span>
+<span id="cb1-3"><a href="#cb1-3" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> rdkit.Chem <span class="im">import</span> AllChem <span class="im">as</span> Chem</span>
+<span id="cb1-4"><a href="#cb1-4" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> rdkit.Chem.Draw <span class="im">import</span> MolsToGridImage, rdMolDraw2D, MolsMatrixToGridImage</span>
+<span id="cb1-5"><a href="#cb1-5" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> copy</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+<div class="cell" data-execution_count="93">
+<div class="sourceCode cell-code" id="cb2"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a>mol <span class="op">=</span> Chem.MolFromSmiles(<span class="st">"FCl"</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+<p>both of the following produce the same grid image:</p>
+<div class="cell" data-execution_count="94">
+<div class="sourceCode cell-code" id="cb3"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a><span class="co"># MolsMatrixToGridImage usage</span></span>
+<span id="cb3-2"><a href="#cb3-2" aria-hidden="true" tabindex="-1"></a>molsMatrix <span class="op">=</span> [[mol, mol], [mol, <span class="va">None</span>, mol]]</span>
+<span id="cb3-3"><a href="#cb3-3" aria-hidden="true" tabindex="-1"></a>MolsMatrixToGridImage(molsMatrix<span class="op">=</span>molsMatrix)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-display" data-execution_count="94">
+<p><img src="2023-10-25-molsmatrixtogridimage_files/figure-html/cell-4-output-1.png" class="img-fluid"></p>
+</div>
+</div>
+<div class="cell" data-execution_count="95">
+<div class="sourceCode cell-code" id="cb4"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a><span class="co"># MolsToGridImage usage</span></span>
+<span id="cb4-2"><a href="#cb4-2" aria-hidden="true" tabindex="-1"></a>mols <span class="op">=</span> [mol, mol, <span class="va">None</span>, mol, <span class="va">None</span>, mol]</span>
+<span id="cb4-3"><a href="#cb4-3" aria-hidden="true" tabindex="-1"></a>MolsToGridImage(mols<span class="op">=</span>mols, molsPerRow<span class="op">=</span><span class="dv">3</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-display" data-execution_count="95">
+<p><img src="2023-10-25-molsmatrixtogridimage_files/figure-html/cell-5-output-1.png" class="img-fluid"></p>
+</div>
+</div>
+<p>where we had to add the first <code>None</code> (null molecule) item for <code>MolsToGridImage</code> to produce the empty cell at the end of the first row.</p>
+<p>The advantage of <code>MolsMatrixToGridImage</code> is that you need not manually pad shorter (narrower) rows, and you can provide molecules in a nested format that explicitly identifies each row.</p>
+<p>While the nested data structure above for <code>MolsMatrixToGridImage</code> is a list of lists, you can use other pairs of iterables: a tuple of tuples, or a list of tuples, etc.</p>
+<section id="choosing-a-grid-image-function" class="level3">
+<h3 class="anchored" data-anchor-id="choosing-a-grid-image-function">Choosing a grid image function</h3>
+<p>Use <code>MolsToGridImage</code> if you want to plot a series of molecules in the least amount of space, where the row that each molecule is on is not important.</p>
+<p>Use <code>MolsMatrixToGridImage</code> if you want each row of molecules to represent something meaningful, and especially if the number of molecules per row can vary. The <em>columns</em> may or may not have meaning: You could plot an uninterrupted series of molecules in a row in no particular order, or you could assign molecules to columns based on some property—for example, a column may represent a spatial location. Or the columns may be used to space out molecules; for example in the retrosynthetic analysis tree below, the columns allow horizontal space for each subtree to avoid visually-confusing overlapping with adjacent subtrees.</p>
+<p>A borderline situation is if each row will have the same number of molecules <code>n</code> (<code>n</code> = 2 below): you can create the same grid using either</p>
+<ul>
+<li><code>MolsToGridImage(molsPerRow=n)</code>, for example <code>MolsToGridImage([mol1a, mol1b, mol2a, mol2b, mol3a, mol3b], molsPerRow=2)</code>.</li>
+<li><code>MolsMatrixToGridImage</code> with <code>n</code> molecules in each row, for example <code>MolsMatrixToGridImage([[mol1a, mol1b], [mol2a, mol2b], [mol3a, mol3b]])</code>. You may find this format easier to use because each row is in its own sub-list. Also, you need not explicitly declare the number of molecules per row, so if you later change that number <code>n</code>, or have a different number of molecules on a given row, the grid will automatically adjust accordingly.</li>
+</ul>
+<p>Both <code>MolsMatrixToGridImage</code> and <code>MolsToGridImage</code> are Python functions; they are not available in C++.</p>
+</section>
+</section>
+<section id="use-cases" class="level2">
+<h2 class="anchored" data-anchor-id="use-cases">Use cases</h2>
+<p>Here are three example use cases. Each comes from an external blog post by the author, which is linked to in the use case’s heading, and which explains more about the chemistry background and how the parameters given below are generated. In each case, we show the <code>MolsMatrixToGridImage</code> usage and then the same output using <code>MolsToGridImage</code>.</p>
+<section id="synthetic-accessibility" class="level3">
+<h3 class="anchored" data-anchor-id="synthetic-accessibility"><a href="https://bertiewooster.github.io/2023/02/07/Are-the-Starting-Materials-for-Synthesizing-Your-Target-Molecules-Commercially-Available.html">Synthetic accessibility</a></h3>
+<p>Given molecules you want to synthesize, and the reaction to create each, this utility determines the starting materials, checks whether they are commercially available per PubChem, and tells you whether each target is accessible—whether all its starting materials are commercially available.</p>
+<p>Here, <code>MolsMatrixToGridImage</code> is useful because</p>
+<ul>
+<li>each row represents a synthetic target</li>
+<li>each target might have a different number of starting materials, and thus a different number of cells (columns). The first column represents the target. Subsequent columns represent the reactants, and are in no particular order.</li>
+</ul>
+<div class="cell" data-execution_count="96">
+<div class="sourceCode cell-code" id="cb5"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a><span class="co"># MolsMatrixToGridImage usage</span></span>
+<span id="cb5-2"><a href="#cb5-2" aria-hidden="true" tabindex="-1"></a>synSmilesMatrix <span class="op">=</span> [[<span class="st">'OCN1C2CC(C=C2)C1CC1NCCc2ccccc12'</span>, <span class="st">'NCCc1ccccc1'</span>, <span class="st">'O=CCC1C2C=CC(C2)N1CO'</span>], [<span class="st">'c1ccc(NCC2NCCc3ccccc32)cc1'</span>, <span class="st">'NCCc1ccccc1'</span>, <span class="st">'O=CCNc1ccccc1'</span>], [<span class="st">'[O-][N+](=O)C1=CC=C(C2NCCc3ccccc23)C2=C1C=CC=C2'</span>, <span class="st">'Nc1ccc(C2NCCc3ccccc32)c2ccccc12'</span>]]</span>
+<span id="cb5-3"><a href="#cb5-3" aria-hidden="true" tabindex="-1"></a>synMolsMatrix <span class="op">=</span> [[Chem.MolFromSmiles(smile) <span class="cf">for</span> smile <span class="kw">in</span> row] <span class="cf">for</span> row <span class="kw">in</span> synSmilesMatrix]</span>
+<span id="cb5-4"><a href="#cb5-4" aria-hidden="true" tabindex="-1"></a>synLegendsMatrix <span class="op">=</span> [[<span class="st">'Pictet-Spengler target accessible: No'</span>, <span class="st">'Reactant available: Yes'</span>, <span class="st">'Reactant available: No'</span>], [<span class="st">'Pictet-Spengler target accesible: Yes'</span>, <span class="st">'Reactant available: Yes'</span>, <span class="st">'Reactant available: Yes'</span>], [<span class="st">'Amine oxidation target accessible: No'</span>, <span class="st">'Reactant available: No'</span>]]</span>
+<span id="cb5-5"><a href="#cb5-5" aria-hidden="true" tabindex="-1"></a>MolsMatrixToGridImage(molsMatrix<span class="op">=</span>synMolsMatrix, legendsMatrix<span class="op">=</span>synLegendsMatrix)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-display" data-execution_count="96">
+<p><img src="2023-10-25-molsmatrixtogridimage_files/figure-html/cell-6-output-1.png" class="img-fluid"></p>
+</div>
+</div>
+<div class="cell" data-execution_count="97">
+<div class="sourceCode cell-code" id="cb6"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb6-1"><a href="#cb6-1" aria-hidden="true" tabindex="-1"></a><span class="co"># MolsToGridImage usage</span></span>
+<span id="cb6-2"><a href="#cb6-2" aria-hidden="true" tabindex="-1"></a>synSmiles <span class="op">=</span> [<span class="st">'OCN1C2CC(C=C2)C1CC1NCCc2ccccc12'</span>, <span class="st">'NCCc1ccccc1'</span>, <span class="st">'O=CCC1C2C=CC(C2)N1CO'</span>, <span class="st">'c1ccc(NCC2NCCc3ccccc32)cc1'</span>, <span class="st">'NCCc1ccccc1'</span>, <span class="st">'O=CCNc1ccccc1'</span>, <span class="st">'[O-][N+](=O)C1=CC=C(C2NCCc3ccccc23)C2=C1C=CC=C2'</span>, <span class="st">'Nc1ccc(C2NCCc3ccccc32)c2ccccc12'</span>, <span class="st">''</span>]</span>
+<span id="cb6-3"><a href="#cb6-3" aria-hidden="true" tabindex="-1"></a>synMols <span class="op">=</span> [Chem.MolFromSmiles(smile) <span class="cf">for</span> smile <span class="kw">in</span> synSmiles]</span>
+<span id="cb6-4"><a href="#cb6-4" aria-hidden="true" tabindex="-1"></a>synLegends <span class="op">=</span> [<span class="st">'Pictet-Spengler target accessible: No'</span>, <span class="st">'Reactant available: Yes'</span>, <span class="st">'Reactant available: No'</span>, <span class="st">'Pictet-Spengler target accesible: Yes'</span>, <span class="st">'Reactant available: Yes'</span>, <span class="st">'Reactant available: Yes'</span>, <span class="st">'Amine oxidation target accessible: No'</span>, <span class="st">'Reactant available: No'</span>, <span class="st">''</span>]</span>
+<span id="cb6-5"><a href="#cb6-5" aria-hidden="true" tabindex="-1"></a>MolsToGridImage(mols<span class="op">=</span>synMols, legends<span class="op">=</span>synLegends, molsPerRow<span class="op">=</span><span class="dv">3</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-display" data-execution_count="97">
+<p><img src="2023-10-25-molsmatrixtogridimage_files/figure-html/cell-7-output-1.png" class="img-fluid"></p>
+</div>
+</div>
+</section>
+<section id="find-the-maximum-common-substructure-and-groups-off-it" class="level3">
+<h3 class="anchored" data-anchor-id="find-the-maximum-common-substructure-and-groups-off-it"><a href="https://bertiewooster.github.io/2022/12/25/RDKit-Find-Groups-Off-Common-Core.html">Find the maximum common substructure and groups off it</a></h3>
+<p>In drug discovery, the lead optimization step often involves creating analogues of a hit (a promising compound which produces a desired result in an assay) to optimize selectivity and minimize toxicity. Because it has historically been easier to chemically modify the periphery of the molecule (for example the functional groups) than the scaffold, it is helpful to compare the groups off of the common scaffold. A utility function uses the RDKit to find the maximum common substructure (MCS) between a set of molecules, then show the groups off of that core scaffold.</p>
+<p>Here, <code>MolsMatrixToGridImage</code> is useful because</p>
+<ul>
+<li>each row represents a molecule in the set</li>
+<li>each of those molecules might have a different number of groups off the core scaffold. The first column represents the molecule. Subsequent columns represent the groups off the core scaffold for that molecule, and are in no particular order.</li>
+</ul>
+<p>The following example is for a set of two pyridinols.</p>
+<div class="cell" data-execution_count="98">
+<div class="sourceCode cell-code" id="cb7"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb7-1"><a href="#cb7-1" aria-hidden="true" tabindex="-1"></a><span class="co"># MolsMatrixToGridImage usage</span></span>
+<span id="cb7-2"><a href="#cb7-2" aria-hidden="true" tabindex="-1"></a>mcsStringsMatrix <span class="op">=</span> [[<span class="st">'[#6]1:[#6](-[#8]):[#6]:[#7]:[#6](:[#6]:1)-[#7]'</span>, <span class="st">'NC1:C:C:C(O):C:N:1'</span>], [<span class="st">'c1c(O)cnc(N)c(NC(=O)(C))1'</span>, <span class="st">'[2*]NC(C)=O'</span>], [<span class="st">'c1c(O)cnc(N(CCC))c1(C)'</span>, <span class="st">'[0*]CCC'</span>, <span class="st">'[2*]C'</span>]]</span>
+<span id="cb7-3"><a href="#cb7-3" aria-hidden="true" tabindex="-1"></a>mcsMolsMatrix <span class="op">=</span> [[Chem.MolFromSmiles(smile) <span class="cf">for</span> smile <span class="kw">in</span> row] <span class="cf">for</span> row <span class="kw">in</span> mcsStringsMatrix]</span>
+<span id="cb7-4"><a href="#cb7-4" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb7-5"><a href="#cb7-5" aria-hidden="true" tabindex="-1"></a>mcsLegends <span class="op">=</span> [[<span class="st">'Max. substructure match'</span>, <span class="st">'Core'</span>], [<span class="st">'aldehyde off aromatic carbon'</span>, <span class="st">'[2*]NC(C)=O'</span>], [<span class="st">'alkyl off amine'</span>, <span class="st">'[0*]CCC'</span>, <span class="st">'[2*]C'</span>]]</span>
+<span id="cb7-6"><a href="#cb7-6" aria-hidden="true" tabindex="-1"></a>mcsHighlightAtomLists <span class="op">=</span> [[(), ()], [(<span class="dv">0</span>, <span class="dv">1</span>, <span class="dv">2</span>, <span class="dv">3</span>, <span class="dv">4</span>, <span class="dv">5</span>, <span class="dv">7</span>, <span class="dv">6</span>), ()], [(<span class="dv">0</span>, <span class="dv">1</span>, <span class="dv">2</span>, <span class="dv">3</span>, <span class="dv">4</span>, <span class="dv">5</span>, <span class="dv">10</span>, <span class="dv">6</span>), (), ()]]</span>
+<span id="cb7-7"><a href="#cb7-7" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb7-8"><a href="#cb7-8" aria-hidden="true" tabindex="-1"></a>mcsMolForMatrix <span class="op">=</span> Chem.MolFromSmarts(mcsStringsMatrix[<span class="dv">0</span>][<span class="dv">0</span>])</span>
+<span id="cb7-9"><a href="#cb7-9" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb7-10"><a href="#cb7-10" aria-hidden="true" tabindex="-1"></a><span class="co"># Align cores--optional, for easier visual comparison of molecules</span></span>
+<span id="cb7-11"><a href="#cb7-11" aria-hidden="true" tabindex="-1"></a>subms <span class="op">=</span> [mcsMolsMatrix[<span class="dv">0</span>][<span class="dv">1</span>]]</span>
+<span id="cb7-12"><a href="#cb7-12" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> row <span class="kw">in</span> mcsMolsMatrix[<span class="dv">1</span>:]:</span>
+<span id="cb7-13"><a href="#cb7-13" aria-hidden="true" tabindex="-1"></a>    subms <span class="op">+=</span> [row[<span class="dv">0</span>]]</span>
+<span id="cb7-14"><a href="#cb7-14" aria-hidden="true" tabindex="-1"></a>Chem.Compute2DCoords(mcsMolForMatrix)</span>
+<span id="cb7-15"><a href="#cb7-15" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb7-16"><a href="#cb7-16" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> m <span class="kw">in</span> subms:</span>
+<span id="cb7-17"><a href="#cb7-17" aria-hidden="true" tabindex="-1"></a>    _ <span class="op">=</span> Chem.GenerateDepictionMatching2DStructure(m, mcsMolForMatrix)</span>
+<span id="cb7-18"><a href="#cb7-18" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb7-19"><a href="#cb7-19" aria-hidden="true" tabindex="-1"></a>MolsMatrixToGridImage(molsMatrix<span class="op">=</span>mcsMolsMatrix, highlightAtomListsMatrix<span class="op">=</span>mcsHighlightAtomLists, legendsMatrix<span class="op">=</span>mcsLegends, useSVG<span class="op">=</span><span class="va">True</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-display" data-execution_count="98">
+<p><img src="2023-10-25-molsmatrixtogridimage_files/figure-html/cell-8-output-1.png" class="img-fluid"></p>
+</div>
+</div>
+<div class="cell" data-execution_count="99">
+<div class="sourceCode cell-code" id="cb8"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb8-1"><a href="#cb8-1" aria-hidden="true" tabindex="-1"></a><span class="co"># MolsToGridImage usage</span></span>
+<span id="cb8-2"><a href="#cb8-2" aria-hidden="true" tabindex="-1"></a>mcsStrings <span class="op">=</span> [<span class="st">'[#6]1:[#6](-[#8]):[#6]:[#7]:[#6](:[#6]:1)-[#7]'</span>, <span class="st">'NC1:C:C:C(O):C:N:1'</span>, <span class="st">''</span>, <span class="st">'c1c(O)cnc(N)c(NC(=O)(C))1'</span>, <span class="st">'[2*]NC(C)=O'</span>, <span class="st">''</span>, <span class="st">'c1c(O)cnc(N(CCC))c1(C)'</span>, <span class="st">'[0*]CCC'</span>, <span class="st">'[2*]C'</span>]</span>
+<span id="cb8-3"><a href="#cb8-3" aria-hidden="true" tabindex="-1"></a>molsPerRow <span class="op">=</span> <span class="dv">3</span></span>
+<span id="cb8-4"><a href="#cb8-4" aria-hidden="true" tabindex="-1"></a>mcsMols <span class="op">=</span> [Chem.MolFromSmiles(smile) <span class="cf">for</span> smile <span class="kw">in</span> mcsStrings]</span>
+<span id="cb8-5"><a href="#cb8-5" aria-hidden="true" tabindex="-1"></a>mcsLegends <span class="op">=</span> [<span class="st">'Max. substructure match'</span>, <span class="st">'Core'</span>, <span class="st">''</span>, <span class="st">'aldehyde off aromatic carbon'</span>, <span class="st">'[2*]NC(C)=O'</span>, <span class="st">''</span>, <span class="st">'alkyl off amine'</span>, <span class="st">'[0*]CCC'</span>, <span class="st">'[2*]C'</span>]</span>
+<span id="cb8-6"><a href="#cb8-6" aria-hidden="true" tabindex="-1"></a>mcsHighlightAtomLists <span class="op">=</span> [(), (), (), (<span class="dv">0</span>, <span class="dv">1</span>, <span class="dv">2</span>, <span class="dv">3</span>, <span class="dv">4</span>, <span class="dv">5</span>, <span class="dv">7</span>, <span class="dv">6</span>), (), (), (<span class="dv">0</span>, <span class="dv">1</span>, <span class="dv">2</span>, <span class="dv">3</span>, <span class="dv">4</span>, <span class="dv">5</span>, <span class="dv">10</span>, <span class="dv">6</span>), (), ()]</span>
+<span id="cb8-7"><a href="#cb8-7" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb8-8"><a href="#cb8-8" aria-hidden="true" tabindex="-1"></a>mcsMol <span class="op">=</span> Chem.MolFromSmarts(mcsStrings[<span class="dv">0</span>])</span>
+<span id="cb8-9"><a href="#cb8-9" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb8-10"><a href="#cb8-10" aria-hidden="true" tabindex="-1"></a><span class="co"># Align cores--optional, just for easier visual comparison of molecules</span></span>
+<span id="cb8-11"><a href="#cb8-11" aria-hidden="true" tabindex="-1"></a>subms <span class="op">=</span> [mcsMols[<span class="dv">1</span>]]</span>
+<span id="cb8-12"><a href="#cb8-12" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> mol <span class="kw">in</span> mcsMols[molsPerRow::molsPerRow]:</span>
+<span id="cb8-13"><a href="#cb8-13" aria-hidden="true" tabindex="-1"></a>    subms <span class="op">+=</span> [mol]</span>
+<span id="cb8-14"><a href="#cb8-14" aria-hidden="true" tabindex="-1"></a>Chem.Compute2DCoords(mcsMol)</span>
+<span id="cb8-15"><a href="#cb8-15" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> m <span class="kw">in</span> subms:</span>
+<span id="cb8-16"><a href="#cb8-16" aria-hidden="true" tabindex="-1"></a>    _ <span class="op">=</span> Chem.GenerateDepictionMatching2DStructure(m, mcsMol)</span>
+<span id="cb8-17"><a href="#cb8-17" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb8-18"><a href="#cb8-18" aria-hidden="true" tabindex="-1"></a>MolsToGridImage(mcsMols, highlightAtomLists<span class="op">=</span>mcsHighlightAtomLists, legends<span class="op">=</span>mcsLegends, molsPerRow<span class="op">=</span>molsPerRow, useSVG<span class="op">=</span><span class="va">True</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-display" data-execution_count="99">
+<p><img src="2023-10-25-molsmatrixtogridimage_files/figure-html/cell-9-output-1.svg" class="img-fluid"></p>
+</div>
+</div>
+</section>
+<section id="retrosynthetic-analysis" class="level3">
+<h3 class="anchored" data-anchor-id="retrosynthetic-analysis"><a href="https://bertiewooster.github.io/2022/11/11/RDKit-Recap-decomposition-tree.html">Retrosynthetic analysis</a></h3>
+<p>Retrosynthetic analysis involves decomposing a target molecule into a set of fragments that could be combined to make the parent molecule using common reactions. The <a href="https://www.semanticscholar.org/paper/RECAP-%E2%80%94-Retrosynthetic-Combinatorial-Analysis-A-New-Lewell-Judd/fbfb10d1f63aa803f6d47df6587aa0e41109f5ee">Recap algorithm</a> by X. Lewell et al.&nbsp;accomplishes that. <a href="https://www.rdkit.org/docs/GettingStartedInPython.html#recap-implementation">Recap is implemented in the RDKit</a>.</p>
+<p>Here, <code>MolsMatrixToGridImage</code> is useful because</p>
+<ul>
+<li>each row represents a level of fragmentation, with the parent molecule at the top and increasing fragmentation towards the bottom</li>
+<li>we want to arrange the fragments hierarchically and allow horizontal space for each subtree to avoid visually-confusing overlapping with adjacent subtrees. The columns have no inherent meaning, except that the parent molecule is in the first column, and fragments (of the parent molecule and its fragments) are arrayed to the right.</li>
+</ul>
+<p>Here is an example retrosynthetic analysis of [6-(hydroxymethoxy)pyridin-2-yl]oxymethanol.</p>
+<div class="cell" data-execution_count="100">
+<div class="sourceCode cell-code" id="cb9"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb9-1"><a href="#cb9-1" aria-hidden="true" tabindex="-1"></a><span class="co"># MolsMatrixToGridImage usage</span></span>
+<span id="cb9-2"><a href="#cb9-2" aria-hidden="true" tabindex="-1"></a>retrosynSmilesMatrix <span class="op">=</span> [[<span class="st">'OCOc1cccc(OCO)n1'</span>, <span class="st">''</span>, <span class="st">''</span>],</span>
+<span id="cb9-3"><a href="#cb9-3" aria-hidden="true" tabindex="-1"></a> [<span class="st">'*CO'</span>, <span class="st">'*c1cccc(OCO)n1'</span>, <span class="st">''</span>],</span>
+<span id="cb9-4"><a href="#cb9-4" aria-hidden="true" tabindex="-1"></a> [<span class="st">''</span>, <span class="st">'*CO'</span>, <span class="st">'*c1cccc(*)n1'</span>]]</span>
+<span id="cb9-5"><a href="#cb9-5" aria-hidden="true" tabindex="-1"></a>retrosynMolsMatrix <span class="op">=</span> [[Chem.MolFromSmiles(smile) <span class="cf">for</span> smile <span class="kw">in</span> row] <span class="cf">for</span> row <span class="kw">in</span> retrosynSmilesMatrix]</span>
+<span id="cb9-6"><a href="#cb9-6" aria-hidden="true" tabindex="-1"></a>retrosynLegendsMatrix <span class="op">=</span> copy.deepcopy(retrosynSmilesMatrix)</span>
+<span id="cb9-7"><a href="#cb9-7" aria-hidden="true" tabindex="-1"></a>retrosynLegendsMatrix[<span class="dv">0</span>][<span class="dv">0</span>] <span class="op">=</span> <span class="st">"Parent molecule"</span></span>
+<span id="cb9-8"><a href="#cb9-8" aria-hidden="true" tabindex="-1"></a>MolsMatrixToGridImage(retrosynMolsMatrix, legendsMatrix<span class="op">=</span>retrosynLegendsMatrix)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-display" data-execution_count="100">
+<p><img src="2023-10-25-molsmatrixtogridimage_files/figure-html/cell-10-output-1.png" class="img-fluid"></p>
+</div>
+</div>
+<div class="cell" data-execution_count="101">
+<div class="sourceCode cell-code" id="cb10"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb10-1"><a href="#cb10-1" aria-hidden="true" tabindex="-1"></a><span class="co"># MolsToGridImage usage</span></span>
+<span id="cb10-2"><a href="#cb10-2" aria-hidden="true" tabindex="-1"></a>retrosynSmiles <span class="op">=</span> [<span class="st">'OCOc1cccc(OCO)n1'</span>, <span class="st">''</span>, <span class="st">''</span>, <span class="st">'*CO'</span>, <span class="st">'*c1cccc(OCO)n1'</span>, <span class="st">''</span>, <span class="st">''</span>, <span class="st">'*CO'</span>, <span class="st">'*c1cccc(*)n1'</span>]</span>
+<span id="cb10-3"><a href="#cb10-3" aria-hidden="true" tabindex="-1"></a>retrosynMols <span class="op">=</span> [Chem.MolFromSmiles(smile) <span class="cf">for</span> smile <span class="kw">in</span> retrosynSmiles]</span>
+<span id="cb10-4"><a href="#cb10-4" aria-hidden="true" tabindex="-1"></a>retrosynLegends <span class="op">=</span> [<span class="st">'Parent molecule'</span>, <span class="st">''</span>, <span class="st">''</span>, <span class="st">'*CO'</span>, <span class="st">'*c1cccc(OCO)n1'</span>, <span class="st">''</span>, <span class="st">''</span>, <span class="st">'*CO'</span>, <span class="st">'*c1cccc(*)n1'</span>]</span>
+<span id="cb10-5"><a href="#cb10-5" aria-hidden="true" tabindex="-1"></a>MolsToGridImage(mols<span class="op">=</span>retrosynMols, legends<span class="op">=</span>retrosynLegends, molsPerRow<span class="op">=</span><span class="dv">3</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-display" data-execution_count="101">
+<p><img src="2023-10-25-molsmatrixtogridimage_files/figure-html/cell-11-output-1.png" class="img-fluid"></p>
+</div>
+</div>
+</section>
+</section>
+<section id="molsmatrixtogridimage-parameters" class="level2">
+<h2 class="anchored" data-anchor-id="molsmatrixtogridimage-parameters">MolsMatrixToGridImage parameters</h2>
+<p>The only required parameter to <code>MolsMatrixToGridImage</code> is <code>molsMatrix</code>.</p>
+<p><code>MolsMatrixToGridImage</code> nests data structures one additional level beyond the analogous parameter in <code>MolsToGridImage</code>. The following table compares those parameters for the two functions, where the example parameters would produce the same output for their respective functions.</p>
+<table>
+<colgroup>
+<col style="width: 100%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>Key to table lines within a cell:<br><code>MolsToGridImage</code><em><br><code>MolsMatrixToGridImage</code><br></em></th>
+</tr>
+</thead>
+<tbody>
+</tbody>
+</table>
+<table class="table">
+<colgroup>
+<col style="width: 13%">
+<col style="width: 8%">
+<col style="width: 12%">
+<col style="width: 16%">
+<col style="width: 49%">
+</colgroup>
+<thead>
+<tr class="header">
+<th></th>
+<th>Elements mean</th>
+<th>Parameter name</th>
+<th>Data structure</th>
+<th>Example</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>Molecules</td>
+<td>RDKit molecule</td>
+<td>mols<br><em>molsMatrix</em></td>
+<td>Iterable[mol]<br><em>Iterable[<wbr>Iterable[mol]]</em></td>
+<td>[FCl, FCl, None, FCl, None, FCl]<br><em>[[FCl, FCl], [FCl, None, FCl]]</em></td>
+</tr>
+<tr class="even">
+<td>Legends</td>
+<td>Legend text</td>
+<td>legends<br><em>legendsMatrix</em></td>
+<td>Iterable[str]<br><em>Iterable[<wbr>Iterable[<wbr>str]]</em></td>
+<td>[“no highlighting”, “bond highlighted”, ““,”F highlighted”, ““,”Cl and bond highlighted”]<br><em>[[“no highlighting”, “bond highlighted”], [“F highlighted”, ““,”Cl and bond highlighted”]]</em></td>
+</tr>
+<tr class="odd">
+<td>Highlight atoms</td>
+<td>Indices of atoms to highlight</td>
+<td>highlightAtomLists<br><em>highlightAtomListsMatrix</em></td>
+<td>Iterable[Iterable[int]]<br><em>Iterable[<wbr>Iterable[<wbr>Iterable[<wbr>Int]]</em></td>
+<td>[[], [], None, [0], None, [1]]<br><em>[[[], []], [[0], None, [1]]]</em></td>
+</tr>
+<tr class="even">
+<td>Highlight bonds</td>
+<td>Indices of bonds to highlight</td>
+<td>highlightBondLists<br><em>highlightBondListsMatrix</em></td>
+<td>Iterable[Iterable[int]]<br><em>Iterable[<wbr>Iterable[<wbr>Iterable[<wbr>Int]]</em></td>
+<td>[[], [0], None, [], None, [0]]<br><em>[[[], [0]], [[], None, [0]]]</em></td>
+</tr>
+</tbody>
+</table>
+<p>In the optional highlighting parameters (<code>highlightAtomLists</code>, <code>highlightAtomListsMatrix</code>, <code>highlightBondLists</code>, and <code>highlightBondListsMatrix</code>), to highlight nothing for a given molecule, you can use either <code>None</code> or an empty iterable such as <code>[]</code>.</p>
+<p>If you provide the parameter names in the function call, for example <code>MolsMatrixToGridImage(molsMatrix=molsMatrix, legendsMatrix=legendsMatrix)</code>, be careful to include the suffix “Matrix” in those last three parameter names: if you use the parameter name from <code>MolsToGridImage</code>, such as <code>legends</code>, it will be passed to <code>MolsToGridImage</code> as a keyword argument and you will get an error like:</p>
+<p><code>TypeError: rdkit.Chem.Draw.IPythonConsole.ShowMols() got multiple values for keyword argument 'legends'</code></p>
+<p>Unlike <code>MolsToGridImage</code>, <code>MolsMatrixToGridImage</code> does not take a <code>molsPerRow</code> parameter because <code>MolsMatrixToGridImage</code> automatically sets the number of molecules per row to the length of the longest row in <code>molsMatrix</code>. Other than that, and the per-molecule parameters having a more nested structure, <code>MolsMatrixToGridImage</code> can accept all the same parameters as <code>MolsToGridImage</code>: <code>useSVG</code>, <code>returnPNG</code>, and <code>**kwargs</code> such as <code>drawOptions</code>. Indeed, <code>MolsMatrixToGridImage</code> passes those three parameters to <code>MolsToGridImage</code>.</p>
+<section id="requirements-for-agreement-of-dimensions-of-per-molecule-parameters" class="level3">
+<h3 class="anchored" data-anchor-id="requirements-for-agreement-of-dimensions-of-per-molecule-parameters">Requirements for agreement of dimensions of per-molecule parameters</h3>
+<p><code>molsMatrix</code> sets the dimensions, and any other supplied Matrix (per-molecule) parameters must match those dimensions. In the example in the table above, <code>molsMatrix</code> has two rows (sub-lists), so <code>legendsMatrix</code>, <code>highlightAtomListsMatrix</code>, and <code>highlightBondListsMatrix</code> (if supplied) must also have two rows. Also, because the first row (sub-list) of <code>molsMatrix</code> has two columns (elements), that must true for those three other parameters. And because the second row (sub-list) of <code>molsMatrix</code> has three columns (elements), that must true for those three other parameters.</p>
+</section>
+<section id="inserting-blank-cells" class="level3">
+<h3 class="anchored" data-anchor-id="inserting-blank-cells">Inserting blank cells</h3>
+<p>For blank cells at the end of a row, <code>MolsMatrixToGridImage</code> will automatically create them so that all rows have the same number of cells.</p>
+<p>For blank cells in the middle of a row (when there is a molecule after the blank cell), you need to have a blank entry in the iterable. For molecules, this blank entry can either be <code>None</code> or a molecule with no atoms, for example using <code>Chem.MolFromSmiles("")</code>. For legends, a blank cell can be <code>""</code> (an empty string) but not <code>None</code>, which will give a type error. If you create molecules using <code>Chem.MolFromSmiles("")</code>, or use those SMILES strings to create legends, entering an empty string will prevent type errors in both situations. For example, this works:</p>
+<div class="cell" data-execution_count="102">
+<div class="sourceCode cell-code" id="cb11"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb11-1"><a href="#cb11-1" aria-hidden="true" tabindex="-1"></a>smilesMatrixEmptyString <span class="op">=</span> [[<span class="st">"FCl"</span>, <span class="st">"FCl"</span>], [<span class="st">"FCl"</span>, <span class="st">""</span>, <span class="st">"FCl"</span>]]</span>
+<span id="cb11-2"><a href="#cb11-2" aria-hidden="true" tabindex="-1"></a>molsMatrixEmptyString <span class="op">=</span> [[Chem.MolFromSmiles(smiles) <span class="cf">for</span> smiles <span class="kw">in</span> row] <span class="cf">for</span> row <span class="kw">in</span> smilesMatrixEmptyString]</span>
+<span id="cb11-3"><a href="#cb11-3" aria-hidden="true" tabindex="-1"></a>MolsMatrixToGridImage(molsMatrix<span class="op">=</span>molsMatrixEmptyString, legendsMatrix<span class="op">=</span>smilesMatrixEmptyString)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-display" data-execution_count="102">
+<p><img src="2023-10-25-molsmatrixtogridimage_files/figure-html/cell-12-output-1.png" class="img-fluid"></p>
+</div>
+</div>
+<p>Whereas this gives a type error because <code>Chem.MolFromSmiles()</code> needs a string as input:</p>
+<div class="cell" data-execution_count="103">
+<div class="sourceCode cell-code" id="cb12"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb12-1"><a href="#cb12-1" aria-hidden="true" tabindex="-1"></a>smilesMatrixNone <span class="op">=</span> [[<span class="st">"FCl"</span>, <span class="st">"FCl"</span>], [<span class="st">"FCl"</span>, <span class="va">None</span>, <span class="st">"FCl"</span>]]</span>
+<span id="cb12-2"><a href="#cb12-2" aria-hidden="true" tabindex="-1"></a><span class="cf">try</span>:</span>
+<span id="cb12-3"><a href="#cb12-3" aria-hidden="true" tabindex="-1"></a>    molsMatrixNone <span class="op">=</span> [[Chem.MolFromSmiles(smiles) <span class="cf">for</span> smiles <span class="kw">in</span> row] <span class="cf">for</span> row <span class="kw">in</span> smilesMatrixNone]</span>
+<span id="cb12-4"><a href="#cb12-4" aria-hidden="true" tabindex="-1"></a><span class="cf">except</span> <span class="pp">TypeError</span> <span class="im">as</span> e:</span>
+<span id="cb12-5"><a href="#cb12-5" aria-hidden="true" tabindex="-1"></a>    <span class="bu">print</span>(e)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>No registered converter was able to produce a C++ rvalue of type std::__1::basic_string&lt;wchar_t, std::__1::char_traits&lt;wchar_t&gt;, std::__1::allocator&lt;wchar_t&gt;&gt; from this Python object of type NoneType</code></pre>
+</div>
+</div>
+<p>as does this because of the <code>None</code> element in <code>legendsMatrix</code>:</p>
+<div class="cell" data-execution_count="104">
+<div class="sourceCode cell-code" id="cb14"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb14-1"><a href="#cb14-1" aria-hidden="true" tabindex="-1"></a><span class="cf">try</span>:</span>
+<span id="cb14-2"><a href="#cb14-2" aria-hidden="true" tabindex="-1"></a>    MolsMatrixToGridImage(molsMatrix<span class="op">=</span>molsMatrixEmptyString, legendsMatrix<span class="op">=</span>smilesMatrixNone)</span>
+<span id="cb14-3"><a href="#cb14-3" aria-hidden="true" tabindex="-1"></a><span class="cf">except</span> <span class="pp">TypeError</span> <span class="im">as</span> e:</span>
+<span id="cb14-4"><a href="#cb14-4" aria-hidden="true" tabindex="-1"></a>    <span class="bu">print</span>(e)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>No registered converter was able to produce a C++ rvalue of type std::__1::basic_string&lt;char, std::__1::char_traits&lt;char&gt;, std::__1::allocator&lt;char&gt;&gt; from this Python object of type NoneType</code></pre>
+</div>
+</div>
+</section>
+<section id="example-with-all-parameters" class="level3">
+<h3 class="anchored" data-anchor-id="example-with-all-parameters">Example with all parameters</h3>
+<p>Here is an example of supplying all parameters to <code>MolsMatrixToGridImage</code>.</p>
+<div class="cell" data-execution_count="105">
+<div class="sourceCode cell-code" id="cb16"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb16-1"><a href="#cb16-1" aria-hidden="true" tabindex="-1"></a>legendsMatrix <span class="op">=</span> [[<span class="st">"no highlighting"</span>, <span class="st">"bond highlighted"</span>], [<span class="st">"F highlighted"</span>, <span class="st">""</span>, <span class="st">"Cl and bond highlighted"</span>]]</span>
+<span id="cb16-2"><a href="#cb16-2" aria-hidden="true" tabindex="-1"></a>highlightAtomListsMatrix <span class="op">=</span> [[[],[]], [[<span class="dv">0</span>], <span class="va">None</span>, [<span class="dv">1</span>]]]</span>
+<span id="cb16-3"><a href="#cb16-3" aria-hidden="true" tabindex="-1"></a>highlightBondListsMatrix <span class="op">=</span> [[[],[<span class="dv">0</span>]], [[], <span class="va">None</span>, [<span class="dv">0</span>]]]</span>
+<span id="cb16-4"><a href="#cb16-4" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb16-5"><a href="#cb16-5" aria-hidden="true" tabindex="-1"></a><span class="co"># Add atom indices to drawing</span></span>
+<span id="cb16-6"><a href="#cb16-6" aria-hidden="true" tabindex="-1"></a>dopts <span class="op">=</span> rdMolDraw2D.MolDrawOptions()</span>
+<span id="cb16-7"><a href="#cb16-7" aria-hidden="true" tabindex="-1"></a>dopts.addAtomIndices <span class="op">=</span> <span class="va">True</span></span>
+<span id="cb16-8"><a href="#cb16-8" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb16-9"><a href="#cb16-9" aria-hidden="true" tabindex="-1"></a>MolsMatrixToGridImage(molsMatrix<span class="op">=</span>molsMatrix, subImgSize<span class="op">=</span>(<span class="dv">200</span>, <span class="dv">150</span>), legendsMatrix<span class="op">=</span>legendsMatrix, highlightAtomListsMatrix<span class="op">=</span>highlightAtomListsMatrix, highlightBondListsMatrix<span class="op">=</span>highlightBondListsMatrix, useSVG<span class="op">=</span><span class="va">False</span>, returnPNG<span class="op">=</span><span class="va">False</span>, drawOptions<span class="op">=</span>dopts)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-display" data-execution_count="105">
+<p><img src="2023-10-25-molsmatrixtogridimage_files/figure-html/cell-15-output-1.png" class="img-fluid"></p>
+</div>
+</div>
+<p>Here is the same image created using <code>MolsToGridImage</code>:</p>
+<div class="cell" data-execution_count="106">
+<div class="sourceCode cell-code" id="cb17"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb17-1"><a href="#cb17-1" aria-hidden="true" tabindex="-1"></a>legends <span class="op">=</span> [<span class="st">"no highlighting"</span>, <span class="st">"bond highlighted"</span>, <span class="st">""</span>, <span class="st">"F highlighted"</span>, <span class="st">""</span>, <span class="st">"Cl and bond highlighted"</span>]</span>
+<span id="cb17-2"><a href="#cb17-2" aria-hidden="true" tabindex="-1"></a>highlightAtomLists <span class="op">=</span> [[],[], <span class="va">None</span>, [<span class="dv">0</span>], <span class="va">None</span>, [<span class="dv">1</span>]]</span>
+<span id="cb17-3"><a href="#cb17-3" aria-hidden="true" tabindex="-1"></a>highlightBondLists <span class="op">=</span> [<span class="va">None</span>,[<span class="dv">0</span>], [], [], <span class="va">None</span>, [<span class="dv">0</span>]]</span>
+<span id="cb17-4"><a href="#cb17-4" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb17-5"><a href="#cb17-5" aria-hidden="true" tabindex="-1"></a>MolsToGridImage(mols, molsPerRow<span class="op">=</span><span class="dv">3</span>, subImgSize<span class="op">=</span>(<span class="dv">200</span>, <span class="dv">150</span>), legends<span class="op">=</span>legends, highlightAtomLists<span class="op">=</span>highlightAtomLists, highlightBondLists<span class="op">=</span>highlightBondLists, useSVG<span class="op">=</span><span class="va">False</span>, returnPNG<span class="op">=</span><span class="va">False</span>, drawOptions<span class="op">=</span>dopts)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-display" data-execution_count="106">
+<p><img src="2023-10-25-molsmatrixtogridimage_files/figure-html/cell-16-output-1.png" class="img-fluid"></p>
+</div>
+</div>
+</section>
+</section>
+<section id="share-your-examples" class="level2">
+<h2 class="anchored" data-anchor-id="share-your-examples">Share your examples</h2>
+<p>If you use <code>MolsMatrixToGridImage</code> in a public project, please post a link in the comments below.</p>
+
+
+</section>
+
+</main> <!-- /main -->
+<script id="quarto-html-after-body" type="application/javascript">
+window.document.addEventListener("DOMContentLoaded", function (event) {
+  const toggleBodyColorMode = (bsSheetEl) => {
+    const mode = bsSheetEl.getAttribute("data-mode");
+    const bodyEl = window.document.querySelector("body");
+    if (mode === "dark") {
+      bodyEl.classList.add("quarto-dark");
+      bodyEl.classList.remove("quarto-light");
+    } else {
+      bodyEl.classList.add("quarto-light");
+      bodyEl.classList.remove("quarto-dark");
+    }
+  }
+  const toggleBodyColorPrimary = () => {
+    const bsSheetEl = window.document.querySelector("link#quarto-bootstrap");
+    if (bsSheetEl) {
+      toggleBodyColorMode(bsSheetEl);
+    }
+  }
+  toggleBodyColorPrimary();  
+  const disableStylesheet = (stylesheets) => {
+    for (let i=0; i < stylesheets.length; i++) {
+      const stylesheet = stylesheets[i];
+      stylesheet.rel = 'prefetch';
+    }
+  }
+  const enableStylesheet = (stylesheets) => {
+    for (let i=0; i < stylesheets.length; i++) {
+      const stylesheet = stylesheets[i];
+      stylesheet.rel = 'stylesheet';
+    }
+  }
+  const manageTransitions = (selector, allowTransitions) => {
+    const els = window.document.querySelectorAll(selector);
+    for (let i=0; i < els.length; i++) {
+      const el = els[i];
+      if (allowTransitions) {
+        el.classList.remove('notransition');
+      } else {
+        el.classList.add('notransition');
+      }
+    }
+  }
+  const toggleColorMode = (alternate) => {
+    // Switch the stylesheets
+    const alternateStylesheets = window.document.querySelectorAll('link.quarto-color-scheme.quarto-color-alternate');
+    manageTransitions('#quarto-margin-sidebar .nav-link', false);
+    if (alternate) {
+      enableStylesheet(alternateStylesheets);
+      for (const sheetNode of alternateStylesheets) {
+        if (sheetNode.id === "quarto-bootstrap") {
+          toggleBodyColorMode(sheetNode);
+        }
+      }
+    } else {
+      disableStylesheet(alternateStylesheets);
+      toggleBodyColorPrimary();
+    }
+    manageTransitions('#quarto-margin-sidebar .nav-link', true);
+    // Switch the toggles
+    const toggles = window.document.querySelectorAll('.quarto-color-scheme-toggle');
+    for (let i=0; i < toggles.length; i++) {
+      const toggle = toggles[i];
+      if (toggle) {
+        if (alternate) {
+          toggle.classList.add("alternate");     
+        } else {
+          toggle.classList.remove("alternate");
+        }
+      }
+    }
+    // Hack to workaround the fact that safari doesn't
+    // properly recolor the scrollbar when toggling (#1455)
+    if (navigator.userAgent.indexOf('Safari') > 0 && navigator.userAgent.indexOf('Chrome') == -1) {
+      manageTransitions("body", false);
+      window.scrollTo(0, 1);
+      setTimeout(() => {
+        window.scrollTo(0, 0);
+        manageTransitions("body", true);
+      }, 40);  
+    }
+  }
+  const isFileUrl = () => { 
+    return window.location.protocol === 'file:';
+  }
+  const hasAlternateSentinel = () => {  
+    let styleSentinel = getColorSchemeSentinel();
+    if (styleSentinel !== null) {
+      return styleSentinel === "alternate";
+    } else {
+      return false;
+    }
+  }
+  const setStyleSentinel = (alternate) => {
+    const value = alternate ? "alternate" : "default";
+    if (!isFileUrl()) {
+      window.localStorage.setItem("quarto-color-scheme", value);
+    } else {
+      localAlternateSentinel = value;
+    }
+  }
+  const getColorSchemeSentinel = () => {
+    if (!isFileUrl()) {
+      const storageValue = window.localStorage.getItem("quarto-color-scheme");
+      return storageValue != null ? storageValue : localAlternateSentinel;
+    } else {
+      return localAlternateSentinel;
+    }
+  }
+  let localAlternateSentinel = 'default';
+  // Dark / light mode switch
+  window.quartoToggleColorScheme = () => {
+    // Read the current dark / light value 
+    let toAlternate = !hasAlternateSentinel();
+    toggleColorMode(toAlternate);
+    setStyleSentinel(toAlternate);
+  };
+  // Ensure there is a toggle, if there isn't float one in the top right
+  if (window.document.querySelector('.quarto-color-scheme-toggle') === null) {
+    const a = window.document.createElement('a');
+    a.classList.add('top-right');
+    a.classList.add('quarto-color-scheme-toggle');
+    a.href = "";
+    a.onclick = function() { try { window.quartoToggleColorScheme(); } catch {} return false; };
+    const i = window.document.createElement("i");
+    i.classList.add('bi');
+    a.appendChild(i);
+    window.document.body.appendChild(a);
+  }
+  // Switch to dark mode if need be
+  if (hasAlternateSentinel()) {
+    toggleColorMode(true);
+  } else {
+    toggleColorMode(false);
+  }
+  const icon = "";
+  const anchorJS = new window.AnchorJS();
+  anchorJS.options = {
+    placement: 'right',
+    icon: icon
+  };
+  anchorJS.add('.anchored');
+  const clipboard = new window.ClipboardJS('.code-copy-button', {
+    target: function(trigger) {
+      return trigger.previousElementSibling;
+    }
+  });
+  clipboard.on('success', function(e) {
+    // button target
+    const button = e.trigger;
+    // don't keep focus
+    button.blur();
+    // flash "checked"
+    button.classList.add('code-copy-button-checked');
+    var currentTitle = button.getAttribute("title");
+    button.setAttribute("title", "Copied!");
+    let tooltip;
+    if (window.bootstrap) {
+      button.setAttribute("data-bs-toggle", "tooltip");
+      button.setAttribute("data-bs-placement", "left");
+      button.setAttribute("data-bs-title", "Copied!");
+      tooltip = new bootstrap.Tooltip(button, 
+        { trigger: "manual", 
+          customClass: "code-copy-button-tooltip",
+          offset: [0, -8]});
+      tooltip.show();    
+    }
+    setTimeout(function() {
+      if (tooltip) {
+        tooltip.hide();
+        button.removeAttribute("data-bs-title");
+        button.removeAttribute("data-bs-toggle");
+        button.removeAttribute("data-bs-placement");
+      }
+      button.setAttribute("title", currentTitle);
+      button.classList.remove('code-copy-button-checked');
+    }, 1000);
+    // clear code selection
+    e.clearSelection();
+  });
+  function tippyHover(el, contentFn) {
+    const config = {
+      allowHTML: true,
+      content: contentFn,
+      maxWidth: 500,
+      delay: 100,
+      arrow: false,
+      appendTo: function(el) {
+          return el.parentElement;
+      },
+      interactive: true,
+      interactiveBorder: 10,
+      theme: 'quarto',
+      placement: 'bottom-start'
+    };
+    window.tippy(el, config); 
+  }
+  const noterefs = window.document.querySelectorAll('a[role="doc-noteref"]');
+  for (var i=0; i<noterefs.length; i++) {
+    const ref = noterefs[i];
+    tippyHover(ref, function() {
+      // use id or data attribute instead here
+      let href = ref.getAttribute('data-footnote-href') || ref.getAttribute('href');
+      try { href = new URL(href).hash; } catch {}
+      const id = href.replace(/^#\/?/, "");
+      const note = window.document.getElementById(id);
+      return note.innerHTML;
+    });
+  }
+  const findCites = (el) => {
+    const parentEl = el.parentElement;
+    if (parentEl) {
+      const cites = parentEl.dataset.cites;
+      if (cites) {
+        return {
+          el,
+          cites: cites.split(' ')
+        };
+      } else {
+        return findCites(el.parentElement)
+      }
+    } else {
+      return undefined;
+    }
+  };
+  var bibliorefs = window.document.querySelectorAll('a[role="doc-biblioref"]');
+  for (var i=0; i<bibliorefs.length; i++) {
+    const ref = bibliorefs[i];
+    const citeInfo = findCites(ref);
+    if (citeInfo) {
+      tippyHover(citeInfo.el, function() {
+        var popup = window.document.createElement('div');
+        citeInfo.cites.forEach(function(cite) {
+          var citeDiv = window.document.createElement('div');
+          citeDiv.classList.add('hanging-indent');
+          citeDiv.classList.add('csl-entry');
+          var biblioDiv = window.document.getElementById('ref-' + cite);
+          if (biblioDiv) {
+            citeDiv.innerHTML = biblioDiv.innerHTML;
+          }
+          popup.appendChild(citeDiv);
+        });
+        return popup.innerHTML;
+      });
+    }
+  }
+});
+</script>
+<script src="https://utteranc.es/client.js" repo="greglandrum/rdkit-blog" issue-term="pathname" theme="github-light" crossorigin="anonymous" async="">
+</script>
+</div> <!-- /content -->
+
+
+
+</body></html>

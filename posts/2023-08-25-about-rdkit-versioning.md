@@ -10,6 +10,15 @@ toc: true
 
 ---
 
+# Update, 10 November 2023
+
+We decided to try moving forward with the new versioning model: future minor
+releases of the RDKit will include new features that don't cause backwards
+incompatibility problems or change existing behavior. The [2023.09.2
+release](https://github.com/rdkit/rdkit/releases/tag/Release_2023_09_2) is the
+first example of this.
+
+
 # Background
 
 The current RDKit versioning scheme is pretty simple: we do two major releases a
