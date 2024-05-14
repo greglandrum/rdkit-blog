@@ -1,0 +1,1141 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en"><head>
+
+<meta charset="utf-8">
+<meta name="generator" content="quarto-1.2.280">
+
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+
+<meta name="dcterms.date" content="2024-05-14">
+<meta name="description" content="Mainly I just wanted to write “topologically complex”.">
+
+<title>RDKit blog - The impact of single-atom changes on similarity</title>
+<style>
+code{white-space: pre-wrap;}
+span.smallcaps{font-variant: small-caps;}
+div.columns{display: flex; gap: min(4vw, 1.5em);}
+div.column{flex: auto; overflow-x: auto;}
+div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+ul.task-list{list-style: none;}
+ul.task-list li input[type="checkbox"] {
+  width: 0.8em;
+  margin: 0 0.8em 0.2em -1.6em;
+  vertical-align: middle;
+}
+pre > code.sourceCode { white-space: pre; position: relative; }
+pre > code.sourceCode > span { display: inline-block; line-height: 1.25; }
+pre > code.sourceCode > span:empty { height: 1.2em; }
+.sourceCode { overflow: visible; }
+code.sourceCode > span { color: inherit; text-decoration: inherit; }
+div.sourceCode { margin: 1em 0; }
+pre.sourceCode { margin: 0; }
+@media screen {
+div.sourceCode { overflow: auto; }
+}
+@media print {
+pre > code.sourceCode { white-space: pre-wrap; }
+pre > code.sourceCode > span { text-indent: -5em; padding-left: 5em; }
+}
+pre.numberSource code
+  { counter-reset: source-line 0; }
+pre.numberSource code > span
+  { position: relative; left: -4em; counter-increment: source-line; }
+pre.numberSource code > span > a:first-child::before
+  { content: counter(source-line);
+    position: relative; left: -1em; text-align: right; vertical-align: baseline;
+    border: none; display: inline-block;
+    -webkit-touch-callout: none; -webkit-user-select: none;
+    -khtml-user-select: none; -moz-user-select: none;
+    -ms-user-select: none; user-select: none;
+    padding: 0 4px; width: 4em;
+    color: #aaaaaa;
+  }
+pre.numberSource { margin-left: 3em; border-left: 1px solid #aaaaaa;  padding-left: 4px; }
+div.sourceCode
+  {   }
+@media screen {
+pre > code.sourceCode > span > a:first-child::before { text-decoration: underline; }
+}
+code span.al { color: #ff0000; font-weight: bold; } /* Alert */
+code span.an { color: #60a0b0; font-weight: bold; font-style: italic; } /* Annotation */
+code span.at { color: #7d9029; } /* Attribute */
+code span.bn { color: #40a070; } /* BaseN */
+code span.bu { color: #008000; } /* BuiltIn */
+code span.cf { color: #007020; font-weight: bold; } /* ControlFlow */
+code span.ch { color: #4070a0; } /* Char */
+code span.cn { color: #880000; } /* Constant */
+code span.co { color: #60a0b0; font-style: italic; } /* Comment */
+code span.cv { color: #60a0b0; font-weight: bold; font-style: italic; } /* CommentVar */
+code span.do { color: #ba2121; font-style: italic; } /* Documentation */
+code span.dt { color: #902000; } /* DataType */
+code span.dv { color: #40a070; } /* DecVal */
+code span.er { color: #ff0000; font-weight: bold; } /* Error */
+code span.ex { } /* Extension */
+code span.fl { color: #40a070; } /* Float */
+code span.fu { color: #06287e; } /* Function */
+code span.im { color: #008000; font-weight: bold; } /* Import */
+code span.in { color: #60a0b0; font-weight: bold; font-style: italic; } /* Information */
+code span.kw { color: #007020; font-weight: bold; } /* Keyword */
+code span.op { color: #666666; } /* Operator */
+code span.ot { color: #007020; } /* Other */
+code span.pp { color: #bc7a00; } /* Preprocessor */
+code span.sc { color: #4070a0; } /* SpecialChar */
+code span.ss { color: #bb6688; } /* SpecialString */
+code span.st { color: #4070a0; } /* String */
+code span.va { color: #19177c; } /* Variable */
+code span.vs { color: #4070a0; } /* VerbatimString */
+code span.wa { color: #60a0b0; font-weight: bold; font-style: italic; } /* Warning */
+</style>
+
+
+<script src="../site_libs/quarto-nav/quarto-nav.js"></script>
+<script src="../site_libs/quarto-nav/headroom.min.js"></script>
+<script src="../site_libs/clipboard/clipboard.min.js"></script>
+<script src="../site_libs/quarto-search/autocomplete.umd.js"></script>
+<script src="../site_libs/quarto-search/fuse.min.js"></script>
+<script src="../site_libs/quarto-search/quarto-search.js"></script>
+<meta name="quarto:offset" content="../">
+<link href="../posts/icons/favicon.ico" rel="icon">
+<script src="../site_libs/quarto-html/quarto.js"></script>
+<script src="../site_libs/quarto-html/popper.min.js"></script>
+<script src="../site_libs/quarto-html/tippy.umd.min.js"></script>
+<script src="../site_libs/quarto-html/anchor.min.js"></script>
+<link href="../site_libs/quarto-html/tippy.css" rel="stylesheet">
+<link href="../site_libs/quarto-html/quarto-syntax-highlighting.css" rel="stylesheet" class="quarto-color-scheme" id="quarto-text-highlighting-styles">
+<link href="../site_libs/quarto-html/quarto-syntax-highlighting-dark.css" rel="prefetch" class="quarto-color-scheme quarto-color-alternate" id="quarto-text-highlighting-styles">
+<script src="../site_libs/bootstrap/bootstrap.min.js"></script>
+<link href="../site_libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
+<link href="../site_libs/bootstrap/bootstrap.min.css" rel="stylesheet" class="quarto-color-scheme" id="quarto-bootstrap" data-mode="light">
+<link href="../site_libs/bootstrap/bootstrap-dark.min.css" rel="prefetch" class="quarto-color-scheme quarto-color-alternate" id="quarto-bootstrap" data-mode="dark">
+<script id="quarto-search-options" type="application/json">{
+  "location": "navbar",
+  "copy-button": false,
+  "collapse-after": 3,
+  "panel-placement": "end",
+  "type": "overlay",
+  "limit": 20,
+  "language": {
+    "search-no-results-text": "No results",
+    "search-matching-documents-text": "matching documents",
+    "search-copy-link-title": "Copy link to search",
+    "search-hide-matches-text": "Hide additional matches",
+    "search-more-match-text": "more match in this document",
+    "search-more-matches-text": "more matches in this document",
+    "search-clear-button-title": "Clear",
+    "search-detached-cancel-button-title": "Cancel",
+    "search-submit-button-title": "Submit"
+  }
+}</script>
+
+  <script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml-full.js" type="text/javascript"></script>
+
+<link rel="stylesheet" href="../styles.css">
+</head>
+
+<body class="nav-fixed">
+
+<div id="quarto-search-results"></div>
+  <header id="quarto-header" class="headroom fixed-top">
+    <nav class="navbar navbar-expand-lg navbar-dark ">
+      <div class="navbar-container container-fluid">
+      <div class="navbar-brand-container">
+    <a class="navbar-brand" href="../index.html">
+    <span class="navbar-title">RDKit blog</span>
+    </a>
+  </div>
+          <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarCollapse" aria-controls="navbarCollapse" aria-expanded="false" aria-label="Toggle navigation" onclick="if (window.quartoToggleHeadroom) { window.quartoToggleHeadroom(); }">
+  <span class="navbar-toggler-icon"></span>
+</button>
+          <div class="collapse navbar-collapse" id="navbarCollapse">
+            <ul class="navbar-nav navbar-nav-scroll ms-auto">
+  <li class="nav-item">
+    <a class="nav-link" href="../about.html">
+ <span class="menu-text">RDKit experiments, tips, and tutorials</span></a>
+  </li>  
+  <li class="nav-item compact">
+    <a class="nav-link" href="https://github.com/rdkit/rdkit"><i class="bi bi-github" role="img">
+</i> 
+ <span class="menu-text"></span></a>
+  </li>  
+  <li class="nav-item compact">
+    <a class="nav-link" href="https://twitter.com/rdkit_org"><i class="bi bi-twitter" role="img">
+</i> 
+ <span class="menu-text"></span></a>
+  </li>  
+  <li class="nav-item compact">
+    <a class="nav-link" href="../index.xml"><i class="bi bi-rss" role="img">
+</i> 
+ <span class="menu-text"></span></a>
+  </li>  
+</ul>
+              <div class="quarto-toggle-container">
+                  <a href="" class="quarto-color-scheme-toggle nav-link" onclick="window.quartoToggleColorScheme(); return false;" title="Toggle dark mode"><i class="bi"></i></a>
+              </div>
+              <div id="quarto-search" class="" title="Search"></div>
+          </div> <!-- /navcollapse -->
+      </div> <!-- /container-fluid -->
+    </nav>
+</header>
+<!-- content -->
+<div id="quarto-content" class="quarto-container page-columns page-rows-contents page-layout-article page-navbar">
+<!-- sidebar -->
+<!-- margin-sidebar -->
+    <div id="quarto-margin-sidebar" class="sidebar margin-sidebar">
+        <nav id="TOC" role="doc-toc" class="toc-active">
+    <h2 id="toc-title">On this page</h2>
+   
+  <ul>
+  <li><a href="#impact-of-single-atom-changes-on-similarity" id="toc-impact-of-single-atom-changes-on-similarity" class="nav-link active" data-scroll-target="#impact-of-single-atom-changes-on-similarity">Impact of single-atom changes on similarity</a>
+  <ul class="collapse">
+  <li><a href="#aside" id="toc-aside" class="nav-link" data-scroll-target="#aside">Aside</a></li>
+  </ul></li>
+  <li><a href="#visualizing-the-impact-of-single-atom-changes-on-similarity" id="toc-visualizing-the-impact-of-single-atom-changes-on-similarity" class="nav-link" data-scroll-target="#visualizing-the-impact-of-single-atom-changes-on-similarity">Visualizing the impact of single-atom changes on similarity</a></li>
+  <li><a href="#looking-at-delta_similarity-as-a-function-of-the-number-of-atoms-in-the-neighborhood" id="toc-looking-at-delta_similarity-as-a-function-of-the-number-of-atoms-in-the-neighborhood" class="nav-link" data-scroll-target="#looking-at-delta_similarity-as-a-function-of-the-number-of-atoms-in-the-neighborhood">Looking at <span class="math inline">\(\Delta_{similarity}\)</span> as a function of the number of atoms in the neighborhood</a></li>
+  </ul>
+</nav>
+    </div>
+<!-- main -->
+<main class="content" id="quarto-document-content">
+
+<header id="title-block-header" class="quarto-title-block default">
+<div class="quarto-title">
+<h1 class="title">The impact of single-atom changes on similarity</h1>
+  <div class="quarto-categories">
+    <div class="quarto-category">fingerprints</div>
+    <div class="quarto-category">reference</div>
+    <div class="quarto-category">exploration</div>
+  </div>
+  </div>
+
+<div>
+  <div class="description">
+    Mainly I just wanted to write “topologically complex”.
+  </div>
+</div>
+
+
+<div class="quarto-title-meta">
+
+    
+    <div>
+    <div class="quarto-title-meta-heading">Published</div>
+    <div class="quarto-title-meta-contents">
+      <p class="date">May 14, 2024</p>
+    </div>
+  </div>
+  
+    
+  </div>
+  
+
+</header>
+
+<section id="impact-of-single-atom-changes-on-similarity" class="level1">
+<h1>Impact of single-atom changes on similarity</h1>
+<p>Last week I got curious about the impact single atoms make on the similarity between two molecules. I was initially wondering whether small differences in the “core” of two molecules have a disproportionate influence on the similarity between them. This blog post came from me trying to answer that question.</p>
+<p>Along the way I discovered that there’s more to this topic than I thought, so the blog post is longer than planned. It still feels like there’s some exploration to do, so I may still end up doing a follow up.</p>
+<p>Here’s a summary of the analysis of the average Tanimoto similarity of a molecule to itself with a single atom changed to a dummy atom. The analysis was done across 5000 ChEMBL molecules.</p>
+<table class="table">
+<thead>
+<tr class="header">
+<th>FP</th>
+<th>mean(SD)</th>
+<th>90%</th>
+<th>95%</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>MFP3</td>
+<td>0.68(0.12)</td>
+<td>0.53</td>
+<td>0.48</td>
+</tr>
+<tr class="even">
+<td>MFP2</td>
+<td>0.75(0.09)</td>
+<td>0.63</td>
+<td>0.59</td>
+</tr>
+<tr class="odd">
+<td>MFP1</td>
+<td>0.83(0.06)</td>
+<td>0.75</td>
+<td>0.72</td>
+</tr>
+<tr class="even">
+<td>RDK7</td>
+<td>0.76(0.15)</td>
+<td>0.54</td>
+<td>0.47</td>
+</tr>
+<tr class="odd">
+<td>RDK5</td>
+<td>0.74(0.14)</td>
+<td>0.53</td>
+<td>0.46</td>
+</tr>
+<tr class="even">
+<td>TT</td>
+<td>0.78(0.12)</td>
+<td>0.61</td>
+<td>0.55</td>
+</tr>
+<tr class="odd">
+<td>AP</td>
+<td>0.88(0.05)</td>
+<td>0.83</td>
+<td>0.81</td>
+</tr>
+</tbody>
+</table>
+<p>We can think about these values as thresholds for retrieving <em>extremely</em> similar molecules: using the RDK5 fingerprint (RDKit fingerprint with a path length of 5) we need to use a Tanimoto similarity threshold of 0.46 to be 95% certain of retrieving molecules that have the same connectivity and that only differ in the identity of a single atom.</p>
+<p>As for my original question about centrality: it’s not how central an atom is that matters, but how many atoms are close to it. We can see this in the similarity map showing the contributions of individual atoms to the similarity of one of the test molecules to itself using the RDK5 fingerprint:</p>
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="2024-05-14-similarity-and-centrality_files/figure-html/733e9c17-1-image.png" class="img-fluid figure-img"></p>
+<p></p><figcaption class="figure-caption">image.png</figcaption><p></p>
+</figure>
+</div>
+<div class="cell" data-executetime="{&quot;end_time&quot;:&quot;2024-05-11T03:16:19.832919Z&quot;,&quot;start_time&quot;:&quot;2024-05-11T03:16:19.359437Z&quot;}" data-execution_count="1">
+<div class="sourceCode cell-code" id="cb1"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> rdkit <span class="im">import</span> Chem</span>
+<span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> rdkit.Chem <span class="im">import</span> rdFingerprintGenerator</span>
+<span id="cb1-3"><a href="#cb1-3" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> rdkit.Chem.Draw <span class="im">import</span> IPythonConsole</span>
+<span id="cb1-4"><a href="#cb1-4" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> rdkit.Chem.MolStandardize <span class="im">import</span> rdMolStandardize</span>
+<span id="cb1-5"><a href="#cb1-5" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> rdkit.Chem <span class="im">import</span> Draw</span>
+<span id="cb1-6"><a href="#cb1-6" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> rdkit <span class="im">import</span> DataStructs</span>
+<span id="cb1-7"><a href="#cb1-7" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> rdkit <span class="im">import</span> RDLogger</span>
+<span id="cb1-8"><a href="#cb1-8" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> numpy <span class="im">as</span> np</span>
+<span id="cb1-9"><a href="#cb1-9" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-10"><a href="#cb1-10" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-11"><a href="#cb1-11" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> matplotlib <span class="im">import</span> pyplot <span class="im">as</span> plt</span>
+<span id="cb1-12"><a href="#cb1-12" aria-hidden="true" tabindex="-1"></a>plt.style.use(<span class="st">'tableau-colorblind10'</span>)</span>
+<span id="cb1-13"><a href="#cb1-13" aria-hidden="true" tabindex="-1"></a>plt.rcParams[<span class="st">'font.size'</span>] <span class="op">=</span> <span class="st">'16'</span></span>
+<span id="cb1-14"><a href="#cb1-14" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-15"><a href="#cb1-15" aria-hidden="true" tabindex="-1"></a><span class="op">%</span>matplotlib inline</span>
+<span id="cb1-16"><a href="#cb1-16" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-17"><a href="#cb1-17" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> rdkit</span>
+<span id="cb1-18"><a href="#cb1-18" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(rdkit.__version__)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>2024.03.2</code></pre>
+</div>
+</div>
+<p>Let’s start with one of my favority example molecules, the bioactive part of esomeprazole:</p>
+<div class="cell" data-executetime="{&quot;end_time&quot;:&quot;2024-05-11T03:16:20.255497Z&quot;,&quot;start_time&quot;:&quot;2024-05-11T03:16:20.226958Z&quot;}" data-execution_count="2">
+<div class="sourceCode cell-code" id="cb3"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a>IPythonConsole.molSize <span class="op">=</span> <span class="dv">450</span>,<span class="dv">350</span></span>
+<span id="cb3-2"><a href="#cb3-2" aria-hidden="true" tabindex="-1"></a>IPythonConsole.drawOptions.addAtomIndices <span class="op">=</span> <span class="va">True</span></span>
+<span id="cb3-3"><a href="#cb3-3" aria-hidden="true" tabindex="-1"></a>esomeprazole <span class="op">=</span> Chem.MolFromSmiles(<span class="st">'COc1ccc2[nH]c(nc2c1)[S@@+]([O-])Cc3ncc(C)c(OC)c3C'</span>)</span>
+<span id="cb3-4"><a href="#cb3-4" aria-hidden="true" tabindex="-1"></a>esomeprazole</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-display" data-execution_count="2">
+<p><img src="2024-05-14-similarity-and-centrality_files/figure-html/cell-3-output-1.png" class="img-fluid"></p>
+</div>
+</div>
+<p>Define a function which changes each of the atoms to a dummy and then compares the similarity of that to the unperturbed molecule.</p>
+<p>We track the similarity between the modified and original molecules together with the number of atoms within a target radius of the modified atom (this second piece of info will be used at the end of the blog post).</p>
+<div class="cell" data-executetime="{&quot;end_time&quot;:&quot;2024-05-11T03:16:21.574107Z&quot;,&quot;start_time&quot;:&quot;2024-05-11T03:16:21.562616Z&quot;}" data-execution_count="3">
+<div class="sourceCode cell-code" id="cb4"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> get_modified_sims(mol,maxRadius,fpFunc):</span>
+<span id="cb4-2"><a href="#cb4-2" aria-hidden="true" tabindex="-1"></a>    basefp <span class="op">=</span> fpFunc(mol)</span>
+<span id="cb4-3"><a href="#cb4-3" aria-hidden="true" tabindex="-1"></a>    dm <span class="op">=</span> Chem.GetDistanceMatrix(mol)</span>
+<span id="cb4-4"><a href="#cb4-4" aria-hidden="true" tabindex="-1"></a>    res <span class="op">=</span> []</span>
+<span id="cb4-5"><a href="#cb4-5" aria-hidden="true" tabindex="-1"></a>    <span class="cf">for</span> aidx <span class="kw">in</span> <span class="bu">range</span>(mol.GetNumAtoms()):</span>
+<span id="cb4-6"><a href="#cb4-6" aria-hidden="true" tabindex="-1"></a>        nm <span class="op">=</span> Chem.Mol(mol)</span>
+<span id="cb4-7"><a href="#cb4-7" aria-hidden="true" tabindex="-1"></a>        nm.GetAtomWithIdx(aidx).SetAtomicNum(<span class="dv">0</span>)</span>
+<span id="cb4-8"><a href="#cb4-8" aria-hidden="true" tabindex="-1"></a>        count <span class="op">=</span> <span class="bu">sum</span>(dm[aidx]<span class="op">&lt;=</span>maxRadius)</span>
+<span id="cb4-9"><a href="#cb4-9" aria-hidden="true" tabindex="-1"></a>        res.append((count,DataStructs.TanimotoSimilarity(basefp,fpFunc(nm))))</span>
+<span id="cb4-10"><a href="#cb4-10" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> res</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+<p>Now run that for esomeprazole using Morgan fingerprints with three different radius values.</p>
+<p>We do the analysis for both count-based and bit-based fingerprints</p>
+<div class="cell" data-executetime="{&quot;end_time&quot;:&quot;2024-05-11T03:16:23.627485Z&quot;,&quot;start_time&quot;:&quot;2024-05-11T03:16:23.612079Z&quot;}" data-execution_count="4">
+<div class="sourceCode cell-code" id="cb5"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> collections <span class="im">import</span> defaultdict</span>
+<span id="cb5-2"><a href="#cb5-2" aria-hidden="true" tabindex="-1"></a>res <span class="op">=</span> defaultdict(<span class="kw">lambda</span> : defaultdict(<span class="bu">list</span>))</span>
+<span id="cb5-3"><a href="#cb5-3" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb5-4"><a href="#cb5-4" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> radius <span class="kw">in</span> (<span class="dv">1</span>,<span class="dv">2</span>,<span class="dv">3</span>):</span>
+<span id="cb5-5"><a href="#cb5-5" aria-hidden="true" tabindex="-1"></a>    fpg <span class="op">=</span> rdFingerprintGenerator.GetMorganGenerator(radius<span class="op">=</span>radius,fpSize<span class="op">=</span><span class="dv">2048</span>)</span>
+<span id="cb5-6"><a href="#cb5-6" aria-hidden="true" tabindex="-1"></a>    res[<span class="st">'counts'</span>][radius].extend(get_modified_sims(esomeprazole,radius,fpg.GetCountFingerprint))</span>
+<span id="cb5-7"><a href="#cb5-7" aria-hidden="true" tabindex="-1"></a>    res[<span class="st">'bits'</span>][radius].extend(get_modified_sims(esomeprazole,radius,fpg.GetFingerprint))</span>
+<span id="cb5-8"><a href="#cb5-8" aria-hidden="true" tabindex="-1"></a>    </span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+<p>At each radius value, there’s one entry in <code>res</code> for each atom in the molecule:</p>
+<div class="cell" data-executetime="{&quot;end_time&quot;:&quot;2024-05-11T03:16:25.164927Z&quot;,&quot;start_time&quot;:&quot;2024-05-11T03:16:25.158331Z&quot;}" data-execution_count="5">
+<div class="sourceCode cell-code" id="cb6"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb6-1"><a href="#cb6-1" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(esomeprazole.GetNumAtoms(),<span class="bu">len</span>(res[<span class="st">'counts'</span>][<span class="dv">3</span>]))</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>24 24</code></pre>
+</div>
+</div>
+<p>Here are the values:</p>
+<div class="cell" data-executetime="{&quot;end_time&quot;:&quot;2024-05-11T03:16:26.247121Z&quot;,&quot;start_time&quot;:&quot;2024-05-11T03:16:26.233803Z&quot;}" data-execution_count="6">
+<div class="sourceCode cell-code" id="cb8"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb8-1"><a href="#cb8-1" aria-hidden="true" tabindex="-1"></a>res[<span class="st">'counts'</span>][<span class="dv">3</span>]</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-display" data-execution_count="6">
+<pre><code>[(5, 0.8260869565217391),
+ (7, 0.7319587628865979),
+ (9, 0.6470588235294118),
+ (9, 0.68),
+ (10, 0.6310679611650486),
+ (10, 0.5849056603773585),
+ (11, 0.6),
+ (11, 0.5849056603773585),
+ (11, 0.6),
+ (11, 0.5700934579439252),
+ (11, 0.6153846153846154),
+ (11, 0.6),
+ (7, 0.75),
+ (12, 0.6153846153846154),
+ (12, 0.6),
+ (10, 0.6470588235294118),
+ (9, 0.68),
+ (10, 0.6633663366336634),
+ (7, 0.7684210526315789),
+ (11, 0.6470588235294118),
+ (9, 0.7319587628865979),
+ (5, 0.8260869565217391),
+ (12, 0.6153846153846154),
+ (8, 0.75)]</code></pre>
+</div>
+</div>
+<p>Interpreting the above: - atom 0 of esomeprazole has 5 atoms (including itself) within radius 2. The count-based fingerprint calculated when setting atom 0 to be a dummy has a similarity of 0.826 to the unmodified fingerprint. - atom 22 (the second to last atom) has 12 atoms (including itself) within radius 2. The count-based fingerprint calculated when setting atom 22 to be a dummy has a similarity of 0.615 to the unmodified fingerprint.</p>
+<p>Now let’s do that perturbation on a bunch of molecules and see what the statistics look like. We’ll use 5000 molecules from <a href="https://rdkit.blogspot.com/2019/10/a-new-lessel-and-briem-like-dataset.html">this older blog post</a></p>
+<div class="cell" data-executetime="{&quot;end_time&quot;:&quot;2024-05-11T03:16:33.675233Z&quot;,&quot;start_time&quot;:&quot;2024-05-11T03:16:30.801772Z&quot;}" data-execution_count="7">
+<div class="sourceCode cell-code" id="cb10"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb10-1"><a href="#cb10-1" aria-hidden="true" tabindex="-1"></a><span class="cf">with</span> <span class="bu">open</span>(<span class="st">'../data/BLSets_actives.txt'</span>,<span class="st">'r'</span>) <span class="im">as</span> inf:</span>
+<span id="cb10-2"><a href="#cb10-2" aria-hidden="true" tabindex="-1"></a>    d <span class="op">=</span> [x.split(<span class="st">'</span><span class="ch">\t</span><span class="st">'</span>)[<span class="dv">0</span>] <span class="cf">for</span> x <span class="kw">in</span> inf.readlines()]</span>
+<span id="cb10-3"><a href="#cb10-3" aria-hidden="true" tabindex="-1"></a>    d.pop(<span class="dv">0</span>) <span class="co"># title line</span></span>
+<span id="cb10-4"><a href="#cb10-4" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> random</span>
+<span id="cb10-5"><a href="#cb10-5" aria-hidden="true" tabindex="-1"></a>random.seed(<span class="bn">0xf00d</span>)</span>
+<span id="cb10-6"><a href="#cb10-6" aria-hidden="true" tabindex="-1"></a>random.shuffle(d)</span>
+<span id="cb10-7"><a href="#cb10-7" aria-hidden="true" tabindex="-1"></a>d <span class="op">=</span> d[:<span class="dv">5000</span>]</span>
+<span id="cb10-8"><a href="#cb10-8" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb10-9"><a href="#cb10-9" aria-hidden="true" tabindex="-1"></a>RDLogger.DisableLog(<span class="st">'rdApp.info'</span>)</span>
+<span id="cb10-10"><a href="#cb10-10" aria-hidden="true" tabindex="-1"></a>mols <span class="op">=</span> []</span>
+<span id="cb10-11"><a href="#cb10-11" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> smi <span class="kw">in</span> d:</span>
+<span id="cb10-12"><a href="#cb10-12" aria-hidden="true" tabindex="-1"></a>    mol <span class="op">=</span> Chem.MolFromSmiles(smi)</span>
+<span id="cb10-13"><a href="#cb10-13" aria-hidden="true" tabindex="-1"></a>    mols.append(mol)</span>
+<span id="cb10-14"><a href="#cb10-14" aria-hidden="true" tabindex="-1"></a>rdMolStandardize.ChargeParentInPlace(mols,numThreads<span class="op">=</span><span class="dv">4</span>)</span>
+<span id="cb10-15"><a href="#cb10-15" aria-hidden="true" tabindex="-1"></a>    </span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+<p>The first few molecules, just to get a sense of what we’re dealing with here.</p>
+<div class="cell" data-executetime="{&quot;end_time&quot;:&quot;2024-05-11T03:16:33.774565Z&quot;,&quot;start_time&quot;:&quot;2024-05-11T03:16:33.689816Z&quot;}" data-execution_count="8">
+<div class="sourceCode cell-code" id="cb11"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb11-1"><a href="#cb11-1" aria-hidden="true" tabindex="-1"></a>IPythonConsole.drawOptions.addAtomIndices <span class="op">=</span> <span class="va">False</span></span>
+<span id="cb11-2"><a href="#cb11-2" aria-hidden="true" tabindex="-1"></a>Draw.MolsToGridImage(mols[:<span class="dv">12</span>],molsPerRow<span class="op">=</span><span class="dv">4</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-display" data-execution_count="8">
+<p><img src="2024-05-14-similarity-and-centrality_files/figure-html/cell-9-output-1.png" class="img-fluid"></p>
+</div>
+</div>
+<p>Histogram of molecule sizes:</p>
+<div class="cell" data-executetime="{&quot;end_time&quot;:&quot;2024-05-05T03:54:42.489762Z&quot;,&quot;start_time&quot;:&quot;2024-05-05T03:54:42.381684Z&quot;}" data-execution_count="74">
+<div class="sourceCode cell-code" id="cb12"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb12-1"><a href="#cb12-1" aria-hidden="true" tabindex="-1"></a>nAts <span class="op">=</span> [x.GetNumHeavyAtoms() <span class="cf">for</span> x <span class="kw">in</span> mols]</span>
+<span id="cb12-2"><a href="#cb12-2" aria-hidden="true" tabindex="-1"></a>plt.figure(figsize<span class="op">=</span>(<span class="dv">6</span>,<span class="dv">6</span>))</span>
+<span id="cb12-3"><a href="#cb12-3" aria-hidden="true" tabindex="-1"></a>plt.hist(nAts,bins<span class="op">=</span><span class="dv">20</span>)<span class="op">;</span></span>
+<span id="cb12-4"><a href="#cb12-4" aria-hidden="true" tabindex="-1"></a>plt.xlabel(<span class="st">'Num Heavy Atoms'</span>)<span class="op">;</span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-display">
+<p><img src="2024-05-14-similarity-and-centrality_files/figure-html/cell-10-output-1.png" class="img-fluid"></p>
+</div>
+</div>
+<p>There’s a reasonable amount of computation to be done here, so we’ll use ipyparallel</p>
+<div class="cell" data-executetime="{&quot;end_time&quot;:&quot;2024-05-04T08:14:28.580384Z&quot;,&quot;start_time&quot;:&quot;2024-05-04T08:14:28.486251Z&quot;}" data-execution_count="10">
+<div class="sourceCode cell-code" id="cb13"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb13-1"><a href="#cb13-1" aria-hidden="true" tabindex="-1"></a><span class="cf">try</span>:</span>
+<span id="cb13-2"><a href="#cb13-2" aria-hidden="true" tabindex="-1"></a>    <span class="im">import</span> ipyparallel <span class="im">as</span> ipp</span>
+<span id="cb13-3"><a href="#cb13-3" aria-hidden="true" tabindex="-1"></a>    rc <span class="op">=</span> ipp.Client()</span>
+<span id="cb13-4"><a href="#cb13-4" aria-hidden="true" tabindex="-1"></a>    dview <span class="op">=</span> rc[:]</span>
+<span id="cb13-5"><a href="#cb13-5" aria-hidden="true" tabindex="-1"></a>    dview.execute(<span class="st">'from rdkit import Chem'</span>)</span>
+<span id="cb13-6"><a href="#cb13-6" aria-hidden="true" tabindex="-1"></a>    dview.execute(<span class="st">'from rdkit.Chem import rdFingerprintGenerator'</span>)</span>
+<span id="cb13-7"><a href="#cb13-7" aria-hidden="true" tabindex="-1"></a>    dview.execute(<span class="st">'from rdkit import DataStructs'</span>)</span>
+<span id="cb13-8"><a href="#cb13-8" aria-hidden="true" tabindex="-1"></a><span class="cf">except</span>:</span>
+<span id="cb13-9"><a href="#cb13-9" aria-hidden="true" tabindex="-1"></a>    <span class="bu">print</span>(<span class="st">"could not use ipyparallel"</span>)</span>
+<span id="cb13-10"><a href="#cb13-10" aria-hidden="true" tabindex="-1"></a>    dview <span class="op">=</span> <span class="va">None</span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+<div class="cell" data-executetime="{&quot;end_time&quot;:&quot;2024-05-04T08:14:28.964188Z&quot;,&quot;start_time&quot;:&quot;2024-05-04T08:14:28.950756Z&quot;}" data-execution_count="11">
+<div class="sourceCode cell-code" id="cb14"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb14-1"><a href="#cb14-1" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> get_modified_sims2(mol,maxRadius,fpgFunc,method):</span>
+<span id="cb14-2"><a href="#cb14-2" aria-hidden="true" tabindex="-1"></a>    fpg <span class="op">=</span> fpgFunc()</span>
+<span id="cb14-3"><a href="#cb14-3" aria-hidden="true" tabindex="-1"></a>    fpFunc <span class="op">=</span> <span class="bu">getattr</span>(fpg,method)</span>
+<span id="cb14-4"><a href="#cb14-4" aria-hidden="true" tabindex="-1"></a>    basefp <span class="op">=</span> fpFunc(mol)</span>
+<span id="cb14-5"><a href="#cb14-5" aria-hidden="true" tabindex="-1"></a>    dm <span class="op">=</span> Chem.GetDistanceMatrix(mol)</span>
+<span id="cb14-6"><a href="#cb14-6" aria-hidden="true" tabindex="-1"></a>    res <span class="op">=</span> []</span>
+<span id="cb14-7"><a href="#cb14-7" aria-hidden="true" tabindex="-1"></a>    <span class="cf">for</span> aidx <span class="kw">in</span> <span class="bu">range</span>(mol.GetNumAtoms()):</span>
+<span id="cb14-8"><a href="#cb14-8" aria-hidden="true" tabindex="-1"></a>        nm <span class="op">=</span> Chem.Mol(mol)</span>
+<span id="cb14-9"><a href="#cb14-9" aria-hidden="true" tabindex="-1"></a>        nm.GetAtomWithIdx(aidx).SetAtomicNum(<span class="dv">0</span>)</span>
+<span id="cb14-10"><a href="#cb14-10" aria-hidden="true" tabindex="-1"></a>        count <span class="op">=</span> <span class="bu">sum</span>(dm[aidx]<span class="op">&lt;=</span>maxRadius)</span>
+<span id="cb14-11"><a href="#cb14-11" aria-hidden="true" tabindex="-1"></a>        res.append((count,DataStructs.TanimotoSimilarity(basefp,fpFunc(nm))))</span>
+<span id="cb14-12"><a href="#cb14-12" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> res</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+<p>Run Morgan fingerprints with radius 1, 2, and 3.</p>
+<div class="cell" data-executetime="{&quot;end_time&quot;:&quot;2024-05-04T09:21:51.848837Z&quot;,&quot;start_time&quot;:&quot;2024-05-04T09:21:24.808786Z&quot;}" data-execution_count="66">
+<div class="sourceCode cell-code" id="cb15"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb15-1"><a href="#cb15-1" aria-hidden="true" tabindex="-1"></a>accum <span class="op">=</span> defaultdict(<span class="kw">lambda</span> : defaultdict(<span class="bu">list</span>))</span>
+<span id="cb15-2"><a href="#cb15-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb15-3"><a href="#cb15-3" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> radius <span class="kw">in</span> (<span class="dv">1</span>,<span class="dv">2</span>,<span class="dv">3</span>):</span>
+<span id="cb15-4"><a href="#cb15-4" aria-hidden="true" tabindex="-1"></a>    fpg <span class="op">=</span> <span class="kw">lambda</span> r<span class="op">=</span>radius:rdFingerprintGenerator.GetMorganGenerator(radius<span class="op">=</span>r,fpSize<span class="op">=</span><span class="dv">2048</span>)</span>
+<span id="cb15-5"><a href="#cb15-5" aria-hidden="true" tabindex="-1"></a>    lres <span class="op">=</span> dview.map_sync(<span class="kw">lambda</span> x,r<span class="op">=</span>radius,y<span class="op">=</span>get_modified_sims2,</span>
+<span id="cb15-6"><a href="#cb15-6" aria-hidden="true" tabindex="-1"></a>                          z<span class="op">=</span>fpg:y(x,r,z,<span class="st">'GetCountFingerprint'</span>),mols)</span>
+<span id="cb15-7"><a href="#cb15-7" aria-hidden="true" tabindex="-1"></a>    <span class="cf">for</span> entry <span class="kw">in</span> lres:</span>
+<span id="cb15-8"><a href="#cb15-8" aria-hidden="true" tabindex="-1"></a>        accum[<span class="st">'counts'</span>][radius].extend(entry)</span>
+<span id="cb15-9"><a href="#cb15-9" aria-hidden="true" tabindex="-1"></a>    lres <span class="op">=</span> dview.map_sync(<span class="kw">lambda</span> x,r<span class="op">=</span>radius,y<span class="op">=</span>get_modified_sims2,</span>
+<span id="cb15-10"><a href="#cb15-10" aria-hidden="true" tabindex="-1"></a>                          z<span class="op">=</span>fpg:y(x,r,z,<span class="st">'GetFingerprint'</span>),mols)</span>
+<span id="cb15-11"><a href="#cb15-11" aria-hidden="true" tabindex="-1"></a>    <span class="cf">for</span> entry <span class="kw">in</span> lres:</span>
+<span id="cb15-12"><a href="#cb15-12" aria-hidden="true" tabindex="-1"></a>        accum[<span class="st">'bits'</span>][radius].extend(entry)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+<p>Run RDKit fingerprints with max path length 5, 6, and 7</p>
+<div class="cell" data-executetime="{&quot;end_time&quot;:&quot;2024-05-04T09:26:19.302386Z&quot;,&quot;start_time&quot;:&quot;2024-05-04T09:21:51.850115Z&quot;}" data-execution_count="67">
+<div class="sourceCode cell-code" id="cb16"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb16-1"><a href="#cb16-1" aria-hidden="true" tabindex="-1"></a>rdkit_accum <span class="op">=</span> defaultdict(<span class="kw">lambda</span> : defaultdict(<span class="bu">list</span>))</span>
+<span id="cb16-2"><a href="#cb16-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb16-3"><a href="#cb16-3" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> radius <span class="kw">in</span> (<span class="dv">5</span>,<span class="dv">6</span>,<span class="dv">7</span>):</span>
+<span id="cb16-4"><a href="#cb16-4" aria-hidden="true" tabindex="-1"></a>    fpg <span class="op">=</span> <span class="kw">lambda</span> r<span class="op">=</span>radius:rdFingerprintGenerator.GetRDKitFPGenerator(maxPath<span class="op">=</span>r,fpSize<span class="op">=</span><span class="dv">2048</span>)</span>
+<span id="cb16-5"><a href="#cb16-5" aria-hidden="true" tabindex="-1"></a>    lres <span class="op">=</span> dview.map_sync(<span class="kw">lambda</span> x,r<span class="op">=</span>radius,y<span class="op">=</span>get_modified_sims2,</span>
+<span id="cb16-6"><a href="#cb16-6" aria-hidden="true" tabindex="-1"></a>                          z<span class="op">=</span>fpg:y(x,r,z,<span class="st">'GetCountFingerprint'</span>),mols)</span>
+<span id="cb16-7"><a href="#cb16-7" aria-hidden="true" tabindex="-1"></a>    <span class="cf">for</span> entry <span class="kw">in</span> lres:</span>
+<span id="cb16-8"><a href="#cb16-8" aria-hidden="true" tabindex="-1"></a>        rdkit_accum[<span class="st">'counts'</span>][radius].extend(entry)</span>
+<span id="cb16-9"><a href="#cb16-9" aria-hidden="true" tabindex="-1"></a>    lres <span class="op">=</span> dview.map_sync(<span class="kw">lambda</span> x,r<span class="op">=</span>radius,y<span class="op">=</span>get_modified_sims2,</span>
+<span id="cb16-10"><a href="#cb16-10" aria-hidden="true" tabindex="-1"></a>                          z<span class="op">=</span>fpg:y(x,r,z,<span class="st">'GetFingerprint'</span>),mols)</span>
+<span id="cb16-11"><a href="#cb16-11" aria-hidden="true" tabindex="-1"></a>    <span class="cf">for</span> entry <span class="kw">in</span> lres:</span>
+<span id="cb16-12"><a href="#cb16-12" aria-hidden="true" tabindex="-1"></a>        rdkit_accum[<span class="st">'bits'</span>][radius].extend(entry)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+<p>Same analysis for topological torsions and atom pairs. For these the extra “radius” argument does not really mean anything</p>
+<div class="cell" data-executetime="{&quot;end_time&quot;:&quot;2024-05-04T09:26:34.666338Z&quot;,&quot;start_time&quot;:&quot;2024-05-04T09:26:20.402848Z&quot;}" data-execution_count="70">
+<div class="sourceCode cell-code" id="cb17"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb17-1"><a href="#cb17-1" aria-hidden="true" tabindex="-1"></a>tt_accum <span class="op">=</span> defaultdict(<span class="kw">lambda</span> : defaultdict(<span class="bu">list</span>))</span>
+<span id="cb17-2"><a href="#cb17-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb17-3"><a href="#cb17-3" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> radius <span class="kw">in</span> (<span class="dv">3</span>,):</span>
+<span id="cb17-4"><a href="#cb17-4" aria-hidden="true" tabindex="-1"></a>    fpg <span class="op">=</span> <span class="kw">lambda</span> r<span class="op">=</span>radius:rdFingerprintGenerator.GetTopologicalTorsionGenerator(fpSize<span class="op">=</span><span class="dv">4096</span>)</span>
+<span id="cb17-5"><a href="#cb17-5" aria-hidden="true" tabindex="-1"></a>    lres <span class="op">=</span> dview.map_sync(<span class="kw">lambda</span> x,r<span class="op">=</span>radius,y<span class="op">=</span>get_modified_sims2,</span>
+<span id="cb17-6"><a href="#cb17-6" aria-hidden="true" tabindex="-1"></a>                          z<span class="op">=</span>fpg:y(x,r,z,<span class="st">'GetCountFingerprint'</span>),mols)</span>
+<span id="cb17-7"><a href="#cb17-7" aria-hidden="true" tabindex="-1"></a>    <span class="cf">for</span> entry <span class="kw">in</span> lres:</span>
+<span id="cb17-8"><a href="#cb17-8" aria-hidden="true" tabindex="-1"></a>        tt_accum[<span class="st">'counts'</span>][radius].extend(entry)</span>
+<span id="cb17-9"><a href="#cb17-9" aria-hidden="true" tabindex="-1"></a>    lres <span class="op">=</span> dview.map_sync(<span class="kw">lambda</span> x,r<span class="op">=</span>radius,y<span class="op">=</span>get_modified_sims2,</span>
+<span id="cb17-10"><a href="#cb17-10" aria-hidden="true" tabindex="-1"></a>                          z<span class="op">=</span>fpg:y(x,r,z,<span class="st">'GetFingerprint'</span>),mols)</span>
+<span id="cb17-11"><a href="#cb17-11" aria-hidden="true" tabindex="-1"></a>    <span class="cf">for</span> entry <span class="kw">in</span> lres:</span>
+<span id="cb17-12"><a href="#cb17-12" aria-hidden="true" tabindex="-1"></a>        tt_accum[<span class="st">'bits'</span>][radius].extend(entry)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+<div class="cell" data-executetime="{&quot;end_time&quot;:&quot;2024-05-04T09:26:50.452013Z&quot;,&quot;start_time&quot;:&quot;2024-05-04T09:26:34.667378Z&quot;}" data-execution_count="71">
+<div class="sourceCode cell-code" id="cb18"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb18-1"><a href="#cb18-1" aria-hidden="true" tabindex="-1"></a>ap_accum <span class="op">=</span> defaultdict(<span class="kw">lambda</span> : defaultdict(<span class="bu">list</span>))</span>
+<span id="cb18-2"><a href="#cb18-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb18-3"><a href="#cb18-3" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> radius <span class="kw">in</span> (<span class="dv">3</span>,):</span>
+<span id="cb18-4"><a href="#cb18-4" aria-hidden="true" tabindex="-1"></a>    fpg <span class="op">=</span> <span class="kw">lambda</span> r<span class="op">=</span>radius:rdFingerprintGenerator.GetAtomPairGenerator(fpSize<span class="op">=</span><span class="dv">4096</span>)</span>
+<span id="cb18-5"><a href="#cb18-5" aria-hidden="true" tabindex="-1"></a>    lres <span class="op">=</span> dview.map_sync(<span class="kw">lambda</span> x,r<span class="op">=</span>radius,y<span class="op">=</span>get_modified_sims2,</span>
+<span id="cb18-6"><a href="#cb18-6" aria-hidden="true" tabindex="-1"></a>                          z<span class="op">=</span>fpg:y(x,r,z,<span class="st">'GetCountFingerprint'</span>),mols)</span>
+<span id="cb18-7"><a href="#cb18-7" aria-hidden="true" tabindex="-1"></a>    <span class="cf">for</span> entry <span class="kw">in</span> lres:</span>
+<span id="cb18-8"><a href="#cb18-8" aria-hidden="true" tabindex="-1"></a>        ap_accum[<span class="st">'counts'</span>][radius].extend(entry)</span>
+<span id="cb18-9"><a href="#cb18-9" aria-hidden="true" tabindex="-1"></a>    lres <span class="op">=</span> dview.map_sync(<span class="kw">lambda</span> x,r<span class="op">=</span>radius,y<span class="op">=</span>get_modified_sims2,</span>
+<span id="cb18-10"><a href="#cb18-10" aria-hidden="true" tabindex="-1"></a>                          z<span class="op">=</span>fpg:y(x,r,z,<span class="st">'GetFingerprint'</span>),mols)</span>
+<span id="cb18-11"><a href="#cb18-11" aria-hidden="true" tabindex="-1"></a>    <span class="cf">for</span> entry <span class="kw">in</span> lres:</span>
+<span id="cb18-12"><a href="#cb18-12" aria-hidden="true" tabindex="-1"></a>        ap_accum[<span class="st">'bits'</span>][radius].extend(entry)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+<p>Save all of those results for later analysis</p>
+<div class="cell" data-executetime="{&quot;end_time&quot;:&quot;2024-05-06T03:03:37.275742Z&quot;,&quot;start_time&quot;:&quot;2024-05-06T03:03:37.273663Z&quot;}" data-execution_count="125">
+<div class="sourceCode cell-code" id="cb19"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb19-1"><a href="#cb19-1" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> copy</span>
+<span id="cb19-2"><a href="#cb19-2" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> to_dict(dd):</span>
+<span id="cb19-3"><a href="#cb19-3" aria-hidden="true" tabindex="-1"></a>    <span class="cf">if</span> <span class="kw">not</span> <span class="bu">isinstance</span>(dd,defaultdict):</span>
+<span id="cb19-4"><a href="#cb19-4" aria-hidden="true" tabindex="-1"></a>        <span class="cf">return</span> copy.deepcopy(dd)</span>
+<span id="cb19-5"><a href="#cb19-5" aria-hidden="true" tabindex="-1"></a>    res <span class="op">=</span> {}</span>
+<span id="cb19-6"><a href="#cb19-6" aria-hidden="true" tabindex="-1"></a>    <span class="cf">for</span> k,v <span class="kw">in</span> dd.items():</span>
+<span id="cb19-7"><a href="#cb19-7" aria-hidden="true" tabindex="-1"></a>        res[k] <span class="op">=</span> to_dict(v)</span>
+<span id="cb19-8"><a href="#cb19-8" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> res</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+<div class="cell" data-executetime="{&quot;end_time&quot;:&quot;2024-05-06T03:04:31.812936Z&quot;,&quot;start_time&quot;:&quot;2024-05-06T03:04:11.089538Z&quot;}" data-execution_count="126">
+<div class="sourceCode cell-code" id="cb20"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb20-1"><a href="#cb20-1" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> pickle</span>
+<span id="cb20-2"><a href="#cb20-2" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> gzip</span>
+<span id="cb20-3"><a href="#cb20-3" aria-hidden="true" tabindex="-1"></a><span class="cf">with</span> gzip.<span class="bu">open</span>(<span class="st">'./results/fp_perturbation.pkl.gz'</span>,<span class="st">'wb+'</span>) <span class="im">as</span> outf:</span>
+<span id="cb20-4"><a href="#cb20-4" aria-hidden="true" tabindex="-1"></a>    pickle.dump((to_dict(accum),to_dict(rdkit_accum),to_dict(ap_accum),to_dict(tt_accum)),outf)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+<div class="cell" data-executetime="{&quot;end_time&quot;:&quot;2024-05-12T03:32:20.510651Z&quot;,&quot;start_time&quot;:&quot;2024-05-12T03:32:20.056176Z&quot;}" data-execution_count="159">
+<div class="sourceCode cell-code" id="cb21"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb21-1"><a href="#cb21-1" aria-hidden="true" tabindex="-1"></a><span class="op">!</span>chmod gou<span class="op">-</span>w .<span class="op">/</span>results<span class="op">/</span>fp_perturbation.pkl.gz</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+<p>Load the saved data:</p>
+<div class="cell" data-executetime="{&quot;end_time&quot;:&quot;2024-05-12T03:32:07.796279Z&quot;,&quot;start_time&quot;:&quot;2024-05-12T03:32:06.880954Z&quot;}" data-execution_count="158">
+<div class="sourceCode cell-code" id="cb22"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb22-1"><a href="#cb22-1" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> collections <span class="im">import</span> defaultdict</span>
+<span id="cb22-2"><a href="#cb22-2" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> pickle</span>
+<span id="cb22-3"><a href="#cb22-3" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> gzip</span>
+<span id="cb22-4"><a href="#cb22-4" aria-hidden="true" tabindex="-1"></a><span class="cf">with</span> gzip.<span class="bu">open</span>(<span class="st">'./results/fp_perturbation.pkl.gz'</span>,<span class="st">'rb'</span>) <span class="im">as</span> inf:</span>
+<span id="cb22-5"><a href="#cb22-5" aria-hidden="true" tabindex="-1"></a>    accum,rdkit_accum,ap_accum,tt_accum <span class="op">=</span> pickle.load(inf)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+<p>Now let’s look at the Morgan and RDKit results:</p>
+<div class="cell" data-executetime="{&quot;end_time&quot;:&quot;2024-05-06T03:05:05.412375Z&quot;,&quot;start_time&quot;:&quot;2024-05-06T03:05:04.709371Z&quot;}" data-execution_count="4">
+<div class="sourceCode cell-code" id="cb23"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb23-1"><a href="#cb23-1" aria-hidden="true" tabindex="-1"></a>rs <span class="op">=</span> (<span class="dv">3</span>,<span class="dv">2</span>,<span class="dv">1</span>)</span>
+<span id="cb23-2"><a href="#cb23-2" aria-hidden="true" tabindex="-1"></a>tacc <span class="op">=</span> accum</span>
+<span id="cb23-3"><a href="#cb23-3" aria-hidden="true" tabindex="-1"></a>titl<span class="op">=</span><span class="st">'Morgan'</span></span>
+<span id="cb23-4"><a href="#cb23-4" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb23-5"><a href="#cb23-5" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> which <span class="kw">in</span> (<span class="st">'counts'</span>,<span class="st">'bits'</span>):</span>
+<span id="cb23-6"><a href="#cb23-6" aria-hidden="true" tabindex="-1"></a>    <span class="bu">print</span>(<span class="ss">f'---- </span><span class="sc">{</span>which<span class="sc">}</span><span class="ss"> ----'</span>)</span>
+<span id="cb23-7"><a href="#cb23-7" aria-hidden="true" tabindex="-1"></a>    <span class="cf">for</span> rad <span class="kw">in</span> rs:</span>
+<span id="cb23-8"><a href="#cb23-8" aria-hidden="true" tabindex="-1"></a>        yps <span class="op">=</span> [y <span class="cf">for</span> x,y <span class="kw">in</span> tacc[which][rad]]</span>
+<span id="cb23-9"><a href="#cb23-9" aria-hidden="true" tabindex="-1"></a>        qs <span class="op">=</span> np.quantile(yps,[<span class="fl">0.1</span>,<span class="fl">0.05</span>])</span>
+<span id="cb23-10"><a href="#cb23-10" aria-hidden="true" tabindex="-1"></a>        <span class="bu">print</span>(<span class="ss">f'  r=</span><span class="sc">{</span>rad<span class="sc">}</span><span class="ss"> mean=</span><span class="sc">{</span>np<span class="sc">.</span>mean(yps)<span class="sc">:.2f}</span><span class="ss"> stddev=</span><span class="sc">{</span>np<span class="sc">.</span>std(yps)<span class="sc">:.2f}</span><span class="ss"> median=</span><span class="sc">{</span>np<span class="sc">.</span>median(yps)<span class="sc">:.2f}</span><span class="ss"> 90%=</span><span class="sc">{</span>qs[<span class="dv">0</span>]<span class="sc">:.2f}</span><span class="ss">, 95%:</span><span class="sc">{</span>qs[<span class="dv">1</span>]<span class="sc">:.2f}</span><span class="ss">'</span>)</span>
+<span id="cb23-11"><a href="#cb23-11" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb23-12"><a href="#cb23-12" aria-hidden="true" tabindex="-1"></a>plt.figure(figsize<span class="op">=</span>(<span class="dv">12</span>,<span class="dv">6</span>))</span>
+<span id="cb23-13"><a href="#cb23-13" aria-hidden="true" tabindex="-1"></a>plt.subplot(<span class="dv">1</span>,<span class="dv">2</span>,<span class="dv">1</span>)</span>
+<span id="cb23-14"><a href="#cb23-14" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb23-15"><a href="#cb23-15" aria-hidden="true" tabindex="-1"></a>plt.hist([[y <span class="cf">for</span> x,y <span class="kw">in</span> tacc[<span class="st">'counts'</span>][rad]] <span class="cf">for</span> rad <span class="kw">in</span> rs],</span>
+<span id="cb23-16"><a href="#cb23-16" aria-hidden="true" tabindex="-1"></a>         label<span class="op">=</span>[<span class="ss">f'counts r=</span><span class="sc">{</span>rad<span class="sc">}</span><span class="ss">'</span> <span class="cf">for</span> rad <span class="kw">in</span> rs],bins<span class="op">=</span><span class="dv">20</span>)<span class="op">;</span></span>
+<span id="cb23-17"><a href="#cb23-17" aria-hidden="true" tabindex="-1"></a>plt.xlabel(<span class="st">'similarity'</span>)</span>
+<span id="cb23-18"><a href="#cb23-18" aria-hidden="true" tabindex="-1"></a>plt.legend()<span class="op">;</span></span>
+<span id="cb23-19"><a href="#cb23-19" aria-hidden="true" tabindex="-1"></a>plt.title(titl)</span>
+<span id="cb23-20"><a href="#cb23-20" aria-hidden="true" tabindex="-1"></a>plt.xlim(<span class="dv">0</span>,<span class="dv">1</span>)</span>
+<span id="cb23-21"><a href="#cb23-21" aria-hidden="true" tabindex="-1"></a>plt.subplot(<span class="dv">1</span>,<span class="dv">2</span>,<span class="dv">2</span>)</span>
+<span id="cb23-22"><a href="#cb23-22" aria-hidden="true" tabindex="-1"></a>plt.hist([[y <span class="cf">for</span> x,y <span class="kw">in</span> tacc[<span class="st">'bits'</span>][rad]] <span class="cf">for</span> rad <span class="kw">in</span> rs],</span>
+<span id="cb23-23"><a href="#cb23-23" aria-hidden="true" tabindex="-1"></a>         label<span class="op">=</span>[<span class="ss">f'bits r=</span><span class="sc">{</span>rad<span class="sc">}</span><span class="ss">'</span> <span class="cf">for</span> rad <span class="kw">in</span> rs],bins<span class="op">=</span><span class="dv">20</span>)<span class="op">;</span></span>
+<span id="cb23-24"><a href="#cb23-24" aria-hidden="true" tabindex="-1"></a>plt.xlabel(<span class="st">'similarity'</span>)</span>
+<span id="cb23-25"><a href="#cb23-25" aria-hidden="true" tabindex="-1"></a>plt.legend()<span class="op">;</span></span>
+<span id="cb23-26"><a href="#cb23-26" aria-hidden="true" tabindex="-1"></a>plt.xlim(<span class="dv">0</span>,<span class="dv">1</span>)</span>
+<span id="cb23-27"><a href="#cb23-27" aria-hidden="true" tabindex="-1"></a>plt.tight_layout()</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>---- counts ----
+  r=3 mean=0.74 stddev=0.10 median=0.74 90%=0.61, 95%:0.56
+  r=2 mean=0.80 stddev=0.08 median=0.80 90%=0.71, 95%:0.67
+  r=1 mean=0.87 stddev=0.05 median=0.88 90%=0.82, 95%:0.80
+---- bits ----
+  r=3 mean=0.68 stddev=0.12 median=0.69 90%=0.53, 95%:0.48
+  r=2 mean=0.75 stddev=0.09 median=0.76 90%=0.63, 95%:0.59
+  r=1 mean=0.83 stddev=0.06 median=0.84 90%=0.75, 95%:0.72</code></pre>
+</div>
+<div class="cell-output cell-output-display">
+<p><img src="2024-05-14-similarity-and-centrality_files/figure-html/cell-21-output-2.png" class="img-fluid"></p>
+</div>
+</div>
+<p>Observations here: - The perturbations have a larger effect when the radius is larger. This makes sense because more atoms “feel” the changed atom with a larger radius. - I’m surprised by how large the overall impact on similarity is for these single atom-changes. With bit-based radius 2 or 3 fingerprints (the most commonly used, I believe), the mean similarities are 0.75 or 0.68 and you have to go all the way down to a similarity level of 0.59 or 0.48 to get 95% of the molecules. Those values are 0.56 and 0.67 with count-based fingerprints.</p>
+<div class="cell" data-executetime="{&quot;end_time&quot;:&quot;2024-05-05T04:12:54.454272Z&quot;,&quot;start_time&quot;:&quot;2024-05-05T04:12:53.779011Z&quot;}" data-execution_count="5">
+<div class="sourceCode cell-code" id="cb25"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb25-1"><a href="#cb25-1" aria-hidden="true" tabindex="-1"></a>rs <span class="op">=</span> (<span class="dv">7</span>,<span class="dv">6</span>,<span class="dv">5</span>)</span>
+<span id="cb25-2"><a href="#cb25-2" aria-hidden="true" tabindex="-1"></a>tacc <span class="op">=</span> rdkit_accum</span>
+<span id="cb25-3"><a href="#cb25-3" aria-hidden="true" tabindex="-1"></a>titl<span class="op">=</span><span class="st">'RDKit'</span></span>
+<span id="cb25-4"><a href="#cb25-4" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb25-5"><a href="#cb25-5" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> which <span class="kw">in</span> (<span class="st">'counts'</span>,<span class="st">'bits'</span>):</span>
+<span id="cb25-6"><a href="#cb25-6" aria-hidden="true" tabindex="-1"></a>    <span class="bu">print</span>(<span class="ss">f'---- </span><span class="sc">{</span>which<span class="sc">}</span><span class="ss"> ----'</span>)</span>
+<span id="cb25-7"><a href="#cb25-7" aria-hidden="true" tabindex="-1"></a>    <span class="cf">for</span> rad <span class="kw">in</span> rs:</span>
+<span id="cb25-8"><a href="#cb25-8" aria-hidden="true" tabindex="-1"></a>        yps <span class="op">=</span> [y <span class="cf">for</span> x,y <span class="kw">in</span> tacc[which][rad]]</span>
+<span id="cb25-9"><a href="#cb25-9" aria-hidden="true" tabindex="-1"></a>        qs <span class="op">=</span> np.quantile(yps,[<span class="fl">0.1</span>,<span class="fl">0.05</span>])</span>
+<span id="cb25-10"><a href="#cb25-10" aria-hidden="true" tabindex="-1"></a>        <span class="bu">print</span>(<span class="ss">f'  maxp=</span><span class="sc">{</span>rad<span class="sc">}</span><span class="ss"> mean=</span><span class="sc">{</span>np<span class="sc">.</span>mean(yps)<span class="sc">:.2f}</span><span class="ss"> stddev=</span><span class="sc">{</span>np<span class="sc">.</span>std(yps)<span class="sc">:.2f}</span><span class="ss"> median=</span><span class="sc">{</span>np<span class="sc">.</span>median(yps)<span class="sc">:.2f}</span><span class="ss"> 90%=</span><span class="sc">{</span>qs[<span class="dv">0</span>]<span class="sc">:.2f}</span><span class="ss">, 95%:</span><span class="sc">{</span>qs[<span class="dv">1</span>]<span class="sc">:.2f}</span><span class="ss">'</span>)</span>
+<span id="cb25-11"><a href="#cb25-11" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb25-12"><a href="#cb25-12" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb25-13"><a href="#cb25-13" aria-hidden="true" tabindex="-1"></a>plt.figure(figsize<span class="op">=</span>(<span class="dv">12</span>,<span class="dv">6</span>))</span>
+<span id="cb25-14"><a href="#cb25-14" aria-hidden="true" tabindex="-1"></a>plt.subplot(<span class="dv">1</span>,<span class="dv">2</span>,<span class="dv">1</span>)</span>
+<span id="cb25-15"><a href="#cb25-15" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb25-16"><a href="#cb25-16" aria-hidden="true" tabindex="-1"></a>plt.hist([[y <span class="cf">for</span> x,y <span class="kw">in</span> tacc[<span class="st">'counts'</span>][rad]] <span class="cf">for</span> rad <span class="kw">in</span> rs],</span>
+<span id="cb25-17"><a href="#cb25-17" aria-hidden="true" tabindex="-1"></a>         label<span class="op">=</span>[<span class="ss">f'counts maxp=</span><span class="sc">{</span>rad<span class="sc">}</span><span class="ss">'</span> <span class="cf">for</span> rad <span class="kw">in</span> rs],bins<span class="op">=</span><span class="dv">20</span>)<span class="op">;</span></span>
+<span id="cb25-18"><a href="#cb25-18" aria-hidden="true" tabindex="-1"></a>plt.xlabel(<span class="st">'similarity'</span>)</span>
+<span id="cb25-19"><a href="#cb25-19" aria-hidden="true" tabindex="-1"></a>plt.legend()<span class="op">;</span></span>
+<span id="cb25-20"><a href="#cb25-20" aria-hidden="true" tabindex="-1"></a>plt.title(titl)</span>
+<span id="cb25-21"><a href="#cb25-21" aria-hidden="true" tabindex="-1"></a>plt.xlim(<span class="dv">0</span>,<span class="dv">1</span>)</span>
+<span id="cb25-22"><a href="#cb25-22" aria-hidden="true" tabindex="-1"></a>plt.subplot(<span class="dv">1</span>,<span class="dv">2</span>,<span class="dv">2</span>)</span>
+<span id="cb25-23"><a href="#cb25-23" aria-hidden="true" tabindex="-1"></a>plt.hist([[y <span class="cf">for</span> x,y <span class="kw">in</span> tacc[<span class="st">'bits'</span>][rad]] <span class="cf">for</span> rad <span class="kw">in</span> rs],</span>
+<span id="cb25-24"><a href="#cb25-24" aria-hidden="true" tabindex="-1"></a>         label<span class="op">=</span>[<span class="ss">f'bits maxp=</span><span class="sc">{</span>rad<span class="sc">}</span><span class="ss">'</span> <span class="cf">for</span> rad <span class="kw">in</span> rs],bins<span class="op">=</span><span class="dv">20</span>)<span class="op">;</span></span>
+<span id="cb25-25"><a href="#cb25-25" aria-hidden="true" tabindex="-1"></a>plt.xlabel(<span class="st">'similarity'</span>)</span>
+<span id="cb25-26"><a href="#cb25-26" aria-hidden="true" tabindex="-1"></a>plt.xlim(<span class="dv">0</span>,<span class="dv">1</span>)</span>
+<span id="cb25-27"><a href="#cb25-27" aria-hidden="true" tabindex="-1"></a>plt.legend()<span class="op">;</span></span>
+<span id="cb25-28"><a href="#cb25-28" aria-hidden="true" tabindex="-1"></a>plt.tight_layout()</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>---- counts ----
+  maxp=7 mean=0.71 stddev=0.17 median=0.73 90%=0.47, 95%:0.40
+  maxp=6 mean=0.72 stddev=0.16 median=0.75 90%=0.50, 95%:0.42
+  maxp=5 mean=0.75 stddev=0.14 median=0.77 90%=0.55, 95%:0.48
+---- bits ----
+  maxp=7 mean=0.76 stddev=0.15 median=0.78 90%=0.54, 95%:0.47
+  maxp=6 mean=0.74 stddev=0.15 median=0.76 90%=0.52, 95%:0.45
+  maxp=5 mean=0.74 stddev=0.14 median=0.76 90%=0.53, 95%:0.46</code></pre>
+</div>
+<div class="cell-output cell-output-display">
+<p><img src="2024-05-14-similarity-and-centrality_files/figure-html/cell-22-output-2.png" class="img-fluid"></p>
+</div>
+</div>
+<p>Observations: - In contrast to the Morgan fingerprints, the changes for the bit-based fingerprints are less than count-based. I assume that this has to do with collisions, the RDKit fingerprints <a href="https://greglandrum.github.io/rdkit-blog/posts/2021-07-06-number-of-fp-bits-set.html">set way more bits</a> than the Morgan fingerprints and have <a href="https://greglandrum.github.io/rdkit-blog/posts/2023-01-23-colliding-bits-iii-expanded.html">many more collisions</a>. - The distributions here have much longer tails than the Morgan FPs did and are more asymmetric (this is inevitable with the longer tails).</p>
+<p>Atom pairs and topological torsions;</p>
+<div class="cell" data-executetime="{&quot;end_time&quot;:&quot;2024-05-05T04:09:00.232485Z&quot;,&quot;start_time&quot;:&quot;2024-05-05T04:08:59.726766Z&quot;}" data-execution_count="6">
+<div class="sourceCode cell-code" id="cb27"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb27-1"><a href="#cb27-1" aria-hidden="true" tabindex="-1"></a>plt.figure(figsize<span class="op">=</span>(<span class="dv">12</span>,<span class="dv">6</span>))</span>
+<span id="cb27-2"><a href="#cb27-2" aria-hidden="true" tabindex="-1"></a>plt.subplot(<span class="dv">1</span>,<span class="dv">2</span>,<span class="dv">1</span>)</span>
+<span id="cb27-3"><a href="#cb27-3" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb27-4"><a href="#cb27-4" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> which <span class="kw">in</span> (<span class="st">'counts'</span>,<span class="st">'bits'</span>):</span>
+<span id="cb27-5"><a href="#cb27-5" aria-hidden="true" tabindex="-1"></a>    <span class="bu">print</span>(<span class="ss">f'---- </span><span class="sc">{</span>which<span class="sc">}</span><span class="ss"> ----'</span>)</span>
+<span id="cb27-6"><a href="#cb27-6" aria-hidden="true" tabindex="-1"></a>    yps <span class="op">=</span> [y <span class="cf">for</span> x,y <span class="kw">in</span> tt_accum[which][<span class="dv">3</span>]]</span>
+<span id="cb27-7"><a href="#cb27-7" aria-hidden="true" tabindex="-1"></a>    qs <span class="op">=</span> np.quantile(yps,[<span class="fl">0.1</span>,<span class="fl">0.05</span>])</span>
+<span id="cb27-8"><a href="#cb27-8" aria-hidden="true" tabindex="-1"></a>    <span class="bu">print</span>(<span class="ss">f'  TT mean=</span><span class="sc">{</span>np<span class="sc">.</span>mean(yps)<span class="sc">:.2f}</span><span class="ss"> stddev=</span><span class="sc">{</span>np<span class="sc">.</span>std(yps)<span class="sc">:.2f}</span><span class="ss"> median=</span><span class="sc">{</span>np<span class="sc">.</span>median(yps)<span class="sc">:.2f}</span><span class="ss"> 90%=</span><span class="sc">{</span>qs[<span class="dv">0</span>]<span class="sc">:.2f}</span><span class="ss">, 95%:</span><span class="sc">{</span>qs[<span class="dv">1</span>]<span class="sc">:.2f}</span><span class="ss">'</span>)</span>
+<span id="cb27-9"><a href="#cb27-9" aria-hidden="true" tabindex="-1"></a>    yps <span class="op">=</span> [y <span class="cf">for</span> x,y <span class="kw">in</span> ap_accum[which][<span class="dv">3</span>]]</span>
+<span id="cb27-10"><a href="#cb27-10" aria-hidden="true" tabindex="-1"></a>    qs <span class="op">=</span> np.quantile(yps,[<span class="fl">0.1</span>,<span class="fl">0.05</span>])</span>
+<span id="cb27-11"><a href="#cb27-11" aria-hidden="true" tabindex="-1"></a>    <span class="bu">print</span>(<span class="ss">f'  AP mean=</span><span class="sc">{</span>np<span class="sc">.</span>mean(yps)<span class="sc">:.2f}</span><span class="ss"> stddev=</span><span class="sc">{</span>np<span class="sc">.</span>std(yps)<span class="sc">:.2f}</span><span class="ss"> median=</span><span class="sc">{</span>np<span class="sc">.</span>median(yps)<span class="sc">:.2f}</span><span class="ss"> 90%=</span><span class="sc">{</span>qs[<span class="dv">0</span>]<span class="sc">:.2f}</span><span class="ss">, 95%:</span><span class="sc">{</span>qs[<span class="dv">1</span>]<span class="sc">:.2f}</span><span class="ss">'</span>)</span>
+<span id="cb27-12"><a href="#cb27-12" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb27-13"><a href="#cb27-13" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb27-14"><a href="#cb27-14" aria-hidden="true" tabindex="-1"></a>plt.hist([[y <span class="cf">for</span> x,y <span class="kw">in</span> tt_accum[<span class="st">'counts'</span>][<span class="dv">3</span>]],[y <span class="cf">for</span> x,y <span class="kw">in</span> ap_accum[<span class="st">'counts'</span>][<span class="dv">3</span>]]],</span>
+<span id="cb27-15"><a href="#cb27-15" aria-hidden="true" tabindex="-1"></a>         label<span class="op">=</span>[<span class="ss">f'TT counts'</span>,<span class="st">'AP counts'</span>],bins<span class="op">=</span><span class="dv">20</span>)<span class="op">;</span></span>
+<span id="cb27-16"><a href="#cb27-16" aria-hidden="true" tabindex="-1"></a>plt.xlabel(<span class="st">'similarity'</span>)</span>
+<span id="cb27-17"><a href="#cb27-17" aria-hidden="true" tabindex="-1"></a>plt.xlim(<span class="dv">0</span>,<span class="dv">1</span>)</span>
+<span id="cb27-18"><a href="#cb27-18" aria-hidden="true" tabindex="-1"></a>plt.legend()<span class="op">;</span></span>
+<span id="cb27-19"><a href="#cb27-19" aria-hidden="true" tabindex="-1"></a>plt.subplot(<span class="dv">1</span>,<span class="dv">2</span>,<span class="dv">2</span>)</span>
+<span id="cb27-20"><a href="#cb27-20" aria-hidden="true" tabindex="-1"></a>plt.hist([[y <span class="cf">for</span> x,y <span class="kw">in</span> tt_accum[<span class="st">'bits'</span>][<span class="dv">3</span>]],[y <span class="cf">for</span> x,y <span class="kw">in</span> ap_accum[<span class="st">'bits'</span>][<span class="dv">3</span>]]],</span>
+<span id="cb27-21"><a href="#cb27-21" aria-hidden="true" tabindex="-1"></a>         label<span class="op">=</span>[<span class="ss">f'TT bits'</span>,<span class="st">'AP bits'</span>],bins<span class="op">=</span><span class="dv">20</span>)<span class="op">;</span></span>
+<span id="cb27-22"><a href="#cb27-22" aria-hidden="true" tabindex="-1"></a>plt.xlabel(<span class="st">'similarity'</span>)</span>
+<span id="cb27-23"><a href="#cb27-23" aria-hidden="true" tabindex="-1"></a>plt.xlim(<span class="dv">0</span>,<span class="dv">1</span>)</span>
+<span id="cb27-24"><a href="#cb27-24" aria-hidden="true" tabindex="-1"></a>plt.legend()<span class="op">;</span></span>
+<span id="cb27-25"><a href="#cb27-25" aria-hidden="true" tabindex="-1"></a>plt.tight_layout()</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>---- counts ----
+  TT mean=0.78 stddev=0.12 median=0.79 90%=0.61, 95%:0.55
+  AP mean=0.88 stddev=0.04 median=0.88 90%=0.83, 95%:0.81
+---- bits ----
+  TT mean=0.78 stddev=0.12 median=0.80 90%=0.61, 95%:0.55
+  AP mean=0.88 stddev=0.05 median=0.89 90%=0.83, 95%:0.81</code></pre>
+</div>
+<div class="cell-output cell-output-display">
+<p><img src="2024-05-14-similarity-and-centrality_files/figure-html/cell-23-output-2.png" class="img-fluid"></p>
+</div>
+</div>
+<p>Observations: - The AP fingerprints are substantially less sensitive to the single-atom perturbations than any of the fingerprints looked at here. - The differences between counts and bits here are so small because both the TT and AP fingerprints use <a href="https://greglandrum.github.io/rdkit-blog/posts/2021-07-06-simulating-counts.html">count simulation</a> by default (this is why I used 4096 bits here instead of the 2048 bits used for the other fingerprints)</p>
+<section id="aside" class="level3">
+<h3 class="anchored" data-anchor-id="aside">Aside</h3>
+<p>Assuming no collisions, we can directly calculate the atom-pair similarity between a molecule and itself with a single atom perturbed.</p>
+<p>The Tanimoto similarity between fingerprints A and B is calculated as:</p>
+<p><span class="math display">\[\frac{\|A\&amp;B\|}{\|A\|+\|B\|-\|A\&amp;B\|}\]</span></p>
+<p>The number of atom pair bits for a molecule is:</p>
+<p><span class="math display">\[\frac{N (N-1)}{2}\]</span></p>
+<p>When we perturb one atom, this changes <span class="math inline">\(N-1\)</span> of those bits, so the number of bits in common between the perturbed and unperturbed fingerprints is:</p>
+<p><span class="math display">\[\frac{N (N-1)}{2} - (N-1)\]</span></p>
+<p>After a bit of math, we find that the Tanimoto similarity between the perturbed and unperturbed molecules is:</p>
+<p><span class="math display">\[\frac{\frac{N (N-1)}{2} - (N-1)}{\frac{N (N-1)}{2} + (N-1)}\]</span></p>
+<p>Plot this to demonstrate:</p>
+<div class="cell" data-executetime="{&quot;end_time&quot;:&quot;2024-05-05T05:11:46.336296Z&quot;,&quot;start_time&quot;:&quot;2024-05-05T05:11:46.174449Z&quot;}" data-execution_count="10">
+<div class="sourceCode cell-code" id="cb29"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb29-1"><a href="#cb29-1" aria-hidden="true" tabindex="-1"></a>nAts <span class="op">=</span> [x.GetNumHeavyAtoms() <span class="cf">for</span> x <span class="kw">in</span> mols]</span>
+<span id="cb29-2"><a href="#cb29-2" aria-hidden="true" tabindex="-1"></a>psims <span class="op">=</span> []</span>
+<span id="cb29-3"><a href="#cb29-3" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> x <span class="kw">in</span> nAts:</span>
+<span id="cb29-4"><a href="#cb29-4" aria-hidden="true" tabindex="-1"></a>    <span class="cf">if</span> x<span class="op">&lt;=</span><span class="dv">1</span>:</span>
+<span id="cb29-5"><a href="#cb29-5" aria-hidden="true" tabindex="-1"></a>        <span class="cf">continue</span></span>
+<span id="cb29-6"><a href="#cb29-6" aria-hidden="true" tabindex="-1"></a>    psims.extend([(x<span class="op">*</span>(x<span class="op">-</span><span class="dv">1</span>)<span class="op">/</span><span class="dv">2</span> <span class="op">-</span> (x<span class="op">-</span><span class="dv">1</span>))<span class="op">/</span>(x<span class="op">*</span>(x<span class="op">-</span><span class="dv">1</span>)<span class="op">/</span><span class="dv">2</span> <span class="op">+</span> (x<span class="op">-</span><span class="dv">1</span>))]<span class="op">*</span>x)</span>
+<span id="cb29-7"><a href="#cb29-7" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb29-8"><a href="#cb29-8" aria-hidden="true" tabindex="-1"></a>plt.figure(figsize<span class="op">=</span>(<span class="dv">6</span>,<span class="dv">6</span>))</span>
+<span id="cb29-9"><a href="#cb29-9" aria-hidden="true" tabindex="-1"></a>plt.hist([[y <span class="cf">for</span> x,y <span class="kw">in</span> ap_accum[<span class="st">'counts'</span>][<span class="dv">3</span>]],psims],label<span class="op">=</span>[<span class="st">'measured'</span>,<span class="st">'computed'</span>],bins<span class="op">=</span><span class="dv">20</span>)<span class="op">;</span></span>
+<span id="cb29-10"><a href="#cb29-10" aria-hidden="true" tabindex="-1"></a>plt.xlim(<span class="dv">0</span>,<span class="dv">1</span>)<span class="op">;</span></span>
+<span id="cb29-11"><a href="#cb29-11" aria-hidden="true" tabindex="-1"></a>plt.legend()<span class="op">;</span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-display">
+<p><img src="2024-05-14-similarity-and-centrality_files/figure-html/cell-24-output-1.png" class="img-fluid"></p>
+</div>
+</div>
+</section>
+</section>
+<section id="visualizing-the-impact-of-single-atom-changes-on-similarity" class="level1">
+<h1>Visualizing the impact of single-atom changes on similarity</h1>
+<p>Using the RDKit’s <a href="https://doi.org/10.1186/1758-2946-5-43">similarity maps</a> we can directly visualize how much the single-atom changes affect similarity</p>
+<div class="cell" data-executetime="{&quot;end_time&quot;:&quot;2024-05-12T03:45:07.741455Z&quot;,&quot;start_time&quot;:&quot;2024-05-12T03:45:07.736619Z&quot;}" data-execution_count="165">
+<div class="sourceCode cell-code" id="cb30"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb30-1"><a href="#cb30-1" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> rdkit.Chem.Draw <span class="im">import</span> SimilarityMaps</span>
+<span id="cb30-2"><a href="#cb30-2" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> rdkit.Chem <span class="im">import</span> rdDepictor</span>
+<span id="cb30-3"><a href="#cb30-3" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> PIL <span class="im">import</span> Image</span>
+<span id="cb30-4"><a href="#cb30-4" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> io <span class="im">import</span> BytesIO</span>
+<span id="cb30-5"><a href="#cb30-5" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb30-6"><a href="#cb30-6" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb30-7"><a href="#cb30-7" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> draw_similarity_map(m,fpfunc,scale_vals<span class="op">=</span><span class="va">False</span>,fillIt<span class="op">=</span><span class="va">True</span>,sigma<span class="op">=</span><span class="fl">0.45</span>,w<span class="op">=</span><span class="dv">500</span>,h<span class="op">=</span><span class="dv">300</span>):</span>
+<span id="cb30-8"><a href="#cb30-8" aria-hidden="true" tabindex="-1"></a>    basefp <span class="op">=</span> fpfunc(m)</span>
+<span id="cb30-9"><a href="#cb30-9" aria-hidden="true" tabindex="-1"></a>    diffs <span class="op">=</span> []</span>
+<span id="cb30-10"><a href="#cb30-10" aria-hidden="true" tabindex="-1"></a>    <span class="cf">for</span> aidx <span class="kw">in</span> <span class="bu">range</span>(m.GetNumAtoms()):</span>
+<span id="cb30-11"><a href="#cb30-11" aria-hidden="true" tabindex="-1"></a>        nm <span class="op">=</span> Chem.Mol(m)</span>
+<span id="cb30-12"><a href="#cb30-12" aria-hidden="true" tabindex="-1"></a>        nm.GetAtomWithIdx(aidx).SetAtomicNum(<span class="dv">0</span>)</span>
+<span id="cb30-13"><a href="#cb30-13" aria-hidden="true" tabindex="-1"></a>        nfp <span class="op">=</span> fpfunc(nm)</span>
+<span id="cb30-14"><a href="#cb30-14" aria-hidden="true" tabindex="-1"></a>        sim <span class="op">=</span> DataStructs.TanimotoSimilarity(basefp,nfp)</span>
+<span id="cb30-15"><a href="#cb30-15" aria-hidden="true" tabindex="-1"></a>        diffs.append(<span class="fl">1.</span><span class="op">-</span>sim)</span>
+<span id="cb30-16"><a href="#cb30-16" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb30-17"><a href="#cb30-17" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb30-18"><a href="#cb30-18" aria-hidden="true" tabindex="-1"></a>    diffs <span class="op">=</span> np.array(diffs)</span>
+<span id="cb30-19"><a href="#cb30-19" aria-hidden="true" tabindex="-1"></a>    rng <span class="op">=</span> <span class="bu">max</span>(diffs)<span class="op">-</span><span class="bu">min</span>(diffs)</span>
+<span id="cb30-20"><a href="#cb30-20" aria-hidden="true" tabindex="-1"></a>    </span>
+<span id="cb30-21"><a href="#cb30-21" aria-hidden="true" tabindex="-1"></a>    <span class="co"># print out the max and min changes caused by a single atom</span></span>
+<span id="cb30-22"><a href="#cb30-22" aria-hidden="true" tabindex="-1"></a>    <span class="bu">print</span>(<span class="ss">f'  max diff=</span><span class="sc">{</span><span class="bu">max</span>(diffs)<span class="sc">:.2f}</span><span class="ss"> min diff=</span><span class="sc">{</span><span class="bu">min</span>(diffs)<span class="sc">:.2f}</span><span class="ss">'</span>)</span>
+<span id="cb30-23"><a href="#cb30-23" aria-hidden="true" tabindex="-1"></a>    </span>
+<span id="cb30-24"><a href="#cb30-24" aria-hidden="true" tabindex="-1"></a>    <span class="co"># optionally scale the values so that differences are more visible</span></span>
+<span id="cb30-25"><a href="#cb30-25" aria-hidden="true" tabindex="-1"></a>    <span class="cf">if</span> scale_vals:</span>
+<span id="cb30-26"><a href="#cb30-26" aria-hidden="true" tabindex="-1"></a>        diffs <span class="op">=</span> (diffs <span class="op">-</span> <span class="bu">min</span>(diffs))<span class="op">/</span>rng <span class="op">+</span> <span class="fl">0.1</span></span>
+<span id="cb30-27"><a href="#cb30-27" aria-hidden="true" tabindex="-1"></a>        </span>
+<span id="cb30-28"><a href="#cb30-28" aria-hidden="true" tabindex="-1"></a>        </span>
+<span id="cb30-29"><a href="#cb30-29" aria-hidden="true" tabindex="-1"></a>    d2d <span class="op">=</span> Draw.MolDraw2DCairo(w,h)</span>
+<span id="cb30-30"><a href="#cb30-30" aria-hidden="true" tabindex="-1"></a>    d2d.drawOptions().useBWAtomPalette()</span>
+<span id="cb30-31"><a href="#cb30-31" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb30-32"><a href="#cb30-32" aria-hidden="true" tabindex="-1"></a>    ps <span class="op">=</span> Draw.ContourParams()</span>
+<span id="cb30-33"><a href="#cb30-33" aria-hidden="true" tabindex="-1"></a>    ps.fillGrid <span class="op">=</span> fillIt</span>
+<span id="cb30-34"><a href="#cb30-34" aria-hidden="true" tabindex="-1"></a>    ps.gridResolution <span class="op">=</span> <span class="fl">0.1</span></span>
+<span id="cb30-35"><a href="#cb30-35" aria-hidden="true" tabindex="-1"></a>    ps.extraGridPadding <span class="op">=</span> <span class="fl">0.5</span></span>
+<span id="cb30-36"><a href="#cb30-36" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb30-37"><a href="#cb30-37" aria-hidden="true" tabindex="-1"></a>    m <span class="op">=</span> rdMolDraw2D.PrepareMolForDrawing(m, addChiralHs<span class="op">=</span><span class="va">False</span>)</span>
+<span id="cb30-38"><a href="#cb30-38" aria-hidden="true" tabindex="-1"></a>    <span class="cf">if</span> <span class="kw">not</span> m.GetNumConformers():</span>
+<span id="cb30-39"><a href="#cb30-39" aria-hidden="true" tabindex="-1"></a>      rdDepictor.Compute2DCoords(m)</span>
+<span id="cb30-40"><a href="#cb30-40" aria-hidden="true" tabindex="-1"></a>    sigmas <span class="op">=</span> [sigma] <span class="op">*</span> m.GetNumAtoms()</span>
+<span id="cb30-41"><a href="#cb30-41" aria-hidden="true" tabindex="-1"></a>    locs <span class="op">=</span> []</span>
+<span id="cb30-42"><a href="#cb30-42" aria-hidden="true" tabindex="-1"></a>    <span class="cf">for</span> i <span class="kw">in</span> <span class="bu">range</span>(m.GetNumAtoms()):</span>
+<span id="cb30-43"><a href="#cb30-43" aria-hidden="true" tabindex="-1"></a>      p <span class="op">=</span> m.GetConformer().GetAtomPosition(i)</span>
+<span id="cb30-44"><a href="#cb30-44" aria-hidden="true" tabindex="-1"></a>      locs.append(Geometry.Point2D(p.x, p.y))</span>
+<span id="cb30-45"><a href="#cb30-45" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb30-46"><a href="#cb30-46" aria-hidden="true" tabindex="-1"></a>    Draw.ContourAndDrawGaussians(d2d, locs, <span class="bu">list</span>(diffs), sigmas, nContours<span class="op">=</span><span class="dv">8</span>, params<span class="op">=</span>ps)</span>
+<span id="cb30-47"><a href="#cb30-47" aria-hidden="true" tabindex="-1"></a>    d2d.drawOptions().clearBackground <span class="op">=</span> <span class="va">False</span></span>
+<span id="cb30-48"><a href="#cb30-48" aria-hidden="true" tabindex="-1"></a>    d2d.DrawMolecule(m)</span>
+<span id="cb30-49"><a href="#cb30-49" aria-hidden="true" tabindex="-1"></a>    </span>
+<span id="cb30-50"><a href="#cb30-50" aria-hidden="true" tabindex="-1"></a>    d2d.FinishDrawing()</span>
+<span id="cb30-51"><a href="#cb30-51" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb30-52"><a href="#cb30-52" aria-hidden="true" tabindex="-1"></a>    sio <span class="op">=</span> BytesIO(d2d.GetDrawingText())</span>
+<span id="cb30-53"><a href="#cb30-53" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> Image.<span class="bu">open</span>(sio)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+<div class="cell" data-executetime="{&quot;end_time&quot;:&quot;2024-05-12T03:45:09.862031Z&quot;,&quot;start_time&quot;:&quot;2024-05-12T03:45:09.780987Z&quot;}" data-execution_count="166">
+<div class="sourceCode cell-code" id="cb31"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb31-1"><a href="#cb31-1" aria-hidden="true" tabindex="-1"></a>fpg <span class="op">=</span> rdFingerprintGenerator.GetMorganGenerator(radius<span class="op">=</span><span class="dv">1</span>,fpSize<span class="op">=</span><span class="dv">2048</span>)</span>
+<span id="cb31-2"><a href="#cb31-2" aria-hidden="true" tabindex="-1"></a>draw_similarity_map(esomeprazole,fpg.GetCountFingerprint)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>  max diff=0.19 min diff=0.12</code></pre>
+</div>
+<div class="cell-output cell-output-display" data-execution_count="166">
+<p><img src="2024-05-14-similarity-and-centrality_files/figure-html/cell-26-output-2.png" class="img-fluid"></p>
+</div>
+</div>
+<div class="cell" data-executetime="{&quot;end_time&quot;:&quot;2024-05-14T02:55:09.178706Z&quot;,&quot;start_time&quot;:&quot;2024-05-14T02:55:09.101493Z&quot;}" data-execution_count="173">
+<div class="sourceCode cell-code" id="cb33"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb33-1"><a href="#cb33-1" aria-hidden="true" tabindex="-1"></a>fpg <span class="op">=</span> rdFingerprintGenerator.GetMorganGenerator(radius<span class="op">=</span><span class="dv">3</span>,fpSize<span class="op">=</span><span class="dv">2048</span>)</span>
+<span id="cb33-2"><a href="#cb33-2" aria-hidden="true" tabindex="-1"></a>draw_similarity_map(esomeprazole,fpg.GetCountFingerprint)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>  max diff=0.43 min diff=0.17</code></pre>
+</div>
+<div class="cell-output cell-output-display" data-execution_count="173">
+<p><img src="2024-05-14-similarity-and-centrality_files/figure-html/cell-27-output-2.png" class="img-fluid"></p>
+</div>
+</div>
+<p>What about the RDKit fingerprint?</p>
+<div class="cell" data-executetime="{&quot;end_time&quot;:&quot;2024-05-14T02:55:29.854622Z&quot;,&quot;start_time&quot;:&quot;2024-05-14T02:55:29.770436Z&quot;}" data-execution_count="174">
+<div class="sourceCode cell-code" id="cb35"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb35-1"><a href="#cb35-1" aria-hidden="true" tabindex="-1"></a>fpg <span class="op">=</span> rdFingerprintGenerator.GetRDKitFPGenerator(maxPath<span class="op">=</span><span class="dv">5</span>,fpSize<span class="op">=</span><span class="dv">2048</span>)</span>
+<span id="cb35-2"><a href="#cb35-2" aria-hidden="true" tabindex="-1"></a>draw_similarity_map(esomeprazole,fpg.GetCountFingerprint)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>  max diff=0.50 min diff=0.06</code></pre>
+</div>
+<div class="cell-output cell-output-display" data-execution_count="174">
+<p><img src="2024-05-14-similarity-and-centrality_files/figure-html/cell-28-output-2.png" class="img-fluid"></p>
+</div>
+</div>
+<p>This makes it look like centrality is important - the changes are largest around the central S atom. That’s a bit misleading, as another molecule will show.</p>
+<p>Let’s look at a molecule from the set that we’ve been working with.</p>
+<p>Morgan fingerprint:</p>
+<div class="cell" data-executetime="{&quot;end_time&quot;:&quot;2024-05-14T02:56:51.288717Z&quot;,&quot;start_time&quot;:&quot;2024-05-14T02:56:51.206462Z&quot;}" data-execution_count="181">
+<div class="sourceCode cell-code" id="cb37"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb37-1"><a href="#cb37-1" aria-hidden="true" tabindex="-1"></a>fpg <span class="op">=</span> rdFingerprintGenerator.GetMorganGenerator(radius<span class="op">=</span><span class="dv">3</span>,fpSize<span class="op">=</span><span class="dv">2048</span>)</span>
+<span id="cb37-2"><a href="#cb37-2" aria-hidden="true" tabindex="-1"></a>draw_similarity_map(mols[<span class="dv">4</span>],fpg.GetFingerprint)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>  max diff=0.47 min diff=0.21</code></pre>
+</div>
+<div class="cell-output cell-output-display" data-execution_count="181">
+<p><img src="2024-05-14-similarity-and-centrality_files/figure-html/cell-29-output-2.png" class="img-fluid"></p>
+</div>
+</div>
+<p>And RDKit fingerprint:</p>
+<div class="cell" data-executetime="{&quot;end_time&quot;:&quot;2024-05-14T02:56:04.921447Z&quot;,&quot;start_time&quot;:&quot;2024-05-14T02:56:04.832787Z&quot;}" data-execution_count="177">
+<div class="sourceCode cell-code" id="cb39"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb39-1"><a href="#cb39-1" aria-hidden="true" tabindex="-1"></a>fpg <span class="op">=</span> rdFingerprintGenerator.GetRDKitFPGenerator(maxPath<span class="op">=</span><span class="dv">5</span>,fpSize<span class="op">=</span><span class="dv">2048</span>)</span>
+<span id="cb39-2"><a href="#cb39-2" aria-hidden="true" tabindex="-1"></a>draw_similarity_map(mols[<span class="dv">4</span>],fpg.GetFingerprint)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>  max diff=0.60 min diff=0.08</code></pre>
+</div>
+<div class="cell-output cell-output-display" data-execution_count="177">
+<p><img src="2024-05-14-similarity-and-centrality_files/figure-html/cell-30-output-2.png" class="img-fluid"></p>
+</div>
+</div>
+<p>With both fingerprints (but particularly the RDKit fingerprint), we can see that the perturbations are largest in the “topologically complex” parts of the molecule: areas with a lot of branching.</p>
+</section>
+<section id="looking-at-delta_similarity-as-a-function-of-the-number-of-atoms-in-the-neighborhood" class="level1">
+<h1>Looking at <span class="math inline">\(\Delta_{similarity}\)</span> as a function of the number of atoms in the neighborhood</h1>
+<p>My original idea with this post was to look at how much of an impact “centrality” - how close an atom is to the middle of the molecule - has on similarity. I realized pretty quickly that the important factor for more “local” fingerprints is the number of atoms within the fingerprints “radius”, not necessarily where that atom is in the molecule.</p>
+<p>So let’s look at that.</p>
+<div class="cell" data-executetime="{&quot;end_time&quot;:&quot;2024-05-12T03:34:55.489790Z&quot;,&quot;start_time&quot;:&quot;2024-05-12T03:34:54.065387Z&quot;}" data-execution_count="163">
+<div class="sourceCode cell-code" id="cb41"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb41-1"><a href="#cb41-1" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb41-2"><a href="#cb41-2" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> matplotlib.patches <span class="im">as</span> mpatches</span>
+<span id="cb41-3"><a href="#cb41-3" aria-hidden="true" tabindex="-1"></a>plt.figure(figsize<span class="op">=</span>(<span class="dv">12</span>,<span class="dv">6</span>))</span>
+<span id="cb41-4"><a href="#cb41-4" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb41-5"><a href="#cb41-5" aria-hidden="true" tabindex="-1"></a>labels <span class="op">=</span> []</span>
+<span id="cb41-6"><a href="#cb41-6" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> i,rad <span class="kw">in</span> <span class="bu">enumerate</span>((<span class="dv">3</span>,<span class="dv">2</span>,<span class="dv">1</span>)):</span>
+<span id="cb41-7"><a href="#cb41-7" aria-hidden="true" tabindex="-1"></a>    d <span class="op">=</span> defaultdict(<span class="bu">list</span>)</span>
+<span id="cb41-8"><a href="#cb41-8" aria-hidden="true" tabindex="-1"></a>    <span class="cf">for</span> r,s <span class="kw">in</span> accum[<span class="st">'counts'</span>][rad]:</span>
+<span id="cb41-9"><a href="#cb41-9" aria-hidden="true" tabindex="-1"></a>        d[r<span class="op">-</span><span class="dv">1</span>].append(s)</span>
+<span id="cb41-10"><a href="#cb41-10" aria-hidden="true" tabindex="-1"></a>    labels.append((mpatches.Patch(color<span class="op">=</span><span class="ss">f'C</span><span class="sc">{</span>i<span class="sc">}</span><span class="ss">'</span>), <span class="ss">f'r=</span><span class="sc">{</span>rad<span class="sc">}</span><span class="ss">'</span>))</span>
+<span id="cb41-11"><a href="#cb41-11" aria-hidden="true" tabindex="-1"></a>    </span>
+<span id="cb41-12"><a href="#cb41-12" aria-hidden="true" tabindex="-1"></a>    <span class="co"># only keep cases where we have at least 10 examples</span></span>
+<span id="cb41-13"><a href="#cb41-13" aria-hidden="true" tabindex="-1"></a>    <span class="cf">for</span> k <span class="kw">in</span> <span class="bu">list</span>(d.keys()):</span>
+<span id="cb41-14"><a href="#cb41-14" aria-hidden="true" tabindex="-1"></a>        <span class="cf">if</span> <span class="bu">len</span>(d[k])<span class="op">&lt;</span><span class="dv">10</span>:</span>
+<span id="cb41-15"><a href="#cb41-15" aria-hidden="true" tabindex="-1"></a>            <span class="kw">del</span> d[k]</span>
+<span id="cb41-16"><a href="#cb41-16" aria-hidden="true" tabindex="-1"></a>        ks <span class="op">=</span> <span class="bu">sorted</span>(d.keys())</span>
+<span id="cb41-17"><a href="#cb41-17" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb41-18"><a href="#cb41-18" aria-hidden="true" tabindex="-1"></a>    ps <span class="op">=</span> [x<span class="op">+</span>i<span class="op">*</span><span class="fl">.25</span> <span class="cf">for</span> x <span class="kw">in</span> ks]</span>
+<span id="cb41-19"><a href="#cb41-19" aria-hidden="true" tabindex="-1"></a>    plt.violinplot([d[k] <span class="cf">for</span> k <span class="kw">in</span> ks],ps,showmedians<span class="op">=</span><span class="va">True</span>)</span>
+<span id="cb41-20"><a href="#cb41-20" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb41-21"><a href="#cb41-21" aria-hidden="true" tabindex="-1"></a>    plt.xlabel(<span class="st">'number of atoms in radius'</span>)</span>
+<span id="cb41-22"><a href="#cb41-22" aria-hidden="true" tabindex="-1"></a>plt.ylabel(<span class="st">'similarity'</span>)</span>
+<span id="cb41-23"><a href="#cb41-23" aria-hidden="true" tabindex="-1"></a>plt.legend(<span class="op">*</span><span class="bu">zip</span>(<span class="op">*</span>labels))</span>
+<span id="cb41-24"><a href="#cb41-24" aria-hidden="true" tabindex="-1"></a>plt.title(<span class="st">'Morgan counts'</span>)<span class="op">;</span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-display">
+<p><img src="2024-05-14-similarity-and-centrality_files/figure-html/cell-31-output-1.png" class="img-fluid"></p>
+</div>
+</div>
+<div class="cell" data-executetime="{&quot;end_time&quot;:&quot;2024-05-12T03:34:14.386818Z&quot;,&quot;start_time&quot;:&quot;2024-05-12T03:34:13.904502Z&quot;}" data-execution_count="162">
+<div class="sourceCode cell-code" id="cb42"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb42-1"><a href="#cb42-1" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> matplotlib.patches <span class="im">as</span> mpatches</span>
+<span id="cb42-2"><a href="#cb42-2" aria-hidden="true" tabindex="-1"></a>plt.figure(figsize<span class="op">=</span>(<span class="dv">12</span>,<span class="dv">6</span>))</span>
+<span id="cb42-3"><a href="#cb42-3" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb42-4"><a href="#cb42-4" aria-hidden="true" tabindex="-1"></a>labels <span class="op">=</span> []</span>
+<span id="cb42-5"><a href="#cb42-5" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> i,rad <span class="kw">in</span> <span class="bu">enumerate</span>((<span class="dv">5</span>,)):</span>
+<span id="cb42-6"><a href="#cb42-6" aria-hidden="true" tabindex="-1"></a>    d <span class="op">=</span> defaultdict(<span class="bu">list</span>)</span>
+<span id="cb42-7"><a href="#cb42-7" aria-hidden="true" tabindex="-1"></a>    <span class="cf">for</span> r,s <span class="kw">in</span> rdkit_accum[<span class="st">'counts'</span>][rad]:</span>
+<span id="cb42-8"><a href="#cb42-8" aria-hidden="true" tabindex="-1"></a>        d[r].append(s)</span>
+<span id="cb42-9"><a href="#cb42-9" aria-hidden="true" tabindex="-1"></a>    labels.append((mpatches.Patch(color<span class="op">=</span><span class="ss">f'C</span><span class="sc">{</span>i<span class="sc">}</span><span class="ss">'</span>), <span class="ss">f'maxp=</span><span class="sc">{</span>rad<span class="sc">}</span><span class="ss">'</span>))</span>
+<span id="cb42-10"><a href="#cb42-10" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb42-11"><a href="#cb42-11" aria-hidden="true" tabindex="-1"></a>    <span class="co"># only keep cases where we have at least 10 examples</span></span>
+<span id="cb42-12"><a href="#cb42-12" aria-hidden="true" tabindex="-1"></a>    <span class="cf">for</span> k <span class="kw">in</span> <span class="bu">list</span>(d.keys()):</span>
+<span id="cb42-13"><a href="#cb42-13" aria-hidden="true" tabindex="-1"></a>        <span class="cf">if</span> <span class="bu">len</span>(d[k])<span class="op">&lt;</span><span class="dv">10</span>:</span>
+<span id="cb42-14"><a href="#cb42-14" aria-hidden="true" tabindex="-1"></a>            <span class="kw">del</span> d[k]</span>
+<span id="cb42-15"><a href="#cb42-15" aria-hidden="true" tabindex="-1"></a>    </span>
+<span id="cb42-16"><a href="#cb42-16" aria-hidden="true" tabindex="-1"></a>    ks <span class="op">=</span> <span class="bu">sorted</span>(d.keys())</span>
+<span id="cb42-17"><a href="#cb42-17" aria-hidden="true" tabindex="-1"></a>    ps <span class="op">=</span> [x<span class="op">+</span>i<span class="op">*</span><span class="fl">.25</span> <span class="cf">for</span> x <span class="kw">in</span> ks]</span>
+<span id="cb42-18"><a href="#cb42-18" aria-hidden="true" tabindex="-1"></a>    plt.violinplot([d[k] <span class="cf">for</span> k <span class="kw">in</span> ks],ps,showmedians<span class="op">=</span><span class="va">True</span>)</span>
+<span id="cb42-19"><a href="#cb42-19" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb42-20"><a href="#cb42-20" aria-hidden="true" tabindex="-1"></a>plt.xlabel(<span class="st">'number of atoms in radius'</span>)</span>
+<span id="cb42-21"><a href="#cb42-21" aria-hidden="true" tabindex="-1"></a>plt.ylabel(<span class="st">'similarity'</span>)</span>
+<span id="cb42-22"><a href="#cb42-22" aria-hidden="true" tabindex="-1"></a>plt.legend(<span class="op">*</span><span class="bu">zip</span>(<span class="op">*</span>labels),loc<span class="op">=</span><span class="dv">4</span>)</span>
+<span id="cb42-23"><a href="#cb42-23" aria-hidden="true" tabindex="-1"></a>plt.title(<span class="st">'RDKit counts'</span>)<span class="op">;</span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-display">
+<p><img src="2024-05-14-similarity-and-centrality_files/figure-html/cell-32-output-1.png" class="img-fluid"></p>
+</div>
+</div>
+<p>The similarity initially decreases before flattening out at around 20 atoms in the radius.</p>
+
+
+</section>
+
+</main> <!-- /main -->
+<script id="quarto-html-after-body" type="application/javascript">
+window.document.addEventListener("DOMContentLoaded", function (event) {
+  const toggleBodyColorMode = (bsSheetEl) => {
+    const mode = bsSheetEl.getAttribute("data-mode");
+    const bodyEl = window.document.querySelector("body");
+    if (mode === "dark") {
+      bodyEl.classList.add("quarto-dark");
+      bodyEl.classList.remove("quarto-light");
+    } else {
+      bodyEl.classList.add("quarto-light");
+      bodyEl.classList.remove("quarto-dark");
+    }
+  }
+  const toggleBodyColorPrimary = () => {
+    const bsSheetEl = window.document.querySelector("link#quarto-bootstrap");
+    if (bsSheetEl) {
+      toggleBodyColorMode(bsSheetEl);
+    }
+  }
+  toggleBodyColorPrimary();  
+  const disableStylesheet = (stylesheets) => {
+    for (let i=0; i < stylesheets.length; i++) {
+      const stylesheet = stylesheets[i];
+      stylesheet.rel = 'prefetch';
+    }
+  }
+  const enableStylesheet = (stylesheets) => {
+    for (let i=0; i < stylesheets.length; i++) {
+      const stylesheet = stylesheets[i];
+      stylesheet.rel = 'stylesheet';
+    }
+  }
+  const manageTransitions = (selector, allowTransitions) => {
+    const els = window.document.querySelectorAll(selector);
+    for (let i=0; i < els.length; i++) {
+      const el = els[i];
+      if (allowTransitions) {
+        el.classList.remove('notransition');
+      } else {
+        el.classList.add('notransition');
+      }
+    }
+  }
+  const toggleColorMode = (alternate) => {
+    // Switch the stylesheets
+    const alternateStylesheets = window.document.querySelectorAll('link.quarto-color-scheme.quarto-color-alternate');
+    manageTransitions('#quarto-margin-sidebar .nav-link', false);
+    if (alternate) {
+      enableStylesheet(alternateStylesheets);
+      for (const sheetNode of alternateStylesheets) {
+        if (sheetNode.id === "quarto-bootstrap") {
+          toggleBodyColorMode(sheetNode);
+        }
+      }
+    } else {
+      disableStylesheet(alternateStylesheets);
+      toggleBodyColorPrimary();
+    }
+    manageTransitions('#quarto-margin-sidebar .nav-link', true);
+    // Switch the toggles
+    const toggles = window.document.querySelectorAll('.quarto-color-scheme-toggle');
+    for (let i=0; i < toggles.length; i++) {
+      const toggle = toggles[i];
+      if (toggle) {
+        if (alternate) {
+          toggle.classList.add("alternate");     
+        } else {
+          toggle.classList.remove("alternate");
+        }
+      }
+    }
+    // Hack to workaround the fact that safari doesn't
+    // properly recolor the scrollbar when toggling (#1455)
+    if (navigator.userAgent.indexOf('Safari') > 0 && navigator.userAgent.indexOf('Chrome') == -1) {
+      manageTransitions("body", false);
+      window.scrollTo(0, 1);
+      setTimeout(() => {
+        window.scrollTo(0, 0);
+        manageTransitions("body", true);
+      }, 40);  
+    }
+  }
+  const isFileUrl = () => { 
+    return window.location.protocol === 'file:';
+  }
+  const hasAlternateSentinel = () => {  
+    let styleSentinel = getColorSchemeSentinel();
+    if (styleSentinel !== null) {
+      return styleSentinel === "alternate";
+    } else {
+      return false;
+    }
+  }
+  const setStyleSentinel = (alternate) => {
+    const value = alternate ? "alternate" : "default";
+    if (!isFileUrl()) {
+      window.localStorage.setItem("quarto-color-scheme", value);
+    } else {
+      localAlternateSentinel = value;
+    }
+  }
+  const getColorSchemeSentinel = () => {
+    if (!isFileUrl()) {
+      const storageValue = window.localStorage.getItem("quarto-color-scheme");
+      return storageValue != null ? storageValue : localAlternateSentinel;
+    } else {
+      return localAlternateSentinel;
+    }
+  }
+  let localAlternateSentinel = 'default';
+  // Dark / light mode switch
+  window.quartoToggleColorScheme = () => {
+    // Read the current dark / light value 
+    let toAlternate = !hasAlternateSentinel();
+    toggleColorMode(toAlternate);
+    setStyleSentinel(toAlternate);
+  };
+  // Ensure there is a toggle, if there isn't float one in the top right
+  if (window.document.querySelector('.quarto-color-scheme-toggle') === null) {
+    const a = window.document.createElement('a');
+    a.classList.add('top-right');
+    a.classList.add('quarto-color-scheme-toggle');
+    a.href = "";
+    a.onclick = function() { try { window.quartoToggleColorScheme(); } catch {} return false; };
+    const i = window.document.createElement("i");
+    i.classList.add('bi');
+    a.appendChild(i);
+    window.document.body.appendChild(a);
+  }
+  // Switch to dark mode if need be
+  if (hasAlternateSentinel()) {
+    toggleColorMode(true);
+  } else {
+    toggleColorMode(false);
+  }
+  const icon = "";
+  const anchorJS = new window.AnchorJS();
+  anchorJS.options = {
+    placement: 'right',
+    icon: icon
+  };
+  anchorJS.add('.anchored');
+  const clipboard = new window.ClipboardJS('.code-copy-button', {
+    target: function(trigger) {
+      return trigger.previousElementSibling;
+    }
+  });
+  clipboard.on('success', function(e) {
+    // button target
+    const button = e.trigger;
+    // don't keep focus
+    button.blur();
+    // flash "checked"
+    button.classList.add('code-copy-button-checked');
+    var currentTitle = button.getAttribute("title");
+    button.setAttribute("title", "Copied!");
+    let tooltip;
+    if (window.bootstrap) {
+      button.setAttribute("data-bs-toggle", "tooltip");
+      button.setAttribute("data-bs-placement", "left");
+      button.setAttribute("data-bs-title", "Copied!");
+      tooltip = new bootstrap.Tooltip(button, 
+        { trigger: "manual", 
+          customClass: "code-copy-button-tooltip",
+          offset: [0, -8]});
+      tooltip.show();    
+    }
+    setTimeout(function() {
+      if (tooltip) {
+        tooltip.hide();
+        button.removeAttribute("data-bs-title");
+        button.removeAttribute("data-bs-toggle");
+        button.removeAttribute("data-bs-placement");
+      }
+      button.setAttribute("title", currentTitle);
+      button.classList.remove('code-copy-button-checked');
+    }, 1000);
+    // clear code selection
+    e.clearSelection();
+  });
+  function tippyHover(el, contentFn) {
+    const config = {
+      allowHTML: true,
+      content: contentFn,
+      maxWidth: 500,
+      delay: 100,
+      arrow: false,
+      appendTo: function(el) {
+          return el.parentElement;
+      },
+      interactive: true,
+      interactiveBorder: 10,
+      theme: 'quarto',
+      placement: 'bottom-start'
+    };
+    window.tippy(el, config); 
+  }
+  const noterefs = window.document.querySelectorAll('a[role="doc-noteref"]');
+  for (var i=0; i<noterefs.length; i++) {
+    const ref = noterefs[i];
+    tippyHover(ref, function() {
+      // use id or data attribute instead here
+      let href = ref.getAttribute('data-footnote-href') || ref.getAttribute('href');
+      try { href = new URL(href).hash; } catch {}
+      const id = href.replace(/^#\/?/, "");
+      const note = window.document.getElementById(id);
+      return note.innerHTML;
+    });
+  }
+  const findCites = (el) => {
+    const parentEl = el.parentElement;
+    if (parentEl) {
+      const cites = parentEl.dataset.cites;
+      if (cites) {
+        return {
+          el,
+          cites: cites.split(' ')
+        };
+      } else {
+        return findCites(el.parentElement)
+      }
+    } else {
+      return undefined;
+    }
+  };
+  var bibliorefs = window.document.querySelectorAll('a[role="doc-biblioref"]');
+  for (var i=0; i<bibliorefs.length; i++) {
+    const ref = bibliorefs[i];
+    const citeInfo = findCites(ref);
+    if (citeInfo) {
+      tippyHover(citeInfo.el, function() {
+        var popup = window.document.createElement('div');
+        citeInfo.cites.forEach(function(cite) {
+          var citeDiv = window.document.createElement('div');
+          citeDiv.classList.add('hanging-indent');
+          citeDiv.classList.add('csl-entry');
+          var biblioDiv = window.document.getElementById('ref-' + cite);
+          if (biblioDiv) {
+            citeDiv.innerHTML = biblioDiv.innerHTML;
+          }
+          popup.appendChild(citeDiv);
+        });
+        return popup.innerHTML;
+      });
+    }
+  }
+});
+</script>
+<script src="https://utteranc.es/client.js" repo="greglandrum/rdkit-blog" issue-term="pathname" theme="github-light" crossorigin="anonymous" async="">
+</script>
+</div> <!-- /content -->
+
+
+
+</body></html>

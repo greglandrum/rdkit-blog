@@ -9,8 +9,676 @@
 <link>https://greglandrum.github.io/rdkit-blog/index.html</link>
 <atom:link href="https://greglandrum.github.io/rdkit-blog/index.xml" rel="self" type="application/rss+xml"/>
 <description>RDKit experiments, tips, and tutorials</description>
-<generator>quarto-1.2.269</generator>
-<lastBuildDate>Thu, 07 Mar 2024 23:00:00 GMT</lastBuildDate>
+<generator>quarto-1.2.280</generator>
+<lastBuildDate>Mon, 13 May 2024 22:00:00 GMT</lastBuildDate>
+<item>
+  <title>The impact of single-atom changes on similarity</title>
+  <link>https://greglandrum.github.io/rdkit-blog/posts/2024-05-14-similarity-and-centrality.html</link>
+  <description><![CDATA[ 
+
+
+
+<section id="impact-of-single-atom-changes-on-similarity" class="level1">
+<h1>Impact of single-atom changes on similarity</h1>
+<p>Last week I got curious about the impact single atoms make on the similarity between two molecules. I was initially wondering whether small differences in the “core” of two molecules have a disproportionate influence on the similarity between them. This blog post came from me trying to answer that question.</p>
+<p>Along the way I discovered that there’s more to this topic than I thought, so the blog post is longer than planned. It still feels like there’s some exploration to do, so I may still end up doing a follow up.</p>
+<p>Here’s a summary of the analysis of the average Tanimoto similarity of a molecule to itself with a single atom changed to a dummy atom. The analysis was done across 5000 ChEMBL molecules.</p>
+<table class="table">
+<thead>
+<tr class="header">
+<th>FP</th>
+<th>mean(SD)</th>
+<th>90%</th>
+<th>95%</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>MFP3</td>
+<td>0.68(0.12)</td>
+<td>0.53</td>
+<td>0.48</td>
+</tr>
+<tr class="even">
+<td>MFP2</td>
+<td>0.75(0.09)</td>
+<td>0.63</td>
+<td>0.59</td>
+</tr>
+<tr class="odd">
+<td>MFP1</td>
+<td>0.83(0.06)</td>
+<td>0.75</td>
+<td>0.72</td>
+</tr>
+<tr class="even">
+<td>RDK7</td>
+<td>0.76(0.15)</td>
+<td>0.54</td>
+<td>0.47</td>
+</tr>
+<tr class="odd">
+<td>RDK5</td>
+<td>0.74(0.14)</td>
+<td>0.53</td>
+<td>0.46</td>
+</tr>
+<tr class="even">
+<td>TT</td>
+<td>0.78(0.12)</td>
+<td>0.61</td>
+<td>0.55</td>
+</tr>
+<tr class="odd">
+<td>AP</td>
+<td>0.88(0.05)</td>
+<td>0.83</td>
+<td>0.81</td>
+</tr>
+</tbody>
+</table>
+<p>We can think about these values as thresholds for retrieving <em>extremely</em> similar molecules: using the RDK5 fingerprint (RDKit fingerprint with a path length of 5) we need to use a Tanimoto similarity threshold of 0.46 to be 95% certain of retrieving molecules that have the same connectivity and that only differ in the identity of a single atom.</p>
+<p>As for my original question about centrality: it’s not how central an atom is that matters, but how many atoms are close to it. We can see this in the similarity map showing the contributions of individual atoms to the similarity of one of the test molecules to itself using the RDK5 fingerprint:</p>
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="https://greglandrum.github.io/rdkit-blog/posts/2024-05-14-similarity-and-centrality_files/figure-html/733e9c17-1-image.png" class="img-fluid figure-img"></p>
+<p></p><figcaption class="figure-caption">image.png</figcaption><p></p>
+</figure>
+</div>
+<div class="cell" data-executetime="{&quot;end_time&quot;:&quot;2024-05-11T03:16:19.832919Z&quot;,&quot;start_time&quot;:&quot;2024-05-11T03:16:19.359437Z&quot;}" data-execution_count="1">
+<div class="sourceCode cell-code" id="cb1" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb1-1"><span class="im" style="color: #00769E;">from</span> rdkit <span class="im" style="color: #00769E;">import</span> Chem</span>
+<span id="cb1-2"><span class="im" style="color: #00769E;">from</span> rdkit.Chem <span class="im" style="color: #00769E;">import</span> rdFingerprintGenerator</span>
+<span id="cb1-3"><span class="im" style="color: #00769E;">from</span> rdkit.Chem.Draw <span class="im" style="color: #00769E;">import</span> IPythonConsole</span>
+<span id="cb1-4"><span class="im" style="color: #00769E;">from</span> rdkit.Chem.MolStandardize <span class="im" style="color: #00769E;">import</span> rdMolStandardize</span>
+<span id="cb1-5"><span class="im" style="color: #00769E;">from</span> rdkit.Chem <span class="im" style="color: #00769E;">import</span> Draw</span>
+<span id="cb1-6"><span class="im" style="color: #00769E;">from</span> rdkit <span class="im" style="color: #00769E;">import</span> DataStructs</span>
+<span id="cb1-7"><span class="im" style="color: #00769E;">from</span> rdkit <span class="im" style="color: #00769E;">import</span> RDLogger</span>
+<span id="cb1-8"><span class="im" style="color: #00769E;">import</span> numpy <span class="im" style="color: #00769E;">as</span> np</span>
+<span id="cb1-9"></span>
+<span id="cb1-10"></span>
+<span id="cb1-11"><span class="im" style="color: #00769E;">from</span> matplotlib <span class="im" style="color: #00769E;">import</span> pyplot <span class="im" style="color: #00769E;">as</span> plt</span>
+<span id="cb1-12">plt.style.use(<span class="st" style="color: #20794D;">'tableau-colorblind10'</span>)</span>
+<span id="cb1-13">plt.rcParams[<span class="st" style="color: #20794D;">'font.size'</span>] <span class="op" style="color: #5E5E5E;">=</span> <span class="st" style="color: #20794D;">'16'</span></span>
+<span id="cb1-14"></span>
+<span id="cb1-15"><span class="op" style="color: #5E5E5E;">%</span>matplotlib inline</span>
+<span id="cb1-16"></span>
+<span id="cb1-17"><span class="im" style="color: #00769E;">import</span> rdkit</span>
+<span id="cb1-18"><span class="bu" style="color: null;">print</span>(rdkit.__version__)</span></code></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>2024.03.2</code></pre>
+</div>
+</div>
+<p>Let’s start with one of my favority example molecules, the bioactive part of esomeprazole:</p>
+<div class="cell" data-executetime="{&quot;end_time&quot;:&quot;2024-05-11T03:16:20.255497Z&quot;,&quot;start_time&quot;:&quot;2024-05-11T03:16:20.226958Z&quot;}" data-execution_count="2">
+<div class="sourceCode cell-code" id="cb3" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb3-1">IPythonConsole.molSize <span class="op" style="color: #5E5E5E;">=</span> <span class="dv" style="color: #AD0000;">450</span>,<span class="dv" style="color: #AD0000;">350</span></span>
+<span id="cb3-2">IPythonConsole.drawOptions.addAtomIndices <span class="op" style="color: #5E5E5E;">=</span> <span class="va" style="color: #111111;">True</span></span>
+<span id="cb3-3">esomeprazole <span class="op" style="color: #5E5E5E;">=</span> Chem.MolFromSmiles(<span class="st" style="color: #20794D;">'COc1ccc2[nH]c(nc2c1)[S@@+]([O-])Cc3ncc(C)c(OC)c3C'</span>)</span>
+<span id="cb3-4">esomeprazole</span></code></pre></div>
+<div class="cell-output cell-output-display" data-execution_count="2">
+<p><img src="https://greglandrum.github.io/rdkit-blog/posts/2024-05-14-similarity-and-centrality_files/figure-html/cell-3-output-1.png" class="img-fluid"></p>
+</div>
+</div>
+<p>Define a function which changes each of the atoms to a dummy and then compares the similarity of that to the unperturbed molecule.</p>
+<p>We track the similarity between the modified and original molecules together with the number of atoms within a target radius of the modified atom (this second piece of info will be used at the end of the blog post).</p>
+<div class="cell" data-executetime="{&quot;end_time&quot;:&quot;2024-05-11T03:16:21.574107Z&quot;,&quot;start_time&quot;:&quot;2024-05-11T03:16:21.562616Z&quot;}" data-execution_count="3">
+<div class="sourceCode cell-code" id="cb4" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb4-1"><span class="kw" style="color: #003B4F;">def</span> get_modified_sims(mol,maxRadius,fpFunc):</span>
+<span id="cb4-2">    basefp <span class="op" style="color: #5E5E5E;">=</span> fpFunc(mol)</span>
+<span id="cb4-3">    dm <span class="op" style="color: #5E5E5E;">=</span> Chem.GetDistanceMatrix(mol)</span>
+<span id="cb4-4">    res <span class="op" style="color: #5E5E5E;">=</span> []</span>
+<span id="cb4-5">    <span class="cf" style="color: #003B4F;">for</span> aidx <span class="kw" style="color: #003B4F;">in</span> <span class="bu" style="color: null;">range</span>(mol.GetNumAtoms()):</span>
+<span id="cb4-6">        nm <span class="op" style="color: #5E5E5E;">=</span> Chem.Mol(mol)</span>
+<span id="cb4-7">        nm.GetAtomWithIdx(aidx).SetAtomicNum(<span class="dv" style="color: #AD0000;">0</span>)</span>
+<span id="cb4-8">        count <span class="op" style="color: #5E5E5E;">=</span> <span class="bu" style="color: null;">sum</span>(dm[aidx]<span class="op" style="color: #5E5E5E;">&lt;=</span>maxRadius)</span>
+<span id="cb4-9">        res.append((count,DataStructs.TanimotoSimilarity(basefp,fpFunc(nm))))</span>
+<span id="cb4-10">    <span class="cf" style="color: #003B4F;">return</span> res</span></code></pre></div>
+</div>
+<p>Now run that for esomeprazole using Morgan fingerprints with three different radius values.</p>
+<p>We do the analysis for both count-based and bit-based fingerprints</p>
+<div class="cell" data-executetime="{&quot;end_time&quot;:&quot;2024-05-11T03:16:23.627485Z&quot;,&quot;start_time&quot;:&quot;2024-05-11T03:16:23.612079Z&quot;}" data-execution_count="4">
+<div class="sourceCode cell-code" id="cb5" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb5-1"><span class="im" style="color: #00769E;">from</span> collections <span class="im" style="color: #00769E;">import</span> defaultdict</span>
+<span id="cb5-2">res <span class="op" style="color: #5E5E5E;">=</span> defaultdict(<span class="kw" style="color: #003B4F;">lambda</span> : defaultdict(<span class="bu" style="color: null;">list</span>))</span>
+<span id="cb5-3"></span>
+<span id="cb5-4"><span class="cf" style="color: #003B4F;">for</span> radius <span class="kw" style="color: #003B4F;">in</span> (<span class="dv" style="color: #AD0000;">1</span>,<span class="dv" style="color: #AD0000;">2</span>,<span class="dv" style="color: #AD0000;">3</span>):</span>
+<span id="cb5-5">    fpg <span class="op" style="color: #5E5E5E;">=</span> rdFingerprintGenerator.GetMorganGenerator(radius<span class="op" style="color: #5E5E5E;">=</span>radius,fpSize<span class="op" style="color: #5E5E5E;">=</span><span class="dv" style="color: #AD0000;">2048</span>)</span>
+<span id="cb5-6">    res[<span class="st" style="color: #20794D;">'counts'</span>][radius].extend(get_modified_sims(esomeprazole,radius,fpg.GetCountFingerprint))</span>
+<span id="cb5-7">    res[<span class="st" style="color: #20794D;">'bits'</span>][radius].extend(get_modified_sims(esomeprazole,radius,fpg.GetFingerprint))</span>
+<span id="cb5-8">    </span></code></pre></div>
+</div>
+<p>At each radius value, there’s one entry in <code>res</code> for each atom in the molecule:</p>
+<div class="cell" data-executetime="{&quot;end_time&quot;:&quot;2024-05-11T03:16:25.164927Z&quot;,&quot;start_time&quot;:&quot;2024-05-11T03:16:25.158331Z&quot;}" data-execution_count="5">
+<div class="sourceCode cell-code" id="cb6" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb6-1"><span class="bu" style="color: null;">print</span>(esomeprazole.GetNumAtoms(),<span class="bu" style="color: null;">len</span>(res[<span class="st" style="color: #20794D;">'counts'</span>][<span class="dv" style="color: #AD0000;">3</span>]))</span></code></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>24 24</code></pre>
+</div>
+</div>
+<p>Here are the values:</p>
+<div class="cell" data-executetime="{&quot;end_time&quot;:&quot;2024-05-11T03:16:26.247121Z&quot;,&quot;start_time&quot;:&quot;2024-05-11T03:16:26.233803Z&quot;}" data-execution_count="6">
+<div class="sourceCode cell-code" id="cb8" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb8-1">res[<span class="st" style="color: #20794D;">'counts'</span>][<span class="dv" style="color: #AD0000;">3</span>]</span></code></pre></div>
+<div class="cell-output cell-output-display" data-execution_count="6">
+<pre><code>[(5, 0.8260869565217391),
+ (7, 0.7319587628865979),
+ (9, 0.6470588235294118),
+ (9, 0.68),
+ (10, 0.6310679611650486),
+ (10, 0.5849056603773585),
+ (11, 0.6),
+ (11, 0.5849056603773585),
+ (11, 0.6),
+ (11, 0.5700934579439252),
+ (11, 0.6153846153846154),
+ (11, 0.6),
+ (7, 0.75),
+ (12, 0.6153846153846154),
+ (12, 0.6),
+ (10, 0.6470588235294118),
+ (9, 0.68),
+ (10, 0.6633663366336634),
+ (7, 0.7684210526315789),
+ (11, 0.6470588235294118),
+ (9, 0.7319587628865979),
+ (5, 0.8260869565217391),
+ (12, 0.6153846153846154),
+ (8, 0.75)]</code></pre>
+</div>
+</div>
+<p>Interpreting the above: - atom 0 of esomeprazole has 5 atoms (including itself) within radius 2. The count-based fingerprint calculated when setting atom 0 to be a dummy has a similarity of 0.826 to the unmodified fingerprint. - atom 22 (the second to last atom) has 12 atoms (including itself) within radius 2. The count-based fingerprint calculated when setting atom 22 to be a dummy has a similarity of 0.615 to the unmodified fingerprint.</p>
+<p>Now let’s do that perturbation on a bunch of molecules and see what the statistics look like. We’ll use 5000 molecules from <a href="https://rdkit.blogspot.com/2019/10/a-new-lessel-and-briem-like-dataset.html">this older blog post</a></p>
+<div class="cell" data-executetime="{&quot;end_time&quot;:&quot;2024-05-11T03:16:33.675233Z&quot;,&quot;start_time&quot;:&quot;2024-05-11T03:16:30.801772Z&quot;}" data-execution_count="7">
+<div class="sourceCode cell-code" id="cb10" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb10-1"><span class="cf" style="color: #003B4F;">with</span> <span class="bu" style="color: null;">open</span>(<span class="st" style="color: #20794D;">'../data/BLSets_actives.txt'</span>,<span class="st" style="color: #20794D;">'r'</span>) <span class="im" style="color: #00769E;">as</span> inf:</span>
+<span id="cb10-2">    d <span class="op" style="color: #5E5E5E;">=</span> [x.split(<span class="st" style="color: #20794D;">'</span><span class="ch" style="color: #20794D;">\t</span><span class="st" style="color: #20794D;">'</span>)[<span class="dv" style="color: #AD0000;">0</span>] <span class="cf" style="color: #003B4F;">for</span> x <span class="kw" style="color: #003B4F;">in</span> inf.readlines()]</span>
+<span id="cb10-3">    d.pop(<span class="dv" style="color: #AD0000;">0</span>) <span class="co" style="color: #5E5E5E;"># title line</span></span>
+<span id="cb10-4"><span class="im" style="color: #00769E;">import</span> random</span>
+<span id="cb10-5">random.seed(<span class="bn" style="color: #AD0000;">0xf00d</span>)</span>
+<span id="cb10-6">random.shuffle(d)</span>
+<span id="cb10-7">d <span class="op" style="color: #5E5E5E;">=</span> d[:<span class="dv" style="color: #AD0000;">5000</span>]</span>
+<span id="cb10-8"></span>
+<span id="cb10-9">RDLogger.DisableLog(<span class="st" style="color: #20794D;">'rdApp.info'</span>)</span>
+<span id="cb10-10">mols <span class="op" style="color: #5E5E5E;">=</span> []</span>
+<span id="cb10-11"><span class="cf" style="color: #003B4F;">for</span> smi <span class="kw" style="color: #003B4F;">in</span> d:</span>
+<span id="cb10-12">    mol <span class="op" style="color: #5E5E5E;">=</span> Chem.MolFromSmiles(smi)</span>
+<span id="cb10-13">    mols.append(mol)</span>
+<span id="cb10-14">rdMolStandardize.ChargeParentInPlace(mols,numThreads<span class="op" style="color: #5E5E5E;">=</span><span class="dv" style="color: #AD0000;">4</span>)</span>
+<span id="cb10-15">    </span></code></pre></div>
+</div>
+<p>The first few molecules, just to get a sense of what we’re dealing with here.</p>
+<div class="cell" data-executetime="{&quot;end_time&quot;:&quot;2024-05-11T03:16:33.774565Z&quot;,&quot;start_time&quot;:&quot;2024-05-11T03:16:33.689816Z&quot;}" data-execution_count="8">
+<div class="sourceCode cell-code" id="cb11" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb11-1">IPythonConsole.drawOptions.addAtomIndices <span class="op" style="color: #5E5E5E;">=</span> <span class="va" style="color: #111111;">False</span></span>
+<span id="cb11-2">Draw.MolsToGridImage(mols[:<span class="dv" style="color: #AD0000;">12</span>],molsPerRow<span class="op" style="color: #5E5E5E;">=</span><span class="dv" style="color: #AD0000;">4</span>)</span></code></pre></div>
+<div class="cell-output cell-output-display" data-execution_count="8">
+<p><img src="https://greglandrum.github.io/rdkit-blog/posts/2024-05-14-similarity-and-centrality_files/figure-html/cell-9-output-1.png" class="img-fluid"></p>
+</div>
+</div>
+<p>Histogram of molecule sizes:</p>
+<div class="cell" data-executetime="{&quot;end_time&quot;:&quot;2024-05-05T03:54:42.489762Z&quot;,&quot;start_time&quot;:&quot;2024-05-05T03:54:42.381684Z&quot;}" data-execution_count="74">
+<div class="sourceCode cell-code" id="cb12" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb12-1">nAts <span class="op" style="color: #5E5E5E;">=</span> [x.GetNumHeavyAtoms() <span class="cf" style="color: #003B4F;">for</span> x <span class="kw" style="color: #003B4F;">in</span> mols]</span>
+<span id="cb12-2">plt.figure(figsize<span class="op" style="color: #5E5E5E;">=</span>(<span class="dv" style="color: #AD0000;">6</span>,<span class="dv" style="color: #AD0000;">6</span>))</span>
+<span id="cb12-3">plt.hist(nAts,bins<span class="op" style="color: #5E5E5E;">=</span><span class="dv" style="color: #AD0000;">20</span>)<span class="op" style="color: #5E5E5E;">;</span></span>
+<span id="cb12-4">plt.xlabel(<span class="st" style="color: #20794D;">'Num Heavy Atoms'</span>)<span class="op" style="color: #5E5E5E;">;</span></span></code></pre></div>
+<div class="cell-output cell-output-display">
+<p><img src="https://greglandrum.github.io/rdkit-blog/posts/2024-05-14-similarity-and-centrality_files/figure-html/cell-10-output-1.png" class="img-fluid"></p>
+</div>
+</div>
+<p>There’s a reasonable amount of computation to be done here, so we’ll use ipyparallel</p>
+<div class="cell" data-executetime="{&quot;end_time&quot;:&quot;2024-05-04T08:14:28.580384Z&quot;,&quot;start_time&quot;:&quot;2024-05-04T08:14:28.486251Z&quot;}" data-execution_count="10">
+<div class="sourceCode cell-code" id="cb13" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb13-1"><span class="cf" style="color: #003B4F;">try</span>:</span>
+<span id="cb13-2">    <span class="im" style="color: #00769E;">import</span> ipyparallel <span class="im" style="color: #00769E;">as</span> ipp</span>
+<span id="cb13-3">    rc <span class="op" style="color: #5E5E5E;">=</span> ipp.Client()</span>
+<span id="cb13-4">    dview <span class="op" style="color: #5E5E5E;">=</span> rc[:]</span>
+<span id="cb13-5">    dview.execute(<span class="st" style="color: #20794D;">'from rdkit import Chem'</span>)</span>
+<span id="cb13-6">    dview.execute(<span class="st" style="color: #20794D;">'from rdkit.Chem import rdFingerprintGenerator'</span>)</span>
+<span id="cb13-7">    dview.execute(<span class="st" style="color: #20794D;">'from rdkit import DataStructs'</span>)</span>
+<span id="cb13-8"><span class="cf" style="color: #003B4F;">except</span>:</span>
+<span id="cb13-9">    <span class="bu" style="color: null;">print</span>(<span class="st" style="color: #20794D;">"could not use ipyparallel"</span>)</span>
+<span id="cb13-10">    dview <span class="op" style="color: #5E5E5E;">=</span> <span class="va" style="color: #111111;">None</span></span></code></pre></div>
+</div>
+<div class="cell" data-executetime="{&quot;end_time&quot;:&quot;2024-05-04T08:14:28.964188Z&quot;,&quot;start_time&quot;:&quot;2024-05-04T08:14:28.950756Z&quot;}" data-execution_count="11">
+<div class="sourceCode cell-code" id="cb14" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb14-1"><span class="kw" style="color: #003B4F;">def</span> get_modified_sims2(mol,maxRadius,fpgFunc,method):</span>
+<span id="cb14-2">    fpg <span class="op" style="color: #5E5E5E;">=</span> fpgFunc()</span>
+<span id="cb14-3">    fpFunc <span class="op" style="color: #5E5E5E;">=</span> <span class="bu" style="color: null;">getattr</span>(fpg,method)</span>
+<span id="cb14-4">    basefp <span class="op" style="color: #5E5E5E;">=</span> fpFunc(mol)</span>
+<span id="cb14-5">    dm <span class="op" style="color: #5E5E5E;">=</span> Chem.GetDistanceMatrix(mol)</span>
+<span id="cb14-6">    res <span class="op" style="color: #5E5E5E;">=</span> []</span>
+<span id="cb14-7">    <span class="cf" style="color: #003B4F;">for</span> aidx <span class="kw" style="color: #003B4F;">in</span> <span class="bu" style="color: null;">range</span>(mol.GetNumAtoms()):</span>
+<span id="cb14-8">        nm <span class="op" style="color: #5E5E5E;">=</span> Chem.Mol(mol)</span>
+<span id="cb14-9">        nm.GetAtomWithIdx(aidx).SetAtomicNum(<span class="dv" style="color: #AD0000;">0</span>)</span>
+<span id="cb14-10">        count <span class="op" style="color: #5E5E5E;">=</span> <span class="bu" style="color: null;">sum</span>(dm[aidx]<span class="op" style="color: #5E5E5E;">&lt;=</span>maxRadius)</span>
+<span id="cb14-11">        res.append((count,DataStructs.TanimotoSimilarity(basefp,fpFunc(nm))))</span>
+<span id="cb14-12">    <span class="cf" style="color: #003B4F;">return</span> res</span></code></pre></div>
+</div>
+<p>Run Morgan fingerprints with radius 1, 2, and 3.</p>
+<div class="cell" data-executetime="{&quot;end_time&quot;:&quot;2024-05-04T09:21:51.848837Z&quot;,&quot;start_time&quot;:&quot;2024-05-04T09:21:24.808786Z&quot;}" data-execution_count="66">
+<div class="sourceCode cell-code" id="cb15" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb15-1">accum <span class="op" style="color: #5E5E5E;">=</span> defaultdict(<span class="kw" style="color: #003B4F;">lambda</span> : defaultdict(<span class="bu" style="color: null;">list</span>))</span>
+<span id="cb15-2"></span>
+<span id="cb15-3"><span class="cf" style="color: #003B4F;">for</span> radius <span class="kw" style="color: #003B4F;">in</span> (<span class="dv" style="color: #AD0000;">1</span>,<span class="dv" style="color: #AD0000;">2</span>,<span class="dv" style="color: #AD0000;">3</span>):</span>
+<span id="cb15-4">    fpg <span class="op" style="color: #5E5E5E;">=</span> <span class="kw" style="color: #003B4F;">lambda</span> r<span class="op" style="color: #5E5E5E;">=</span>radius:rdFingerprintGenerator.GetMorganGenerator(radius<span class="op" style="color: #5E5E5E;">=</span>r,fpSize<span class="op" style="color: #5E5E5E;">=</span><span class="dv" style="color: #AD0000;">2048</span>)</span>
+<span id="cb15-5">    lres <span class="op" style="color: #5E5E5E;">=</span> dview.map_sync(<span class="kw" style="color: #003B4F;">lambda</span> x,r<span class="op" style="color: #5E5E5E;">=</span>radius,y<span class="op" style="color: #5E5E5E;">=</span>get_modified_sims2,</span>
+<span id="cb15-6">                          z<span class="op" style="color: #5E5E5E;">=</span>fpg:y(x,r,z,<span class="st" style="color: #20794D;">'GetCountFingerprint'</span>),mols)</span>
+<span id="cb15-7">    <span class="cf" style="color: #003B4F;">for</span> entry <span class="kw" style="color: #003B4F;">in</span> lres:</span>
+<span id="cb15-8">        accum[<span class="st" style="color: #20794D;">'counts'</span>][radius].extend(entry)</span>
+<span id="cb15-9">    lres <span class="op" style="color: #5E5E5E;">=</span> dview.map_sync(<span class="kw" style="color: #003B4F;">lambda</span> x,r<span class="op" style="color: #5E5E5E;">=</span>radius,y<span class="op" style="color: #5E5E5E;">=</span>get_modified_sims2,</span>
+<span id="cb15-10">                          z<span class="op" style="color: #5E5E5E;">=</span>fpg:y(x,r,z,<span class="st" style="color: #20794D;">'GetFingerprint'</span>),mols)</span>
+<span id="cb15-11">    <span class="cf" style="color: #003B4F;">for</span> entry <span class="kw" style="color: #003B4F;">in</span> lres:</span>
+<span id="cb15-12">        accum[<span class="st" style="color: #20794D;">'bits'</span>][radius].extend(entry)</span></code></pre></div>
+</div>
+<p>Run RDKit fingerprints with max path length 5, 6, and 7</p>
+<div class="cell" data-executetime="{&quot;end_time&quot;:&quot;2024-05-04T09:26:19.302386Z&quot;,&quot;start_time&quot;:&quot;2024-05-04T09:21:51.850115Z&quot;}" data-execution_count="67">
+<div class="sourceCode cell-code" id="cb16" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb16-1">rdkit_accum <span class="op" style="color: #5E5E5E;">=</span> defaultdict(<span class="kw" style="color: #003B4F;">lambda</span> : defaultdict(<span class="bu" style="color: null;">list</span>))</span>
+<span id="cb16-2"></span>
+<span id="cb16-3"><span class="cf" style="color: #003B4F;">for</span> radius <span class="kw" style="color: #003B4F;">in</span> (<span class="dv" style="color: #AD0000;">5</span>,<span class="dv" style="color: #AD0000;">6</span>,<span class="dv" style="color: #AD0000;">7</span>):</span>
+<span id="cb16-4">    fpg <span class="op" style="color: #5E5E5E;">=</span> <span class="kw" style="color: #003B4F;">lambda</span> r<span class="op" style="color: #5E5E5E;">=</span>radius:rdFingerprintGenerator.GetRDKitFPGenerator(maxPath<span class="op" style="color: #5E5E5E;">=</span>r,fpSize<span class="op" style="color: #5E5E5E;">=</span><span class="dv" style="color: #AD0000;">2048</span>)</span>
+<span id="cb16-5">    lres <span class="op" style="color: #5E5E5E;">=</span> dview.map_sync(<span class="kw" style="color: #003B4F;">lambda</span> x,r<span class="op" style="color: #5E5E5E;">=</span>radius,y<span class="op" style="color: #5E5E5E;">=</span>get_modified_sims2,</span>
+<span id="cb16-6">                          z<span class="op" style="color: #5E5E5E;">=</span>fpg:y(x,r,z,<span class="st" style="color: #20794D;">'GetCountFingerprint'</span>),mols)</span>
+<span id="cb16-7">    <span class="cf" style="color: #003B4F;">for</span> entry <span class="kw" style="color: #003B4F;">in</span> lres:</span>
+<span id="cb16-8">        rdkit_accum[<span class="st" style="color: #20794D;">'counts'</span>][radius].extend(entry)</span>
+<span id="cb16-9">    lres <span class="op" style="color: #5E5E5E;">=</span> dview.map_sync(<span class="kw" style="color: #003B4F;">lambda</span> x,r<span class="op" style="color: #5E5E5E;">=</span>radius,y<span class="op" style="color: #5E5E5E;">=</span>get_modified_sims2,</span>
+<span id="cb16-10">                          z<span class="op" style="color: #5E5E5E;">=</span>fpg:y(x,r,z,<span class="st" style="color: #20794D;">'GetFingerprint'</span>),mols)</span>
+<span id="cb16-11">    <span class="cf" style="color: #003B4F;">for</span> entry <span class="kw" style="color: #003B4F;">in</span> lres:</span>
+<span id="cb16-12">        rdkit_accum[<span class="st" style="color: #20794D;">'bits'</span>][radius].extend(entry)</span></code></pre></div>
+</div>
+<p>Same analysis for topological torsions and atom pairs. For these the extra “radius” argument does not really mean anything</p>
+<div class="cell" data-executetime="{&quot;end_time&quot;:&quot;2024-05-04T09:26:34.666338Z&quot;,&quot;start_time&quot;:&quot;2024-05-04T09:26:20.402848Z&quot;}" data-execution_count="70">
+<div class="sourceCode cell-code" id="cb17" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb17-1">tt_accum <span class="op" style="color: #5E5E5E;">=</span> defaultdict(<span class="kw" style="color: #003B4F;">lambda</span> : defaultdict(<span class="bu" style="color: null;">list</span>))</span>
+<span id="cb17-2"></span>
+<span id="cb17-3"><span class="cf" style="color: #003B4F;">for</span> radius <span class="kw" style="color: #003B4F;">in</span> (<span class="dv" style="color: #AD0000;">3</span>,):</span>
+<span id="cb17-4">    fpg <span class="op" style="color: #5E5E5E;">=</span> <span class="kw" style="color: #003B4F;">lambda</span> r<span class="op" style="color: #5E5E5E;">=</span>radius:rdFingerprintGenerator.GetTopologicalTorsionGenerator(fpSize<span class="op" style="color: #5E5E5E;">=</span><span class="dv" style="color: #AD0000;">4096</span>)</span>
+<span id="cb17-5">    lres <span class="op" style="color: #5E5E5E;">=</span> dview.map_sync(<span class="kw" style="color: #003B4F;">lambda</span> x,r<span class="op" style="color: #5E5E5E;">=</span>radius,y<span class="op" style="color: #5E5E5E;">=</span>get_modified_sims2,</span>
+<span id="cb17-6">                          z<span class="op" style="color: #5E5E5E;">=</span>fpg:y(x,r,z,<span class="st" style="color: #20794D;">'GetCountFingerprint'</span>),mols)</span>
+<span id="cb17-7">    <span class="cf" style="color: #003B4F;">for</span> entry <span class="kw" style="color: #003B4F;">in</span> lres:</span>
+<span id="cb17-8">        tt_accum[<span class="st" style="color: #20794D;">'counts'</span>][radius].extend(entry)</span>
+<span id="cb17-9">    lres <span class="op" style="color: #5E5E5E;">=</span> dview.map_sync(<span class="kw" style="color: #003B4F;">lambda</span> x,r<span class="op" style="color: #5E5E5E;">=</span>radius,y<span class="op" style="color: #5E5E5E;">=</span>get_modified_sims2,</span>
+<span id="cb17-10">                          z<span class="op" style="color: #5E5E5E;">=</span>fpg:y(x,r,z,<span class="st" style="color: #20794D;">'GetFingerprint'</span>),mols)</span>
+<span id="cb17-11">    <span class="cf" style="color: #003B4F;">for</span> entry <span class="kw" style="color: #003B4F;">in</span> lres:</span>
+<span id="cb17-12">        tt_accum[<span class="st" style="color: #20794D;">'bits'</span>][radius].extend(entry)</span></code></pre></div>
+</div>
+<div class="cell" data-executetime="{&quot;end_time&quot;:&quot;2024-05-04T09:26:50.452013Z&quot;,&quot;start_time&quot;:&quot;2024-05-04T09:26:34.667378Z&quot;}" data-execution_count="71">
+<div class="sourceCode cell-code" id="cb18" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb18-1">ap_accum <span class="op" style="color: #5E5E5E;">=</span> defaultdict(<span class="kw" style="color: #003B4F;">lambda</span> : defaultdict(<span class="bu" style="color: null;">list</span>))</span>
+<span id="cb18-2"></span>
+<span id="cb18-3"><span class="cf" style="color: #003B4F;">for</span> radius <span class="kw" style="color: #003B4F;">in</span> (<span class="dv" style="color: #AD0000;">3</span>,):</span>
+<span id="cb18-4">    fpg <span class="op" style="color: #5E5E5E;">=</span> <span class="kw" style="color: #003B4F;">lambda</span> r<span class="op" style="color: #5E5E5E;">=</span>radius:rdFingerprintGenerator.GetAtomPairGenerator(fpSize<span class="op" style="color: #5E5E5E;">=</span><span class="dv" style="color: #AD0000;">4096</span>)</span>
+<span id="cb18-5">    lres <span class="op" style="color: #5E5E5E;">=</span> dview.map_sync(<span class="kw" style="color: #003B4F;">lambda</span> x,r<span class="op" style="color: #5E5E5E;">=</span>radius,y<span class="op" style="color: #5E5E5E;">=</span>get_modified_sims2,</span>
+<span id="cb18-6">                          z<span class="op" style="color: #5E5E5E;">=</span>fpg:y(x,r,z,<span class="st" style="color: #20794D;">'GetCountFingerprint'</span>),mols)</span>
+<span id="cb18-7">    <span class="cf" style="color: #003B4F;">for</span> entry <span class="kw" style="color: #003B4F;">in</span> lres:</span>
+<span id="cb18-8">        ap_accum[<span class="st" style="color: #20794D;">'counts'</span>][radius].extend(entry)</span>
+<span id="cb18-9">    lres <span class="op" style="color: #5E5E5E;">=</span> dview.map_sync(<span class="kw" style="color: #003B4F;">lambda</span> x,r<span class="op" style="color: #5E5E5E;">=</span>radius,y<span class="op" style="color: #5E5E5E;">=</span>get_modified_sims2,</span>
+<span id="cb18-10">                          z<span class="op" style="color: #5E5E5E;">=</span>fpg:y(x,r,z,<span class="st" style="color: #20794D;">'GetFingerprint'</span>),mols)</span>
+<span id="cb18-11">    <span class="cf" style="color: #003B4F;">for</span> entry <span class="kw" style="color: #003B4F;">in</span> lres:</span>
+<span id="cb18-12">        ap_accum[<span class="st" style="color: #20794D;">'bits'</span>][radius].extend(entry)</span></code></pre></div>
+</div>
+<p>Save all of those results for later analysis</p>
+<div class="cell" data-executetime="{&quot;end_time&quot;:&quot;2024-05-06T03:03:37.275742Z&quot;,&quot;start_time&quot;:&quot;2024-05-06T03:03:37.273663Z&quot;}" data-execution_count="125">
+<div class="sourceCode cell-code" id="cb19" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb19-1"><span class="im" style="color: #00769E;">import</span> copy</span>
+<span id="cb19-2"><span class="kw" style="color: #003B4F;">def</span> to_dict(dd):</span>
+<span id="cb19-3">    <span class="cf" style="color: #003B4F;">if</span> <span class="kw" style="color: #003B4F;">not</span> <span class="bu" style="color: null;">isinstance</span>(dd,defaultdict):</span>
+<span id="cb19-4">        <span class="cf" style="color: #003B4F;">return</span> copy.deepcopy(dd)</span>
+<span id="cb19-5">    res <span class="op" style="color: #5E5E5E;">=</span> {}</span>
+<span id="cb19-6">    <span class="cf" style="color: #003B4F;">for</span> k,v <span class="kw" style="color: #003B4F;">in</span> dd.items():</span>
+<span id="cb19-7">        res[k] <span class="op" style="color: #5E5E5E;">=</span> to_dict(v)</span>
+<span id="cb19-8">    <span class="cf" style="color: #003B4F;">return</span> res</span></code></pre></div>
+</div>
+<div class="cell" data-executetime="{&quot;end_time&quot;:&quot;2024-05-06T03:04:31.812936Z&quot;,&quot;start_time&quot;:&quot;2024-05-06T03:04:11.089538Z&quot;}" data-execution_count="126">
+<div class="sourceCode cell-code" id="cb20" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb20-1"><span class="im" style="color: #00769E;">import</span> pickle</span>
+<span id="cb20-2"><span class="im" style="color: #00769E;">import</span> gzip</span>
+<span id="cb20-3"><span class="cf" style="color: #003B4F;">with</span> gzip.<span class="bu" style="color: null;">open</span>(<span class="st" style="color: #20794D;">'./results/fp_perturbation.pkl.gz'</span>,<span class="st" style="color: #20794D;">'wb+'</span>) <span class="im" style="color: #00769E;">as</span> outf:</span>
+<span id="cb20-4">    pickle.dump((to_dict(accum),to_dict(rdkit_accum),to_dict(ap_accum),to_dict(tt_accum)),outf)</span></code></pre></div>
+</div>
+<div class="cell" data-executetime="{&quot;end_time&quot;:&quot;2024-05-12T03:32:20.510651Z&quot;,&quot;start_time&quot;:&quot;2024-05-12T03:32:20.056176Z&quot;}" data-execution_count="159">
+<div class="sourceCode cell-code" id="cb21" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb21-1"><span class="op" style="color: #5E5E5E;">!</span>chmod gou<span class="op" style="color: #5E5E5E;">-</span>w .<span class="op" style="color: #5E5E5E;">/</span>results<span class="op" style="color: #5E5E5E;">/</span>fp_perturbation.pkl.gz</span></code></pre></div>
+</div>
+<p>Load the saved data:</p>
+<div class="cell" data-executetime="{&quot;end_time&quot;:&quot;2024-05-12T03:32:07.796279Z&quot;,&quot;start_time&quot;:&quot;2024-05-12T03:32:06.880954Z&quot;}" data-execution_count="158">
+<div class="sourceCode cell-code" id="cb22" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb22-1"><span class="im" style="color: #00769E;">from</span> collections <span class="im" style="color: #00769E;">import</span> defaultdict</span>
+<span id="cb22-2"><span class="im" style="color: #00769E;">import</span> pickle</span>
+<span id="cb22-3"><span class="im" style="color: #00769E;">import</span> gzip</span>
+<span id="cb22-4"><span class="cf" style="color: #003B4F;">with</span> gzip.<span class="bu" style="color: null;">open</span>(<span class="st" style="color: #20794D;">'./results/fp_perturbation.pkl.gz'</span>,<span class="st" style="color: #20794D;">'rb'</span>) <span class="im" style="color: #00769E;">as</span> inf:</span>
+<span id="cb22-5">    accum,rdkit_accum,ap_accum,tt_accum <span class="op" style="color: #5E5E5E;">=</span> pickle.load(inf)</span></code></pre></div>
+</div>
+<p>Now let’s look at the Morgan and RDKit results:</p>
+<div class="cell" data-executetime="{&quot;end_time&quot;:&quot;2024-05-06T03:05:05.412375Z&quot;,&quot;start_time&quot;:&quot;2024-05-06T03:05:04.709371Z&quot;}" data-execution_count="4">
+<div class="sourceCode cell-code" id="cb23" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb23-1">rs <span class="op" style="color: #5E5E5E;">=</span> (<span class="dv" style="color: #AD0000;">3</span>,<span class="dv" style="color: #AD0000;">2</span>,<span class="dv" style="color: #AD0000;">1</span>)</span>
+<span id="cb23-2">tacc <span class="op" style="color: #5E5E5E;">=</span> accum</span>
+<span id="cb23-3">titl<span class="op" style="color: #5E5E5E;">=</span><span class="st" style="color: #20794D;">'Morgan'</span></span>
+<span id="cb23-4"></span>
+<span id="cb23-5"><span class="cf" style="color: #003B4F;">for</span> which <span class="kw" style="color: #003B4F;">in</span> (<span class="st" style="color: #20794D;">'counts'</span>,<span class="st" style="color: #20794D;">'bits'</span>):</span>
+<span id="cb23-6">    <span class="bu" style="color: null;">print</span>(<span class="ss" style="color: #20794D;">f'---- </span><span class="sc" style="color: #5E5E5E;">{</span>which<span class="sc" style="color: #5E5E5E;">}</span><span class="ss" style="color: #20794D;"> ----'</span>)</span>
+<span id="cb23-7">    <span class="cf" style="color: #003B4F;">for</span> rad <span class="kw" style="color: #003B4F;">in</span> rs:</span>
+<span id="cb23-8">        yps <span class="op" style="color: #5E5E5E;">=</span> [y <span class="cf" style="color: #003B4F;">for</span> x,y <span class="kw" style="color: #003B4F;">in</span> tacc[which][rad]]</span>
+<span id="cb23-9">        qs <span class="op" style="color: #5E5E5E;">=</span> np.quantile(yps,[<span class="fl" style="color: #AD0000;">0.1</span>,<span class="fl" style="color: #AD0000;">0.05</span>])</span>
+<span id="cb23-10">        <span class="bu" style="color: null;">print</span>(<span class="ss" style="color: #20794D;">f'  r=</span><span class="sc" style="color: #5E5E5E;">{</span>rad<span class="sc" style="color: #5E5E5E;">}</span><span class="ss" style="color: #20794D;"> mean=</span><span class="sc" style="color: #5E5E5E;">{</span>np<span class="sc" style="color: #5E5E5E;">.</span>mean(yps)<span class="sc" style="color: #5E5E5E;">:.2f}</span><span class="ss" style="color: #20794D;"> stddev=</span><span class="sc" style="color: #5E5E5E;">{</span>np<span class="sc" style="color: #5E5E5E;">.</span>std(yps)<span class="sc" style="color: #5E5E5E;">:.2f}</span><span class="ss" style="color: #20794D;"> median=</span><span class="sc" style="color: #5E5E5E;">{</span>np<span class="sc" style="color: #5E5E5E;">.</span>median(yps)<span class="sc" style="color: #5E5E5E;">:.2f}</span><span class="ss" style="color: #20794D;"> 90%=</span><span class="sc" style="color: #5E5E5E;">{</span>qs[<span class="dv" style="color: #AD0000;">0</span>]<span class="sc" style="color: #5E5E5E;">:.2f}</span><span class="ss" style="color: #20794D;">, 95%:</span><span class="sc" style="color: #5E5E5E;">{</span>qs[<span class="dv" style="color: #AD0000;">1</span>]<span class="sc" style="color: #5E5E5E;">:.2f}</span><span class="ss" style="color: #20794D;">'</span>)</span>
+<span id="cb23-11"></span>
+<span id="cb23-12">plt.figure(figsize<span class="op" style="color: #5E5E5E;">=</span>(<span class="dv" style="color: #AD0000;">12</span>,<span class="dv" style="color: #AD0000;">6</span>))</span>
+<span id="cb23-13">plt.subplot(<span class="dv" style="color: #AD0000;">1</span>,<span class="dv" style="color: #AD0000;">2</span>,<span class="dv" style="color: #AD0000;">1</span>)</span>
+<span id="cb23-14"></span>
+<span id="cb23-15">plt.hist([[y <span class="cf" style="color: #003B4F;">for</span> x,y <span class="kw" style="color: #003B4F;">in</span> tacc[<span class="st" style="color: #20794D;">'counts'</span>][rad]] <span class="cf" style="color: #003B4F;">for</span> rad <span class="kw" style="color: #003B4F;">in</span> rs],</span>
+<span id="cb23-16">         label<span class="op" style="color: #5E5E5E;">=</span>[<span class="ss" style="color: #20794D;">f'counts r=</span><span class="sc" style="color: #5E5E5E;">{</span>rad<span class="sc" style="color: #5E5E5E;">}</span><span class="ss" style="color: #20794D;">'</span> <span class="cf" style="color: #003B4F;">for</span> rad <span class="kw" style="color: #003B4F;">in</span> rs],bins<span class="op" style="color: #5E5E5E;">=</span><span class="dv" style="color: #AD0000;">20</span>)<span class="op" style="color: #5E5E5E;">;</span></span>
+<span id="cb23-17">plt.xlabel(<span class="st" style="color: #20794D;">'similarity'</span>)</span>
+<span id="cb23-18">plt.legend()<span class="op" style="color: #5E5E5E;">;</span></span>
+<span id="cb23-19">plt.title(titl)</span>
+<span id="cb23-20">plt.xlim(<span class="dv" style="color: #AD0000;">0</span>,<span class="dv" style="color: #AD0000;">1</span>)</span>
+<span id="cb23-21">plt.subplot(<span class="dv" style="color: #AD0000;">1</span>,<span class="dv" style="color: #AD0000;">2</span>,<span class="dv" style="color: #AD0000;">2</span>)</span>
+<span id="cb23-22">plt.hist([[y <span class="cf" style="color: #003B4F;">for</span> x,y <span class="kw" style="color: #003B4F;">in</span> tacc[<span class="st" style="color: #20794D;">'bits'</span>][rad]] <span class="cf" style="color: #003B4F;">for</span> rad <span class="kw" style="color: #003B4F;">in</span> rs],</span>
+<span id="cb23-23">         label<span class="op" style="color: #5E5E5E;">=</span>[<span class="ss" style="color: #20794D;">f'bits r=</span><span class="sc" style="color: #5E5E5E;">{</span>rad<span class="sc" style="color: #5E5E5E;">}</span><span class="ss" style="color: #20794D;">'</span> <span class="cf" style="color: #003B4F;">for</span> rad <span class="kw" style="color: #003B4F;">in</span> rs],bins<span class="op" style="color: #5E5E5E;">=</span><span class="dv" style="color: #AD0000;">20</span>)<span class="op" style="color: #5E5E5E;">;</span></span>
+<span id="cb23-24">plt.xlabel(<span class="st" style="color: #20794D;">'similarity'</span>)</span>
+<span id="cb23-25">plt.legend()<span class="op" style="color: #5E5E5E;">;</span></span>
+<span id="cb23-26">plt.xlim(<span class="dv" style="color: #AD0000;">0</span>,<span class="dv" style="color: #AD0000;">1</span>)</span>
+<span id="cb23-27">plt.tight_layout()</span></code></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>---- counts ----
+  r=3 mean=0.74 stddev=0.10 median=0.74 90%=0.61, 95%:0.56
+  r=2 mean=0.80 stddev=0.08 median=0.80 90%=0.71, 95%:0.67
+  r=1 mean=0.87 stddev=0.05 median=0.88 90%=0.82, 95%:0.80
+---- bits ----
+  r=3 mean=0.68 stddev=0.12 median=0.69 90%=0.53, 95%:0.48
+  r=2 mean=0.75 stddev=0.09 median=0.76 90%=0.63, 95%:0.59
+  r=1 mean=0.83 stddev=0.06 median=0.84 90%=0.75, 95%:0.72</code></pre>
+</div>
+<div class="cell-output cell-output-display">
+<p><img src="https://greglandrum.github.io/rdkit-blog/posts/2024-05-14-similarity-and-centrality_files/figure-html/cell-21-output-2.png" class="img-fluid"></p>
+</div>
+</div>
+<p>Observations here: - The perturbations have a larger effect when the radius is larger. This makes sense because more atoms “feel” the changed atom with a larger radius. - I’m surprised by how large the overall impact on similarity is for these single atom-changes. With bit-based radius 2 or 3 fingerprints (the most commonly used, I believe), the mean similarities are 0.75 or 0.68 and you have to go all the way down to a similarity level of 0.59 or 0.48 to get 95% of the molecules. Those values are 0.56 and 0.67 with count-based fingerprints.</p>
+<div class="cell" data-executetime="{&quot;end_time&quot;:&quot;2024-05-05T04:12:54.454272Z&quot;,&quot;start_time&quot;:&quot;2024-05-05T04:12:53.779011Z&quot;}" data-execution_count="5">
+<div class="sourceCode cell-code" id="cb25" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb25-1">rs <span class="op" style="color: #5E5E5E;">=</span> (<span class="dv" style="color: #AD0000;">7</span>,<span class="dv" style="color: #AD0000;">6</span>,<span class="dv" style="color: #AD0000;">5</span>)</span>
+<span id="cb25-2">tacc <span class="op" style="color: #5E5E5E;">=</span> rdkit_accum</span>
+<span id="cb25-3">titl<span class="op" style="color: #5E5E5E;">=</span><span class="st" style="color: #20794D;">'RDKit'</span></span>
+<span id="cb25-4"></span>
+<span id="cb25-5"><span class="cf" style="color: #003B4F;">for</span> which <span class="kw" style="color: #003B4F;">in</span> (<span class="st" style="color: #20794D;">'counts'</span>,<span class="st" style="color: #20794D;">'bits'</span>):</span>
+<span id="cb25-6">    <span class="bu" style="color: null;">print</span>(<span class="ss" style="color: #20794D;">f'---- </span><span class="sc" style="color: #5E5E5E;">{</span>which<span class="sc" style="color: #5E5E5E;">}</span><span class="ss" style="color: #20794D;"> ----'</span>)</span>
+<span id="cb25-7">    <span class="cf" style="color: #003B4F;">for</span> rad <span class="kw" style="color: #003B4F;">in</span> rs:</span>
+<span id="cb25-8">        yps <span class="op" style="color: #5E5E5E;">=</span> [y <span class="cf" style="color: #003B4F;">for</span> x,y <span class="kw" style="color: #003B4F;">in</span> tacc[which][rad]]</span>
+<span id="cb25-9">        qs <span class="op" style="color: #5E5E5E;">=</span> np.quantile(yps,[<span class="fl" style="color: #AD0000;">0.1</span>,<span class="fl" style="color: #AD0000;">0.05</span>])</span>
+<span id="cb25-10">        <span class="bu" style="color: null;">print</span>(<span class="ss" style="color: #20794D;">f'  maxp=</span><span class="sc" style="color: #5E5E5E;">{</span>rad<span class="sc" style="color: #5E5E5E;">}</span><span class="ss" style="color: #20794D;"> mean=</span><span class="sc" style="color: #5E5E5E;">{</span>np<span class="sc" style="color: #5E5E5E;">.</span>mean(yps)<span class="sc" style="color: #5E5E5E;">:.2f}</span><span class="ss" style="color: #20794D;"> stddev=</span><span class="sc" style="color: #5E5E5E;">{</span>np<span class="sc" style="color: #5E5E5E;">.</span>std(yps)<span class="sc" style="color: #5E5E5E;">:.2f}</span><span class="ss" style="color: #20794D;"> median=</span><span class="sc" style="color: #5E5E5E;">{</span>np<span class="sc" style="color: #5E5E5E;">.</span>median(yps)<span class="sc" style="color: #5E5E5E;">:.2f}</span><span class="ss" style="color: #20794D;"> 90%=</span><span class="sc" style="color: #5E5E5E;">{</span>qs[<span class="dv" style="color: #AD0000;">0</span>]<span class="sc" style="color: #5E5E5E;">:.2f}</span><span class="ss" style="color: #20794D;">, 95%:</span><span class="sc" style="color: #5E5E5E;">{</span>qs[<span class="dv" style="color: #AD0000;">1</span>]<span class="sc" style="color: #5E5E5E;">:.2f}</span><span class="ss" style="color: #20794D;">'</span>)</span>
+<span id="cb25-11"></span>
+<span id="cb25-12"></span>
+<span id="cb25-13">plt.figure(figsize<span class="op" style="color: #5E5E5E;">=</span>(<span class="dv" style="color: #AD0000;">12</span>,<span class="dv" style="color: #AD0000;">6</span>))</span>
+<span id="cb25-14">plt.subplot(<span class="dv" style="color: #AD0000;">1</span>,<span class="dv" style="color: #AD0000;">2</span>,<span class="dv" style="color: #AD0000;">1</span>)</span>
+<span id="cb25-15"></span>
+<span id="cb25-16">plt.hist([[y <span class="cf" style="color: #003B4F;">for</span> x,y <span class="kw" style="color: #003B4F;">in</span> tacc[<span class="st" style="color: #20794D;">'counts'</span>][rad]] <span class="cf" style="color: #003B4F;">for</span> rad <span class="kw" style="color: #003B4F;">in</span> rs],</span>
+<span id="cb25-17">         label<span class="op" style="color: #5E5E5E;">=</span>[<span class="ss" style="color: #20794D;">f'counts maxp=</span><span class="sc" style="color: #5E5E5E;">{</span>rad<span class="sc" style="color: #5E5E5E;">}</span><span class="ss" style="color: #20794D;">'</span> <span class="cf" style="color: #003B4F;">for</span> rad <span class="kw" style="color: #003B4F;">in</span> rs],bins<span class="op" style="color: #5E5E5E;">=</span><span class="dv" style="color: #AD0000;">20</span>)<span class="op" style="color: #5E5E5E;">;</span></span>
+<span id="cb25-18">plt.xlabel(<span class="st" style="color: #20794D;">'similarity'</span>)</span>
+<span id="cb25-19">plt.legend()<span class="op" style="color: #5E5E5E;">;</span></span>
+<span id="cb25-20">plt.title(titl)</span>
+<span id="cb25-21">plt.xlim(<span class="dv" style="color: #AD0000;">0</span>,<span class="dv" style="color: #AD0000;">1</span>)</span>
+<span id="cb25-22">plt.subplot(<span class="dv" style="color: #AD0000;">1</span>,<span class="dv" style="color: #AD0000;">2</span>,<span class="dv" style="color: #AD0000;">2</span>)</span>
+<span id="cb25-23">plt.hist([[y <span class="cf" style="color: #003B4F;">for</span> x,y <span class="kw" style="color: #003B4F;">in</span> tacc[<span class="st" style="color: #20794D;">'bits'</span>][rad]] <span class="cf" style="color: #003B4F;">for</span> rad <span class="kw" style="color: #003B4F;">in</span> rs],</span>
+<span id="cb25-24">         label<span class="op" style="color: #5E5E5E;">=</span>[<span class="ss" style="color: #20794D;">f'bits maxp=</span><span class="sc" style="color: #5E5E5E;">{</span>rad<span class="sc" style="color: #5E5E5E;">}</span><span class="ss" style="color: #20794D;">'</span> <span class="cf" style="color: #003B4F;">for</span> rad <span class="kw" style="color: #003B4F;">in</span> rs],bins<span class="op" style="color: #5E5E5E;">=</span><span class="dv" style="color: #AD0000;">20</span>)<span class="op" style="color: #5E5E5E;">;</span></span>
+<span id="cb25-25">plt.xlabel(<span class="st" style="color: #20794D;">'similarity'</span>)</span>
+<span id="cb25-26">plt.xlim(<span class="dv" style="color: #AD0000;">0</span>,<span class="dv" style="color: #AD0000;">1</span>)</span>
+<span id="cb25-27">plt.legend()<span class="op" style="color: #5E5E5E;">;</span></span>
+<span id="cb25-28">plt.tight_layout()</span></code></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>---- counts ----
+  maxp=7 mean=0.71 stddev=0.17 median=0.73 90%=0.47, 95%:0.40
+  maxp=6 mean=0.72 stddev=0.16 median=0.75 90%=0.50, 95%:0.42
+  maxp=5 mean=0.75 stddev=0.14 median=0.77 90%=0.55, 95%:0.48
+---- bits ----
+  maxp=7 mean=0.76 stddev=0.15 median=0.78 90%=0.54, 95%:0.47
+  maxp=6 mean=0.74 stddev=0.15 median=0.76 90%=0.52, 95%:0.45
+  maxp=5 mean=0.74 stddev=0.14 median=0.76 90%=0.53, 95%:0.46</code></pre>
+</div>
+<div class="cell-output cell-output-display">
+<p><img src="https://greglandrum.github.io/rdkit-blog/posts/2024-05-14-similarity-and-centrality_files/figure-html/cell-22-output-2.png" class="img-fluid"></p>
+</div>
+</div>
+<p>Observations: - In contrast to the Morgan fingerprints, the changes for the bit-based fingerprints are less than count-based. I assume that this has to do with collisions, the RDKit fingerprints <a href="https://greglandrum.github.io/rdkit-blog/posts/2021-07-06-number-of-fp-bits-set.html">set way more bits</a> than the Morgan fingerprints and have <a href="https://greglandrum.github.io/rdkit-blog/posts/2023-01-23-colliding-bits-iii-expanded.html">many more collisions</a>. - The distributions here have much longer tails than the Morgan FPs did and are more asymmetric (this is inevitable with the longer tails).</p>
+<p>Atom pairs and topological torsions;</p>
+<div class="cell" data-executetime="{&quot;end_time&quot;:&quot;2024-05-05T04:09:00.232485Z&quot;,&quot;start_time&quot;:&quot;2024-05-05T04:08:59.726766Z&quot;}" data-execution_count="6">
+<div class="sourceCode cell-code" id="cb27" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb27-1">plt.figure(figsize<span class="op" style="color: #5E5E5E;">=</span>(<span class="dv" style="color: #AD0000;">12</span>,<span class="dv" style="color: #AD0000;">6</span>))</span>
+<span id="cb27-2">plt.subplot(<span class="dv" style="color: #AD0000;">1</span>,<span class="dv" style="color: #AD0000;">2</span>,<span class="dv" style="color: #AD0000;">1</span>)</span>
+<span id="cb27-3"></span>
+<span id="cb27-4"><span class="cf" style="color: #003B4F;">for</span> which <span class="kw" style="color: #003B4F;">in</span> (<span class="st" style="color: #20794D;">'counts'</span>,<span class="st" style="color: #20794D;">'bits'</span>):</span>
+<span id="cb27-5">    <span class="bu" style="color: null;">print</span>(<span class="ss" style="color: #20794D;">f'---- </span><span class="sc" style="color: #5E5E5E;">{</span>which<span class="sc" style="color: #5E5E5E;">}</span><span class="ss" style="color: #20794D;"> ----'</span>)</span>
+<span id="cb27-6">    yps <span class="op" style="color: #5E5E5E;">=</span> [y <span class="cf" style="color: #003B4F;">for</span> x,y <span class="kw" style="color: #003B4F;">in</span> tt_accum[which][<span class="dv" style="color: #AD0000;">3</span>]]</span>
+<span id="cb27-7">    qs <span class="op" style="color: #5E5E5E;">=</span> np.quantile(yps,[<span class="fl" style="color: #AD0000;">0.1</span>,<span class="fl" style="color: #AD0000;">0.05</span>])</span>
+<span id="cb27-8">    <span class="bu" style="color: null;">print</span>(<span class="ss" style="color: #20794D;">f'  TT mean=</span><span class="sc" style="color: #5E5E5E;">{</span>np<span class="sc" style="color: #5E5E5E;">.</span>mean(yps)<span class="sc" style="color: #5E5E5E;">:.2f}</span><span class="ss" style="color: #20794D;"> stddev=</span><span class="sc" style="color: #5E5E5E;">{</span>np<span class="sc" style="color: #5E5E5E;">.</span>std(yps)<span class="sc" style="color: #5E5E5E;">:.2f}</span><span class="ss" style="color: #20794D;"> median=</span><span class="sc" style="color: #5E5E5E;">{</span>np<span class="sc" style="color: #5E5E5E;">.</span>median(yps)<span class="sc" style="color: #5E5E5E;">:.2f}</span><span class="ss" style="color: #20794D;"> 90%=</span><span class="sc" style="color: #5E5E5E;">{</span>qs[<span class="dv" style="color: #AD0000;">0</span>]<span class="sc" style="color: #5E5E5E;">:.2f}</span><span class="ss" style="color: #20794D;">, 95%:</span><span class="sc" style="color: #5E5E5E;">{</span>qs[<span class="dv" style="color: #AD0000;">1</span>]<span class="sc" style="color: #5E5E5E;">:.2f}</span><span class="ss" style="color: #20794D;">'</span>)</span>
+<span id="cb27-9">    yps <span class="op" style="color: #5E5E5E;">=</span> [y <span class="cf" style="color: #003B4F;">for</span> x,y <span class="kw" style="color: #003B4F;">in</span> ap_accum[which][<span class="dv" style="color: #AD0000;">3</span>]]</span>
+<span id="cb27-10">    qs <span class="op" style="color: #5E5E5E;">=</span> np.quantile(yps,[<span class="fl" style="color: #AD0000;">0.1</span>,<span class="fl" style="color: #AD0000;">0.05</span>])</span>
+<span id="cb27-11">    <span class="bu" style="color: null;">print</span>(<span class="ss" style="color: #20794D;">f'  AP mean=</span><span class="sc" style="color: #5E5E5E;">{</span>np<span class="sc" style="color: #5E5E5E;">.</span>mean(yps)<span class="sc" style="color: #5E5E5E;">:.2f}</span><span class="ss" style="color: #20794D;"> stddev=</span><span class="sc" style="color: #5E5E5E;">{</span>np<span class="sc" style="color: #5E5E5E;">.</span>std(yps)<span class="sc" style="color: #5E5E5E;">:.2f}</span><span class="ss" style="color: #20794D;"> median=</span><span class="sc" style="color: #5E5E5E;">{</span>np<span class="sc" style="color: #5E5E5E;">.</span>median(yps)<span class="sc" style="color: #5E5E5E;">:.2f}</span><span class="ss" style="color: #20794D;"> 90%=</span><span class="sc" style="color: #5E5E5E;">{</span>qs[<span class="dv" style="color: #AD0000;">0</span>]<span class="sc" style="color: #5E5E5E;">:.2f}</span><span class="ss" style="color: #20794D;">, 95%:</span><span class="sc" style="color: #5E5E5E;">{</span>qs[<span class="dv" style="color: #AD0000;">1</span>]<span class="sc" style="color: #5E5E5E;">:.2f}</span><span class="ss" style="color: #20794D;">'</span>)</span>
+<span id="cb27-12"></span>
+<span id="cb27-13"></span>
+<span id="cb27-14">plt.hist([[y <span class="cf" style="color: #003B4F;">for</span> x,y <span class="kw" style="color: #003B4F;">in</span> tt_accum[<span class="st" style="color: #20794D;">'counts'</span>][<span class="dv" style="color: #AD0000;">3</span>]],[y <span class="cf" style="color: #003B4F;">for</span> x,y <span class="kw" style="color: #003B4F;">in</span> ap_accum[<span class="st" style="color: #20794D;">'counts'</span>][<span class="dv" style="color: #AD0000;">3</span>]]],</span>
+<span id="cb27-15">         label<span class="op" style="color: #5E5E5E;">=</span>[<span class="ss" style="color: #20794D;">f'TT counts'</span>,<span class="st" style="color: #20794D;">'AP counts'</span>],bins<span class="op" style="color: #5E5E5E;">=</span><span class="dv" style="color: #AD0000;">20</span>)<span class="op" style="color: #5E5E5E;">;</span></span>
+<span id="cb27-16">plt.xlabel(<span class="st" style="color: #20794D;">'similarity'</span>)</span>
+<span id="cb27-17">plt.xlim(<span class="dv" style="color: #AD0000;">0</span>,<span class="dv" style="color: #AD0000;">1</span>)</span>
+<span id="cb27-18">plt.legend()<span class="op" style="color: #5E5E5E;">;</span></span>
+<span id="cb27-19">plt.subplot(<span class="dv" style="color: #AD0000;">1</span>,<span class="dv" style="color: #AD0000;">2</span>,<span class="dv" style="color: #AD0000;">2</span>)</span>
+<span id="cb27-20">plt.hist([[y <span class="cf" style="color: #003B4F;">for</span> x,y <span class="kw" style="color: #003B4F;">in</span> tt_accum[<span class="st" style="color: #20794D;">'bits'</span>][<span class="dv" style="color: #AD0000;">3</span>]],[y <span class="cf" style="color: #003B4F;">for</span> x,y <span class="kw" style="color: #003B4F;">in</span> ap_accum[<span class="st" style="color: #20794D;">'bits'</span>][<span class="dv" style="color: #AD0000;">3</span>]]],</span>
+<span id="cb27-21">         label<span class="op" style="color: #5E5E5E;">=</span>[<span class="ss" style="color: #20794D;">f'TT bits'</span>,<span class="st" style="color: #20794D;">'AP bits'</span>],bins<span class="op" style="color: #5E5E5E;">=</span><span class="dv" style="color: #AD0000;">20</span>)<span class="op" style="color: #5E5E5E;">;</span></span>
+<span id="cb27-22">plt.xlabel(<span class="st" style="color: #20794D;">'similarity'</span>)</span>
+<span id="cb27-23">plt.xlim(<span class="dv" style="color: #AD0000;">0</span>,<span class="dv" style="color: #AD0000;">1</span>)</span>
+<span id="cb27-24">plt.legend()<span class="op" style="color: #5E5E5E;">;</span></span>
+<span id="cb27-25">plt.tight_layout()</span></code></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>---- counts ----
+  TT mean=0.78 stddev=0.12 median=0.79 90%=0.61, 95%:0.55
+  AP mean=0.88 stddev=0.04 median=0.88 90%=0.83, 95%:0.81
+---- bits ----
+  TT mean=0.78 stddev=0.12 median=0.80 90%=0.61, 95%:0.55
+  AP mean=0.88 stddev=0.05 median=0.89 90%=0.83, 95%:0.81</code></pre>
+</div>
+<div class="cell-output cell-output-display">
+<p><img src="https://greglandrum.github.io/rdkit-blog/posts/2024-05-14-similarity-and-centrality_files/figure-html/cell-23-output-2.png" class="img-fluid"></p>
+</div>
+</div>
+<p>Observations: - The AP fingerprints are substantially less sensitive to the single-atom perturbations than any of the fingerprints looked at here. - The differences between counts and bits here are so small because both the TT and AP fingerprints use <a href="https://greglandrum.github.io/rdkit-blog/posts/2021-07-06-simulating-counts.html">count simulation</a> by default (this is why I used 4096 bits here instead of the 2048 bits used for the other fingerprints)</p>
+<section id="aside" class="level3">
+<h3 class="anchored" data-anchor-id="aside">Aside</h3>
+<p>Assuming no collisions, we can directly calculate the atom-pair similarity between a molecule and itself with a single atom perturbed.</p>
+<p>The Tanimoto similarity between fingerprints A and B is calculated as:</p>
+<p><img src="https://latex.codecogs.com/png.latex?%5Cfrac%7B%5C%7CA%5C&amp;B%5C%7C%7D%7B%5C%7CA%5C%7C+%5C%7CB%5C%7C-%5C%7CA%5C&amp;B%5C%7C%7D"></p>
+<p>The number of atom pair bits for a molecule is:</p>
+<p><img src="https://latex.codecogs.com/png.latex?%5Cfrac%7BN%20(N-1)%7D%7B2%7D"></p>
+<p>When we perturb one atom, this changes <img src="https://latex.codecogs.com/png.latex?N-1"> of those bits, so the number of bits in common between the perturbed and unperturbed fingerprints is:</p>
+<p><img src="https://latex.codecogs.com/png.latex?%5Cfrac%7BN%20(N-1)%7D%7B2%7D%20-%20(N-1)"></p>
+<p>After a bit of math, we find that the Tanimoto similarity between the perturbed and unperturbed molecules is:</p>
+<p><img src="https://latex.codecogs.com/png.latex?%5Cfrac%7B%5Cfrac%7BN%20(N-1)%7D%7B2%7D%20-%20(N-1)%7D%7B%5Cfrac%7BN%20(N-1)%7D%7B2%7D%20+%20(N-1)%7D"></p>
+<p>Plot this to demonstrate:</p>
+<div class="cell" data-executetime="{&quot;end_time&quot;:&quot;2024-05-05T05:11:46.336296Z&quot;,&quot;start_time&quot;:&quot;2024-05-05T05:11:46.174449Z&quot;}" data-execution_count="10">
+<div class="sourceCode cell-code" id="cb29" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb29-1">nAts <span class="op" style="color: #5E5E5E;">=</span> [x.GetNumHeavyAtoms() <span class="cf" style="color: #003B4F;">for</span> x <span class="kw" style="color: #003B4F;">in</span> mols]</span>
+<span id="cb29-2">psims <span class="op" style="color: #5E5E5E;">=</span> []</span>
+<span id="cb29-3"><span class="cf" style="color: #003B4F;">for</span> x <span class="kw" style="color: #003B4F;">in</span> nAts:</span>
+<span id="cb29-4">    <span class="cf" style="color: #003B4F;">if</span> x<span class="op" style="color: #5E5E5E;">&lt;=</span><span class="dv" style="color: #AD0000;">1</span>:</span>
+<span id="cb29-5">        <span class="cf" style="color: #003B4F;">continue</span></span>
+<span id="cb29-6">    psims.extend([(x<span class="op" style="color: #5E5E5E;">*</span>(x<span class="op" style="color: #5E5E5E;">-</span><span class="dv" style="color: #AD0000;">1</span>)<span class="op" style="color: #5E5E5E;">/</span><span class="dv" style="color: #AD0000;">2</span> <span class="op" style="color: #5E5E5E;">-</span> (x<span class="op" style="color: #5E5E5E;">-</span><span class="dv" style="color: #AD0000;">1</span>))<span class="op" style="color: #5E5E5E;">/</span>(x<span class="op" style="color: #5E5E5E;">*</span>(x<span class="op" style="color: #5E5E5E;">-</span><span class="dv" style="color: #AD0000;">1</span>)<span class="op" style="color: #5E5E5E;">/</span><span class="dv" style="color: #AD0000;">2</span> <span class="op" style="color: #5E5E5E;">+</span> (x<span class="op" style="color: #5E5E5E;">-</span><span class="dv" style="color: #AD0000;">1</span>))]<span class="op" style="color: #5E5E5E;">*</span>x)</span>
+<span id="cb29-7"></span>
+<span id="cb29-8">plt.figure(figsize<span class="op" style="color: #5E5E5E;">=</span>(<span class="dv" style="color: #AD0000;">6</span>,<span class="dv" style="color: #AD0000;">6</span>))</span>
+<span id="cb29-9">plt.hist([[y <span class="cf" style="color: #003B4F;">for</span> x,y <span class="kw" style="color: #003B4F;">in</span> ap_accum[<span class="st" style="color: #20794D;">'counts'</span>][<span class="dv" style="color: #AD0000;">3</span>]],psims],label<span class="op" style="color: #5E5E5E;">=</span>[<span class="st" style="color: #20794D;">'measured'</span>,<span class="st" style="color: #20794D;">'computed'</span>],bins<span class="op" style="color: #5E5E5E;">=</span><span class="dv" style="color: #AD0000;">20</span>)<span class="op" style="color: #5E5E5E;">;</span></span>
+<span id="cb29-10">plt.xlim(<span class="dv" style="color: #AD0000;">0</span>,<span class="dv" style="color: #AD0000;">1</span>)<span class="op" style="color: #5E5E5E;">;</span></span>
+<span id="cb29-11">plt.legend()<span class="op" style="color: #5E5E5E;">;</span></span></code></pre></div>
+<div class="cell-output cell-output-display">
+<p><img src="https://greglandrum.github.io/rdkit-blog/posts/2024-05-14-similarity-and-centrality_files/figure-html/cell-24-output-1.png" class="img-fluid"></p>
+</div>
+</div>
+</section>
+</section>
+<section id="visualizing-the-impact-of-single-atom-changes-on-similarity" class="level1">
+<h1>Visualizing the impact of single-atom changes on similarity</h1>
+<p>Using the RDKit’s <a href="https://doi.org/10.1186/1758-2946-5-43">similarity maps</a> we can directly visualize how much the single-atom changes affect similarity</p>
+<div class="cell" data-executetime="{&quot;end_time&quot;:&quot;2024-05-12T03:45:07.741455Z&quot;,&quot;start_time&quot;:&quot;2024-05-12T03:45:07.736619Z&quot;}" data-execution_count="165">
+<div class="sourceCode cell-code" id="cb30" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb30-1"><span class="im" style="color: #00769E;">from</span> rdkit.Chem.Draw <span class="im" style="color: #00769E;">import</span> SimilarityMaps</span>
+<span id="cb30-2"><span class="im" style="color: #00769E;">from</span> rdkit.Chem <span class="im" style="color: #00769E;">import</span> rdDepictor</span>
+<span id="cb30-3"><span class="im" style="color: #00769E;">from</span> PIL <span class="im" style="color: #00769E;">import</span> Image</span>
+<span id="cb30-4"><span class="im" style="color: #00769E;">from</span> io <span class="im" style="color: #00769E;">import</span> BytesIO</span>
+<span id="cb30-5"></span>
+<span id="cb30-6"></span>
+<span id="cb30-7"><span class="kw" style="color: #003B4F;">def</span> draw_similarity_map(m,fpfunc,scale_vals<span class="op" style="color: #5E5E5E;">=</span><span class="va" style="color: #111111;">False</span>,fillIt<span class="op" style="color: #5E5E5E;">=</span><span class="va" style="color: #111111;">True</span>,sigma<span class="op" style="color: #5E5E5E;">=</span><span class="fl" style="color: #AD0000;">0.45</span>,w<span class="op" style="color: #5E5E5E;">=</span><span class="dv" style="color: #AD0000;">500</span>,h<span class="op" style="color: #5E5E5E;">=</span><span class="dv" style="color: #AD0000;">300</span>):</span>
+<span id="cb30-8">    basefp <span class="op" style="color: #5E5E5E;">=</span> fpfunc(m)</span>
+<span id="cb30-9">    diffs <span class="op" style="color: #5E5E5E;">=</span> []</span>
+<span id="cb30-10">    <span class="cf" style="color: #003B4F;">for</span> aidx <span class="kw" style="color: #003B4F;">in</span> <span class="bu" style="color: null;">range</span>(m.GetNumAtoms()):</span>
+<span id="cb30-11">        nm <span class="op" style="color: #5E5E5E;">=</span> Chem.Mol(m)</span>
+<span id="cb30-12">        nm.GetAtomWithIdx(aidx).SetAtomicNum(<span class="dv" style="color: #AD0000;">0</span>)</span>
+<span id="cb30-13">        nfp <span class="op" style="color: #5E5E5E;">=</span> fpfunc(nm)</span>
+<span id="cb30-14">        sim <span class="op" style="color: #5E5E5E;">=</span> DataStructs.TanimotoSimilarity(basefp,nfp)</span>
+<span id="cb30-15">        diffs.append(<span class="fl" style="color: #AD0000;">1.</span><span class="op" style="color: #5E5E5E;">-</span>sim)</span>
+<span id="cb30-16"></span>
+<span id="cb30-17"></span>
+<span id="cb30-18">    diffs <span class="op" style="color: #5E5E5E;">=</span> np.array(diffs)</span>
+<span id="cb30-19">    rng <span class="op" style="color: #5E5E5E;">=</span> <span class="bu" style="color: null;">max</span>(diffs)<span class="op" style="color: #5E5E5E;">-</span><span class="bu" style="color: null;">min</span>(diffs)</span>
+<span id="cb30-20">    </span>
+<span id="cb30-21">    <span class="co" style="color: #5E5E5E;"># print out the max and min changes caused by a single atom</span></span>
+<span id="cb30-22">    <span class="bu" style="color: null;">print</span>(<span class="ss" style="color: #20794D;">f'  max diff=</span><span class="sc" style="color: #5E5E5E;">{</span><span class="bu" style="color: null;">max</span>(diffs)<span class="sc" style="color: #5E5E5E;">:.2f}</span><span class="ss" style="color: #20794D;"> min diff=</span><span class="sc" style="color: #5E5E5E;">{</span><span class="bu" style="color: null;">min</span>(diffs)<span class="sc" style="color: #5E5E5E;">:.2f}</span><span class="ss" style="color: #20794D;">'</span>)</span>
+<span id="cb30-23">    </span>
+<span id="cb30-24">    <span class="co" style="color: #5E5E5E;"># optionally scale the values so that differences are more visible</span></span>
+<span id="cb30-25">    <span class="cf" style="color: #003B4F;">if</span> scale_vals:</span>
+<span id="cb30-26">        diffs <span class="op" style="color: #5E5E5E;">=</span> (diffs <span class="op" style="color: #5E5E5E;">-</span> <span class="bu" style="color: null;">min</span>(diffs))<span class="op" style="color: #5E5E5E;">/</span>rng <span class="op" style="color: #5E5E5E;">+</span> <span class="fl" style="color: #AD0000;">0.1</span></span>
+<span id="cb30-27">        </span>
+<span id="cb30-28">        </span>
+<span id="cb30-29">    d2d <span class="op" style="color: #5E5E5E;">=</span> Draw.MolDraw2DCairo(w,h)</span>
+<span id="cb30-30">    d2d.drawOptions().useBWAtomPalette()</span>
+<span id="cb30-31"></span>
+<span id="cb30-32">    ps <span class="op" style="color: #5E5E5E;">=</span> Draw.ContourParams()</span>
+<span id="cb30-33">    ps.fillGrid <span class="op" style="color: #5E5E5E;">=</span> fillIt</span>
+<span id="cb30-34">    ps.gridResolution <span class="op" style="color: #5E5E5E;">=</span> <span class="fl" style="color: #AD0000;">0.1</span></span>
+<span id="cb30-35">    ps.extraGridPadding <span class="op" style="color: #5E5E5E;">=</span> <span class="fl" style="color: #AD0000;">0.5</span></span>
+<span id="cb30-36"></span>
+<span id="cb30-37">    m <span class="op" style="color: #5E5E5E;">=</span> rdMolDraw2D.PrepareMolForDrawing(m, addChiralHs<span class="op" style="color: #5E5E5E;">=</span><span class="va" style="color: #111111;">False</span>)</span>
+<span id="cb30-38">    <span class="cf" style="color: #003B4F;">if</span> <span class="kw" style="color: #003B4F;">not</span> m.GetNumConformers():</span>
+<span id="cb30-39">      rdDepictor.Compute2DCoords(m)</span>
+<span id="cb30-40">    sigmas <span class="op" style="color: #5E5E5E;">=</span> [sigma] <span class="op" style="color: #5E5E5E;">*</span> m.GetNumAtoms()</span>
+<span id="cb30-41">    locs <span class="op" style="color: #5E5E5E;">=</span> []</span>
+<span id="cb30-42">    <span class="cf" style="color: #003B4F;">for</span> i <span class="kw" style="color: #003B4F;">in</span> <span class="bu" style="color: null;">range</span>(m.GetNumAtoms()):</span>
+<span id="cb30-43">      p <span class="op" style="color: #5E5E5E;">=</span> m.GetConformer().GetAtomPosition(i)</span>
+<span id="cb30-44">      locs.append(Geometry.Point2D(p.x, p.y))</span>
+<span id="cb30-45"></span>
+<span id="cb30-46">    Draw.ContourAndDrawGaussians(d2d, locs, <span class="bu" style="color: null;">list</span>(diffs), sigmas, nContours<span class="op" style="color: #5E5E5E;">=</span><span class="dv" style="color: #AD0000;">8</span>, params<span class="op" style="color: #5E5E5E;">=</span>ps)</span>
+<span id="cb30-47">    d2d.drawOptions().clearBackground <span class="op" style="color: #5E5E5E;">=</span> <span class="va" style="color: #111111;">False</span></span>
+<span id="cb30-48">    d2d.DrawMolecule(m)</span>
+<span id="cb30-49">    </span>
+<span id="cb30-50">    d2d.FinishDrawing()</span>
+<span id="cb30-51"></span>
+<span id="cb30-52">    sio <span class="op" style="color: #5E5E5E;">=</span> BytesIO(d2d.GetDrawingText())</span>
+<span id="cb30-53">    <span class="cf" style="color: #003B4F;">return</span> Image.<span class="bu" style="color: null;">open</span>(sio)</span></code></pre></div>
+</div>
+<div class="cell" data-executetime="{&quot;end_time&quot;:&quot;2024-05-12T03:45:09.862031Z&quot;,&quot;start_time&quot;:&quot;2024-05-12T03:45:09.780987Z&quot;}" data-execution_count="166">
+<div class="sourceCode cell-code" id="cb31" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb31-1">fpg <span class="op" style="color: #5E5E5E;">=</span> rdFingerprintGenerator.GetMorganGenerator(radius<span class="op" style="color: #5E5E5E;">=</span><span class="dv" style="color: #AD0000;">1</span>,fpSize<span class="op" style="color: #5E5E5E;">=</span><span class="dv" style="color: #AD0000;">2048</span>)</span>
+<span id="cb31-2">draw_similarity_map(esomeprazole,fpg.GetCountFingerprint)</span></code></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>  max diff=0.19 min diff=0.12</code></pre>
+</div>
+<div class="cell-output cell-output-display" data-execution_count="166">
+<p><img src="https://greglandrum.github.io/rdkit-blog/posts/2024-05-14-similarity-and-centrality_files/figure-html/cell-26-output-2.png" class="img-fluid"></p>
+</div>
+</div>
+<div class="cell" data-executetime="{&quot;end_time&quot;:&quot;2024-05-14T02:55:09.178706Z&quot;,&quot;start_time&quot;:&quot;2024-05-14T02:55:09.101493Z&quot;}" data-execution_count="173">
+<div class="sourceCode cell-code" id="cb33" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb33-1">fpg <span class="op" style="color: #5E5E5E;">=</span> rdFingerprintGenerator.GetMorganGenerator(radius<span class="op" style="color: #5E5E5E;">=</span><span class="dv" style="color: #AD0000;">3</span>,fpSize<span class="op" style="color: #5E5E5E;">=</span><span class="dv" style="color: #AD0000;">2048</span>)</span>
+<span id="cb33-2">draw_similarity_map(esomeprazole,fpg.GetCountFingerprint)</span></code></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>  max diff=0.43 min diff=0.17</code></pre>
+</div>
+<div class="cell-output cell-output-display" data-execution_count="173">
+<p><img src="https://greglandrum.github.io/rdkit-blog/posts/2024-05-14-similarity-and-centrality_files/figure-html/cell-27-output-2.png" class="img-fluid"></p>
+</div>
+</div>
+<p>What about the RDKit fingerprint?</p>
+<div class="cell" data-executetime="{&quot;end_time&quot;:&quot;2024-05-14T02:55:29.854622Z&quot;,&quot;start_time&quot;:&quot;2024-05-14T02:55:29.770436Z&quot;}" data-execution_count="174">
+<div class="sourceCode cell-code" id="cb35" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb35-1">fpg <span class="op" style="color: #5E5E5E;">=</span> rdFingerprintGenerator.GetRDKitFPGenerator(maxPath<span class="op" style="color: #5E5E5E;">=</span><span class="dv" style="color: #AD0000;">5</span>,fpSize<span class="op" style="color: #5E5E5E;">=</span><span class="dv" style="color: #AD0000;">2048</span>)</span>
+<span id="cb35-2">draw_similarity_map(esomeprazole,fpg.GetCountFingerprint)</span></code></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>  max diff=0.50 min diff=0.06</code></pre>
+</div>
+<div class="cell-output cell-output-display" data-execution_count="174">
+<p><img src="https://greglandrum.github.io/rdkit-blog/posts/2024-05-14-similarity-and-centrality_files/figure-html/cell-28-output-2.png" class="img-fluid"></p>
+</div>
+</div>
+<p>This makes it look like centrality is important - the changes are largest around the central S atom. That’s a bit misleading, as another molecule will show.</p>
+<p>Let’s look at a molecule from the set that we’ve been working with.</p>
+<p>Morgan fingerprint:</p>
+<div class="cell" data-executetime="{&quot;end_time&quot;:&quot;2024-05-14T02:56:51.288717Z&quot;,&quot;start_time&quot;:&quot;2024-05-14T02:56:51.206462Z&quot;}" data-execution_count="181">
+<div class="sourceCode cell-code" id="cb37" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb37-1">fpg <span class="op" style="color: #5E5E5E;">=</span> rdFingerprintGenerator.GetMorganGenerator(radius<span class="op" style="color: #5E5E5E;">=</span><span class="dv" style="color: #AD0000;">3</span>,fpSize<span class="op" style="color: #5E5E5E;">=</span><span class="dv" style="color: #AD0000;">2048</span>)</span>
+<span id="cb37-2">draw_similarity_map(mols[<span class="dv" style="color: #AD0000;">4</span>],fpg.GetFingerprint)</span></code></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>  max diff=0.47 min diff=0.21</code></pre>
+</div>
+<div class="cell-output cell-output-display" data-execution_count="181">
+<p><img src="https://greglandrum.github.io/rdkit-blog/posts/2024-05-14-similarity-and-centrality_files/figure-html/cell-29-output-2.png" class="img-fluid"></p>
+</div>
+</div>
+<p>And RDKit fingerprint:</p>
+<div class="cell" data-executetime="{&quot;end_time&quot;:&quot;2024-05-14T02:56:04.921447Z&quot;,&quot;start_time&quot;:&quot;2024-05-14T02:56:04.832787Z&quot;}" data-execution_count="177">
+<div class="sourceCode cell-code" id="cb39" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb39-1">fpg <span class="op" style="color: #5E5E5E;">=</span> rdFingerprintGenerator.GetRDKitFPGenerator(maxPath<span class="op" style="color: #5E5E5E;">=</span><span class="dv" style="color: #AD0000;">5</span>,fpSize<span class="op" style="color: #5E5E5E;">=</span><span class="dv" style="color: #AD0000;">2048</span>)</span>
+<span id="cb39-2">draw_similarity_map(mols[<span class="dv" style="color: #AD0000;">4</span>],fpg.GetFingerprint)</span></code></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>  max diff=0.60 min diff=0.08</code></pre>
+</div>
+<div class="cell-output cell-output-display" data-execution_count="177">
+<p><img src="https://greglandrum.github.io/rdkit-blog/posts/2024-05-14-similarity-and-centrality_files/figure-html/cell-30-output-2.png" class="img-fluid"></p>
+</div>
+</div>
+<p>With both fingerprints (but particularly the RDKit fingerprint), we can see that the perturbations are largest in the “topologically complex” parts of the molecule: areas with a lot of branching.</p>
+</section>
+<section id="looking-at-delta_similarity-as-a-function-of-the-number-of-atoms-in-the-neighborhood" class="level1">
+<h1>Looking at <img src="https://latex.codecogs.com/png.latex?%5CDelta_%7Bsimilarity%7D"> as a function of the number of atoms in the neighborhood</h1>
+<p>My original idea with this post was to look at how much of an impact “centrality” - how close an atom is to the middle of the molecule - has on similarity. I realized pretty quickly that the important factor for more “local” fingerprints is the number of atoms within the fingerprints “radius”, not necessarily where that atom is in the molecule.</p>
+<p>So let’s look at that.</p>
+<div class="cell" data-executetime="{&quot;end_time&quot;:&quot;2024-05-12T03:34:55.489790Z&quot;,&quot;start_time&quot;:&quot;2024-05-12T03:34:54.065387Z&quot;}" data-execution_count="163">
+<div class="sourceCode cell-code" id="cb41" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb41-1"></span>
+<span id="cb41-2"><span class="im" style="color: #00769E;">import</span> matplotlib.patches <span class="im" style="color: #00769E;">as</span> mpatches</span>
+<span id="cb41-3">plt.figure(figsize<span class="op" style="color: #5E5E5E;">=</span>(<span class="dv" style="color: #AD0000;">12</span>,<span class="dv" style="color: #AD0000;">6</span>))</span>
+<span id="cb41-4"></span>
+<span id="cb41-5">labels <span class="op" style="color: #5E5E5E;">=</span> []</span>
+<span id="cb41-6"><span class="cf" style="color: #003B4F;">for</span> i,rad <span class="kw" style="color: #003B4F;">in</span> <span class="bu" style="color: null;">enumerate</span>((<span class="dv" style="color: #AD0000;">3</span>,<span class="dv" style="color: #AD0000;">2</span>,<span class="dv" style="color: #AD0000;">1</span>)):</span>
+<span id="cb41-7">    d <span class="op" style="color: #5E5E5E;">=</span> defaultdict(<span class="bu" style="color: null;">list</span>)</span>
+<span id="cb41-8">    <span class="cf" style="color: #003B4F;">for</span> r,s <span class="kw" style="color: #003B4F;">in</span> accum[<span class="st" style="color: #20794D;">'counts'</span>][rad]:</span>
+<span id="cb41-9">        d[r<span class="op" style="color: #5E5E5E;">-</span><span class="dv" style="color: #AD0000;">1</span>].append(s)</span>
+<span id="cb41-10">    labels.append((mpatches.Patch(color<span class="op" style="color: #5E5E5E;">=</span><span class="ss" style="color: #20794D;">f'C</span><span class="sc" style="color: #5E5E5E;">{</span>i<span class="sc" style="color: #5E5E5E;">}</span><span class="ss" style="color: #20794D;">'</span>), <span class="ss" style="color: #20794D;">f'r=</span><span class="sc" style="color: #5E5E5E;">{</span>rad<span class="sc" style="color: #5E5E5E;">}</span><span class="ss" style="color: #20794D;">'</span>))</span>
+<span id="cb41-11">    </span>
+<span id="cb41-12">    <span class="co" style="color: #5E5E5E;"># only keep cases where we have at least 10 examples</span></span>
+<span id="cb41-13">    <span class="cf" style="color: #003B4F;">for</span> k <span class="kw" style="color: #003B4F;">in</span> <span class="bu" style="color: null;">list</span>(d.keys()):</span>
+<span id="cb41-14">        <span class="cf" style="color: #003B4F;">if</span> <span class="bu" style="color: null;">len</span>(d[k])<span class="op" style="color: #5E5E5E;">&lt;</span><span class="dv" style="color: #AD0000;">10</span>:</span>
+<span id="cb41-15">            <span class="kw" style="color: #003B4F;">del</span> d[k]</span>
+<span id="cb41-16">        ks <span class="op" style="color: #5E5E5E;">=</span> <span class="bu" style="color: null;">sorted</span>(d.keys())</span>
+<span id="cb41-17"></span>
+<span id="cb41-18">    ps <span class="op" style="color: #5E5E5E;">=</span> [x<span class="op" style="color: #5E5E5E;">+</span>i<span class="op" style="color: #5E5E5E;">*</span><span class="fl" style="color: #AD0000;">.25</span> <span class="cf" style="color: #003B4F;">for</span> x <span class="kw" style="color: #003B4F;">in</span> ks]</span>
+<span id="cb41-19">    plt.violinplot([d[k] <span class="cf" style="color: #003B4F;">for</span> k <span class="kw" style="color: #003B4F;">in</span> ks],ps,showmedians<span class="op" style="color: #5E5E5E;">=</span><span class="va" style="color: #111111;">True</span>)</span>
+<span id="cb41-20"></span>
+<span id="cb41-21">    plt.xlabel(<span class="st" style="color: #20794D;">'number of atoms in radius'</span>)</span>
+<span id="cb41-22">plt.ylabel(<span class="st" style="color: #20794D;">'similarity'</span>)</span>
+<span id="cb41-23">plt.legend(<span class="op" style="color: #5E5E5E;">*</span><span class="bu" style="color: null;">zip</span>(<span class="op" style="color: #5E5E5E;">*</span>labels))</span>
+<span id="cb41-24">plt.title(<span class="st" style="color: #20794D;">'Morgan counts'</span>)<span class="op" style="color: #5E5E5E;">;</span></span></code></pre></div>
+<div class="cell-output cell-output-display">
+<p><img src="https://greglandrum.github.io/rdkit-blog/posts/2024-05-14-similarity-and-centrality_files/figure-html/cell-31-output-1.png" class="img-fluid"></p>
+</div>
+</div>
+<div class="cell" data-executetime="{&quot;end_time&quot;:&quot;2024-05-12T03:34:14.386818Z&quot;,&quot;start_time&quot;:&quot;2024-05-12T03:34:13.904502Z&quot;}" data-execution_count="162">
+<div class="sourceCode cell-code" id="cb42" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb42-1"><span class="im" style="color: #00769E;">import</span> matplotlib.patches <span class="im" style="color: #00769E;">as</span> mpatches</span>
+<span id="cb42-2">plt.figure(figsize<span class="op" style="color: #5E5E5E;">=</span>(<span class="dv" style="color: #AD0000;">12</span>,<span class="dv" style="color: #AD0000;">6</span>))</span>
+<span id="cb42-3"></span>
+<span id="cb42-4">labels <span class="op" style="color: #5E5E5E;">=</span> []</span>
+<span id="cb42-5"><span class="cf" style="color: #003B4F;">for</span> i,rad <span class="kw" style="color: #003B4F;">in</span> <span class="bu" style="color: null;">enumerate</span>((<span class="dv" style="color: #AD0000;">5</span>,)):</span>
+<span id="cb42-6">    d <span class="op" style="color: #5E5E5E;">=</span> defaultdict(<span class="bu" style="color: null;">list</span>)</span>
+<span id="cb42-7">    <span class="cf" style="color: #003B4F;">for</span> r,s <span class="kw" style="color: #003B4F;">in</span> rdkit_accum[<span class="st" style="color: #20794D;">'counts'</span>][rad]:</span>
+<span id="cb42-8">        d[r].append(s)</span>
+<span id="cb42-9">    labels.append((mpatches.Patch(color<span class="op" style="color: #5E5E5E;">=</span><span class="ss" style="color: #20794D;">f'C</span><span class="sc" style="color: #5E5E5E;">{</span>i<span class="sc" style="color: #5E5E5E;">}</span><span class="ss" style="color: #20794D;">'</span>), <span class="ss" style="color: #20794D;">f'maxp=</span><span class="sc" style="color: #5E5E5E;">{</span>rad<span class="sc" style="color: #5E5E5E;">}</span><span class="ss" style="color: #20794D;">'</span>))</span>
+<span id="cb42-10"></span>
+<span id="cb42-11">    <span class="co" style="color: #5E5E5E;"># only keep cases where we have at least 10 examples</span></span>
+<span id="cb42-12">    <span class="cf" style="color: #003B4F;">for</span> k <span class="kw" style="color: #003B4F;">in</span> <span class="bu" style="color: null;">list</span>(d.keys()):</span>
+<span id="cb42-13">        <span class="cf" style="color: #003B4F;">if</span> <span class="bu" style="color: null;">len</span>(d[k])<span class="op" style="color: #5E5E5E;">&lt;</span><span class="dv" style="color: #AD0000;">10</span>:</span>
+<span id="cb42-14">            <span class="kw" style="color: #003B4F;">del</span> d[k]</span>
+<span id="cb42-15">    </span>
+<span id="cb42-16">    ks <span class="op" style="color: #5E5E5E;">=</span> <span class="bu" style="color: null;">sorted</span>(d.keys())</span>
+<span id="cb42-17">    ps <span class="op" style="color: #5E5E5E;">=</span> [x<span class="op" style="color: #5E5E5E;">+</span>i<span class="op" style="color: #5E5E5E;">*</span><span class="fl" style="color: #AD0000;">.25</span> <span class="cf" style="color: #003B4F;">for</span> x <span class="kw" style="color: #003B4F;">in</span> ks]</span>
+<span id="cb42-18">    plt.violinplot([d[k] <span class="cf" style="color: #003B4F;">for</span> k <span class="kw" style="color: #003B4F;">in</span> ks],ps,showmedians<span class="op" style="color: #5E5E5E;">=</span><span class="va" style="color: #111111;">True</span>)</span>
+<span id="cb42-19"></span>
+<span id="cb42-20">plt.xlabel(<span class="st" style="color: #20794D;">'number of atoms in radius'</span>)</span>
+<span id="cb42-21">plt.ylabel(<span class="st" style="color: #20794D;">'similarity'</span>)</span>
+<span id="cb42-22">plt.legend(<span class="op" style="color: #5E5E5E;">*</span><span class="bu" style="color: null;">zip</span>(<span class="op" style="color: #5E5E5E;">*</span>labels),loc<span class="op" style="color: #5E5E5E;">=</span><span class="dv" style="color: #AD0000;">4</span>)</span>
+<span id="cb42-23">plt.title(<span class="st" style="color: #20794D;">'RDKit counts'</span>)<span class="op" style="color: #5E5E5E;">;</span></span></code></pre></div>
+<div class="cell-output cell-output-display">
+<p><img src="https://greglandrum.github.io/rdkit-blog/posts/2024-05-14-similarity-and-centrality_files/figure-html/cell-32-output-1.png" class="img-fluid"></p>
+</div>
+</div>
+<p>The similarity initially decreases before flattening out at around 20 atoms in the radius.</p>
+
+
+</section>
+
+ ]]></description>
+  <category>fingerprints</category>
+  <category>reference</category>
+  <category>exploration</category>
+  <guid>https://greglandrum.github.io/rdkit-blog/posts/2024-05-14-similarity-and-centrality.html</guid>
+  <pubDate>Mon, 13 May 2024 22:00:00 GMT</pubDate>
+  <media:content url="https://greglandrum.github.io/rdkit-blog/posts/images/blog/similarity-and-centrality-1.png" medium="image" type="image/png" height="86" width="144"/>
+</item>
 <item>
   <title>A stub a day keeps the docstrings at bay</title>
   <link>https://greglandrum.github.io/rdkit-blog/posts/2024-03-08-docstring-stubs.html</link>
@@ -3874,7 +4542,7 @@ Q 174.3 83.2, 175.8 83.2
 <p>These boxplots look at Cohen’s kappa (left plot) and AUROC (right plot) for classifiers built on the MDCK dataset. The left pair of bars in each plot show the distribution of values for 100 random splits, the right pair show distributions for 50 different 5-fold cross validations. The left bar in each pair has the results for XGB, the right bar for RF.</p>
 <div class="quarto-figure quarto-figure-center">
 <figure class="figure">
-<p><img src="https://greglandrum.github.io/rdkit-blog/posts/2023-08-13-xval-variability1_files/figure-html/f3703cdf-1-image-2.png" class="img-fluid figure-img"></p>
+<p><img src="https://greglandrum.github.io/rdkit-blog/posts/2023-08-13-xval-variability1_files/figure-html/ce232273-1-image-2.png" class="img-fluid figure-img"></p>
 <p></p><figcaption class="figure-caption">image-2.png</figcaption><p></p>
 </figure>
 </div>
@@ -4916,7 +5584,7 @@ AUC fraction&gt;0: 1.00</code></pre>
 <p>The TL;DR summary: if we’re careful about using as much metadata as possible to ascertain which assays can be combined, we get quite good agreement between Ki assays:</p>
 <div class="quarto-figure quarto-figure-center">
 <figure class="figure">
-<p><img src="https://greglandrum.github.io/rdkit-blog/posts/2023-06-17-overlapping-Ki-assays1_files/figure-html/809765f9-1-image.png" class="img-fluid figure-img"></p>
+<p><img src="https://greglandrum.github.io/rdkit-blog/posts/2023-06-17-overlapping-Ki-assays1_files/figure-html/5ec8a863-1-image.png" class="img-fluid figure-img"></p>
 <p></p><figcaption class="figure-caption">results summary</figcaption><p></p>
 </figure>
 </div>
@@ -10151,7 +10819,7 @@ CHEMBL1019596  CHEMBL828284    0.00 22</code></pre>
 <p>If I am careful about which xC50 assays I combine, making sure as much available metadata as possible matches, and then plot the pchembl values for duplicate compounds, I get the following:</p>
 <div class="quarto-figure quarto-figure-center">
 <figure class="figure">
-<p><img src="https://greglandrum.github.io/rdkit-blog/posts/2023-06-12-overlapping-ic50-assays1_files/figure-html/c8cf1a0e-1-image-6.png" class="img-fluid figure-img"></p>
+<p><img src="https://greglandrum.github.io/rdkit-blog/posts/2023-06-12-overlapping-ic50-assays1_files/figure-html/560adf2f-1-image-6.png" class="img-fluid figure-img"></p>
 <p></p><figcaption class="figure-caption">image-6.png</figcaption><p></p>
 </figure>
 </div>
@@ -10160,7 +10828,7 @@ CHEMBL1019596  CHEMBL828284    0.00 22</code></pre>
 <p>If I’m not careful at all, and just combine using the target ID and the type of the result (so that I’m not combining IC50 and EC50), I get the following (this time it’s a hexbin plot, because otherwise you can’t see anything):</p>
 <div class="quarto-figure quarto-figure-center">
 <figure class="figure">
-<p><img src="https://greglandrum.github.io/rdkit-blog/posts/2023-06-12-overlapping-ic50-assays1_files/figure-html/c8cf1a0e-2-image-7.png" class="img-fluid figure-img"></p>
+<p><img src="https://greglandrum.github.io/rdkit-blog/posts/2023-06-12-overlapping-ic50-assays1_files/figure-html/560adf2f-2-image-7.png" class="img-fluid figure-img"></p>
 <p></p><figcaption class="figure-caption">image-7.png</figcaption><p></p>
 </figure>
 </div>
@@ -36896,402 +37564,6 @@ BAD_DOUBLE_BOND_STEREO 4</code></pre>
   <guid>https://greglandrum.github.io/rdkit-blog/posts/2023-05-17-understanding-confgen-errors.html</guid>
   <pubDate>Tue, 16 May 2023 22:00:00 GMT</pubDate>
   <media:content url="https://greglandrum.github.io/rdkit-blog/posts/images/blog/understanding_confgen_errors1.png" medium="image" type="image/png" height="138" width="144"/>
-</item>
-<item>
-  <title>Binary molecules and the cartridge</title>
-  <link>https://greglandrum.github.io/rdkit-blog/posts/2023-05-07-binary-molecules-and-the-cartridge.html</link>
-  <description><![CDATA[ 
-
-
-
-<p><strong>Updated 07.05.2023</strong> This is an updated version of a <a href="http://rdkit.blogspot.com/2020/05/binary-molecules-and-cartridge.html">post from 2020</a> with a few revisions.</p>
-<p>I had a couple of online conversations this week about working with the PostgreSQL cartridge from Python and sending molecules back and forth between Python and the database. Here’s a quick blogpost on that topic.</p>
-<div class="cell" data-execution_count="2">
-<div class="sourceCode cell-code" id="cb1" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb1-1"><span class="im" style="color: #00769E;">from</span> rdkit <span class="im" style="color: #00769E;">import</span> Chem</span>
-<span id="cb1-2"><span class="im" style="color: #00769E;">import</span> gzip</span>
-<span id="cb1-3"><span class="im" style="color: #00769E;">import</span> time</span>
-<span id="cb1-4"><span class="im" style="color: #00769E;">import</span> psycopg2</span>
-<span id="cb1-5"><span class="im" style="color: #00769E;">import</span> json</span>
-<span id="cb1-6"><span class="im" style="color: #00769E;">import</span> rdkit</span>
-<span id="cb1-7"><span class="bu" style="color: null;">print</span>(rdkit.__version__)</span></code></pre></div>
-<div class="cell-output cell-output-stdout">
-<pre><code>2023.03.1</code></pre>
-</div>
-</div>
-<p>The dataset we’ll use here is a set of molecules+activity data from ChEMBL26. We take all the measured Ki values that are less than 1nM.</p>
-<p>Here’s how I constructed the dataset</p>
-<pre><code>conn2 = psycopg2.connect("dbname=chembl_26 host=localhost")
-curs2 = conn2.cursor()
-curs2.execute('''select cid1.chembl_id as compound_chembl_id,cid2.chembl_id as assay_chembl_id,
-    target_dictionary.chembl_id as target_chembl_id,target_dictionary.pref_name as pref_name,
-    standard_relation,standard_value,standard_units,standard_type,molfile 
-from activities acts 
-  join assays using (assay_id) 
-  join compound_structures using (molregno) 
-  join chembl_id_lookup cid1 on (molregno=entity_id and entity_type='COMPOUND') 
-  join chembl_id_lookup cid2 on (assay_id=cid2.entity_id and cid2.entity_type='ASSAY')
-  join target_dictionary using (tid) 
-where standard_type='Ki' and standard_units='nM' and standard_value is not null and 
-  standard_relation='=' and standard_value&lt;1''')
-data = curs2.fetchall()
-import gzip
-cnames = [x.name for x in curs2.description]
-w = Chem.SDWriter(gzip.open('/home/glandrum/RDKit_blog/data/chembl26_very_active.sdf.gz','wt+'))
-for row in data:
-    m = Chem.MolFromMolBlock(row[-1])
-    for i in range(len(cnames)-1):
-        m.SetProp(cnames[i],str(row[i]))
-    w.write(m)
-w=None</code></pre>
-<p>The timing data in this post were generated on a standard desktop PC from 2022 (Dell XPS, 16 core i9 3.2 GHz CPU, 64GB RAM) running Ubuntu 22.04. I used the Ubuntu install of PostgreSQL 14 and didn’t do any tuning of the database configuration.</p>
-<section id="binary-molecules-tofrom-the-database" class="level1">
-<h1>Binary molecules to/from the database</h1>
-<p>Let’s start by assembling a benchmarking set of 30K molblocks:</p>
-<div class="cell" data-execution_count="3">
-<div class="sourceCode cell-code" id="cb4" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb4-1">molblocks <span class="op" style="color: #5E5E5E;">=</span> []</span>
-<span id="cb4-2">nms <span class="op" style="color: #5E5E5E;">=</span> []</span>
-<span id="cb4-3"><span class="cf" style="color: #003B4F;">with</span> gzip.<span class="bu" style="color: null;">open</span>(<span class="st" style="color: #20794D;">'../data/chembl26_very_active.sdf.gz'</span>,<span class="st" style="color: #20794D;">'r'</span>) <span class="im" style="color: #00769E;">as</span> inf:</span>
-<span id="cb4-4">    suppl <span class="op" style="color: #5E5E5E;">=</span> Chem.ForwardSDMolSupplier(inf)</span>
-<span id="cb4-5">    <span class="cf" style="color: #003B4F;">while</span> <span class="bu" style="color: null;">len</span>(molblocks)<span class="op" style="color: #5E5E5E;">&lt;</span><span class="dv" style="color: #AD0000;">30000</span>:</span>
-<span id="cb4-6">        m <span class="op" style="color: #5E5E5E;">=</span> <span class="bu" style="color: null;">next</span>(suppl)</span>
-<span id="cb4-7">        <span class="cf" style="color: #003B4F;">if</span> <span class="kw" style="color: #003B4F;">not</span> m:</span>
-<span id="cb4-8">            <span class="cf" style="color: #003B4F;">continue</span></span>
-<span id="cb4-9">        nms.append(m.GetProp(<span class="st" style="color: #20794D;">'compound_chembl_id'</span>))</span>
-<span id="cb4-10">        molblocks.append(Chem.MolToMolBlock(m))</span></code></pre></div>
-</div>
-<p>How long does it take to parse all the molblocks on the python side?</p>
-<div class="cell" data-execution_count="4">
-<div class="sourceCode cell-code" id="cb5" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb5-1">t1 <span class="op" style="color: #5E5E5E;">=</span> time.time()</span>
-<span id="cb5-2">ms <span class="op" style="color: #5E5E5E;">=</span> [Chem.MolFromMolBlock(mb) <span class="cf" style="color: #003B4F;">for</span> mb <span class="kw" style="color: #003B4F;">in</span> molblocks]</span>
-<span id="cb5-3">t2 <span class="op" style="color: #5E5E5E;">=</span> time.time()</span>
-<span id="cb5-4"><span class="bu" style="color: null;">print</span>(<span class="ss" style="color: #20794D;">f" that took </span><span class="sc" style="color: #5E5E5E;">{</span>t2<span class="op" style="color: #5E5E5E;">-</span>t1 <span class="sc" style="color: #5E5E5E;">:.2f}</span><span class="ss" style="color: #20794D;"> seconds"</span>)</span></code></pre></div>
-<div class="cell-output cell-output-stdout">
-<pre><code> that took 3.48 seconds</code></pre>
-</div>
-</div>
-<p>What about to do the same work in the database?</p>
-<div class="cell" data-execution_count="5">
-<div class="sourceCode cell-code" id="cb7" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb7-1">conn <span class="op" style="color: #5E5E5E;">=</span> psycopg2.<span class="ex" style="color: null;">connect</span>(<span class="st" style="color: #20794D;">"dbname=demodb host=localhost"</span>)</span>
-<span id="cb7-2">curs <span class="op" style="color: #5E5E5E;">=</span> conn.cursor()</span>
-<span id="cb7-3">curs.execute(<span class="st" style="color: #20794D;">'drop table if exists molbs'</span>)</span>
-<span id="cb7-4">curs.execute(<span class="st" style="color: #20794D;">'drop table if exists mols'</span>)</span>
-<span id="cb7-5">curs.execute(<span class="st" style="color: #20794D;">'create table molbs (chembl_id text,molb text)'</span>)</span>
-<span id="cb7-6">curs.executemany(<span class="st" style="color: #20794D;">'insert into molbs values (</span><span class="sc" style="color: #5E5E5E;">%s</span><span class="st" style="color: #20794D;">,</span><span class="sc" style="color: #5E5E5E;">%s</span><span class="st" style="color: #20794D;">)'</span>,[(x,y) <span class="cf" style="color: #003B4F;">for</span> x,y <span class="kw" style="color: #003B4F;">in</span> <span class="bu" style="color: null;">zip</span>(nms,molblocks)])</span>
-<span id="cb7-7">t1 <span class="op" style="color: #5E5E5E;">=</span> time.time()</span>
-<span id="cb7-8">curs.execute(<span class="st" style="color: #20794D;">'select chembl_id,mol_from_ctab(molb::cstring) m into mols from molbs'</span>)</span>
-<span id="cb7-9">conn.commit()</span>
-<span id="cb7-10">t2 <span class="op" style="color: #5E5E5E;">=</span> time.time()</span>
-<span id="cb7-11"><span class="bu" style="color: null;">print</span>(<span class="ss" style="color: #20794D;">f" that took </span><span class="sc" style="color: #5E5E5E;">{</span>t2<span class="op" style="color: #5E5E5E;">-</span>t1 <span class="sc" style="color: #5E5E5E;">:.2f}</span><span class="ss" style="color: #20794D;"> seconds"</span>)</span></code></pre></div>
-<div class="cell-output cell-output-stdout">
-<pre><code> that took 4.66 seconds</code></pre>
-</div>
-</div>
-<p>Notice that we also had to transfer the mol blocks to the database. I didn’t include that in the timing results because we’re just looking at processing time.</p>
-<section id="sending-binary-molecules-to-the-database" class="level2">
-<h2 class="anchored" data-anchor-id="sending-binary-molecules-to-the-database">Sending binary molecules to the database</h2>
-<p>It seems silly to do the work of processing the mol blocks in the database a second time. Fortunately, we can add the molecules to the database in RDKit’s binary form:</p>
-<div class="cell" data-execution_count="6">
-<div class="sourceCode cell-code" id="cb9" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb9-1">conn <span class="op" style="color: #5E5E5E;">=</span> psycopg2.<span class="ex" style="color: null;">connect</span>(<span class="st" style="color: #20794D;">"dbname=demodb host=localhost"</span>)</span>
-<span id="cb9-2">curs <span class="op" style="color: #5E5E5E;">=</span> conn.cursor()</span>
-<span id="cb9-3">curs.execute(<span class="st" style="color: #20794D;">'drop table if exists mols'</span>)</span>
-<span id="cb9-4">curs.execute(<span class="st" style="color: #20794D;">'create table mols (chembl_id text,m mol)'</span>)</span>
-<span id="cb9-5">t1 <span class="op" style="color: #5E5E5E;">=</span> time.time()</span>
-<span id="cb9-6">curs.executemany(<span class="st" style="color: #20794D;">'insert into mols values (</span><span class="sc" style="color: #5E5E5E;">%s</span><span class="st" style="color: #20794D;">,mol_from_pkl(</span><span class="sc" style="color: #5E5E5E;">%s</span><span class="st" style="color: #20794D;">))'</span>,[(x,y.ToBinary(),) <span class="cf" style="color: #003B4F;">for</span> x,y <span class="kw" style="color: #003B4F;">in</span> <span class="bu" style="color: null;">zip</span>(nms,ms)])</span>
-<span id="cb9-7">conn.commit()</span>
-<span id="cb9-8">t2 <span class="op" style="color: #5E5E5E;">=</span> time.time()</span>
-<span id="cb9-9"><span class="bu" style="color: null;">print</span>(<span class="ss" style="color: #20794D;">f" that took </span><span class="sc" style="color: #5E5E5E;">{</span>t2<span class="op" style="color: #5E5E5E;">-</span>t1 <span class="sc" style="color: #5E5E5E;">:.2f}</span><span class="ss" style="color: #20794D;"> seconds"</span>)</span></code></pre></div>
-<div class="cell-output cell-output-stdout">
-<pre><code> that took 2.65 seconds</code></pre>
-</div>
-</div>
-</section>
-<section id="retrieving-binary-molecules-from-the-database" class="level2">
-<h2 class="anchored" data-anchor-id="retrieving-binary-molecules-from-the-database">Retrieving binary molecules from the database</h2>
-<p>What about going the other way: we have binary molecules in the database and want to pull them back into Python to work with them?</p>
-<div class="cell" data-execution_count="7">
-<div class="sourceCode cell-code" id="cb11" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb11-1">conn <span class="op" style="color: #5E5E5E;">=</span> psycopg2.<span class="ex" style="color: null;">connect</span>(<span class="st" style="color: #20794D;">"dbname=demodb host=localhost"</span>)</span>
-<span id="cb11-2">curs <span class="op" style="color: #5E5E5E;">=</span> conn.cursor()</span>
-<span id="cb11-3">t1 <span class="op" style="color: #5E5E5E;">=</span> time.time()</span>
-<span id="cb11-4">curs.execute(<span class="st" style="color: #20794D;">'select chembl_id,mol_to_pkl(m) from mols'</span>)</span>
-<span id="cb11-5">tms <span class="op" style="color: #5E5E5E;">=</span> [Chem.Mol(x[<span class="dv" style="color: #AD0000;">1</span>].tobytes()) <span class="cf" style="color: #003B4F;">for</span> x <span class="kw" style="color: #003B4F;">in</span> curs.fetchall()]</span>
-<span id="cb11-6">t2 <span class="op" style="color: #5E5E5E;">=</span> time.time()</span>
-<span id="cb11-7"><span class="bu" style="color: null;">print</span>(<span class="ss" style="color: #20794D;">f" that took </span><span class="sc" style="color: #5E5E5E;">{</span>t2<span class="op" style="color: #5E5E5E;">-</span>t1 <span class="sc" style="color: #5E5E5E;">:.2f}</span><span class="ss" style="color: #20794D;"> seconds"</span>)</span></code></pre></div>
-<div class="cell-output cell-output-stdout">
-<pre><code> that took 1.72 seconds</code></pre>
-</div>
-</div>
-<p>We can, of course, do searches in the database and then pull just the molecules from the search results into Python:</p>
-<div class="cell" data-execution_count="12">
-<div class="sourceCode cell-code" id="cb13" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb13-1">conn <span class="op" style="color: #5E5E5E;">=</span> psycopg2.<span class="ex" style="color: null;">connect</span>(<span class="st" style="color: #20794D;">"dbname=demodb host=localhost"</span>)</span>
-<span id="cb13-2">curs <span class="op" style="color: #5E5E5E;">=</span> conn.cursor()</span>
-<span id="cb13-3">t1 <span class="op" style="color: #5E5E5E;">=</span> time.time()</span>
-<span id="cb13-4">curs.execute(<span class="st" style="color: #20794D;">'select chembl_id,mol_to_pkl(m) from mols where m@&gt;qmol_from_smarts(</span><span class="sc" style="color: #5E5E5E;">%s</span><span class="st" style="color: #20794D;">)'</span>,(<span class="st" style="color: #20794D;">'c1ncn[o,n]1'</span>,))</span>
-<span id="cb13-5">tms <span class="op" style="color: #5E5E5E;">=</span> [Chem.Mol(x[<span class="dv" style="color: #AD0000;">1</span>].tobytes()) <span class="cf" style="color: #003B4F;">for</span> x <span class="kw" style="color: #003B4F;">in</span> curs.fetchall()]</span>
-<span id="cb13-6">t2 <span class="op" style="color: #5E5E5E;">=</span> time.time()</span>
-<span id="cb13-7"><span class="bu" style="color: null;">print</span>(<span class="ss" style="color: #20794D;">f" that took </span><span class="sc" style="color: #5E5E5E;">{</span>t2<span class="op" style="color: #5E5E5E;">-</span>t1 <span class="sc" style="color: #5E5E5E;">:.2f}</span><span class="ss" style="color: #20794D;"> seconds and returned </span><span class="sc" style="color: #5E5E5E;">{</span><span class="bu" style="color: null;">len</span>(tms)<span class="sc" style="color: #5E5E5E;">}</span><span class="ss" style="color: #20794D;"> results"</span>)</span></code></pre></div>
-<div class="cell-output cell-output-stdout">
-<pre><code> that took 0.42 seconds and returned 993 results</code></pre>
-</div>
-</div>
-</section>
-</section>
-<section id="example-1-adding-descriptors-to-the-database" class="level1">
-<h1>Example 1: adding descriptors to the database</h1>
-<p>The cartridge can calculate a <a href="https://rdkit.org/docs/Cartridge.html#descriptors">number of molecular descriptors</a> directly, but there are more available in Python. Let’s calculate some of those and add them to the database.</p>
-<p>We’ll pull the binary molecules from the database, calculate BCUT2D descriptors for them, and then add the descriptors to a new database table.</p>
-<div class="cell" data-execution_count="13">
-<div class="sourceCode cell-code" id="cb15" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb15-1"><span class="im" style="color: #00769E;">from</span> rdkit.Chem <span class="im" style="color: #00769E;">import</span> Descriptors</span>
-<span id="cb15-2"><span class="im" style="color: #00769E;">from</span> rdkit.Chem <span class="im" style="color: #00769E;">import</span> rdMolDescriptors</span>
-<span id="cb15-3">nBCuts <span class="op" style="color: #5E5E5E;">=</span> <span class="bu" style="color: null;">len</span>(rdMolDescriptors.BCUT2D(Chem.MolFromSmiles(<span class="st" style="color: #20794D;">'c1ccccc1'</span>)))</span>
-<span id="cb15-4">descrdefn <span class="op" style="color: #5E5E5E;">=</span> <span class="st" style="color: #20794D;">','</span>.join(<span class="ss" style="color: #20794D;">f'bcut_</span><span class="sc" style="color: #5E5E5E;">{</span>i<span class="op" style="color: #5E5E5E;">+</span><span class="dv" style="color: #AD0000;">1</span><span class="sc" style="color: #5E5E5E;">}</span><span class="ss" style="color: #20794D;"> float'</span> <span class="cf" style="color: #003B4F;">for</span> i <span class="kw" style="color: #003B4F;">in</span> <span class="bu" style="color: null;">range</span>(nBCuts))</span>
-<span id="cb15-5">descrholder <span class="op" style="color: #5E5E5E;">=</span> <span class="st" style="color: #20794D;">','</span>.join([<span class="st" style="color: #20794D;">'</span><span class="sc" style="color: #5E5E5E;">%s</span><span class="st" style="color: #20794D;">'</span>]<span class="op" style="color: #5E5E5E;">*</span>nBCuts)</span></code></pre></div>
-</div>
-<div class="cell" data-execution_count="14">
-<div class="sourceCode cell-code" id="cb16" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb16-1">conn <span class="op" style="color: #5E5E5E;">=</span> psycopg2.<span class="ex" style="color: null;">connect</span>(<span class="st" style="color: #20794D;">"dbname=demodb host=localhost"</span>)</span>
-<span id="cb16-2">curs <span class="op" style="color: #5E5E5E;">=</span> conn.cursor()</span>
-<span id="cb16-3">curs.execute(<span class="st" style="color: #20794D;">'drop table if exists bcuts'</span>)</span>
-<span id="cb16-4">curs.execute(<span class="ss" style="color: #20794D;">f'create table bcuts (chembl_id text,</span><span class="sc" style="color: #5E5E5E;">{</span>descrdefn<span class="sc" style="color: #5E5E5E;">}</span><span class="ss" style="color: #20794D;">)'</span>)</span>
-<span id="cb16-5">curs.execute(<span class="st" style="color: #20794D;">'select chembl_id,mol_to_pkl(m) from mols'</span>)</span>
-<span id="cb16-6">bcut_data <span class="op" style="color: #5E5E5E;">=</span> []</span>
-<span id="cb16-7"><span class="cf" style="color: #003B4F;">for</span> row <span class="kw" style="color: #003B4F;">in</span> curs.fetchall():</span>
-<span id="cb16-8">    trow <span class="op" style="color: #5E5E5E;">=</span> [row[<span class="dv" style="color: #AD0000;">0</span>]]</span>
-<span id="cb16-9">    mol <span class="op" style="color: #5E5E5E;">=</span> Chem.Mol(row[<span class="dv" style="color: #AD0000;">1</span>].tobytes())</span>
-<span id="cb16-10">    <span class="cf" style="color: #003B4F;">try</span>:</span>
-<span id="cb16-11">        descrs <span class="op" style="color: #5E5E5E;">=</span> rdMolDescriptors.BCUT2D(mol)</span>
-<span id="cb16-12">    <span class="cf" style="color: #003B4F;">except</span> <span class="pp" style="color: #AD0000;">ValueError</span>:</span>
-<span id="cb16-13">        <span class="cf" style="color: #003B4F;">continue</span></span>
-<span id="cb16-14">    trow.extend(descrs)</span>
-<span id="cb16-15">    bcut_data.append(trow)</span>
-<span id="cb16-16">cmd <span class="op" style="color: #5E5E5E;">=</span> <span class="ss" style="color: #20794D;">f'insert into bcuts values (%s,</span><span class="sc" style="color: #5E5E5E;">{</span>descrholder<span class="sc" style="color: #5E5E5E;">}</span><span class="ss" style="color: #20794D;">)'</span></span>
-<span id="cb16-17">curs.executemany(cmd,bcut_data)</span>
-<span id="cb16-18">conn.commit()    </span></code></pre></div>
-</div>
-<p>Since the bcuts descriptors use partial charges and we don’t have parameters for all atom types, some molecules don’t have values:</p>
-<div class="cell" data-execution_count="15">
-<div class="sourceCode cell-code" id="cb17" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb17-1">curs.execute(<span class="st" style="color: #20794D;">'select count(*) from bcuts'</span>)</span>
-<span id="cb17-2">curs.fetchone()</span></code></pre></div>
-<div class="cell-output cell-output-display" data-execution_count="15">
-<pre><code>(29937,)</code></pre>
-</div>
-</div>
-<div class="cell" data-execution_count="16">
-<div class="sourceCode cell-code" id="cb19" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb19-1">curs.execute(<span class="st" style="color: #20794D;">'select count(*) from mols'</span>)</span>
-<span id="cb19-2">curs.fetchone()</span></code></pre></div>
-<div class="cell-output cell-output-display" data-execution_count="16">
-<pre><code>(30000,)</code></pre>
-</div>
-</div>
-</section>
-<section id="example-2-loading-sdf-data-into-the-database" class="level1">
-<h1>Example 2: Loading SDF data into the database</h1>
-<p>We loaded the molecules from an SDF, but ignored the data fields in that SDF. Now let’s load those into the database too.</p>
-<p>We’ll take advantage of PostgreSQL’s jsonb type to store the properties on each molecule in a dictionary-like object.</p>
-<p>Let’s start by loading the data:</p>
-<div class="cell" data-execution_count="23">
-<div class="sourceCode cell-code" id="cb21" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb21-1">conn <span class="op" style="color: #5E5E5E;">=</span> psycopg2.<span class="ex" style="color: null;">connect</span>(<span class="st" style="color: #20794D;">"dbname=demodb host=localhost"</span>)</span>
-<span id="cb21-2">curs <span class="op" style="color: #5E5E5E;">=</span> conn.cursor()</span>
-<span id="cb21-3">curs.execute(<span class="st" style="color: #20794D;">'drop table if exists mols'</span>)</span>
-<span id="cb21-4">curs.execute(<span class="st" style="color: #20794D;">'create table mols (chembl_id text,m mol,sdf_data jsonb)'</span>)</span>
-<span id="cb21-5">rows <span class="op" style="color: #5E5E5E;">=</span> []</span>
-<span id="cb21-6"><span class="cf" style="color: #003B4F;">with</span> gzip.<span class="bu" style="color: null;">open</span>(<span class="st" style="color: #20794D;">'../data/chembl26_very_active.sdf.gz'</span>,<span class="st" style="color: #20794D;">'r'</span>) <span class="im" style="color: #00769E;">as</span> inf:</span>
-<span id="cb21-7">    suppl <span class="op" style="color: #5E5E5E;">=</span> Chem.ForwardSDMolSupplier(inf)</span>
-<span id="cb21-8">    <span class="cf" style="color: #003B4F;">for</span> m <span class="kw" style="color: #003B4F;">in</span> suppl:</span>
-<span id="cb21-9">        <span class="cf" style="color: #003B4F;">if</span> <span class="kw" style="color: #003B4F;">not</span> m:</span>
-<span id="cb21-10">            <span class="cf" style="color: #003B4F;">continue</span></span>
-<span id="cb21-11">        nm <span class="op" style="color: #5E5E5E;">=</span> m.GetProp(<span class="st" style="color: #20794D;">'compound_chembl_id'</span>)</span>
-<span id="cb21-12">        props <span class="op" style="color: #5E5E5E;">=</span> m.GetPropsAsDict()</span>
-<span id="cb21-13">        rows.append((nm,m.ToBinary(),json.dumps(props)))</span>
-<span id="cb21-14">        <span class="cf" style="color: #003B4F;">if</span> <span class="bu" style="color: null;">len</span>(rows)<span class="op" style="color: #5E5E5E;">&gt;=</span><span class="dv" style="color: #AD0000;">10000</span>:</span>
-<span id="cb21-15">            curs.executemany(<span class="st" style="color: #20794D;">'insert into mols values (</span><span class="sc" style="color: #5E5E5E;">%s</span><span class="st" style="color: #20794D;">,mol_from_pkl(</span><span class="sc" style="color: #5E5E5E;">%s</span><span class="st" style="color: #20794D;">),</span><span class="sc" style="color: #5E5E5E;">%s</span><span class="st" style="color: #20794D;">)'</span>,rows)</span>
-<span id="cb21-16">            conn.commit()</span>
-<span id="cb21-17">            rows <span class="op" style="color: #5E5E5E;">=</span> []</span>
-<span id="cb21-18">curs.executemany(<span class="st" style="color: #20794D;">'insert into mols values (</span><span class="sc" style="color: #5E5E5E;">%s</span><span class="st" style="color: #20794D;">,mol_from_pkl(</span><span class="sc" style="color: #5E5E5E;">%s</span><span class="st" style="color: #20794D;">),</span><span class="sc" style="color: #5E5E5E;">%s</span><span class="st" style="color: #20794D;">)'</span>,rows)       </span>
-<span id="cb21-19">conn.commit()</span></code></pre></div>
-</div>
-<div class="cell" data-execution_count="24">
-<div class="sourceCode cell-code" id="cb22" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb22-1">curs.execute(<span class="st" style="color: #20794D;">'select count(*) from mols'</span>)</span>
-<span id="cb22-2"><span class="bu" style="color: null;">print</span>(curs.fetchone()[<span class="dv" style="color: #AD0000;">0</span>])</span></code></pre></div>
-<div class="cell-output cell-output-stdout">
-<pre><code>35767</code></pre>
-</div>
-</div>
-<p>Demonstrate how to do a string query:</p>
-<div class="cell" data-execution_count="25">
-<div class="sourceCode cell-code" id="cb24" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb24-1">t1 <span class="op" style="color: #5E5E5E;">=</span> time.time()</span>
-<span id="cb24-2">curs.execute(<span class="st" style="color: #20794D;">"select count(*) from mols where sdf_data-&gt;&gt;'pref_name' = 'Human immunodeficiency virus type 1 protease'"</span>)</span>
-<span id="cb24-3">t2 <span class="op" style="color: #5E5E5E;">=</span> time.time()</span>
-<span id="cb24-4"><span class="bu" style="color: null;">print</span>(<span class="ss" style="color: #20794D;">f" that took </span><span class="sc" style="color: #5E5E5E;">{</span>t2<span class="op" style="color: #5E5E5E;">-</span>t1 <span class="sc" style="color: #5E5E5E;">:.2f}</span><span class="ss" style="color: #20794D;"> seconds"</span>)</span>
-<span id="cb24-5">curs.fetchone()</span></code></pre></div>
-<div class="cell-output cell-output-stdout">
-<pre><code> that took 0.01 seconds</code></pre>
-</div>
-<div class="cell-output cell-output-display" data-execution_count="25">
-<pre><code>(892,)</code></pre>
-</div>
-</div>
-<p>And a query on a floating point value, here we’re counting the number of rows where the Ki value is less than 10 picomolar.</p>
-<div class="cell" data-execution_count="26">
-<div class="sourceCode cell-code" id="cb27" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb27-1">t1 <span class="op" style="color: #5E5E5E;">=</span> time.time()</span>
-<span id="cb27-2">curs.execute(<span class="st" style="color: #20794D;">"select count(*) from mols where (sdf_data-&gt;&gt;'standard_value')::float &lt; 0.01"</span>)</span>
-<span id="cb27-3">t2 <span class="op" style="color: #5E5E5E;">=</span> time.time()</span>
-<span id="cb27-4"><span class="bu" style="color: null;">print</span>(<span class="ss" style="color: #20794D;">f" that took </span><span class="sc" style="color: #5E5E5E;">{</span>t2<span class="op" style="color: #5E5E5E;">-</span>t1 <span class="sc" style="color: #5E5E5E;">:.2f}</span><span class="ss" style="color: #20794D;"> seconds"</span>)</span>
-<span id="cb27-5">curs.fetchone()</span></code></pre></div>
-<div class="cell-output cell-output-stdout">
-<pre><code> that took 0.01 seconds</code></pre>
-</div>
-<div class="cell-output cell-output-display" data-execution_count="26">
-<pre><code>(916,)</code></pre>
-</div>
-</div>
-<p>Get all the rows with measurements aginst HIV protease where Ki &lt; 1 picomolar</p>
-<div class="cell" data-execution_count="27">
-<div class="sourceCode cell-code" id="cb30" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb30-1">t1 <span class="op" style="color: #5E5E5E;">=</span> time.time()</span>
-<span id="cb30-2">curs.execute(<span class="st" style="color: #20794D;">"select chembl_id,m from mols where sdf_data-&gt;&gt;'pref_name' = 'Human immunodeficiency virus type 1 protease'</span><span class="ch" style="color: #20794D;">\</span></span>
-<span id="cb30-3"><span class="st" style="color: #20794D;">and (sdf_data-&gt;&gt;'standard_value')::float &lt; 0.01"</span>)</span>
-<span id="cb30-4">d <span class="op" style="color: #5E5E5E;">=</span> curs.fetchall()</span>
-<span id="cb30-5">t2 <span class="op" style="color: #5E5E5E;">=</span> time.time()</span>
-<span id="cb30-6"><span class="bu" style="color: null;">print</span>(<span class="ss" style="color: #20794D;">f" that took </span><span class="sc" style="color: #5E5E5E;">{</span>t2<span class="op" style="color: #5E5E5E;">-</span>t1 <span class="sc" style="color: #5E5E5E;">:.2f}</span><span class="ss" style="color: #20794D;"> seconds"</span>)</span>
-<span id="cb30-7">d[:<span class="dv" style="color: #AD0000;">2</span>]</span></code></pre></div>
-<div class="cell-output cell-output-stdout">
-<pre><code> that took 0.02 seconds</code></pre>
-</div>
-<div class="cell-output cell-output-display" data-execution_count="27">
-<pre><code>[('CHEMBL443030',
-  'COc1cc(CN2C(=O)N(Cc3ccc(O)c(OC)c3)N(Cc3ccccc3)C[C@@H](O)[C@H]2Cc2ccccc2)ccc1O |(3.8692,2.234,;3.0465,2.2956,;2.5817,1.614,;1.759,1.6756,;1.2943,0.994,;0.4716,1.0556,;0.0069,0.374,;-0.8089,0.4969,;-1.0521,1.2853,;-1.4137,-0.0642,;-2.1817,0.2372,;-2.3046,1.053,;-3.0726,1.3544,;-3.1955,2.1702,;-2.5505,2.6846,;-2.6735,3.5004,;-1.7826,2.3832,;-1.1376,2.8975,;-0.3696,2.5961,;-1.6596,1.5674,;-1.352,-0.8869,;-2.0665,-1.2994,;-2.0665,-2.1244,;-2.781,-2.5369,;-2.781,-3.3619,;-2.0665,-3.7744,;-1.352,-3.3619,;-1.352,-2.5369,;-0.6704,-1.3516,;0.118,-1.1085,;0.6791,-1.7132,;0.4194,-0.3405,;1.2421,-0.2788,;1.7068,-0.9605,;2.5295,-0.8988,;2.9942,-1.5805,;2.6363,-2.3238,;1.8136,-2.3854,;1.3488,-1.7038,;1.6523,0.2507,;2.4749,0.189,;2.9397,0.8707,;3.7624,0.809,)|'),
- ('CHEMBL177470',
-  'CC(C)(CCCN)CN(C[C@@H](O)[C@H](Cc1ccccc1)NC(=O)O[C@H]1CO[C@H]2OCC[C@H]21)S(=O)(=O)c1ccc2c(c1)OCO2 |(8.05,-8.8625,;8.0542,-8.0375,;7.4667,-8.6167,;8.775,-7.6292,;9.4875,-8.0417,;10.2,-7.6292,;10.9125,-8.0417,;7.35,-7.6167,;7.3542,-6.7917,;6.6375,-6.3875,;5.9292,-6.8042,;5.9292,-7.6292,;5.2125,-6.3917,;5.2042,-5.5667,;5.9167,-5.1542,;5.9167,-4.3292,;6.625,-3.9167,;7.3417,-4.3167,;7.35,-5.15,;6.6375,-5.5667,;4.5,-6.8125,;3.7792,-6.4042,;3.775,-5.5792,;3.0667,-6.8167,;2.3542,-6.4042,;2.3625,-5.6875,;1.1167,-5.6792,;1.1167,-6.4,;0.4792,-7.475,;1.1042,-7.8417,;1.7375,-7.4875,;1.7417,-6.7667,;8.0667,-6.3792,;8.7792,-6.7792,;8.0542,-5.5542,;8.8625,-6.1625,;9.4417,-6.7417,;10.2417,-6.5292,;10.4542,-5.7292,;9.8625,-5.1417,;9.0667,-5.3667,;10.2292,-4.4042,;11.0542,-4.5292,;11.1917,-5.35,)|')]</code></pre>
-</div>
-</div>
-<p>Notice that we get CXSMILES with coordinates back from the database. We loaded the compounds from the SDF with coordinates and the CXSMILES coming back from the database includes those coordinates.</p>
-<p>Let’s do one last query there to look at the composition of the dataset:</p>
-<div class="cell" data-execution_count="28">
-<div class="sourceCode cell-code" id="cb33" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb33-1">t1 <span class="op" style="color: #5E5E5E;">=</span> time.time()</span>
-<span id="cb33-2">curs.execute(<span class="st" style="color: #20794D;">"select sdf_data-&gt;&gt;'pref_name',count(distinct(chembl_id)) cnt </span><span class="ch" style="color: #20794D;">\</span></span>
-<span id="cb33-3"><span class="st" style="color: #20794D;">from mols group by (sdf_data-&gt;&gt;'pref_name') order by cnt desc limit 20"</span>)</span>
-<span id="cb33-4">t2 <span class="op" style="color: #5E5E5E;">=</span> time.time()</span>
-<span id="cb33-5"><span class="bu" style="color: null;">print</span>(<span class="ss" style="color: #20794D;">f" that took </span><span class="sc" style="color: #5E5E5E;">{</span>t2<span class="op" style="color: #5E5E5E;">-</span>t1 <span class="sc" style="color: #5E5E5E;">:.2f}</span><span class="ss" style="color: #20794D;"> seconds"</span>)</span>
-<span id="cb33-6">curs.fetchall()</span></code></pre></div>
-<div class="cell-output cell-output-stdout">
-<pre><code> that took 0.04 seconds</code></pre>
-</div>
-<div class="cell-output cell-output-display" data-execution_count="28">
-<pre><code>[('Unchecked', 1475),
- ('Mu opioid receptor', 1202),
- ('Serine/threonine-protein kinase PIM1', 900),
- ('Kappa opioid receptor', 823),
- ('Apoptosis regulator Bcl-2', 695),
- ('Delta opioid receptor', 631),
- ('Human immunodeficiency virus type 1 protease', 588),
- ('Coagulation factor X', 558),
- ('Serotonin 1a (5-HT1a) receptor', 553),
- ('Histamine H3 receptor', 542),
- ('Neuronal acetylcholine receptor; alpha4/beta2', 483),
- ('Dopamine D3 receptor', 444),
- ('Thrombin', 386),
- ('Dopamine D2 receptor', 382),
- ('Serotonin transporter', 373),
- ('Alpha-1a adrenergic receptor', 364),
- ('Serotonin 2a (5-HT2a) receptor', 354),
- ('PI3-kinase p110-alpha/p85-alpha', 352),
- ('Tyrosine-protein kinase JAK1', 349),
- ('Phosphodiesterase 10A', 331)]</code></pre>
-</div>
-</div>
-<p>The table only has ~35K rows, but notice that the performance of these jsonb queries is still quite good.</p>
-<p>I think using JSONB this way, which basically lets us combine a relational database with a document store, opens up a bunch of interesting possibilties. I’ll try and do another blog post on that in the near(ish) future.</p>
-</section>
-<section id="addendum-a-larger-dataset" class="level1">
-<h1>Addendum: a larger dataset</h1>
-<p>I was curious about performance, so let’s try loading a larger dataset:</p>
-<div class="cell" data-execution_count="32">
-<div class="sourceCode cell-code" id="cb36" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb36-1"><span class="im" style="color: #00769E;">from</span> rdkit <span class="im" style="color: #00769E;">import</span> RDLogger</span>
-<span id="cb36-2"><span class="co" style="color: #5E5E5E;"># Disable RDKit warnings and error messages:</span></span>
-<span id="cb36-3">RDLogger.DisableLog(<span class="st" style="color: #20794D;">'rdApp.*'</span>)</span>
-<span id="cb36-4"><span class="im" style="color: #00769E;">import</span> glob</span>
-<span id="cb36-5">conn <span class="op" style="color: #5E5E5E;">=</span> psycopg2.<span class="ex" style="color: null;">connect</span>(<span class="st" style="color: #20794D;">"dbname=demodb host=localhost"</span>)</span>
-<span id="cb36-6">curs <span class="op" style="color: #5E5E5E;">=</span> conn.cursor()</span>
-<span id="cb36-7">curs.execute(<span class="st" style="color: #20794D;">'drop table if exists mols'</span>)</span>
-<span id="cb36-8">curs.execute(<span class="st" style="color: #20794D;">'create table mols (pubchem_compound_id text,m mol,sdf_data jsonb)'</span>)</span>
-<span id="cb36-9">rows <span class="op" style="color: #5E5E5E;">=</span> []</span>
-<span id="cb36-10"><span class="cf" style="color: #003B4F;">for</span> fn <span class="kw" style="color: #003B4F;">in</span> glob.glob(<span class="st" style="color: #20794D;">'/scratch/Data/PubChem/Compound_*.sdf.gz'</span>)[:<span class="dv" style="color: #AD0000;">2</span>]:</span>
-<span id="cb36-11">    <span class="bu" style="color: null;">print</span>(fn)</span>
-<span id="cb36-12">    <span class="cf" style="color: #003B4F;">with</span> gzip.<span class="bu" style="color: null;">open</span>(fn,<span class="st" style="color: #20794D;">'r'</span>) <span class="im" style="color: #00769E;">as</span> inf:</span>
-<span id="cb36-13">        suppl <span class="op" style="color: #5E5E5E;">=</span> Chem.ForwardSDMolSupplier(inf)</span>
-<span id="cb36-14">        <span class="cf" style="color: #003B4F;">for</span> m <span class="kw" style="color: #003B4F;">in</span> suppl:</span>
-<span id="cb36-15">            <span class="cf" style="color: #003B4F;">if</span> <span class="kw" style="color: #003B4F;">not</span> m:</span>
-<span id="cb36-16">                <span class="cf" style="color: #003B4F;">continue</span></span>
-<span id="cb36-17">            nm <span class="op" style="color: #5E5E5E;">=</span> m.GetProp(<span class="st" style="color: #20794D;">'PUBCHEM_COMPOUND_CID'</span>)</span>
-<span id="cb36-18">            props <span class="op" style="color: #5E5E5E;">=</span> m.GetPropsAsDict()</span>
-<span id="cb36-19">            rows.append((nm,m.ToBinary(),json.dumps(props)))</span>
-<span id="cb36-20">            <span class="cf" style="color: #003B4F;">if</span> <span class="bu" style="color: null;">len</span>(rows)<span class="op" style="color: #5E5E5E;">&gt;=</span><span class="dv" style="color: #AD0000;">10000</span>:</span>
-<span id="cb36-21">                curs.executemany(<span class="st" style="color: #20794D;">'insert into mols values (</span><span class="sc" style="color: #5E5E5E;">%s</span><span class="st" style="color: #20794D;">,mol_from_pkl(</span><span class="sc" style="color: #5E5E5E;">%s</span><span class="st" style="color: #20794D;">),</span><span class="sc" style="color: #5E5E5E;">%s</span><span class="st" style="color: #20794D;">)'</span>,rows)</span>
-<span id="cb36-22">                conn.commit()</span>
-<span id="cb36-23">                rows <span class="op" style="color: #5E5E5E;">=</span> []</span>
-<span id="cb36-24">curs.executemany(<span class="st" style="color: #20794D;">'insert into mols values (</span><span class="sc" style="color: #5E5E5E;">%s</span><span class="st" style="color: #20794D;">,mol_from_pkl(</span><span class="sc" style="color: #5E5E5E;">%s</span><span class="st" style="color: #20794D;">),</span><span class="sc" style="color: #5E5E5E;">%s</span><span class="st" style="color: #20794D;">)'</span>,rows)       </span>
-<span id="cb36-25">conn.commit()</span></code></pre></div>
-<div class="cell-output cell-output-stdout">
-<pre><code>/scratch/Data/PubChem/Compound_000000001_000500000.sdf.gz
-/scratch/Data/PubChem/Compound_006000001_006500000.sdf.gz</code></pre>
-</div>
-</div>
-<div class="cell" data-execution_count="33">
-<div class="sourceCode cell-code" id="cb38" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb38-1">curs.execute(<span class="st" style="color: #20794D;">'select count(*) from mols'</span>)</span>
-<span id="cb38-2">curs.fetchone()[<span class="dv" style="color: #AD0000;">0</span>]</span></code></pre></div>
-<div class="cell-output cell-output-display" data-execution_count="33">
-<pre><code>728778</code></pre>
-</div>
-</div>
-<p>Now we’ve got about 700K compounds, how long do the queries take?</p>
-<div class="cell" data-execution_count="34">
-<div class="sourceCode cell-code" id="cb40" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb40-1">t1 <span class="op" style="color: #5E5E5E;">=</span> time.time()</span>
-<span id="cb40-2">curs.execute(<span class="st" style="color: #20794D;">"select count(*) from mols where (sdf_data-&gt;&gt;'PUBCHEM_ISOTOPIC_ATOM_COUNT')::int &gt; 10"</span>)</span>
-<span id="cb40-3">t2 <span class="op" style="color: #5E5E5E;">=</span> time.time()</span>
-<span id="cb40-4"><span class="bu" style="color: null;">print</span>(<span class="ss" style="color: #20794D;">f" that took </span><span class="sc" style="color: #5E5E5E;">{</span>t2<span class="op" style="color: #5E5E5E;">-</span>t1 <span class="sc" style="color: #5E5E5E;">:.2f}</span><span class="ss" style="color: #20794D;"> seconds"</span>)</span>
-<span id="cb40-5">curs.fetchone()</span></code></pre></div>
-<div class="cell-output cell-output-stdout">
-<pre><code> that took 0.62 seconds</code></pre>
-</div>
-<div class="cell-output cell-output-display" data-execution_count="34">
-<pre><code>(25,)</code></pre>
-</div>
-</div>
-<div class="cell" data-execution_count="35">
-<div class="sourceCode cell-code" id="cb43" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb43-1">t1 <span class="op" style="color: #5E5E5E;">=</span> time.time()</span>
-<span id="cb43-2">curs.execute(<span class="st" style="color: #20794D;">"select count(*) from mols where (sdf_data-&gt;&gt;'PUBCHEM_HEAVY_ATOM_COUNT')::int &gt; 200"</span>)</span>
-<span id="cb43-3">t2 <span class="op" style="color: #5E5E5E;">=</span> time.time()</span>
-<span id="cb43-4"><span class="bu" style="color: null;">print</span>(<span class="ss" style="color: #20794D;">f" that took </span><span class="sc" style="color: #5E5E5E;">{</span>t2<span class="op" style="color: #5E5E5E;">-</span>t1 <span class="sc" style="color: #5E5E5E;">:.2f}</span><span class="ss" style="color: #20794D;"> seconds"</span>)</span>
-<span id="cb43-5">curs.fetchone()</span></code></pre></div>
-<div class="cell-output cell-output-stdout">
-<pre><code> that took 0.60 seconds</code></pre>
-</div>
-<div class="cell-output cell-output-display" data-execution_count="35">
-<pre><code>(20,)</code></pre>
-</div>
-</div>
-<div class="cell" data-execution_count="38">
-<div class="sourceCode cell-code" id="cb46" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb46-1">t1 <span class="op" style="color: #5E5E5E;">=</span> time.time()</span>
-<span id="cb46-2">curs.execute(<span class="st" style="color: #20794D;">"select count(*) from mols where (sdf_data-&gt;&gt;'PUBCHEM_HEAVY_ATOM_COUNT')::int &lt; 20 and (sdf_data-&gt;&gt;'PUBCHEM_ISOTOPIC_ATOM_COUNT')::int &gt; 10"</span>)</span>
-<span id="cb46-3">t2 <span class="op" style="color: #5E5E5E;">=</span> time.time()</span>
-<span id="cb46-4"><span class="bu" style="color: null;">print</span>(<span class="ss" style="color: #20794D;">f" that took </span><span class="sc" style="color: #5E5E5E;">{</span>t2<span class="op" style="color: #5E5E5E;">-</span>t1 <span class="sc" style="color: #5E5E5E;">:.2f}</span><span class="ss" style="color: #20794D;"> seconds"</span>)</span>
-<span id="cb46-5">curs.fetchone()</span></code></pre></div>
-<div class="cell-output cell-output-stdout">
-<pre><code> that took 0.72 seconds</code></pre>
-</div>
-<div class="cell-output cell-output-display" data-execution_count="38">
-<pre><code>(21,)</code></pre>
-</div>
-</div>
-<p>Those are still quite quick. Nice!</p>
-
-
-</section>
-
- ]]></description>
-  <category>cartridge</category>
-  <category>tutorial</category>
-  <category>exploration</category>
-  <guid>https://greglandrum.github.io/rdkit-blog/posts/2023-05-07-binary-molecules-and-the-cartridge.html</guid>
-  <pubDate>Sat, 06 May 2023 22:00:00 GMT</pubDate>
 </item>
 </channel>
 </rss>
