@@ -9,8 +9,475 @@
 <link>https://greglandrum.github.io/rdkit-blog/index.html</link>
 <atom:link href="https://greglandrum.github.io/rdkit-blog/index.xml" rel="self" type="application/rss+xml"/>
 <description>RDKit experiments, tips, and tutorials</description>
-<generator>quarto-1.2.280</generator>
-<lastBuildDate>Mon, 13 May 2024 22:00:00 GMT</lastBuildDate>
+<generator>quarto-1.2.269</generator>
+<lastBuildDate>Thu, 30 May 2024 22:00:00 GMT</lastBuildDate>
+<item>
+  <title>The problem(s) with scaffold splits, part 1</title>
+  <link>https://greglandrum.github.io/rdkit-blog/posts/2024-05-31-scaffold-splits-and-murcko-scaffolds1.html</link>
+  <description><![CDATA[ 
+
+
+
+<section id="introduction" class="level1">
+<h1>Introduction</h1>
+<p>An unfortunately popular strategy for validating machine-learning models is to do a “scaffold split” of the data. The idea is behind the scaffold split is to identify chemical series/scaffolds in the data set and to move all molecules sharing one or more scaffolds to the test set. The intent here is to see how well a model performs on regions of chemical space which are different from those it was trained on. Scaffold splitting is one of a variety of validation methods proposed to provide a more “realistic” assessment of model performance than random (or bootstrap) splits do. This seems, in principle, like a great idea, particularly for models intended for lead-finding or lead-optimization, where one typically has data for a number of scaffolds which, hopefully, are active (or inactive) for similar reasons. Scaffold splitting, with good scaffold definitions, can also be quite useful in identify systematic problems in global models, like those used for ADME or safety endpoints.</p>
+<p>The problem with doing a realistic scaffold split is that the definition of “scaffold” is specific to the particular data set (or project). A 2020 paper by Franziska Kruger and a couple of former colleagues at Novartis looked at the challenges here and published a tool which provides suggestions for what the chemical series might be in a particular data set: https://doi.org/10.1021/acs.jcim.0c00204. As an aside, a followup paper by Maximilian Beckers and the same two former colleagues applied this series-finding approach to an interesting historical analysis of med-chem project data: https://doi.org/10.1021/acs.jcim.2c00785</p>
+<p>Given that Franziska’s method is time-consuming and cannot be fully automated, the standard approach in the literature for doing a scaffold split is to use Bemis-Murcko scaffolds, commonly just called “Murcko scaffolds” (https://doi.org/10.1021/jm9602928). Briefly, the algorithm behind these scaffolds is to iteratively remove all degree-one atoms from a molecule, leaving the “central” set of rings and the atoms which connect them.</p>
+<blockquote class="blockquote">
+<p>Aside: The RDKit implementation of “Murcko scaffolds” uses a slight variation of the original algorithm. Degree-one atoms with double bonds to atoms in the scaffold are also preserved. The logic behind this variation is that these atoms have a very strong impact on the shape and properties of the scaffold, so they should be part of the scaffold.</p>
+</blockquote>
+<p>I think that doing a Murcko decomposition is a useful exercise for organizing a collection of molecules, particularly as part of either a scaffold network analysis or the type of scaffold-finding algorithm in Franziska’s paper, but that it is poorly suited for use in either actually identifying the type of scaffold that medicinal chemists use to organize and reason about their data or for splitting data sets for validating machine learning models.</p>
+<p>This was turning into a mega-post, so I’m going to split it into two. In this first one I will look of the number of “Murcko scaffolds” found in medicinal chemistry papers. This is done by looking at the compounds tested in ChEMBL33 Ki assays with between 20 and 100 unique compounds which came from a document with a DOI. I’d expect a typical med chem assay (these come from a single paper) to have compounds for a small number of chemical series along with a few reference compounds from the literature. And then in a second post, coming later, I will do an analysis of the similarity characteristics of leave-scaffold-out splits for a random selection of the Ki assays mentioned above using the modified spatial statistics we used in the SIMPD paper (https://doi.org/10.1186/s13321-023-00787-9).</p>
+<section id="tldr" class="level2">
+<h2 class="anchored" data-anchor-id="tldr">TL;DR</h2>
+<p>Looking across 7148 Ki assays, the median number of scaffolds per assay is 12. The median ratio of the number of scaffolds to the number of compounds in an assay is 0.4; the number of scaffolds is 40% of the number of compounds tested in an assay (= the compounds from a single med chem paper). This doesn’t match my expectations at all, nor does it match what is actually observed in the five random papers I selected to spot check.</p>
+<blockquote class="blockquote">
+<p>Final Note: The analysis in this post is focused on the type of data sets that commonly show up during lead finding or lead optimization. A Murcko scaffold analysis likely to be less wrong when partitioning datasets of diverse compounds that don’t contain SAR series. Of course, in these cases a standard neighbor split works just as well.</p>
+</blockquote>
+<div class="cell" data-executetime="{&quot;end_time&quot;:&quot;2024-05-31T08:44:09.599524Z&quot;,&quot;start_time&quot;:&quot;2024-05-31T08:44:09.595151Z&quot;}" data-execution_count="23">
+<div class="sourceCode cell-code" id="cb1" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb1-1"><span class="im" style="color: #00769E;">import</span> numpy <span class="im" style="color: #00769E;">as</span> np</span>
+<span id="cb1-2"></span>
+<span id="cb1-3"><span class="im" style="color: #00769E;">from</span> rdkit <span class="im" style="color: #00769E;">import</span> Chem</span>
+<span id="cb1-4"><span class="im" style="color: #00769E;">from</span> rdkit.Chem.Draw <span class="im" style="color: #00769E;">import</span> IPythonConsole</span>
+<span id="cb1-5"><span class="im" style="color: #00769E;">from</span> rdkit.Chem <span class="im" style="color: #00769E;">import</span> Draw</span>
+<span id="cb1-6"><span class="im" style="color: #00769E;">from</span> rdkit.Chem <span class="im" style="color: #00769E;">import</span> rdFMCS</span>
+<span id="cb1-7">Draw.SetComicMode(IPythonConsole.drawOptions)</span>
+<span id="cb1-8"><span class="op" style="color: #5E5E5E;">%</span>load_ext sql</span>
+<span id="cb1-9"></span>
+<span id="cb1-10"><span class="op" style="color: #5E5E5E;">%</span>matplotlib inline</span>
+<span id="cb1-11"><span class="im" style="color: #00769E;">import</span> matplotlib.pyplot <span class="im" style="color: #00769E;">as</span> plt</span>
+<span id="cb1-12">plt.style.use(<span class="st" style="color: #20794D;">'tableau-colorblind10'</span>)</span>
+<span id="cb1-13">plt.rcParams[<span class="st" style="color: #20794D;">'font.size'</span>] <span class="op" style="color: #5E5E5E;">=</span> <span class="st" style="color: #20794D;">'16'</span></span></code></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>The sql extension is already loaded. To reload it, use:
+  %reload_ext sql</code></pre>
+</div>
+</div>
+</section>
+</section>
+<section id="grabbing-the-data-from-chembl" class="level1">
+<h1>Grabbing the data from ChEMBL</h1>
+<p>We pull all the compounds for each of the Ki assays in ChEMBL33 that are taken from a document with a DOI and a publication year. Then we keep the assays containing between 20 and 100 compounds - the idea of the upper limit here is to try and limit ourselves to the primary literature,</p>
+<div class="cell" data-executetime="{&quot;end_time&quot;:&quot;2024-04-20T04:16:46.214901Z&quot;,&quot;start_time&quot;:&quot;2024-04-20T04:16:43.237443Z&quot;}" data-execution_count="2">
+<div class="sourceCode cell-code" id="cb3" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb3-1"><span class="op" style="color: #5E5E5E;">%</span>sql postgresql:<span class="op" style="color: #5E5E5E;">//</span>glandrum<span class="op" style="color: #5E5E5E;">@</span>stoat<span class="op" style="color: #5E5E5E;">/</span>chembl_33 <span class="op" style="color: #5E5E5E;">\</span></span>
+<span id="cb3-2">  drop table <span class="cf" style="color: #003B4F;">if</span> exists assay_counts</span>
+<span id="cb3-3">    </span>
+<span id="cb3-4"><span class="op" style="color: #5E5E5E;">%</span>sql postgresql:<span class="op" style="color: #5E5E5E;">//</span>glandrum<span class="op" style="color: #5E5E5E;">@</span>stoat<span class="op" style="color: #5E5E5E;">/</span>chembl_33 <span class="op" style="color: #5E5E5E;">\</span></span>
+<span id="cb3-5">  select assays.chembl_id,assay_id,count(distinct molregno) cnt into temporary table assay_counts <span class="op" style="color: #5E5E5E;">\</span></span>
+<span id="cb3-6">      <span class="im" style="color: #00769E;">from</span> assays join activities using (assay_id) <span class="op" style="color: #5E5E5E;">\</span></span>
+<span id="cb3-7">                  join docs on (assays.doc_id <span class="op" style="color: #5E5E5E;">=</span> docs.doc_id) <span class="op" style="color: #5E5E5E;">\</span></span>
+<span id="cb3-8">      where standard_type<span class="op" style="color: #5E5E5E;">=</span><span class="st" style="color: #20794D;">'Ki'</span> <span class="kw" style="color: #003B4F;">and</span> <span class="op" style="color: #5E5E5E;">\</span></span>
+<span id="cb3-9">      assays.doc_id <span class="kw" style="color: #003B4F;">is</span> <span class="kw" style="color: #003B4F;">not</span> null <span class="kw" style="color: #003B4F;">and</span> doi <span class="kw" style="color: #003B4F;">is</span> <span class="kw" style="color: #003B4F;">not</span> null <span class="kw" style="color: #003B4F;">and</span> year <span class="kw" style="color: #003B4F;">is</span> <span class="kw" style="color: #003B4F;">not</span> null<span class="op" style="color: #5E5E5E;">\</span></span>
+<span id="cb3-10">      group by (assays.chembl_id,assay_id)<span class="op" style="color: #5E5E5E;">;</span></span>
+<span id="cb3-11"></span>
+<span id="cb3-12">aids <span class="op" style="color: #5E5E5E;">=</span> <span class="op" style="color: #5E5E5E;">%</span>sql postgresql:<span class="op" style="color: #5E5E5E;">//</span>glandrum<span class="op" style="color: #5E5E5E;">@</span>stoat<span class="op" style="color: #5E5E5E;">/</span>chembl_33 <span class="op" style="color: #5E5E5E;">\</span></span>
+<span id="cb3-13">    select <span class="op" style="color: #5E5E5E;">*</span> <span class="im" style="color: #00769E;">from</span> assay_counts where cnt<span class="op" style="color: #5E5E5E;">&gt;</span><span class="dv" style="color: #AD0000;">20</span> <span class="kw" style="color: #003B4F;">and</span> cnt<span class="op" style="color: #5E5E5E;">&lt;</span><span class="dv" style="color: #AD0000;">100</span><span class="op" style="color: #5E5E5E;">;</span></span>
+<span id="cb3-14"><span class="bu" style="color: null;">len</span>(aids)</span></code></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>Done.
+53801 rows affected.
+7148 rows affected.</code></pre>
+</div>
+<div class="cell-output cell-output-display" data-execution_count="2">
+<pre><code>7148</code></pre>
+</div>
+</div>
+<p>We now have a list with assay ChEMBL ID, assay ID (a primary key used in the database), and the number of compounds with data in the assay:</p>
+<div class="cell" data-executetime="{&quot;end_time&quot;:&quot;2024-03-10T05:55:29.542942Z&quot;,&quot;start_time&quot;:&quot;2024-03-10T05:55:29.540228Z&quot;}" data-execution_count="48">
+<div class="sourceCode cell-code" id="cb6" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb6-1">aids[:<span class="dv" style="color: #AD0000;">4</span>]</span></code></pre></div>
+<div class="cell-output cell-output-display" data-execution_count="48">
+<pre><code>[('CHEMBL857972', 157, 66),
+ ('CHEMBL615643', 393, 24),
+ ('CHEMBL615557', 535, 71),
+ ('CHEMBL615558', 536, 30)]</code></pre>
+</div>
+</div>
+<p>Randomly reorder the assays:</p>
+<div class="cell" data-executetime="{&quot;end_time&quot;:&quot;2024-03-10T05:55:38.641883Z&quot;,&quot;start_time&quot;:&quot;2024-03-10T05:55:38.636297Z&quot;}" data-execution_count="49">
+<div class="sourceCode cell-code" id="cb8" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb8-1"><span class="im" style="color: #00769E;">import</span> random</span>
+<span id="cb8-2">random.seed(<span class="bn" style="color: #AD0000;">0xC0FFEE</span>)</span>
+<span id="cb8-3">random.shuffle(aids)</span>
+<span id="cb8-4">aids[:<span class="dv" style="color: #AD0000;">4</span>]</span></code></pre></div>
+<div class="cell-output cell-output-display" data-execution_count="49">
+<pre><code>[('CHEMBL1176478', 642589, 29),
+ ('CHEMBL902340', 453190, 32),
+ ('CHEMBL3877023', 1634231, 21),
+ ('CHEMBL1959874', 807746, 36)]</code></pre>
+</div>
+</div>
+</section>
+<section id="looking-at-some-of-example-results" class="level1">
+<h1>Looking at some of example results</h1>
+<div class="cell" data-executetime="{&quot;end_time&quot;:&quot;2024-03-10T06:13:12.476522Z&quot;,&quot;start_time&quot;:&quot;2024-03-10T06:13:12.470018Z&quot;}" data-execution_count="61">
+<div class="sourceCode cell-code" id="cb10" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb10-1">aid <span class="op" style="color: #5E5E5E;">=</span> <span class="st" style="color: #20794D;">'CHEMBL1803423'</span>  <span class="co" style="color: #5E5E5E;"># this was the first hit from ChEMBL 32</span></span>
+<span id="cb10-2">aid <span class="op" style="color: #5E5E5E;">=</span> aids[<span class="dv" style="color: #AD0000;">0</span>][<span class="dv" style="color: #AD0000;">0</span>]</span>
+<span id="cb10-3">structs <span class="op" style="color: #5E5E5E;">=</span> <span class="op" style="color: #5E5E5E;">%</span>sql postgresql:<span class="op" style="color: #5E5E5E;">//</span>glandrum<span class="op" style="color: #5E5E5E;">@</span>stoat<span class="op" style="color: #5E5E5E;">/</span>chembl_33 <span class="op" style="color: #5E5E5E;">\</span></span>
+<span id="cb10-4">  select distinct on (canonical_smiles) cids.chembl_id compound_chembl_id,canonical_smiles <span class="op" style="color: #5E5E5E;">\</span></span>
+<span id="cb10-5">    <span class="im" style="color: #00769E;">from</span> activities <span class="op" style="color: #5E5E5E;">\</span></span>
+<span id="cb10-6">        join assays using (assay_id) <span class="op" style="color: #5E5E5E;">\</span></span>
+<span id="cb10-7">        join compound_structures using (molregno) <span class="op" style="color: #5E5E5E;">\</span></span>
+<span id="cb10-8">        join chembl_id_lookup cids on (molregno<span class="op" style="color: #5E5E5E;">=</span>entity_id <span class="kw" style="color: #003B4F;">and</span> entity_type<span class="op" style="color: #5E5E5E;">=</span><span class="st" style="color: #20794D;">'COMPOUND'</span>)<span class="op" style="color: #5E5E5E;">\</span></span>
+<span id="cb10-9">    where assays.chembl_id<span class="op" style="color: #5E5E5E;">=</span>:aid <span class="op" style="color: #5E5E5E;">\</span></span>
+<span id="cb10-10">      <span class="kw" style="color: #003B4F;">and</span> standard_type<span class="op" style="color: #5E5E5E;">=</span><span class="st" style="color: #20794D;">'Ki'</span></span>
+<span id="cb10-11"><span class="bu" style="color: null;">len</span>(structs)</span>
+<span id="cb10-12">    </span></code></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>29 rows affected.</code></pre>
+</div>
+<div class="cell-output cell-output-display" data-execution_count="61">
+<pre><code>29</code></pre>
+</div>
+</div>
+<p>Here are the compounds from that assay:</p>
+<div class="cell" data-executetime="{&quot;end_time&quot;:&quot;2024-03-10T06:06:15.354701Z&quot;,&quot;start_time&quot;:&quot;2024-03-10T06:06:15.325187Z&quot;}" data-execution_count="57">
+<div class="sourceCode cell-code" id="cb13" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb13-1">nms,smis <span class="op" style="color: #5E5E5E;">=</span> <span class="bu" style="color: null;">zip</span>(<span class="op" style="color: #5E5E5E;">*</span>structs)</span>
+<span id="cb13-2">mols <span class="op" style="color: #5E5E5E;">=</span> [Chem.MolFromSmiles(x) <span class="cf" style="color: #003B4F;">for</span> x <span class="kw" style="color: #003B4F;">in</span> smis]</span>
+<span id="cb13-3">Draw.MolsToGridImage(mols[:<span class="dv" style="color: #AD0000;">6</span>],legends<span class="op" style="color: #5E5E5E;">=</span>nms,subImgSize<span class="op" style="color: #5E5E5E;">=</span>(<span class="dv" style="color: #AD0000;">250</span>,<span class="dv" style="color: #AD0000;">200</span>))</span></code></pre></div>
+<div class="cell-output cell-output-display" data-execution_count="57">
+<p><img src="https://greglandrum.github.io/rdkit-blog/posts/2024-05-31-scaffold-splits-and-murcko-scaffolds1_files/figure-html/cell-7-output-1.png" class="img-fluid"></p>
+</div>
+</div>
+<p>Generate the Murcko scaffolds:</p>
+<div class="cell" data-executetime="{&quot;end_time&quot;:&quot;2024-03-10T06:06:17.068323Z&quot;,&quot;start_time&quot;:&quot;2024-03-10T06:06:17.031225Z&quot;}" data-execution_count="58">
+<div class="sourceCode cell-code" id="cb14" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb14-1">scaffs <span class="op" style="color: #5E5E5E;">=</span> []</span>
+<span id="cb14-2"><span class="cf" style="color: #003B4F;">for</span> m <span class="kw" style="color: #003B4F;">in</span> mols:</span>
+<span id="cb14-3">    scaff <span class="op" style="color: #5E5E5E;">=</span> Chem.MurckoDecompose(m)</span>
+<span id="cb14-4">    Chem.SanitizeMol(scaff)</span>
+<span id="cb14-5">    scaffs.append(scaff)</span>
+<span id="cb14-6">scaff_smis <span class="op" style="color: #5E5E5E;">=</span> [Chem.MolToSmiles(x) <span class="cf" style="color: #003B4F;">for</span> x <span class="kw" style="color: #003B4F;">in</span> scaffs]</span>
+<span id="cb14-7"><span class="bu" style="color: null;">len</span>(<span class="bu" style="color: null;">set</span>(scaff_smis))</span></code></pre></div>
+<div class="cell-output cell-output-display" data-execution_count="58">
+<pre><code>12</code></pre>
+</div>
+</div>
+<p>There are twelve unique “scaffolds”. Draw the first six of them:</p>
+<div class="cell" data-executetime="{&quot;end_time&quot;:&quot;2024-03-10T06:06:18.282630Z&quot;,&quot;start_time&quot;:&quot;2024-03-10T06:06:18.260959Z&quot;}" data-execution_count="59">
+<div class="sourceCode cell-code" id="cb16" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb16-1">unique_scaffs <span class="op" style="color: #5E5E5E;">=</span> [Chem.MolFromSmiles(smi) <span class="cf" style="color: #003B4F;">for</span> smi <span class="kw" style="color: #003B4F;">in</span> <span class="bu" style="color: null;">set</span>(scaff_smis)]</span>
+<span id="cb16-2">Draw.MolsToGridImage(unique_scaffs[:<span class="dv" style="color: #AD0000;">6</span>],subImgSize<span class="op" style="color: #5E5E5E;">=</span>(<span class="dv" style="color: #AD0000;">250</span>,<span class="dv" style="color: #AD0000;">200</span>))</span></code></pre></div>
+<div class="cell-output cell-output-display" data-execution_count="59">
+<p><img src="https://greglandrum.github.io/rdkit-blog/posts/2024-05-31-scaffold-splits-and-murcko-scaffolds1_files/figure-html/cell-9-output-1.png" class="img-fluid"></p>
+</div>
+</div>
+<p>Some of these are quite similar to each other and others, like the first and last in the second row, are clearly structurally related - the last entry in the second row is a substructure of the first entry in that row.</p>
+<p>Look at the compounds from another assay:</p>
+<div class="cell" data-executetime="{&quot;end_time&quot;:&quot;2024-03-10T06:13:25.501136Z&quot;,&quot;start_time&quot;:&quot;2024-03-10T06:13:25.469349Z&quot;}" data-execution_count="62">
+<div class="sourceCode cell-code" id="cb17" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb17-1">aid <span class="op" style="color: #5E5E5E;">=</span> aids[<span class="dv" style="color: #AD0000;">1</span>][<span class="dv" style="color: #AD0000;">0</span>]</span>
+<span id="cb17-2">structs <span class="op" style="color: #5E5E5E;">=</span> <span class="op" style="color: #5E5E5E;">%</span>sql postgresql:<span class="op" style="color: #5E5E5E;">//</span>glandrum<span class="op" style="color: #5E5E5E;">@</span>stoat<span class="op" style="color: #5E5E5E;">/</span>chembl_33 <span class="op" style="color: #5E5E5E;">\</span></span>
+<span id="cb17-3">  select distinct on (canonical_smiles) cids.chembl_id compound_chembl_id,canonical_smiles <span class="op" style="color: #5E5E5E;">\</span></span>
+<span id="cb17-4">    <span class="im" style="color: #00769E;">from</span> activities <span class="op" style="color: #5E5E5E;">\</span></span>
+<span id="cb17-5">        join assays using (assay_id) <span class="op" style="color: #5E5E5E;">\</span></span>
+<span id="cb17-6">        join compound_structures using (molregno) <span class="op" style="color: #5E5E5E;">\</span></span>
+<span id="cb17-7">        join chembl_id_lookup cids on (molregno<span class="op" style="color: #5E5E5E;">=</span>entity_id <span class="kw" style="color: #003B4F;">and</span> entity_type<span class="op" style="color: #5E5E5E;">=</span><span class="st" style="color: #20794D;">'COMPOUND'</span>)<span class="op" style="color: #5E5E5E;">\</span></span>
+<span id="cb17-8">    where assays.chembl_id<span class="op" style="color: #5E5E5E;">=</span>:aid <span class="op" style="color: #5E5E5E;">\</span></span>
+<span id="cb17-9">      <span class="kw" style="color: #003B4F;">and</span> standard_type<span class="op" style="color: #5E5E5E;">=</span><span class="st" style="color: #20794D;">'Ki'</span></span>
+<span id="cb17-10"></span>
+<span id="cb17-11">nms,smis <span class="op" style="color: #5E5E5E;">=</span> <span class="bu" style="color: null;">zip</span>(<span class="op" style="color: #5E5E5E;">*</span>structs)</span>
+<span id="cb17-12">mols <span class="op" style="color: #5E5E5E;">=</span> [Chem.MolFromSmiles(x) <span class="cf" style="color: #003B4F;">for</span> x <span class="kw" style="color: #003B4F;">in</span> smis]</span>
+<span id="cb17-13">Draw.MolsToGridImage(mols[:<span class="dv" style="color: #AD0000;">6</span>],legends<span class="op" style="color: #5E5E5E;">=</span>nms,subImgSize<span class="op" style="color: #5E5E5E;">=</span>(<span class="dv" style="color: #AD0000;">250</span>,<span class="dv" style="color: #AD0000;">200</span>))</span></code></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>32 rows affected.</code></pre>
+</div>
+<div class="cell-output cell-output-display" data-execution_count="62">
+<p><img src="https://greglandrum.github.io/rdkit-blog/posts/2024-05-31-scaffold-splits-and-murcko-scaffolds1_files/figure-html/cell-10-output-2.png" class="img-fluid"></p>
+</div>
+</div>
+<p>And generate the scaffolds:</p>
+<div class="cell" data-executetime="{&quot;end_time&quot;:&quot;2024-03-10T06:13:53.674681Z&quot;,&quot;start_time&quot;:&quot;2024-03-10T06:13:53.608917Z&quot;}" data-execution_count="63">
+<div class="sourceCode cell-code" id="cb19" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb19-1">scaffs <span class="op" style="color: #5E5E5E;">=</span> []</span>
+<span id="cb19-2"><span class="cf" style="color: #003B4F;">for</span> m <span class="kw" style="color: #003B4F;">in</span> mols:</span>
+<span id="cb19-3">    scaff <span class="op" style="color: #5E5E5E;">=</span> Chem.MurckoDecompose(m)</span>
+<span id="cb19-4">    Chem.SanitizeMol(scaff)</span>
+<span id="cb19-5">    scaffs.append(scaff)</span>
+<span id="cb19-6">scaff_smis <span class="op" style="color: #5E5E5E;">=</span> [Chem.MolToSmiles(x) <span class="cf" style="color: #003B4F;">for</span> x <span class="kw" style="color: #003B4F;">in</span> scaffs]</span>
+<span id="cb19-7"><span class="bu" style="color: null;">print</span>(<span class="bu" style="color: null;">len</span>(<span class="bu" style="color: null;">set</span>(scaff_smis)))</span>
+<span id="cb19-8">unique_scaffs <span class="op" style="color: #5E5E5E;">=</span> [Chem.MolFromSmiles(smi) <span class="cf" style="color: #003B4F;">for</span> smi <span class="kw" style="color: #003B4F;">in</span> <span class="bu" style="color: null;">set</span>(scaff_smis)]</span>
+<span id="cb19-9">Draw.MolsToGridImage(unique_scaffs[:<span class="dv" style="color: #AD0000;">6</span>],subImgSize<span class="op" style="color: #5E5E5E;">=</span>(<span class="dv" style="color: #AD0000;">250</span>,<span class="dv" style="color: #AD0000;">200</span>))</span></code></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>20</code></pre>
+</div>
+<div class="cell-output cell-output-display" data-execution_count="63">
+<p><img src="https://greglandrum.github.io/rdkit-blog/posts/2024-05-31-scaffold-splits-and-murcko-scaffolds1_files/figure-html/cell-11-output-2.png" class="img-fluid"></p>
+</div>
+</div>
+<p>This time there are 20 scaffolds and some of them are QUITE similar to each other.</p>
+</section>
+<section id="number-of-scaffolds-per-assay" class="level1">
+<h1>Number of scaffolds per assay</h1>
+<p>Do the compound extraction and scaffold calculation for all of the assays:</p>
+<div class="cell" data-executetime="{&quot;end_time&quot;:&quot;2024-03-10T06:38:02.463123Z&quot;,&quot;start_time&quot;:&quot;2024-03-10T06:35:59.902309Z&quot;}" data-scrolled="true" data-execution_count="69">
+<div class="sourceCode cell-code" id="cb21" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb21-1"><span class="op" style="color: #5E5E5E;">%</span>config SqlMagic.feedback <span class="op" style="color: #5E5E5E;">=</span> <span class="va" style="color: #111111;">False</span></span>
+<span id="cb21-2"></span>
+<span id="cb21-3">accum <span class="op" style="color: #5E5E5E;">=</span> []</span>
+<span id="cb21-4"><span class="cf" style="color: #003B4F;">for</span> aid,_,_ <span class="kw" style="color: #003B4F;">in</span> aids:</span>
+<span id="cb21-5">    structs <span class="op" style="color: #5E5E5E;">=</span> <span class="op" style="color: #5E5E5E;">%</span>sql postgresql:<span class="op" style="color: #5E5E5E;">//</span>glandrum<span class="op" style="color: #5E5E5E;">@</span>stoat<span class="op" style="color: #5E5E5E;">/</span>chembl_33 <span class="op" style="color: #5E5E5E;">\</span></span>
+<span id="cb21-6">      select distinct on (canonical_smiles) cids.chembl_id compound_chembl_id,canonical_smiles <span class="op" style="color: #5E5E5E;">\</span></span>
+<span id="cb21-7">        <span class="im" style="color: #00769E;">from</span> activities <span class="op" style="color: #5E5E5E;">\</span></span>
+<span id="cb21-8">            join assays using (assay_id) <span class="op" style="color: #5E5E5E;">\</span></span>
+<span id="cb21-9">            join compound_structures using (molregno) <span class="op" style="color: #5E5E5E;">\</span></span>
+<span id="cb21-10">            join chembl_id_lookup cids on (molregno<span class="op" style="color: #5E5E5E;">=</span>entity_id <span class="kw" style="color: #003B4F;">and</span> entity_type<span class="op" style="color: #5E5E5E;">=</span><span class="st" style="color: #20794D;">'COMPOUND'</span>)<span class="op" style="color: #5E5E5E;">\</span></span>
+<span id="cb21-11">        where assays.chembl_id<span class="op" style="color: #5E5E5E;">=</span>:aid <span class="op" style="color: #5E5E5E;">\</span></span>
+<span id="cb21-12">          <span class="kw" style="color: #003B4F;">and</span> standard_type<span class="op" style="color: #5E5E5E;">=</span><span class="st" style="color: #20794D;">'Ki'</span></span>
+<span id="cb21-13"></span>
+<span id="cb21-14">    nms,smis <span class="op" style="color: #5E5E5E;">=</span> <span class="bu" style="color: null;">zip</span>(<span class="op" style="color: #5E5E5E;">*</span>structs)</span>
+<span id="cb21-15">    mols <span class="op" style="color: #5E5E5E;">=</span> [Chem.MolFromSmiles(x) <span class="cf" style="color: #003B4F;">for</span> x <span class="kw" style="color: #003B4F;">in</span> smis]</span>
+<span id="cb21-16">    scaffs <span class="op" style="color: #5E5E5E;">=</span> <span class="bu" style="color: null;">set</span>()</span>
+<span id="cb21-17">    <span class="cf" style="color: #003B4F;">for</span> m <span class="kw" style="color: #003B4F;">in</span> mols:</span>
+<span id="cb21-18">        scaff <span class="op" style="color: #5E5E5E;">=</span> Chem.MurckoDecompose(m)</span>
+<span id="cb21-19">        Chem.SanitizeMol(scaff)</span>
+<span id="cb21-20">        scaffs.add(Chem.MolToSmiles(scaff))</span>
+<span id="cb21-21">    accum.append((aid,<span class="bu" style="color: null;">len</span>(mols),<span class="bu" style="color: null;">len</span>(scaffs)))</span>
+<span id="cb21-22">    <span class="cf" style="color: #003B4F;">if</span> <span class="kw" style="color: #003B4F;">not</span> <span class="bu" style="color: null;">len</span>(accum)<span class="op" style="color: #5E5E5E;">%</span><span class="dv" style="color: #AD0000;">100</span>:</span>
+<span id="cb21-23">        <span class="bu" style="color: null;">print</span>(<span class="ss" style="color: #20794D;">f'Done </span><span class="sc" style="color: #5E5E5E;">{</span><span class="bu" style="color: null;">len</span>(accum)<span class="sc" style="color: #5E5E5E;">}</span><span class="ss" style="color: #20794D;"> of </span><span class="sc" style="color: #5E5E5E;">{</span><span class="bu" style="color: null;">len</span>(aids)<span class="sc" style="color: #5E5E5E;">}</span><span class="ss" style="color: #20794D;">'</span>)</span></code></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>Done 100 of 7148
+Done 200 of 7148
+Done 300 of 7148
+Done 400 of 7148
+Done 500 of 7148
+Done 600 of 7148
+Done 700 of 7148
+Done 800 of 7148
+Done 900 of 7148
+Done 1000 of 7148
+Done 1100 of 7148
+Done 1200 of 7148
+Done 1300 of 7148
+Done 1400 of 7148
+Done 1500 of 7148
+Done 1600 of 7148
+Done 1700 of 7148
+Done 1800 of 7148
+Done 1900 of 7148
+Done 2000 of 7148
+Done 2100 of 7148
+Done 2200 of 7148
+Done 2300 of 7148
+Done 2400 of 7148
+Done 2500 of 7148
+Done 2600 of 7148
+Done 2700 of 7148
+Done 2800 of 7148
+Done 2900 of 7148
+Done 3000 of 7148
+Done 3100 of 7148
+Done 3200 of 7148
+Done 3300 of 7148
+Done 3400 of 7148
+Done 3500 of 7148
+Done 3600 of 7148
+Done 3700 of 7148
+Done 3800 of 7148
+Done 3900 of 7148
+Done 4000 of 7148
+Done 4100 of 7148
+Done 4200 of 7148
+Done 4300 of 7148
+Done 4400 of 7148
+Done 4500 of 7148
+Done 4600 of 7148
+Done 4700 of 7148
+Done 4800 of 7148
+Done 4900 of 7148
+Done 5000 of 7148
+Done 5100 of 7148
+Done 5200 of 7148
+Done 5300 of 7148
+Done 5400 of 7148
+Done 5500 of 7148
+Done 5600 of 7148
+Done 5700 of 7148
+Done 5800 of 7148
+Done 5900 of 7148
+Done 6000 of 7148
+Done 6100 of 7148
+Done 6200 of 7148
+Done 6300 of 7148
+Done 6400 of 7148
+Done 6500 of 7148
+Done 6600 of 7148
+Done 6700 of 7148
+Done 6800 of 7148
+Done 6900 of 7148
+Done 7000 of 7148
+Done 7100 of 7148</code></pre>
+</div>
+</div>
+<div class="cell" data-executetime="{&quot;end_time&quot;:&quot;2024-03-10T06:38:02.469222Z&quot;,&quot;start_time&quot;:&quot;2024-03-10T06:38:02.464415Z&quot;}" data-execution_count="70">
+<div class="sourceCode cell-code" id="cb23" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb23-1"><span class="im" style="color: #00769E;">import</span> pickle</span>
+<span id="cb23-2"><span class="cf" style="color: #003B4F;">with</span> <span class="bu" style="color: null;">open</span>(<span class="st" style="color: #20794D;">'./results/murcko_scaffs.pkl'</span>,<span class="st" style="color: #20794D;">'wb+'</span>) <span class="im" style="color: #00769E;">as</span> outf:</span>
+<span id="cb23-3">    pickle.dump(accum,outf)</span></code></pre></div>
+</div>
+<div class="cell" data-executetime="{&quot;end_time&quot;:&quot;2024-05-31T06:19:08.749247Z&quot;,&quot;start_time&quot;:&quot;2024-05-31T06:19:08.673610Z&quot;}" data-execution_count="2">
+<div class="sourceCode cell-code" id="cb24" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb24-1"><span class="im" style="color: #00769E;">import</span> pickle</span>
+<span id="cb24-2"><span class="cf" style="color: #003B4F;">with</span> <span class="bu" style="color: null;">open</span>(<span class="st" style="color: #20794D;">'./results/murcko_scaffs.pkl'</span>,<span class="st" style="color: #20794D;">'rb'</span>) <span class="im" style="color: #00769E;">as</span> inf:</span>
+<span id="cb24-3">    accum <span class="op" style="color: #5E5E5E;">=</span> pickle.load(inf)</span></code></pre></div>
+</div>
+<p>How many scaffolds are there in each assay?</p>
+<div class="cell" data-executetime="{&quot;end_time&quot;:&quot;2024-05-31T06:20:57.765887Z&quot;,&quot;start_time&quot;:&quot;2024-05-31T06:20:57.664715Z&quot;}" data-execution_count="7">
+<div class="sourceCode cell-code" id="cb25" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb25-1">plt.figure(figsize<span class="op" style="color: #5E5E5E;">=</span>(<span class="dv" style="color: #AD0000;">6</span>,<span class="dv" style="color: #AD0000;">6</span>))</span>
+<span id="cb25-2">nscaffs <span class="op" style="color: #5E5E5E;">=</span> [x[<span class="dv" style="color: #AD0000;">2</span>] <span class="cf" style="color: #003B4F;">for</span> x <span class="kw" style="color: #003B4F;">in</span> accum]</span>
+<span id="cb25-3">plt.hist(nscaffs,bins<span class="op" style="color: #5E5E5E;">=</span><span class="dv" style="color: #AD0000;">20</span>)</span>
+<span id="cb25-4">plt.xlabel(<span class="st" style="color: #20794D;">'num scaffolds'</span>)<span class="op" style="color: #5E5E5E;">;</span></span></code></pre></div>
+<div class="cell-output cell-output-display">
+<p><img src="https://greglandrum.github.io/rdkit-blog/posts/2024-05-31-scaffold-splits-and-murcko-scaffolds1_files/figure-html/cell-15-output-1.png" class="img-fluid"></p>
+</div>
+</div>
+<p>Stats of that:</p>
+<div class="cell" data-executetime="{&quot;end_time&quot;:&quot;2024-05-31T06:21:56.019931Z&quot;,&quot;start_time&quot;:&quot;2024-05-31T06:21:56.016973Z&quot;}" data-execution_count="10">
+<div class="sourceCode cell-code" id="cb26" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb26-1"><span class="bu" style="color: null;">print</span>(<span class="ss" style="color: #20794D;">f'mean: </span><span class="sc" style="color: #5E5E5E;">{</span>np<span class="sc" style="color: #5E5E5E;">.</span>mean(nscaffs)<span class="sc" style="color: #5E5E5E;">:.1f}</span><span class="ss" style="color: #20794D;">, median: </span><span class="sc" style="color: #5E5E5E;">{</span>np<span class="sc" style="color: #5E5E5E;">.</span>median(nscaffs)<span class="sc" style="color: #5E5E5E;">:.1f}</span><span class="ss" style="color: #20794D;">'</span>)</span></code></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>mean: 13.2, median: 12.0</code></pre>
+</div>
+</div>
+<p>That’s a lot of scaffolds for each assay.</p>
+<p>Since each assay contains a different number of compounds, it’s interesting to look at the relationship between the number of compounds and the number of scaffolds:</p>
+<div class="cell" data-executetime="{&quot;end_time&quot;:&quot;2024-05-31T06:23:10.864843Z&quot;,&quot;start_time&quot;:&quot;2024-05-31T06:23:10.729686Z&quot;}" data-execution_count="12">
+<div class="sourceCode cell-code" id="cb28" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb28-1">plt.figure(figsize<span class="op" style="color: #5E5E5E;">=</span>(<span class="dv" style="color: #AD0000;">6</span>,<span class="dv" style="color: #AD0000;">6</span>))</span>
+<span id="cb28-2">plt.scatter([x[<span class="dv" style="color: #AD0000;">1</span>] <span class="cf" style="color: #003B4F;">for</span> x <span class="kw" style="color: #003B4F;">in</span> accum],[x[<span class="dv" style="color: #AD0000;">2</span>] <span class="cf" style="color: #003B4F;">for</span> x <span class="kw" style="color: #003B4F;">in</span> accum],alpha<span class="op" style="color: #5E5E5E;">=</span><span class="fl" style="color: #AD0000;">0.2</span>)</span>
+<span id="cb28-3">plt.xlabel(<span class="st" style="color: #20794D;">'num compounds'</span>)</span>
+<span id="cb28-4">plt.ylabel(<span class="st" style="color: #20794D;">'num scaffolds'</span>)<span class="op" style="color: #5E5E5E;">;</span></span></code></pre></div>
+<div class="cell-output cell-output-display">
+<p><img src="https://greglandrum.github.io/rdkit-blog/posts/2024-05-31-scaffold-splits-and-murcko-scaffolds1_files/figure-html/cell-17-output-1.png" class="img-fluid"></p>
+</div>
+</div>
+<p>We can summarize that with a histogram of the ratio of the number of scaffolds to the number of compounds:</p>
+<div class="cell" data-executetime="{&quot;end_time&quot;:&quot;2024-05-31T06:23:11.239584Z&quot;,&quot;start_time&quot;:&quot;2024-05-31T06:23:11.077383Z&quot;}" data-execution_count="13">
+<div class="sourceCode cell-code" id="cb29" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb29-1">frac <span class="op" style="color: #5E5E5E;">=</span> [x[<span class="dv" style="color: #AD0000;">2</span>]<span class="op" style="color: #5E5E5E;">/</span>x[<span class="dv" style="color: #AD0000;">1</span>] <span class="cf" style="color: #003B4F;">for</span> x <span class="kw" style="color: #003B4F;">in</span> accum]</span>
+<span id="cb29-2">plt.figure(figsize<span class="op" style="color: #5E5E5E;">=</span>(<span class="dv" style="color: #AD0000;">6</span>,<span class="dv" style="color: #AD0000;">5</span>))</span>
+<span id="cb29-3">plt.hist(frac,bins<span class="op" style="color: #5E5E5E;">=</span><span class="dv" style="color: #AD0000;">20</span>)</span>
+<span id="cb29-4">plt.xlabel(<span class="st" style="color: #20794D;">'$num_</span><span class="sc" style="color: #5E5E5E;">{scaffolds}</span><span class="st" style="color: #20794D;"> / num_</span><span class="sc" style="color: #5E5E5E;">{compounds}</span><span class="st" style="color: #20794D;">$'</span>)<span class="op" style="color: #5E5E5E;">;</span></span></code></pre></div>
+<div class="cell-output cell-output-display">
+<p><img src="https://greglandrum.github.io/rdkit-blog/posts/2024-05-31-scaffold-splits-and-murcko-scaffolds1_files/figure-html/cell-18-output-1.png" class="img-fluid"></p>
+</div>
+</div>
+<div class="cell" data-executetime="{&quot;end_time&quot;:&quot;2024-05-31T06:23:25.050185Z&quot;,&quot;start_time&quot;:&quot;2024-05-31T06:23:25.046021Z&quot;}" data-execution_count="14">
+<div class="sourceCode cell-code" id="cb30" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb30-1"><span class="bu" style="color: null;">print</span>(<span class="ss" style="color: #20794D;">f'mean: </span><span class="sc" style="color: #5E5E5E;">{</span>np<span class="sc" style="color: #5E5E5E;">.</span>mean(frac)<span class="sc" style="color: #5E5E5E;">:.1f}</span><span class="ss" style="color: #20794D;">, median: </span><span class="sc" style="color: #5E5E5E;">{</span>np<span class="sc" style="color: #5E5E5E;">.</span>median(frac)<span class="sc" style="color: #5E5E5E;">:.1f}</span><span class="ss" style="color: #20794D;">'</span>)</span></code></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>mean: 0.4, median: 0.4</code></pre>
+</div>
+</div>
+</section>
+<section id="manually-extracted-scaffolds" class="level1">
+<h1>Manually extracted scaffolds</h1>
+<p>To see what’s going on in more detail, let’s look at a few randomly selected assays/papers:</p>
+<div class="cell" data-executetime="{&quot;end_time&quot;:&quot;2024-05-31T06:55:21.866570Z&quot;,&quot;start_time&quot;:&quot;2024-05-31T06:55:21.859677Z&quot;}" data-execution_count="20">
+<div class="sourceCode cell-code" id="cb32" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb32-1"><span class="im" style="color: #00769E;">import</span> random</span>
+<span id="cb32-2">acp <span class="op" style="color: #5E5E5E;">=</span> accum[:]</span>
+<span id="cb32-3">random.seed(<span class="bn" style="color: #AD0000;">0xf00d</span>)</span>
+<span id="cb32-4">random.shuffle(acp)</span>
+<span id="cb32-5"><span class="cf" style="color: #003B4F;">for</span> i,tpl <span class="kw" style="color: #003B4F;">in</span> <span class="bu" style="color: null;">enumerate</span>(acp[:<span class="dv" style="color: #AD0000;">5</span>]):</span>
+<span id="cb32-6">    assay,nc,ns <span class="op" style="color: #5E5E5E;">=</span> tpl</span>
+<span id="cb32-7">    <span class="bu" style="color: null;">print</span>(<span class="ss" style="color: #20794D;">f'https://www.ebi.ac.uk/chembl/assay_report_card/</span><span class="sc" style="color: #5E5E5E;">{</span>assay<span class="sc" style="color: #5E5E5E;">}</span><span class="ss" style="color: #20794D;">/  </span><span class="sc" style="color: #5E5E5E;">{</span>ns<span class="sc" style="color: #5E5E5E;">}</span><span class="ss" style="color: #20794D;">   </span><span class="sc" style="color: #5E5E5E;">{</span>nc<span class="sc" style="color: #5E5E5E;">}</span><span class="ss" style="color: #20794D;">'</span>)</span></code></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>https://www.ebi.ac.uk/chembl/assay_report_card/CHEMBL4049094/  13   34
+https://www.ebi.ac.uk/chembl/assay_report_card/CHEMBL859243/  10   39
+https://www.ebi.ac.uk/chembl/assay_report_card/CHEMBL4710796/  16   23
+https://www.ebi.ac.uk/chembl/assay_report_card/CHEMBL3131699/  21   28
+https://www.ebi.ac.uk/chembl/assay_report_card/CHEMBL4183750/  9   25</code></pre>
+</div>
+</div>
+<p>Get the compounds for each assay from the database:</p>
+<div class="cell" data-executetime="{&quot;end_time&quot;:&quot;2024-05-31T08:41:00.885036Z&quot;,&quot;start_time&quot;:&quot;2024-05-31T08:40:59.418519Z&quot;}" data-execution_count="21">
+<div class="sourceCode cell-code" id="cb34" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb34-1"><span class="op" style="color: #5E5E5E;">%</span>config SqlMagic.feedback <span class="op" style="color: #5E5E5E;">=</span> <span class="va" style="color: #111111;">False</span></span>
+<span id="cb34-2"></span>
+<span id="cb34-3">cmpd_accum <span class="op" style="color: #5E5E5E;">=</span> {}</span>
+<span id="cb34-4"><span class="cf" style="color: #003B4F;">for</span> aid,_,_ <span class="kw" style="color: #003B4F;">in</span> acp[:<span class="dv" style="color: #AD0000;">5</span>]:</span>
+<span id="cb34-5">    structs <span class="op" style="color: #5E5E5E;">=</span> <span class="op" style="color: #5E5E5E;">%</span>sql postgresql:<span class="op" style="color: #5E5E5E;">//</span>glandrum<span class="op" style="color: #5E5E5E;">@</span>stoat<span class="op" style="color: #5E5E5E;">/</span>chembl_33 <span class="op" style="color: #5E5E5E;">\</span></span>
+<span id="cb34-6">      select distinct on (canonical_smiles) cids.chembl_id compound_chembl_id,canonical_smiles <span class="op" style="color: #5E5E5E;">\</span></span>
+<span id="cb34-7">        <span class="im" style="color: #00769E;">from</span> activities <span class="op" style="color: #5E5E5E;">\</span></span>
+<span id="cb34-8">            join assays using (assay_id) <span class="op" style="color: #5E5E5E;">\</span></span>
+<span id="cb34-9">            join compound_structures using (molregno) <span class="op" style="color: #5E5E5E;">\</span></span>
+<span id="cb34-10">            join chembl_id_lookup cids on (molregno<span class="op" style="color: #5E5E5E;">=</span>entity_id <span class="kw" style="color: #003B4F;">and</span> entity_type<span class="op" style="color: #5E5E5E;">=</span><span class="st" style="color: #20794D;">'COMPOUND'</span>)<span class="op" style="color: #5E5E5E;">\</span></span>
+<span id="cb34-11">        where assays.chembl_id<span class="op" style="color: #5E5E5E;">=</span>:aid <span class="op" style="color: #5E5E5E;">\</span></span>
+<span id="cb34-12">          <span class="kw" style="color: #003B4F;">and</span> standard_type<span class="op" style="color: #5E5E5E;">=</span><span class="st" style="color: #20794D;">'Ki'</span></span>
+<span id="cb34-13"></span>
+<span id="cb34-14">    nms,smis <span class="op" style="color: #5E5E5E;">=</span> <span class="bu" style="color: null;">zip</span>(<span class="op" style="color: #5E5E5E;">*</span>structs)</span>
+<span id="cb34-15">    mols <span class="op" style="color: #5E5E5E;">=</span> [Chem.MolFromSmiles(x) <span class="cf" style="color: #003B4F;">for</span> x <span class="kw" style="color: #003B4F;">in</span> smis]</span>
+<span id="cb34-16">    cmpd_accum[aid] <span class="op" style="color: #5E5E5E;">=</span> mols</span></code></pre></div>
+</div>
+<div class="cell" data-executetime="{&quot;end_time&quot;:&quot;2024-05-31T08:44:30.245322Z&quot;,&quot;start_time&quot;:&quot;2024-05-31T08:44:30.242882Z&quot;}" data-execution_count="24">
+<div class="sourceCode cell-code" id="cb35" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb35-1"><span class="im" style="color: #00769E;">from</span> rdkit.Chem <span class="im" style="color: #00769E;">import</span> rdDepictor</span>
+<span id="cb35-2">rdDepictor.SetPreferCoordGen(<span class="va" style="color: #111111;">True</span>)</span></code></pre></div>
+</div>
+<p>I went through each of the papers and came up with a scaffold based for each on what the authors of the paper report as the scaffold. If there was no reported scaffold or something which was less-than-useful, I constructed on myself:</p>
+<div class="cell" data-executetime="{&quot;end_time&quot;:&quot;2024-05-31T11:17:19.874772Z&quot;,&quot;start_time&quot;:&quot;2024-05-31T11:17:19.834653Z&quot;}" data-execution_count="69">
+<div class="sourceCode cell-code" id="cb36" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb36-1">scaffolds_from_papers <span class="op" style="color: #5E5E5E;">=</span> {</span>
+<span id="cb36-2">    <span class="st" style="color: #20794D;">'CHEMBL4049094'</span>:<span class="st" style="color: #20794D;">'*n1ncc(n1)C(=O)NC(C*)C(=O)NC1(CC1)C#N'</span>,</span>
+<span id="cb36-3">    <span class="st" style="color: #20794D;">'CHEMBL859243'</span>:<span class="st" style="color: #20794D;">'*CC(N1CCCC1)C(=O)c1ccccc1'</span>,</span>
+<span id="cb36-4">    <span class="st" style="color: #20794D;">'CHEMBL4710796'</span>:<span class="st" style="color: #20794D;">'*c1n[nH]c(=S)n1N=C-*'</span>,</span>
+<span id="cb36-5">    <span class="st" style="color: #20794D;">'CHEMBL3131699'</span>:<span class="st" style="color: #20794D;">'CC(C)(C)NC(=O)Nc1nc(Cl)c(*)n(C1=O)CC(=O)Nc1ccccc1C(=O)NS(=O)(=O)*'</span>,</span>
+<span id="cb36-6">    <span class="st" style="color: #20794D;">'CHEMBL4183750'</span>:<span class="st" style="color: #20794D;">'*C(=O)c1ccc(cc1)c1c(OC)ccc(c1)C1=NN(*)C(=O)C2C1CC=CC2'</span></span>
+<span id="cb36-7">}</span>
+<span id="cb36-8">ps <span class="op" style="color: #5E5E5E;">=</span> Chem.AdjustQueryParameters.NoAdjustments()</span>
+<span id="cb36-9">ps.makeDummiesQueries <span class="op" style="color: #5E5E5E;">=</span> <span class="va" style="color: #111111;">True</span></span>
+<span id="cb36-10"><span class="cf" style="color: #003B4F;">for</span> k <span class="kw" style="color: #003B4F;">in</span> scaffolds_from_papers:</span>
+<span id="cb36-11">    scaffolds_from_papers[k] <span class="op" style="color: #5E5E5E;">=</span> Chem.AdjustQueryProperties(Chem.MolFromSmiles(scaffolds_from_papers[k]),ps)</span>
+<span id="cb36-12">    </span>
+<span id="cb36-13">Draw.MolsToGridImage(scaffolds_from_papers.values(),</span>
+<span id="cb36-14">                     legends<span class="op" style="color: #5E5E5E;">=</span><span class="bu" style="color: null;">list</span>(scaffolds_from_papers.keys()),</span>
+<span id="cb36-15">                     subImgSize<span class="op" style="color: #5E5E5E;">=</span>(<span class="dv" style="color: #AD0000;">350</span>,<span class="dv" style="color: #AD0000;">300</span>))</span></code></pre></div>
+<div class="cell-output cell-output-display" data-execution_count="69">
+<p><img src="https://greglandrum.github.io/rdkit-blog/posts/2024-05-31-scaffold-splits-and-murcko-scaffolds1_files/figure-html/cell-23-output-1.png" class="img-fluid"></p>
+</div>
+</div>
+<p>Confirm that these single scaffolds actually cover a reasonable number of the compounds in the paper:</p>
+<div class="cell" data-executetime="{&quot;end_time&quot;:&quot;2024-05-31T11:17:20.272973Z&quot;,&quot;start_time&quot;:&quot;2024-05-31T11:17:20.265701Z&quot;}" data-execution_count="70">
+<div class="sourceCode cell-code" id="cb37" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb37-1"><span class="cf" style="color: #003B4F;">for</span> k <span class="kw" style="color: #003B4F;">in</span> scaffolds_from_papers:</span>
+<span id="cb37-2">    nMatches <span class="op" style="color: #5E5E5E;">=</span> <span class="bu" style="color: null;">len</span>([<span class="dv" style="color: #AD0000;">1</span> <span class="cf" style="color: #003B4F;">for</span> x <span class="kw" style="color: #003B4F;">in</span> cmpd_accum[k] <span class="cf" style="color: #003B4F;">if</span> x.HasSubstructMatch(scaffolds_from_papers[k])])</span>
+<span id="cb37-3">    <span class="bu" style="color: null;">print</span>(<span class="ss" style="color: #20794D;">f'assay </span><span class="sc" style="color: #5E5E5E;">{</span>k<span class="sc" style="color: #5E5E5E;">}</span><span class="ss" style="color: #20794D;">:  num compounds=</span><span class="sc" style="color: #5E5E5E;">{</span><span class="bu" style="color: null;">len</span>(cmpd_accum[k])<span class="sc" style="color: #5E5E5E;">}</span><span class="ss" style="color: #20794D;"> num matching scaffold=</span><span class="sc" style="color: #5E5E5E;">{</span>nMatches<span class="sc" style="color: #5E5E5E;">}</span><span class="ss" style="color: #20794D;">'</span>)</span></code></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>assay CHEMBL4049094:  num compounds=34 num matching scaffold=34
+assay CHEMBL859243:  num compounds=39 num matching scaffold=31
+assay CHEMBL4710796:  num compounds=23 num matching scaffold=22
+assay CHEMBL3131699:  num compounds=28 num matching scaffold=22
+assay CHEMBL4183750:  num compounds=25 num matching scaffold=21</code></pre>
+</div>
+</div>
+<p>Notice that in each case these individual scaffolds cover most of the compounds in the assay. This is a large contrast to the results from the Murcko decomposition, where even the most populous scaffolds typically cover less than half the compounds in the assay (see below).</p>
+<p>And, finally, let’s just look at those scaffolds together with the most populated Murcko scaffolds from each paper:</p>
+<div class="cell" data-executetime="{&quot;end_time&quot;:&quot;2024-05-31T11:16:49.981899Z&quot;,&quot;start_time&quot;:&quot;2024-05-31T11:16:49.822127Z&quot;}" data-execution_count="66">
+<div class="sourceCode cell-code" id="cb39" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb39-1"><span class="im" style="color: #00769E;">from</span> collections <span class="im" style="color: #00769E;">import</span> Counter</span>
+<span id="cb39-2">rows <span class="op" style="color: #5E5E5E;">=</span> []</span>
+<span id="cb39-3">labels <span class="op" style="color: #5E5E5E;">=</span> []</span>
+<span id="cb39-4"><span class="cf" style="color: #003B4F;">for</span> k <span class="kw" style="color: #003B4F;">in</span> scaffolds_from_papers:</span>
+<span id="cb39-5">    scaffs <span class="op" style="color: #5E5E5E;">=</span> {}</span>
+<span id="cb39-6">    counts <span class="op" style="color: #5E5E5E;">=</span> Counter()</span>
+<span id="cb39-7">    <span class="cf" style="color: #003B4F;">for</span> m <span class="kw" style="color: #003B4F;">in</span> cmpd_accum[k]:</span>
+<span id="cb39-8">        scaff <span class="op" style="color: #5E5E5E;">=</span> Chem.MurckoDecompose(m)</span>
+<span id="cb39-9">        Chem.SanitizeMol(scaff)</span>
+<span id="cb39-10">        smi <span class="op" style="color: #5E5E5E;">=</span> Chem.MolToSmiles(scaff)</span>
+<span id="cb39-11">        counts[smi] <span class="op" style="color: #5E5E5E;">+=</span> <span class="dv" style="color: #AD0000;">1</span></span>
+<span id="cb39-12">        scaffs[smi] <span class="op" style="color: #5E5E5E;">=</span> scaff</span>
+<span id="cb39-13">    row <span class="op" style="color: #5E5E5E;">=</span> [scaffolds_from_papers[k]]</span>
+<span id="cb39-14">    lrow <span class="op" style="color: #5E5E5E;">=</span> [k]</span>
+<span id="cb39-15">    top <span class="op" style="color: #5E5E5E;">=</span> counts.most_common(<span class="dv" style="color: #AD0000;">3</span>)</span>
+<span id="cb39-16">    <span class="cf" style="color: #003B4F;">for</span> smi,cnt <span class="kw" style="color: #003B4F;">in</span> top:</span>
+<span id="cb39-17">        row.append(scaffs[smi])</span>
+<span id="cb39-18">        lrow.append(<span class="bu" style="color: null;">str</span>(cnt))</span>
+<span id="cb39-19">    rows.extend(row)</span>
+<span id="cb39-20">    labels.extend(lrow)</span>
+<span id="cb39-21">Draw.MolsToGridImage(rows,</span>
+<span id="cb39-22">                     legends<span class="op" style="color: #5E5E5E;">=</span>labels,</span>
+<span id="cb39-23">                     molsPerRow<span class="op" style="color: #5E5E5E;">=</span><span class="dv" style="color: #AD0000;">4</span>,</span>
+<span id="cb39-24">                     subImgSize<span class="op" style="color: #5E5E5E;">=</span>(<span class="dv" style="color: #AD0000;">350</span>,<span class="dv" style="color: #AD0000;">300</span>))</span></code></pre></div>
+<div class="cell-output cell-output-display" data-execution_count="66">
+<p><img src="https://greglandrum.github.io/rdkit-blog/posts/2024-05-31-scaffold-splits-and-murcko-scaffolds1_files/figure-html/cell-25-output-1.png" class="img-fluid"></p>
+</div>
+</div>
+<p>Each row above has the hand-sketched scaffold in the first column and the three most common scaffolds along with their frequency in the remaining columns.</p>
+<p>You can see that, with the exception of the second row (assay CHEMBL859243), the scaffolds found by the Murcko decomposition do not track particularly well with the scaffold extracted from the paper.</p>
+
+
+</section>
+
+ ]]></description>
+  <category>machine learning</category>
+  <category>rants</category>
+  <category>reference</category>
+  <guid>https://greglandrum.github.io/rdkit-blog/posts/2024-05-31-scaffold-splits-and-murcko-scaffolds1.html</guid>
+  <pubDate>Thu, 30 May 2024 22:00:00 GMT</pubDate>
+  <media:content url="https://greglandrum.github.io/rdkit-blog/posts/images/blog/scaffold-splits-and-murcko-scaffolds-1.png" medium="image" type="image/png" height="126" width="144"/>
+</item>
 <item>
   <title>The impact of single-atom changes on similarity</title>
   <link>https://greglandrum.github.io/rdkit-blog/posts/2024-05-14-similarity-and-centrality.html</link>
@@ -4542,7 +5009,7 @@ Q 174.3 83.2, 175.8 83.2
 <p>These boxplots look at Cohen’s kappa (left plot) and AUROC (right plot) for classifiers built on the MDCK dataset. The left pair of bars in each plot show the distribution of values for 100 random splits, the right pair show distributions for 50 different 5-fold cross validations. The left bar in each pair has the results for XGB, the right bar for RF.</p>
 <div class="quarto-figure quarto-figure-center">
 <figure class="figure">
-<p><img src="https://greglandrum.github.io/rdkit-blog/posts/2023-08-13-xval-variability1_files/figure-html/ce232273-1-image-2.png" class="img-fluid figure-img"></p>
+<p><img src="https://greglandrum.github.io/rdkit-blog/posts/2023-08-13-xval-variability1_files/figure-html/8974546d-1-image-2.png" class="img-fluid figure-img"></p>
 <p></p><figcaption class="figure-caption">image-2.png</figcaption><p></p>
 </figure>
 </div>
@@ -5584,7 +6051,7 @@ AUC fraction&gt;0: 1.00</code></pre>
 <p>The TL;DR summary: if we’re careful about using as much metadata as possible to ascertain which assays can be combined, we get quite good agreement between Ki assays:</p>
 <div class="quarto-figure quarto-figure-center">
 <figure class="figure">
-<p><img src="https://greglandrum.github.io/rdkit-blog/posts/2023-06-17-overlapping-Ki-assays1_files/figure-html/5ec8a863-1-image.png" class="img-fluid figure-img"></p>
+<p><img src="https://greglandrum.github.io/rdkit-blog/posts/2023-06-17-overlapping-Ki-assays1_files/figure-html/2169bfd3-1-image.png" class="img-fluid figure-img"></p>
 <p></p><figcaption class="figure-caption">results summary</figcaption><p></p>
 </figure>
 </div>
@@ -10819,7 +11286,7 @@ CHEMBL1019596  CHEMBL828284    0.00 22</code></pre>
 <p>If I am careful about which xC50 assays I combine, making sure as much available metadata as possible matches, and then plot the pchembl values for duplicate compounds, I get the following:</p>
 <div class="quarto-figure quarto-figure-center">
 <figure class="figure">
-<p><img src="https://greglandrum.github.io/rdkit-blog/posts/2023-06-12-overlapping-ic50-assays1_files/figure-html/560adf2f-1-image-6.png" class="img-fluid figure-img"></p>
+<p><img src="https://greglandrum.github.io/rdkit-blog/posts/2023-06-12-overlapping-ic50-assays1_files/figure-html/76dd69e5-1-image-6.png" class="img-fluid figure-img"></p>
 <p></p><figcaption class="figure-caption">image-6.png</figcaption><p></p>
 </figure>
 </div>
@@ -10828,7 +11295,7 @@ CHEMBL1019596  CHEMBL828284    0.00 22</code></pre>
 <p>If I’m not careful at all, and just combine using the target ID and the type of the result (so that I’m not combining IC50 and EC50), I get the following (this time it’s a hexbin plot, because otherwise you can’t see anything):</p>
 <div class="quarto-figure quarto-figure-center">
 <figure class="figure">
-<p><img src="https://greglandrum.github.io/rdkit-blog/posts/2023-06-12-overlapping-ic50-assays1_files/figure-html/560adf2f-2-image-7.png" class="img-fluid figure-img"></p>
+<p><img src="https://greglandrum.github.io/rdkit-blog/posts/2023-06-12-overlapping-ic50-assays1_files/figure-html/76dd69e5-2-image-7.png" class="img-fluid figure-img"></p>
 <p></p><figcaption class="figure-caption">image-7.png</figcaption><p></p>
 </figure>
 </div>
@@ -37347,223 +37814,6 @@ Fraction with different classifications:
   <guid>https://greglandrum.github.io/rdkit-blog/posts/2023-05-26-drawing-options-explained.html</guid>
   <pubDate>Thu, 25 May 2023 22:00:00 GMT</pubDate>
   <media:content url="https://greglandrum.github.io/rdkit-blog/posts/images/blog/drawing-options-explained-1.png" medium="image" type="image/png" height="61" width="144"/>
-</item>
-<item>
-  <title>Understanding conformer generation failures</title>
-  <link>https://greglandrum.github.io/rdkit-blog/posts/2023-05-17-understanding-confgen-errors.html</link>
-  <description><![CDATA[ 
-
-
-
-<p>When the RDKit generates conformers for a molecule it performs a number of checks along the way to make sure that the atomic coordinates are reasonable/correct. When one of these checks fails, the current conformer is abandoned and the coordinate generation process starts from scratch. The maximum number of times this restart can happen is controlled by the <code>maxIterations</code> parameter: after <code>maxIterations</code> restarts the conformer generation fails. If you’ve called <code>EmbedMolecule()</code>, asking for a single conformer, you’ll get a conformation ID of -1 to mark this failure. If you’ve asked for multiple conformers, you won’t get as many as you requested.</p>
-<p>One of the changes for the 2023.03.1 release of the RDKit was the addition of an option to track which checks are failing during conformer generation. This can help understand what problems were encountered and to understand why conformer generation is not generating the expected results. Since, as is often the case, the RDKit’s capabilities are ahead of its documentation, this short blog post will explain how to use this functionality and interpret the results.</p>
-<p>A general overview of the conformer generation process can be found in <a href="https://www.rdkit.org/docs/RDKit_Book.html#introduction">the documentation</a>.</p>
-<div class="cell" data-execution_count="1">
-<div class="sourceCode cell-code" id="cb1" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb1-1"><span class="im" style="color: #00769E;">from</span> rdkit <span class="im" style="color: #00769E;">import</span> Chem</span>
-<span id="cb1-2"><span class="im" style="color: #00769E;">from</span> rdkit.Chem <span class="im" style="color: #00769E;">import</span> rdDistGeom</span>
-<span id="cb1-3"><span class="im" style="color: #00769E;">from</span> rdkit.Chem <span class="im" style="color: #00769E;">import</span> rdDepictor</span>
-<span id="cb1-4">rdDepictor.SetPreferCoordGen(<span class="va" style="color: #111111;">True</span>)</span>
-<span id="cb1-5"><span class="im" style="color: #00769E;">from</span> rdkit.Chem.Draw <span class="im" style="color: #00769E;">import</span> IPythonConsole</span>
-<span id="cb1-6">IPythonConsole.ipython_3d <span class="op" style="color: #5E5E5E;">=</span> <span class="va" style="color: #111111;">True</span></span>
-<span id="cb1-7"><span class="im" style="color: #00769E;">import</span> rdkit</span>
-<span id="cb1-8"><span class="bu" style="color: null;">print</span>(rdkit.__version__)</span></code></pre></div>
-<div class="cell-output cell-output-stdout">
-<pre><code>2023.03.1</code></pre>
-</div>
-</div>
-<p>Molecules containing chiral centers in bridged rings can cause problems, so let’s start with a norbornane derivative:</p>
-<div class="cell" data-execution_count="2">
-<div class="sourceCode cell-code" id="cb3" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb3-1">m <span class="op" style="color: #5E5E5E;">=</span> Chem.MolFromSmiles(<span class="st" style="color: #20794D;">'C1C[C@]2(F)CC[C@@]1(Cl)C2'</span>)</span>
-<span id="cb3-2">m</span></code></pre></div>
-<div class="cell-output cell-output-display" data-execution_count="2">
-<p><img src="https://greglandrum.github.io/rdkit-blog/posts/2023-05-17-understanding-confgen-errors_files/figure-html/cell-3-output-1.png" class="img-fluid"></p>
-</div>
-</div>
-<div class="cell" data-execution_count="3">
-<div class="sourceCode cell-code" id="cb4" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb4-1">mh <span class="op" style="color: #5E5E5E;">=</span> Chem.AddHs(m)</span>
-<span id="cb4-2">ps <span class="op" style="color: #5E5E5E;">=</span> rdDistGeom.ETKDGv3()</span>
-<span id="cb4-3">ps.randomSeed <span class="op" style="color: #5E5E5E;">=</span> <span class="bn" style="color: #AD0000;">0xf00d</span></span>
-<span id="cb4-4">rdDistGeom.EmbedMolecule(mh,ps)</span></code></pre></div>
-<div class="cell-output cell-output-display" data-execution_count="3">
-<pre><code>0</code></pre>
-</div>
-</div>
-<div class="cell" data-execution_count="4">
-<div class="sourceCode cell-code" id="cb6" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb6-1">mh</span></code></pre></div>
-<div class="cell-output cell-output-display">
-<div id="3dmolviewer_16842980760963316" style="position: relative; width: 400px; height: 400px">
-        <p id="3dmolwarning_16842980760963316" style="background-color:#ffcccc;color:black">You appear to be running in JupyterLab (or JavaScript failed to load for some other reason).  You need to install the 3dmol extension: <br>
-        <tt>jupyter labextension install jupyterlab_3dmol</tt></p>
-        </div>
-<script>
-
-var loadScriptAsync = function(uri){
-  return new Promise((resolve, reject) => {
-    //this is to ignore the existence of requirejs amd
-    var savedexports, savedmodule;
-    if (typeof exports !== 'undefined') savedexports = exports;
-    else exports = {}
-    if (typeof module !== 'undefined') savedmodule = module;
-    else module = {}
-
-    var tag = document.createElement('script');
-    tag.src = uri;
-    tag.async = true;
-    tag.onload = () => {
-        exports = savedexports;
-        module = savedmodule;
-        resolve();
-    };
-  var firstScriptTag = document.getElementsByTagName('script')[0];
-  firstScriptTag.parentNode.insertBefore(tag, firstScriptTag);
-});
-};
-
-if(typeof $3Dmolpromise === 'undefined') {
-$3Dmolpromise = null;
-  $3Dmolpromise = loadScriptAsync('https://cdnjs.cloudflare.com/ajax/libs/3Dmol/2.0.1/3Dmol-min.js');
-}
-
-var viewer_16842980760963316 = null;
-var warn = document.getElementById("3dmolwarning_16842980760963316");
-if(warn) {
-    warn.parentNode.removeChild(warn);
-}
-$3Dmolpromise.then(function() {
-viewer_16842980760963316 = $3Dmol.createViewer(document.getElementById("3dmolviewer_16842980760963316"),{backgroundColor:"white"});
-viewer_16842980760963316.zoomTo();
-    viewer_16842980760963316.removeAllModels();
-    viewer_16842980760963316.addModel("\n     RDKit          3D\n\n 19 20  0  0  0  0  0  0  0  0999 V2000\n    0.3977   -1.1048    0.9092 C   0  0  0  0  0  0  0  0  0  0  0  0\n    0.1714    0.2776    1.5310 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -0.0342    1.1541    0.3112 C   0  0  2  0  0  0  0  0  0  0  0  0\n    0.0592    2.4675    0.5313 F   0  0  0  0  0  0  0  0  0  0  0  0\n   -1.2277    0.6891   -0.4645 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -0.8251   -0.6288   -1.1377 C   0  0  0  0  0  0  0  0  0  0  0  0\n    0.5690   -0.8512   -0.5607 C   0  0  2  0  0  0  0  0  0  0  0  0\n    1.5427   -1.9684   -1.4195 Cl  0  0  0  0  0  0  0  0  0  0  0  0\n    1.0913    0.5941   -0.5783 C   0  0  0  0  0  0  0  0  0  0  0  0\n    1.2313   -1.6370    1.3677 H   0  0  0  0  0  0  0  0  0  0  0  0\n   -0.5685   -1.6584    1.1003 H   0  0  0  0  0  0  0  0  0  0  0  0\n   -0.6850    0.3071    2.1972 H   0  0  0  0  0  0  0  0  0  0  0  0\n    1.1088    0.5448    2.0466 H   0  0  0  0  0  0  0  0  0  0  0  0\n   -1.3738    1.4261   -1.3041 H   0  0  0  0  0  0  0  0  0  0  0  0\n   -2.1414    0.5927    0.1213 H   0  0  0  0  0  0  0  0  0  0  0  0\n   -1.5380   -1.3969   -0.7508 H   0  0  0  0  0  0  0  0  0  0  0  0\n   -0.8182   -0.5556   -2.2247 H   0  0  0  0  0  0  0  0  0  0  0  0\n    0.9726    1.0587   -1.5612 H   0  0  0  0  0  0  0  0  0  0  0  0\n    2.0679    0.6892   -0.1143 H   0  0  0  0  0  0  0  0  0  0  0  0\n  1  2  1  0\n  2  3  1  0\n  3  4  1  1\n  3  5  1  0\n  5  6  1  0\n  6  7  1  0\n  7  8  1  6\n  7  9  1  0\n  7  1  1  0\n  9  3  1  0\n  1 10  1  0\n  1 11  1  0\n  2 12  1  0\n  2 13  1  0\n  5 14  1  0\n  5 15  1  0\n  6 16  1  0\n  6 17  1  0\n  9 18  1  0\n  9 19  1  0\nM  END\n","sdf");
-    viewer_16842980760963316.setStyle({"stick": {}});
-    viewer_16842980760963316.setBackgroundColor("0xeeeeee");
-    viewer_16842980760963316.zoomTo();
-viewer_16842980760963316.render();
-});
-</script>
-</div>
-<div class="cell-output cell-output-display" data-execution_count="4">
-
-</div>
-</div>
-<p>Now invert one of the stereocenters to create the stereoisomer which can’t actually exist as a stable structure. Imagine inverting one of the chiral centers in the above molecule and you will see the problem: we’d have to point the attached halogen into the center of the cage.</p>
-<div class="cell" data-execution_count="5">
-<div class="sourceCode cell-code" id="cb7" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb7-1">bad_m <span class="op" style="color: #5E5E5E;">=</span> Chem.MolFromSmiles(<span class="st" style="color: #20794D;">'C1C[C@]2(F)CC[C@]1(Cl)C2'</span>)</span>
-<span id="cb7-2">bad_m</span></code></pre></div>
-<div class="cell-output cell-output-display" data-execution_count="5">
-<p><img src="https://greglandrum.github.io/rdkit-blog/posts/2023-05-17-understanding-confgen-errors_files/figure-html/cell-6-output-1.png" class="img-fluid"></p>
-</div>
-</div>
-<p>Try creating a conformer for that:</p>
-<div class="cell" data-execution_count="6">
-<div class="sourceCode cell-code" id="cb8" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb8-1">bad_mh <span class="op" style="color: #5E5E5E;">=</span> Chem.AddHs(bad_m)</span>
-<span id="cb8-2">ps <span class="op" style="color: #5E5E5E;">=</span> rdDistGeom.ETKDGv3()</span>
-<span id="cb8-3">ps.randomSeed <span class="op" style="color: #5E5E5E;">=</span> <span class="bn" style="color: #AD0000;">0xf00d</span></span>
-<span id="cb8-4">rdDistGeom.EmbedMolecule(bad_mh,ps)</span></code></pre></div>
-<div class="cell-output cell-output-display" data-execution_count="6">
-<pre><code>-1</code></pre>
-</div>
-</div>
-<p>The new functionality allows us to keep track of why the embedding failed:</p>
-<div class="cell" data-execution_count="7">
-<div class="sourceCode cell-code" id="cb10" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb10-1">ps.trackFailures <span class="op" style="color: #5E5E5E;">=</span> <span class="va" style="color: #111111;">True</span></span>
-<span id="cb10-2"><span class="bu" style="color: null;">print</span>(rdDistGeom.EmbedMolecule(bad_mh,ps))</span>
-<span id="cb10-3">counts <span class="op" style="color: #5E5E5E;">=</span> ps.GetFailureCounts()</span>
-<span id="cb10-4">counts</span></code></pre></div>
-<div class="cell-output cell-output-stdout">
-<pre><code>-1</code></pre>
-</div>
-<div class="cell-output cell-output-display" data-execution_count="7">
-<pre><code>(7, 11, 30, 0, 0, 0, 142, 0, 0, 0)</code></pre>
-</div>
-</div>
-<p>Here’s a quick loop over all the failure causes to see where the problems were:</p>
-<div class="cell" data-execution_count="8">
-<div class="sourceCode cell-code" id="cb13" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb13-1"><span class="kw" style="color: #003B4F;">def</span> print_failure_causes(counts):</span>
-<span id="cb13-2">    <span class="cf" style="color: #003B4F;">for</span> i,k <span class="kw" style="color: #003B4F;">in</span> <span class="bu" style="color: null;">enumerate</span>(rdDistGeom.EmbedFailureCauses.names):</span>
-<span id="cb13-3">        <span class="bu" style="color: null;">print</span>(k,counts[i])</span>
-<span id="cb13-4">    <span class="co" style="color: #5E5E5E;"># in v2022.03.1 two names are missing from `rdDistGeom.EmbedFailureCauses`:</span></span>
-<span id="cb13-5">    <span class="bu" style="color: null;">print</span>(<span class="st" style="color: #20794D;">'LINEAR_DOUBLE_BOND'</span>,counts[i<span class="op" style="color: #5E5E5E;">+</span><span class="dv" style="color: #AD0000;">1</span>])</span>
-<span id="cb13-6">    <span class="bu" style="color: null;">print</span>(<span class="st" style="color: #20794D;">'BAD_DOUBLE_BOND_STEREO'</span>,counts[i<span class="op" style="color: #5E5E5E;">+</span><span class="dv" style="color: #AD0000;">2</span>])    </span></code></pre></div>
-</div>
-<div class="cell" data-execution_count="9">
-<div class="sourceCode cell-code" id="cb14" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb14-1">print_failure_causes(counts)</span></code></pre></div>
-<div class="cell-output cell-output-stdout">
-<pre><code>INITIAL_COORDS 7
-FIRST_MINIMIZATION 11
-CHECK_TETRAHEDRAL_CENTERS 30
-CHECK_CHIRAL_CENTERS 0
-MINIMIZE_FOURTH_DIMENSION 0
-ETK_MINIMIZATION 0
-FINAL_CHIRAL_BOUNDS 142
-FINAL_CENTER_IN_VOLUME 0
-LINEAR_DOUBLE_BOND 0
-BAD_DOUBLE_BOND_STEREO 0</code></pre>
-</div>
-</div>
-<p>Here’s what the individual failures mean:</p>
-<ul>
-<li><code>INITIAL_COORDS</code>: generation of the initial coordinates from the random distance matrix (default) or from a set of random coordinates (when using random coordinate embedding) failed.</li>
-<li><code>FIRST_MINIMIZATION</code>: the initial optimization of the atom positions using the distance-geometry force field failed to produce a low-enough energy conformer. The check here has thresholds for both average energy per atom and the individual atom energies. I’m not providing the threshold values here since the energies from the distance-geometry force field are not physically meaningful - the threshold values are not interpretable.</li>
-<li><code>CHECK_TETRAHEDRAL_CENTERS</code>: at least one tetrahedral C and N centers either has a volume around it which is too small or is outside the volume defined by its neighbors</li>
-<li><code>MINIMIZE_FOURTH_DIMENSION</code>: the minmization to force the values of the fourth-dimensional component of each atom position failed</li>
-<li><code>ETK_MINIMIZATION</code>: after the minimization with the ET and/or K terms, at least one atom which should have been planar was not</li>
-<li><code>FINAL_CHIRAL_BOUNDS</code>: the neighborhood of an atom with specified chirality was too distorted (it violated distance constraints)</li>
-<li><code>FINAL_CENTER_IN_VOLUME</code>: an atom with specified chirality was outside of the volume defined by its neighbors</li>
-<li><code>LINEAR_DOUBLE_BOND</code>: one of the end atoms of a double bond had a linear geometry</li>
-<li><code>BAD_DOUBLE_BOND_STEREO</code>: the stereochemistry of a double bond with specified stereochemistry was wrong in the generated conformer</li>
-</ul>
-<p>Just for comparison, the starting molecule had no failures:</p>
-<div class="cell" data-execution_count="10">
-<div class="sourceCode cell-code" id="cb16" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb16-1">ps.trackFailures <span class="op" style="color: #5E5E5E;">=</span> <span class="va" style="color: #111111;">True</span></span>
-<span id="cb16-2"><span class="bu" style="color: null;">print</span>(rdDistGeom.EmbedMolecule(mh,ps))</span>
-<span id="cb16-3">counts <span class="op" style="color: #5E5E5E;">=</span> ps.GetFailureCounts()</span>
-<span id="cb16-4">counts</span></code></pre></div>
-<div class="cell-output cell-output-stdout">
-<pre><code>0</code></pre>
-</div>
-<div class="cell-output cell-output-display" data-execution_count="10">
-<pre><code>(0, 0, 0, 0, 0, 0, 0, 0, 0, 0)</code></pre>
-</div>
-</div>
-<p>Let’s try a more complicated molecule from ChEMBL; specified bond stereochemistry in macrocycles can also make conformer generation challenging.</p>
-<div class="cell" data-execution_count="11">
-<div class="sourceCode cell-code" id="cb19" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb19-1">m <span class="op" style="color: #5E5E5E;">=</span> Chem.MolFromSmiles(<span class="vs" style="color: #20794D;">r'COc1cc(O)c2CSC[C@H](\N=C(/S)\CCC[C@@H](CO)OC(=O)c2c1C)c3onc(C)n3'</span>)</span>
-<span id="cb19-2">m</span></code></pre></div>
-<div class="cell-output cell-output-display" data-execution_count="11">
-<p><img src="https://greglandrum.github.io/rdkit-blog/posts/2023-05-17-understanding-confgen-errors_files/figure-html/cell-12-output-1.png" class="img-fluid"></p>
-</div>
-</div>
-<div class="cell" data-scrolled="true" data-execution_count="12">
-<div class="sourceCode cell-code" id="cb20" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb20-1">mh <span class="op" style="color: #5E5E5E;">=</span> Chem.AddHs(m)</span>
-<span id="cb20-2">ps <span class="op" style="color: #5E5E5E;">=</span> rdDistGeom.ETKDGv3()</span>
-<span id="cb20-3">ps.randomSeed <span class="op" style="color: #5E5E5E;">=</span> <span class="bn" style="color: #AD0000;">0xbadd06</span></span>
-<span id="cb20-4">ps.trackFailures <span class="op" style="color: #5E5E5E;">=</span> <span class="va" style="color: #111111;">True</span></span>
-<span id="cb20-5"><span class="bu" style="color: null;">print</span>(rdDistGeom.EmbedMolecule(mh,ps))</span>
-<span id="cb20-6">print_failure_causes(ps.GetFailureCounts())</span></code></pre></div>
-<div class="cell-output cell-output-stdout">
-<pre><code>0
-INITIAL_COORDS 2
-FIRST_MINIMIZATION 0
-CHECK_TETRAHEDRAL_CENTERS 0
-CHECK_CHIRAL_CENTERS 0
-MINIMIZE_FOURTH_DIMENSION 0
-ETK_MINIMIZATION 0
-FINAL_CHIRAL_BOUNDS 0
-FINAL_CENTER_IN_VOLUME 0
-LINEAR_DOUBLE_BOND 3
-BAD_DOUBLE_BOND_STEREO 4</code></pre>
-</div>
-</div>
-<p>Here we did get a conformer, but there were some rejected conformers along the way. The double-bond-related failures indicate that the code had some problems with the ring double bond with specified stereochemistry.</p>
-
-
-
- ]]></description>
-  <category>3d</category>
-  <category>documentation</category>
-  <guid>https://greglandrum.github.io/rdkit-blog/posts/2023-05-17-understanding-confgen-errors.html</guid>
-  <pubDate>Tue, 16 May 2023 22:00:00 GMT</pubDate>
-  <media:content url="https://greglandrum.github.io/rdkit-blog/posts/images/blog/understanding_confgen_errors1.png" medium="image" type="image/png" height="138" width="144"/>
 </item>
 </channel>
 </rss>

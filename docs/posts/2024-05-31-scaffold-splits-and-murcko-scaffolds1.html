@@ -1,0 +1,941 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en"><head>
+
+<meta charset="utf-8">
+<meta name="generator" content="quarto-1.2.269">
+
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+
+<meta name="dcterms.date" content="2024-05-31">
+<meta name="description" content="I get a bit ranty… again.">
+
+<title>RDKit blog - The problem(s) with scaffold splits, part 1</title>
+<style>
+code{white-space: pre-wrap;}
+span.smallcaps{font-variant: small-caps;}
+div.columns{display: flex; gap: min(4vw, 1.5em);}
+div.column{flex: auto; overflow-x: auto;}
+div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+ul.task-list{list-style: none;}
+ul.task-list li input[type="checkbox"] {
+  width: 0.8em;
+  margin: 0 0.8em 0.2em -1.6em;
+  vertical-align: middle;
+}
+pre > code.sourceCode { white-space: pre; position: relative; }
+pre > code.sourceCode > span { display: inline-block; line-height: 1.25; }
+pre > code.sourceCode > span:empty { height: 1.2em; }
+.sourceCode { overflow: visible; }
+code.sourceCode > span { color: inherit; text-decoration: inherit; }
+div.sourceCode { margin: 1em 0; }
+pre.sourceCode { margin: 0; }
+@media screen {
+div.sourceCode { overflow: auto; }
+}
+@media print {
+pre > code.sourceCode { white-space: pre-wrap; }
+pre > code.sourceCode > span { text-indent: -5em; padding-left: 5em; }
+}
+pre.numberSource code
+  { counter-reset: source-line 0; }
+pre.numberSource code > span
+  { position: relative; left: -4em; counter-increment: source-line; }
+pre.numberSource code > span > a:first-child::before
+  { content: counter(source-line);
+    position: relative; left: -1em; text-align: right; vertical-align: baseline;
+    border: none; display: inline-block;
+    -webkit-touch-callout: none; -webkit-user-select: none;
+    -khtml-user-select: none; -moz-user-select: none;
+    -ms-user-select: none; user-select: none;
+    padding: 0 4px; width: 4em;
+    color: #aaaaaa;
+  }
+pre.numberSource { margin-left: 3em; border-left: 1px solid #aaaaaa;  padding-left: 4px; }
+div.sourceCode
+  {   }
+@media screen {
+pre > code.sourceCode > span > a:first-child::before { text-decoration: underline; }
+}
+code span.al { color: #ff0000; font-weight: bold; } /* Alert */
+code span.an { color: #60a0b0; font-weight: bold; font-style: italic; } /* Annotation */
+code span.at { color: #7d9029; } /* Attribute */
+code span.bn { color: #40a070; } /* BaseN */
+code span.bu { color: #008000; } /* BuiltIn */
+code span.cf { color: #007020; font-weight: bold; } /* ControlFlow */
+code span.ch { color: #4070a0; } /* Char */
+code span.cn { color: #880000; } /* Constant */
+code span.co { color: #60a0b0; font-style: italic; } /* Comment */
+code span.cv { color: #60a0b0; font-weight: bold; font-style: italic; } /* CommentVar */
+code span.do { color: #ba2121; font-style: italic; } /* Documentation */
+code span.dt { color: #902000; } /* DataType */
+code span.dv { color: #40a070; } /* DecVal */
+code span.er { color: #ff0000; font-weight: bold; } /* Error */
+code span.ex { } /* Extension */
+code span.fl { color: #40a070; } /* Float */
+code span.fu { color: #06287e; } /* Function */
+code span.im { color: #008000; font-weight: bold; } /* Import */
+code span.in { color: #60a0b0; font-weight: bold; font-style: italic; } /* Information */
+code span.kw { color: #007020; font-weight: bold; } /* Keyword */
+code span.op { color: #666666; } /* Operator */
+code span.ot { color: #007020; } /* Other */
+code span.pp { color: #bc7a00; } /* Preprocessor */
+code span.sc { color: #4070a0; } /* SpecialChar */
+code span.ss { color: #bb6688; } /* SpecialString */
+code span.st { color: #4070a0; } /* String */
+code span.va { color: #19177c; } /* Variable */
+code span.vs { color: #4070a0; } /* VerbatimString */
+code span.wa { color: #60a0b0; font-weight: bold; font-style: italic; } /* Warning */
+</style>
+
+
+<script src="../site_libs/quarto-nav/quarto-nav.js"></script>
+<script src="../site_libs/quarto-nav/headroom.min.js"></script>
+<script src="../site_libs/clipboard/clipboard.min.js"></script>
+<script src="../site_libs/quarto-search/autocomplete.umd.js"></script>
+<script src="../site_libs/quarto-search/fuse.min.js"></script>
+<script src="../site_libs/quarto-search/quarto-search.js"></script>
+<meta name="quarto:offset" content="../">
+<link href="../posts/icons/favicon.ico" rel="icon">
+<script src="../site_libs/quarto-html/quarto.js"></script>
+<script src="../site_libs/quarto-html/popper.min.js"></script>
+<script src="../site_libs/quarto-html/tippy.umd.min.js"></script>
+<script src="../site_libs/quarto-html/anchor.min.js"></script>
+<link href="../site_libs/quarto-html/tippy.css" rel="stylesheet">
+<link href="../site_libs/quarto-html/quarto-syntax-highlighting.css" rel="stylesheet" class="quarto-color-scheme" id="quarto-text-highlighting-styles">
+<link href="../site_libs/quarto-html/quarto-syntax-highlighting-dark.css" rel="prefetch" class="quarto-color-scheme quarto-color-alternate" id="quarto-text-highlighting-styles">
+<script src="../site_libs/bootstrap/bootstrap.min.js"></script>
+<link href="../site_libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
+<link href="../site_libs/bootstrap/bootstrap.min.css" rel="stylesheet" class="quarto-color-scheme" id="quarto-bootstrap" data-mode="light">
+<link href="../site_libs/bootstrap/bootstrap-dark.min.css" rel="prefetch" class="quarto-color-scheme quarto-color-alternate" id="quarto-bootstrap" data-mode="dark">
+<script id="quarto-search-options" type="application/json">{
+  "location": "navbar",
+  "copy-button": false,
+  "collapse-after": 3,
+  "panel-placement": "end",
+  "type": "overlay",
+  "limit": 20,
+  "language": {
+    "search-no-results-text": "No results",
+    "search-matching-documents-text": "matching documents",
+    "search-copy-link-title": "Copy link to search",
+    "search-hide-matches-text": "Hide additional matches",
+    "search-more-match-text": "more match in this document",
+    "search-more-matches-text": "more matches in this document",
+    "search-clear-button-title": "Clear",
+    "search-detached-cancel-button-title": "Cancel",
+    "search-submit-button-title": "Submit"
+  }
+}</script>
+
+
+<link rel="stylesheet" href="../styles.css">
+</head>
+
+<body class="nav-fixed">
+
+<div id="quarto-search-results"></div>
+  <header id="quarto-header" class="headroom fixed-top">
+    <nav class="navbar navbar-expand-lg navbar-dark ">
+      <div class="navbar-container container-fluid">
+      <div class="navbar-brand-container">
+    <a class="navbar-brand" href="../index.html">
+    <span class="navbar-title">RDKit blog</span>
+    </a>
+  </div>
+          <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarCollapse" aria-controls="navbarCollapse" aria-expanded="false" aria-label="Toggle navigation" onclick="if (window.quartoToggleHeadroom) { window.quartoToggleHeadroom(); }">
+  <span class="navbar-toggler-icon"></span>
+</button>
+          <div class="collapse navbar-collapse" id="navbarCollapse">
+            <ul class="navbar-nav navbar-nav-scroll ms-auto">
+  <li class="nav-item">
+    <a class="nav-link" href="../about.html">
+ <span class="menu-text">RDKit experiments, tips, and tutorials</span></a>
+  </li>  
+  <li class="nav-item compact">
+    <a class="nav-link" href="https://github.com/rdkit/rdkit"><i class="bi bi-github" role="img">
+</i> 
+ <span class="menu-text"></span></a>
+  </li>  
+  <li class="nav-item compact">
+    <a class="nav-link" href="https://twitter.com/rdkit_org"><i class="bi bi-twitter" role="img">
+</i> 
+ <span class="menu-text"></span></a>
+  </li>  
+  <li class="nav-item compact">
+    <a class="nav-link" href="../index.xml"><i class="bi bi-rss" role="img">
+</i> 
+ <span class="menu-text"></span></a>
+  </li>  
+</ul>
+              <div class="quarto-toggle-container">
+                  <a href="" class="quarto-color-scheme-toggle nav-link" onclick="window.quartoToggleColorScheme(); return false;" title="Toggle dark mode"><i class="bi"></i></a>
+              </div>
+              <div id="quarto-search" class="" title="Search"></div>
+          </div> <!-- /navcollapse -->
+      </div> <!-- /container-fluid -->
+    </nav>
+</header>
+<!-- content -->
+<div id="quarto-content" class="quarto-container page-columns page-rows-contents page-layout-article page-navbar">
+<!-- sidebar -->
+<!-- margin-sidebar -->
+    <div id="quarto-margin-sidebar" class="sidebar margin-sidebar">
+        <nav id="TOC" role="doc-toc" class="toc-active">
+    <h2 id="toc-title">On this page</h2>
+   
+  <ul>
+  <li><a href="#introduction" id="toc-introduction" class="nav-link active" data-scroll-target="#introduction">Introduction</a>
+  <ul class="collapse">
+  <li><a href="#tldr" id="toc-tldr" class="nav-link" data-scroll-target="#tldr">TL;DR</a></li>
+  </ul></li>
+  <li><a href="#grabbing-the-data-from-chembl" id="toc-grabbing-the-data-from-chembl" class="nav-link" data-scroll-target="#grabbing-the-data-from-chembl">Grabbing the data from ChEMBL</a></li>
+  <li><a href="#looking-at-some-of-example-results" id="toc-looking-at-some-of-example-results" class="nav-link" data-scroll-target="#looking-at-some-of-example-results">Looking at some of example results</a></li>
+  <li><a href="#number-of-scaffolds-per-assay" id="toc-number-of-scaffolds-per-assay" class="nav-link" data-scroll-target="#number-of-scaffolds-per-assay">Number of scaffolds per assay</a></li>
+  <li><a href="#manually-extracted-scaffolds" id="toc-manually-extracted-scaffolds" class="nav-link" data-scroll-target="#manually-extracted-scaffolds">Manually extracted scaffolds</a></li>
+  </ul>
+</nav>
+    </div>
+<!-- main -->
+<main class="content" id="quarto-document-content">
+
+<header id="title-block-header" class="quarto-title-block default">
+<div class="quarto-title">
+<h1 class="title">The problem(s) with scaffold splits, part 1</h1>
+  <div class="quarto-categories">
+    <div class="quarto-category">machine learning</div>
+    <div class="quarto-category">rants</div>
+    <div class="quarto-category">reference</div>
+  </div>
+  </div>
+
+<div>
+  <div class="description">
+    I get a bit ranty… again.
+  </div>
+</div>
+
+
+<div class="quarto-title-meta">
+
+    
+    <div>
+    <div class="quarto-title-meta-heading">Published</div>
+    <div class="quarto-title-meta-contents">
+      <p class="date">May 31, 2024</p>
+    </div>
+  </div>
+  
+    
+  </div>
+  
+
+</header>
+
+<section id="introduction" class="level1">
+<h1>Introduction</h1>
+<p>An unfortunately popular strategy for validating machine-learning models is to do a “scaffold split” of the data. The idea is behind the scaffold split is to identify chemical series/scaffolds in the data set and to move all molecules sharing one or more scaffolds to the test set. The intent here is to see how well a model performs on regions of chemical space which are different from those it was trained on. Scaffold splitting is one of a variety of validation methods proposed to provide a more “realistic” assessment of model performance than random (or bootstrap) splits do. This seems, in principle, like a great idea, particularly for models intended for lead-finding or lead-optimization, where one typically has data for a number of scaffolds which, hopefully, are active (or inactive) for similar reasons. Scaffold splitting, with good scaffold definitions, can also be quite useful in identify systematic problems in global models, like those used for ADME or safety endpoints.</p>
+<p>The problem with doing a realistic scaffold split is that the definition of “scaffold” is specific to the particular data set (or project). A 2020 paper by Franziska Kruger and a couple of former colleagues at Novartis looked at the challenges here and published a tool which provides suggestions for what the chemical series might be in a particular data set: https://doi.org/10.1021/acs.jcim.0c00204. As an aside, a followup paper by Maximilian Beckers and the same two former colleagues applied this series-finding approach to an interesting historical analysis of med-chem project data: https://doi.org/10.1021/acs.jcim.2c00785</p>
+<p>Given that Franziska’s method is time-consuming and cannot be fully automated, the standard approach in the literature for doing a scaffold split is to use Bemis-Murcko scaffolds, commonly just called “Murcko scaffolds” (https://doi.org/10.1021/jm9602928). Briefly, the algorithm behind these scaffolds is to iteratively remove all degree-one atoms from a molecule, leaving the “central” set of rings and the atoms which connect them.</p>
+<blockquote class="blockquote">
+<p>Aside: The RDKit implementation of “Murcko scaffolds” uses a slight variation of the original algorithm. Degree-one atoms with double bonds to atoms in the scaffold are also preserved. The logic behind this variation is that these atoms have a very strong impact on the shape and properties of the scaffold, so they should be part of the scaffold.</p>
+</blockquote>
+<p>I think that doing a Murcko decomposition is a useful exercise for organizing a collection of molecules, particularly as part of either a scaffold network analysis or the type of scaffold-finding algorithm in Franziska’s paper, but that it is poorly suited for use in either actually identifying the type of scaffold that medicinal chemists use to organize and reason about their data or for splitting data sets for validating machine learning models.</p>
+<p>This was turning into a mega-post, so I’m going to split it into two. In this first one I will look of the number of “Murcko scaffolds” found in medicinal chemistry papers. This is done by looking at the compounds tested in ChEMBL33 Ki assays with between 20 and 100 unique compounds which came from a document with a DOI. I’d expect a typical med chem assay (these come from a single paper) to have compounds for a small number of chemical series along with a few reference compounds from the literature. And then in a second post, coming later, I will do an analysis of the similarity characteristics of leave-scaffold-out splits for a random selection of the Ki assays mentioned above using the modified spatial statistics we used in the SIMPD paper (https://doi.org/10.1186/s13321-023-00787-9).</p>
+<section id="tldr" class="level2">
+<h2 class="anchored" data-anchor-id="tldr">TL;DR</h2>
+<p>Looking across 7148 Ki assays, the median number of scaffolds per assay is 12. The median ratio of the number of scaffolds to the number of compounds in an assay is 0.4; the number of scaffolds is 40% of the number of compounds tested in an assay (= the compounds from a single med chem paper). This doesn’t match my expectations at all, nor does it match what is actually observed in the five random papers I selected to spot check.</p>
+<blockquote class="blockquote">
+<p>Final Note: The analysis in this post is focused on the type of data sets that commonly show up during lead finding or lead optimization. A Murcko scaffold analysis likely to be less wrong when partitioning datasets of diverse compounds that don’t contain SAR series. Of course, in these cases a standard neighbor split works just as well.</p>
+</blockquote>
+<div class="cell" data-executetime="{&quot;end_time&quot;:&quot;2024-05-31T08:44:09.599524Z&quot;,&quot;start_time&quot;:&quot;2024-05-31T08:44:09.595151Z&quot;}" data-execution_count="23">
+<div class="sourceCode cell-code" id="cb1"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> numpy <span class="im">as</span> np</span>
+<span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-3"><a href="#cb1-3" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> rdkit <span class="im">import</span> Chem</span>
+<span id="cb1-4"><a href="#cb1-4" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> rdkit.Chem.Draw <span class="im">import</span> IPythonConsole</span>
+<span id="cb1-5"><a href="#cb1-5" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> rdkit.Chem <span class="im">import</span> Draw</span>
+<span id="cb1-6"><a href="#cb1-6" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> rdkit.Chem <span class="im">import</span> rdFMCS</span>
+<span id="cb1-7"><a href="#cb1-7" aria-hidden="true" tabindex="-1"></a>Draw.SetComicMode(IPythonConsole.drawOptions)</span>
+<span id="cb1-8"><a href="#cb1-8" aria-hidden="true" tabindex="-1"></a><span class="op">%</span>load_ext sql</span>
+<span id="cb1-9"><a href="#cb1-9" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-10"><a href="#cb1-10" aria-hidden="true" tabindex="-1"></a><span class="op">%</span>matplotlib inline</span>
+<span id="cb1-11"><a href="#cb1-11" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> matplotlib.pyplot <span class="im">as</span> plt</span>
+<span id="cb1-12"><a href="#cb1-12" aria-hidden="true" tabindex="-1"></a>plt.style.use(<span class="st">'tableau-colorblind10'</span>)</span>
+<span id="cb1-13"><a href="#cb1-13" aria-hidden="true" tabindex="-1"></a>plt.rcParams[<span class="st">'font.size'</span>] <span class="op">=</span> <span class="st">'16'</span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>The sql extension is already loaded. To reload it, use:
+  %reload_ext sql</code></pre>
+</div>
+</div>
+</section>
+</section>
+<section id="grabbing-the-data-from-chembl" class="level1">
+<h1>Grabbing the data from ChEMBL</h1>
+<p>We pull all the compounds for each of the Ki assays in ChEMBL33 that are taken from a document with a DOI and a publication year. Then we keep the assays containing between 20 and 100 compounds - the idea of the upper limit here is to try and limit ourselves to the primary literature,</p>
+<div class="cell" data-executetime="{&quot;end_time&quot;:&quot;2024-04-20T04:16:46.214901Z&quot;,&quot;start_time&quot;:&quot;2024-04-20T04:16:43.237443Z&quot;}" data-execution_count="2">
+<div class="sourceCode cell-code" id="cb3"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a><span class="op">%</span>sql postgresql:<span class="op">//</span>glandrum<span class="op">@</span>stoat<span class="op">/</span>chembl_33 <span class="op">\</span></span>
+<span id="cb3-2"><a href="#cb3-2" aria-hidden="true" tabindex="-1"></a>  drop table <span class="cf">if</span> exists assay_counts</span>
+<span id="cb3-3"><a href="#cb3-3" aria-hidden="true" tabindex="-1"></a>    </span>
+<span id="cb3-4"><a href="#cb3-4" aria-hidden="true" tabindex="-1"></a><span class="op">%</span>sql postgresql:<span class="op">//</span>glandrum<span class="op">@</span>stoat<span class="op">/</span>chembl_33 <span class="op">\</span></span>
+<span id="cb3-5"><a href="#cb3-5" aria-hidden="true" tabindex="-1"></a>  select assays.chembl_id,assay_id,count(distinct molregno) cnt into temporary table assay_counts <span class="op">\</span></span>
+<span id="cb3-6"><a href="#cb3-6" aria-hidden="true" tabindex="-1"></a>      <span class="im">from</span> assays join activities using (assay_id) <span class="op">\</span></span>
+<span id="cb3-7"><a href="#cb3-7" aria-hidden="true" tabindex="-1"></a>                  join docs on (assays.doc_id <span class="op">=</span> docs.doc_id) <span class="op">\</span></span>
+<span id="cb3-8"><a href="#cb3-8" aria-hidden="true" tabindex="-1"></a>      where standard_type<span class="op">=</span><span class="st">'Ki'</span> <span class="kw">and</span> <span class="op">\</span></span>
+<span id="cb3-9"><a href="#cb3-9" aria-hidden="true" tabindex="-1"></a>      assays.doc_id <span class="kw">is</span> <span class="kw">not</span> null <span class="kw">and</span> doi <span class="kw">is</span> <span class="kw">not</span> null <span class="kw">and</span> year <span class="kw">is</span> <span class="kw">not</span> null<span class="op">\</span></span>
+<span id="cb3-10"><a href="#cb3-10" aria-hidden="true" tabindex="-1"></a>      group by (assays.chembl_id,assay_id)<span class="op">;</span></span>
+<span id="cb3-11"><a href="#cb3-11" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb3-12"><a href="#cb3-12" aria-hidden="true" tabindex="-1"></a>aids <span class="op">=</span> <span class="op">%</span>sql postgresql:<span class="op">//</span>glandrum<span class="op">@</span>stoat<span class="op">/</span>chembl_33 <span class="op">\</span></span>
+<span id="cb3-13"><a href="#cb3-13" aria-hidden="true" tabindex="-1"></a>    select <span class="op">*</span> <span class="im">from</span> assay_counts where cnt<span class="op">&gt;</span><span class="dv">20</span> <span class="kw">and</span> cnt<span class="op">&lt;</span><span class="dv">100</span><span class="op">;</span></span>
+<span id="cb3-14"><a href="#cb3-14" aria-hidden="true" tabindex="-1"></a><span class="bu">len</span>(aids)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>Done.
+53801 rows affected.
+7148 rows affected.</code></pre>
+</div>
+<div class="cell-output cell-output-display" data-execution_count="2">
+<pre><code>7148</code></pre>
+</div>
+</div>
+<p>We now have a list with assay ChEMBL ID, assay ID (a primary key used in the database), and the number of compounds with data in the assay:</p>
+<div class="cell" data-executetime="{&quot;end_time&quot;:&quot;2024-03-10T05:55:29.542942Z&quot;,&quot;start_time&quot;:&quot;2024-03-10T05:55:29.540228Z&quot;}" data-execution_count="48">
+<div class="sourceCode cell-code" id="cb6"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb6-1"><a href="#cb6-1" aria-hidden="true" tabindex="-1"></a>aids[:<span class="dv">4</span>]</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-display" data-execution_count="48">
+<pre><code>[('CHEMBL857972', 157, 66),
+ ('CHEMBL615643', 393, 24),
+ ('CHEMBL615557', 535, 71),
+ ('CHEMBL615558', 536, 30)]</code></pre>
+</div>
+</div>
+<p>Randomly reorder the assays:</p>
+<div class="cell" data-executetime="{&quot;end_time&quot;:&quot;2024-03-10T05:55:38.641883Z&quot;,&quot;start_time&quot;:&quot;2024-03-10T05:55:38.636297Z&quot;}" data-execution_count="49">
+<div class="sourceCode cell-code" id="cb8"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb8-1"><a href="#cb8-1" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> random</span>
+<span id="cb8-2"><a href="#cb8-2" aria-hidden="true" tabindex="-1"></a>random.seed(<span class="bn">0xC0FFEE</span>)</span>
+<span id="cb8-3"><a href="#cb8-3" aria-hidden="true" tabindex="-1"></a>random.shuffle(aids)</span>
+<span id="cb8-4"><a href="#cb8-4" aria-hidden="true" tabindex="-1"></a>aids[:<span class="dv">4</span>]</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-display" data-execution_count="49">
+<pre><code>[('CHEMBL1176478', 642589, 29),
+ ('CHEMBL902340', 453190, 32),
+ ('CHEMBL3877023', 1634231, 21),
+ ('CHEMBL1959874', 807746, 36)]</code></pre>
+</div>
+</div>
+</section>
+<section id="looking-at-some-of-example-results" class="level1">
+<h1>Looking at some of example results</h1>
+<div class="cell" data-executetime="{&quot;end_time&quot;:&quot;2024-03-10T06:13:12.476522Z&quot;,&quot;start_time&quot;:&quot;2024-03-10T06:13:12.470018Z&quot;}" data-execution_count="61">
+<div class="sourceCode cell-code" id="cb10"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb10-1"><a href="#cb10-1" aria-hidden="true" tabindex="-1"></a>aid <span class="op">=</span> <span class="st">'CHEMBL1803423'</span>  <span class="co"># this was the first hit from ChEMBL 32</span></span>
+<span id="cb10-2"><a href="#cb10-2" aria-hidden="true" tabindex="-1"></a>aid <span class="op">=</span> aids[<span class="dv">0</span>][<span class="dv">0</span>]</span>
+<span id="cb10-3"><a href="#cb10-3" aria-hidden="true" tabindex="-1"></a>structs <span class="op">=</span> <span class="op">%</span>sql postgresql:<span class="op">//</span>glandrum<span class="op">@</span>stoat<span class="op">/</span>chembl_33 <span class="op">\</span></span>
+<span id="cb10-4"><a href="#cb10-4" aria-hidden="true" tabindex="-1"></a>  select distinct on (canonical_smiles) cids.chembl_id compound_chembl_id,canonical_smiles <span class="op">\</span></span>
+<span id="cb10-5"><a href="#cb10-5" aria-hidden="true" tabindex="-1"></a>    <span class="im">from</span> activities <span class="op">\</span></span>
+<span id="cb10-6"><a href="#cb10-6" aria-hidden="true" tabindex="-1"></a>        join assays using (assay_id) <span class="op">\</span></span>
+<span id="cb10-7"><a href="#cb10-7" aria-hidden="true" tabindex="-1"></a>        join compound_structures using (molregno) <span class="op">\</span></span>
+<span id="cb10-8"><a href="#cb10-8" aria-hidden="true" tabindex="-1"></a>        join chembl_id_lookup cids on (molregno<span class="op">=</span>entity_id <span class="kw">and</span> entity_type<span class="op">=</span><span class="st">'COMPOUND'</span>)<span class="op">\</span></span>
+<span id="cb10-9"><a href="#cb10-9" aria-hidden="true" tabindex="-1"></a>    where assays.chembl_id<span class="op">=</span>:aid <span class="op">\</span></span>
+<span id="cb10-10"><a href="#cb10-10" aria-hidden="true" tabindex="-1"></a>      <span class="kw">and</span> standard_type<span class="op">=</span><span class="st">'Ki'</span></span>
+<span id="cb10-11"><a href="#cb10-11" aria-hidden="true" tabindex="-1"></a><span class="bu">len</span>(structs)</span>
+<span id="cb10-12"><a href="#cb10-12" aria-hidden="true" tabindex="-1"></a>    </span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>29 rows affected.</code></pre>
+</div>
+<div class="cell-output cell-output-display" data-execution_count="61">
+<pre><code>29</code></pre>
+</div>
+</div>
+<p>Here are the compounds from that assay:</p>
+<div class="cell" data-executetime="{&quot;end_time&quot;:&quot;2024-03-10T06:06:15.354701Z&quot;,&quot;start_time&quot;:&quot;2024-03-10T06:06:15.325187Z&quot;}" data-execution_count="57">
+<div class="sourceCode cell-code" id="cb13"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb13-1"><a href="#cb13-1" aria-hidden="true" tabindex="-1"></a>nms,smis <span class="op">=</span> <span class="bu">zip</span>(<span class="op">*</span>structs)</span>
+<span id="cb13-2"><a href="#cb13-2" aria-hidden="true" tabindex="-1"></a>mols <span class="op">=</span> [Chem.MolFromSmiles(x) <span class="cf">for</span> x <span class="kw">in</span> smis]</span>
+<span id="cb13-3"><a href="#cb13-3" aria-hidden="true" tabindex="-1"></a>Draw.MolsToGridImage(mols[:<span class="dv">6</span>],legends<span class="op">=</span>nms,subImgSize<span class="op">=</span>(<span class="dv">250</span>,<span class="dv">200</span>))</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-display" data-execution_count="57">
+<p><img src="2024-05-31-scaffold-splits-and-murcko-scaffolds1_files/figure-html/cell-7-output-1.png" class="img-fluid"></p>
+</div>
+</div>
+<p>Generate the Murcko scaffolds:</p>
+<div class="cell" data-executetime="{&quot;end_time&quot;:&quot;2024-03-10T06:06:17.068323Z&quot;,&quot;start_time&quot;:&quot;2024-03-10T06:06:17.031225Z&quot;}" data-execution_count="58">
+<div class="sourceCode cell-code" id="cb14"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb14-1"><a href="#cb14-1" aria-hidden="true" tabindex="-1"></a>scaffs <span class="op">=</span> []</span>
+<span id="cb14-2"><a href="#cb14-2" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> m <span class="kw">in</span> mols:</span>
+<span id="cb14-3"><a href="#cb14-3" aria-hidden="true" tabindex="-1"></a>    scaff <span class="op">=</span> Chem.MurckoDecompose(m)</span>
+<span id="cb14-4"><a href="#cb14-4" aria-hidden="true" tabindex="-1"></a>    Chem.SanitizeMol(scaff)</span>
+<span id="cb14-5"><a href="#cb14-5" aria-hidden="true" tabindex="-1"></a>    scaffs.append(scaff)</span>
+<span id="cb14-6"><a href="#cb14-6" aria-hidden="true" tabindex="-1"></a>scaff_smis <span class="op">=</span> [Chem.MolToSmiles(x) <span class="cf">for</span> x <span class="kw">in</span> scaffs]</span>
+<span id="cb14-7"><a href="#cb14-7" aria-hidden="true" tabindex="-1"></a><span class="bu">len</span>(<span class="bu">set</span>(scaff_smis))</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-display" data-execution_count="58">
+<pre><code>12</code></pre>
+</div>
+</div>
+<p>There are twelve unique “scaffolds”. Draw the first six of them:</p>
+<div class="cell" data-executetime="{&quot;end_time&quot;:&quot;2024-03-10T06:06:18.282630Z&quot;,&quot;start_time&quot;:&quot;2024-03-10T06:06:18.260959Z&quot;}" data-execution_count="59">
+<div class="sourceCode cell-code" id="cb16"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb16-1"><a href="#cb16-1" aria-hidden="true" tabindex="-1"></a>unique_scaffs <span class="op">=</span> [Chem.MolFromSmiles(smi) <span class="cf">for</span> smi <span class="kw">in</span> <span class="bu">set</span>(scaff_smis)]</span>
+<span id="cb16-2"><a href="#cb16-2" aria-hidden="true" tabindex="-1"></a>Draw.MolsToGridImage(unique_scaffs[:<span class="dv">6</span>],subImgSize<span class="op">=</span>(<span class="dv">250</span>,<span class="dv">200</span>))</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-display" data-execution_count="59">
+<p><img src="2024-05-31-scaffold-splits-and-murcko-scaffolds1_files/figure-html/cell-9-output-1.png" class="img-fluid"></p>
+</div>
+</div>
+<p>Some of these are quite similar to each other and others, like the first and last in the second row, are clearly structurally related - the last entry in the second row is a substructure of the first entry in that row.</p>
+<p>Look at the compounds from another assay:</p>
+<div class="cell" data-executetime="{&quot;end_time&quot;:&quot;2024-03-10T06:13:25.501136Z&quot;,&quot;start_time&quot;:&quot;2024-03-10T06:13:25.469349Z&quot;}" data-execution_count="62">
+<div class="sourceCode cell-code" id="cb17"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb17-1"><a href="#cb17-1" aria-hidden="true" tabindex="-1"></a>aid <span class="op">=</span> aids[<span class="dv">1</span>][<span class="dv">0</span>]</span>
+<span id="cb17-2"><a href="#cb17-2" aria-hidden="true" tabindex="-1"></a>structs <span class="op">=</span> <span class="op">%</span>sql postgresql:<span class="op">//</span>glandrum<span class="op">@</span>stoat<span class="op">/</span>chembl_33 <span class="op">\</span></span>
+<span id="cb17-3"><a href="#cb17-3" aria-hidden="true" tabindex="-1"></a>  select distinct on (canonical_smiles) cids.chembl_id compound_chembl_id,canonical_smiles <span class="op">\</span></span>
+<span id="cb17-4"><a href="#cb17-4" aria-hidden="true" tabindex="-1"></a>    <span class="im">from</span> activities <span class="op">\</span></span>
+<span id="cb17-5"><a href="#cb17-5" aria-hidden="true" tabindex="-1"></a>        join assays using (assay_id) <span class="op">\</span></span>
+<span id="cb17-6"><a href="#cb17-6" aria-hidden="true" tabindex="-1"></a>        join compound_structures using (molregno) <span class="op">\</span></span>
+<span id="cb17-7"><a href="#cb17-7" aria-hidden="true" tabindex="-1"></a>        join chembl_id_lookup cids on (molregno<span class="op">=</span>entity_id <span class="kw">and</span> entity_type<span class="op">=</span><span class="st">'COMPOUND'</span>)<span class="op">\</span></span>
+<span id="cb17-8"><a href="#cb17-8" aria-hidden="true" tabindex="-1"></a>    where assays.chembl_id<span class="op">=</span>:aid <span class="op">\</span></span>
+<span id="cb17-9"><a href="#cb17-9" aria-hidden="true" tabindex="-1"></a>      <span class="kw">and</span> standard_type<span class="op">=</span><span class="st">'Ki'</span></span>
+<span id="cb17-10"><a href="#cb17-10" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb17-11"><a href="#cb17-11" aria-hidden="true" tabindex="-1"></a>nms,smis <span class="op">=</span> <span class="bu">zip</span>(<span class="op">*</span>structs)</span>
+<span id="cb17-12"><a href="#cb17-12" aria-hidden="true" tabindex="-1"></a>mols <span class="op">=</span> [Chem.MolFromSmiles(x) <span class="cf">for</span> x <span class="kw">in</span> smis]</span>
+<span id="cb17-13"><a href="#cb17-13" aria-hidden="true" tabindex="-1"></a>Draw.MolsToGridImage(mols[:<span class="dv">6</span>],legends<span class="op">=</span>nms,subImgSize<span class="op">=</span>(<span class="dv">250</span>,<span class="dv">200</span>))</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>32 rows affected.</code></pre>
+</div>
+<div class="cell-output cell-output-display" data-execution_count="62">
+<p><img src="2024-05-31-scaffold-splits-and-murcko-scaffolds1_files/figure-html/cell-10-output-2.png" class="img-fluid"></p>
+</div>
+</div>
+<p>And generate the scaffolds:</p>
+<div class="cell" data-executetime="{&quot;end_time&quot;:&quot;2024-03-10T06:13:53.674681Z&quot;,&quot;start_time&quot;:&quot;2024-03-10T06:13:53.608917Z&quot;}" data-execution_count="63">
+<div class="sourceCode cell-code" id="cb19"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb19-1"><a href="#cb19-1" aria-hidden="true" tabindex="-1"></a>scaffs <span class="op">=</span> []</span>
+<span id="cb19-2"><a href="#cb19-2" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> m <span class="kw">in</span> mols:</span>
+<span id="cb19-3"><a href="#cb19-3" aria-hidden="true" tabindex="-1"></a>    scaff <span class="op">=</span> Chem.MurckoDecompose(m)</span>
+<span id="cb19-4"><a href="#cb19-4" aria-hidden="true" tabindex="-1"></a>    Chem.SanitizeMol(scaff)</span>
+<span id="cb19-5"><a href="#cb19-5" aria-hidden="true" tabindex="-1"></a>    scaffs.append(scaff)</span>
+<span id="cb19-6"><a href="#cb19-6" aria-hidden="true" tabindex="-1"></a>scaff_smis <span class="op">=</span> [Chem.MolToSmiles(x) <span class="cf">for</span> x <span class="kw">in</span> scaffs]</span>
+<span id="cb19-7"><a href="#cb19-7" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="bu">len</span>(<span class="bu">set</span>(scaff_smis)))</span>
+<span id="cb19-8"><a href="#cb19-8" aria-hidden="true" tabindex="-1"></a>unique_scaffs <span class="op">=</span> [Chem.MolFromSmiles(smi) <span class="cf">for</span> smi <span class="kw">in</span> <span class="bu">set</span>(scaff_smis)]</span>
+<span id="cb19-9"><a href="#cb19-9" aria-hidden="true" tabindex="-1"></a>Draw.MolsToGridImage(unique_scaffs[:<span class="dv">6</span>],subImgSize<span class="op">=</span>(<span class="dv">250</span>,<span class="dv">200</span>))</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>20</code></pre>
+</div>
+<div class="cell-output cell-output-display" data-execution_count="63">
+<p><img src="2024-05-31-scaffold-splits-and-murcko-scaffolds1_files/figure-html/cell-11-output-2.png" class="img-fluid"></p>
+</div>
+</div>
+<p>This time there are 20 scaffolds and some of them are QUITE similar to each other.</p>
+</section>
+<section id="number-of-scaffolds-per-assay" class="level1">
+<h1>Number of scaffolds per assay</h1>
+<p>Do the compound extraction and scaffold calculation for all of the assays:</p>
+<div class="cell" data-executetime="{&quot;end_time&quot;:&quot;2024-03-10T06:38:02.463123Z&quot;,&quot;start_time&quot;:&quot;2024-03-10T06:35:59.902309Z&quot;}" data-scrolled="true" data-execution_count="69">
+<div class="sourceCode cell-code" id="cb21"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb21-1"><a href="#cb21-1" aria-hidden="true" tabindex="-1"></a><span class="op">%</span>config SqlMagic.feedback <span class="op">=</span> <span class="va">False</span></span>
+<span id="cb21-2"><a href="#cb21-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb21-3"><a href="#cb21-3" aria-hidden="true" tabindex="-1"></a>accum <span class="op">=</span> []</span>
+<span id="cb21-4"><a href="#cb21-4" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> aid,_,_ <span class="kw">in</span> aids:</span>
+<span id="cb21-5"><a href="#cb21-5" aria-hidden="true" tabindex="-1"></a>    structs <span class="op">=</span> <span class="op">%</span>sql postgresql:<span class="op">//</span>glandrum<span class="op">@</span>stoat<span class="op">/</span>chembl_33 <span class="op">\</span></span>
+<span id="cb21-6"><a href="#cb21-6" aria-hidden="true" tabindex="-1"></a>      select distinct on (canonical_smiles) cids.chembl_id compound_chembl_id,canonical_smiles <span class="op">\</span></span>
+<span id="cb21-7"><a href="#cb21-7" aria-hidden="true" tabindex="-1"></a>        <span class="im">from</span> activities <span class="op">\</span></span>
+<span id="cb21-8"><a href="#cb21-8" aria-hidden="true" tabindex="-1"></a>            join assays using (assay_id) <span class="op">\</span></span>
+<span id="cb21-9"><a href="#cb21-9" aria-hidden="true" tabindex="-1"></a>            join compound_structures using (molregno) <span class="op">\</span></span>
+<span id="cb21-10"><a href="#cb21-10" aria-hidden="true" tabindex="-1"></a>            join chembl_id_lookup cids on (molregno<span class="op">=</span>entity_id <span class="kw">and</span> entity_type<span class="op">=</span><span class="st">'COMPOUND'</span>)<span class="op">\</span></span>
+<span id="cb21-11"><a href="#cb21-11" aria-hidden="true" tabindex="-1"></a>        where assays.chembl_id<span class="op">=</span>:aid <span class="op">\</span></span>
+<span id="cb21-12"><a href="#cb21-12" aria-hidden="true" tabindex="-1"></a>          <span class="kw">and</span> standard_type<span class="op">=</span><span class="st">'Ki'</span></span>
+<span id="cb21-13"><a href="#cb21-13" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb21-14"><a href="#cb21-14" aria-hidden="true" tabindex="-1"></a>    nms,smis <span class="op">=</span> <span class="bu">zip</span>(<span class="op">*</span>structs)</span>
+<span id="cb21-15"><a href="#cb21-15" aria-hidden="true" tabindex="-1"></a>    mols <span class="op">=</span> [Chem.MolFromSmiles(x) <span class="cf">for</span> x <span class="kw">in</span> smis]</span>
+<span id="cb21-16"><a href="#cb21-16" aria-hidden="true" tabindex="-1"></a>    scaffs <span class="op">=</span> <span class="bu">set</span>()</span>
+<span id="cb21-17"><a href="#cb21-17" aria-hidden="true" tabindex="-1"></a>    <span class="cf">for</span> m <span class="kw">in</span> mols:</span>
+<span id="cb21-18"><a href="#cb21-18" aria-hidden="true" tabindex="-1"></a>        scaff <span class="op">=</span> Chem.MurckoDecompose(m)</span>
+<span id="cb21-19"><a href="#cb21-19" aria-hidden="true" tabindex="-1"></a>        Chem.SanitizeMol(scaff)</span>
+<span id="cb21-20"><a href="#cb21-20" aria-hidden="true" tabindex="-1"></a>        scaffs.add(Chem.MolToSmiles(scaff))</span>
+<span id="cb21-21"><a href="#cb21-21" aria-hidden="true" tabindex="-1"></a>    accum.append((aid,<span class="bu">len</span>(mols),<span class="bu">len</span>(scaffs)))</span>
+<span id="cb21-22"><a href="#cb21-22" aria-hidden="true" tabindex="-1"></a>    <span class="cf">if</span> <span class="kw">not</span> <span class="bu">len</span>(accum)<span class="op">%</span><span class="dv">100</span>:</span>
+<span id="cb21-23"><a href="#cb21-23" aria-hidden="true" tabindex="-1"></a>        <span class="bu">print</span>(<span class="ss">f'Done </span><span class="sc">{</span><span class="bu">len</span>(accum)<span class="sc">}</span><span class="ss"> of </span><span class="sc">{</span><span class="bu">len</span>(aids)<span class="sc">}</span><span class="ss">'</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>Done 100 of 7148
+Done 200 of 7148
+Done 300 of 7148
+Done 400 of 7148
+Done 500 of 7148
+Done 600 of 7148
+Done 700 of 7148
+Done 800 of 7148
+Done 900 of 7148
+Done 1000 of 7148
+Done 1100 of 7148
+Done 1200 of 7148
+Done 1300 of 7148
+Done 1400 of 7148
+Done 1500 of 7148
+Done 1600 of 7148
+Done 1700 of 7148
+Done 1800 of 7148
+Done 1900 of 7148
+Done 2000 of 7148
+Done 2100 of 7148
+Done 2200 of 7148
+Done 2300 of 7148
+Done 2400 of 7148
+Done 2500 of 7148
+Done 2600 of 7148
+Done 2700 of 7148
+Done 2800 of 7148
+Done 2900 of 7148
+Done 3000 of 7148
+Done 3100 of 7148
+Done 3200 of 7148
+Done 3300 of 7148
+Done 3400 of 7148
+Done 3500 of 7148
+Done 3600 of 7148
+Done 3700 of 7148
+Done 3800 of 7148
+Done 3900 of 7148
+Done 4000 of 7148
+Done 4100 of 7148
+Done 4200 of 7148
+Done 4300 of 7148
+Done 4400 of 7148
+Done 4500 of 7148
+Done 4600 of 7148
+Done 4700 of 7148
+Done 4800 of 7148
+Done 4900 of 7148
+Done 5000 of 7148
+Done 5100 of 7148
+Done 5200 of 7148
+Done 5300 of 7148
+Done 5400 of 7148
+Done 5500 of 7148
+Done 5600 of 7148
+Done 5700 of 7148
+Done 5800 of 7148
+Done 5900 of 7148
+Done 6000 of 7148
+Done 6100 of 7148
+Done 6200 of 7148
+Done 6300 of 7148
+Done 6400 of 7148
+Done 6500 of 7148
+Done 6600 of 7148
+Done 6700 of 7148
+Done 6800 of 7148
+Done 6900 of 7148
+Done 7000 of 7148
+Done 7100 of 7148</code></pre>
+</div>
+</div>
+<div class="cell" data-executetime="{&quot;end_time&quot;:&quot;2024-03-10T06:38:02.469222Z&quot;,&quot;start_time&quot;:&quot;2024-03-10T06:38:02.464415Z&quot;}" data-execution_count="70">
+<div class="sourceCode cell-code" id="cb23"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb23-1"><a href="#cb23-1" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> pickle</span>
+<span id="cb23-2"><a href="#cb23-2" aria-hidden="true" tabindex="-1"></a><span class="cf">with</span> <span class="bu">open</span>(<span class="st">'./results/murcko_scaffs.pkl'</span>,<span class="st">'wb+'</span>) <span class="im">as</span> outf:</span>
+<span id="cb23-3"><a href="#cb23-3" aria-hidden="true" tabindex="-1"></a>    pickle.dump(accum,outf)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+<div class="cell" data-executetime="{&quot;end_time&quot;:&quot;2024-05-31T06:19:08.749247Z&quot;,&quot;start_time&quot;:&quot;2024-05-31T06:19:08.673610Z&quot;}" data-execution_count="2">
+<div class="sourceCode cell-code" id="cb24"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb24-1"><a href="#cb24-1" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> pickle</span>
+<span id="cb24-2"><a href="#cb24-2" aria-hidden="true" tabindex="-1"></a><span class="cf">with</span> <span class="bu">open</span>(<span class="st">'./results/murcko_scaffs.pkl'</span>,<span class="st">'rb'</span>) <span class="im">as</span> inf:</span>
+<span id="cb24-3"><a href="#cb24-3" aria-hidden="true" tabindex="-1"></a>    accum <span class="op">=</span> pickle.load(inf)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+<p>How many scaffolds are there in each assay?</p>
+<div class="cell" data-executetime="{&quot;end_time&quot;:&quot;2024-05-31T06:20:57.765887Z&quot;,&quot;start_time&quot;:&quot;2024-05-31T06:20:57.664715Z&quot;}" data-execution_count="7">
+<div class="sourceCode cell-code" id="cb25"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb25-1"><a href="#cb25-1" aria-hidden="true" tabindex="-1"></a>plt.figure(figsize<span class="op">=</span>(<span class="dv">6</span>,<span class="dv">6</span>))</span>
+<span id="cb25-2"><a href="#cb25-2" aria-hidden="true" tabindex="-1"></a>nscaffs <span class="op">=</span> [x[<span class="dv">2</span>] <span class="cf">for</span> x <span class="kw">in</span> accum]</span>
+<span id="cb25-3"><a href="#cb25-3" aria-hidden="true" tabindex="-1"></a>plt.hist(nscaffs,bins<span class="op">=</span><span class="dv">20</span>)</span>
+<span id="cb25-4"><a href="#cb25-4" aria-hidden="true" tabindex="-1"></a>plt.xlabel(<span class="st">'num scaffolds'</span>)<span class="op">;</span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-display">
+<p><img src="2024-05-31-scaffold-splits-and-murcko-scaffolds1_files/figure-html/cell-15-output-1.png" class="img-fluid"></p>
+</div>
+</div>
+<p>Stats of that:</p>
+<div class="cell" data-executetime="{&quot;end_time&quot;:&quot;2024-05-31T06:21:56.019931Z&quot;,&quot;start_time&quot;:&quot;2024-05-31T06:21:56.016973Z&quot;}" data-execution_count="10">
+<div class="sourceCode cell-code" id="cb26"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb26-1"><a href="#cb26-1" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f'mean: </span><span class="sc">{</span>np<span class="sc">.</span>mean(nscaffs)<span class="sc">:.1f}</span><span class="ss">, median: </span><span class="sc">{</span>np<span class="sc">.</span>median(nscaffs)<span class="sc">:.1f}</span><span class="ss">'</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>mean: 13.2, median: 12.0</code></pre>
+</div>
+</div>
+<p>That’s a lot of scaffolds for each assay.</p>
+<p>Since each assay contains a different number of compounds, it’s interesting to look at the relationship between the number of compounds and the number of scaffolds:</p>
+<div class="cell" data-executetime="{&quot;end_time&quot;:&quot;2024-05-31T06:23:10.864843Z&quot;,&quot;start_time&quot;:&quot;2024-05-31T06:23:10.729686Z&quot;}" data-execution_count="12">
+<div class="sourceCode cell-code" id="cb28"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb28-1"><a href="#cb28-1" aria-hidden="true" tabindex="-1"></a>plt.figure(figsize<span class="op">=</span>(<span class="dv">6</span>,<span class="dv">6</span>))</span>
+<span id="cb28-2"><a href="#cb28-2" aria-hidden="true" tabindex="-1"></a>plt.scatter([x[<span class="dv">1</span>] <span class="cf">for</span> x <span class="kw">in</span> accum],[x[<span class="dv">2</span>] <span class="cf">for</span> x <span class="kw">in</span> accum],alpha<span class="op">=</span><span class="fl">0.2</span>)</span>
+<span id="cb28-3"><a href="#cb28-3" aria-hidden="true" tabindex="-1"></a>plt.xlabel(<span class="st">'num compounds'</span>)</span>
+<span id="cb28-4"><a href="#cb28-4" aria-hidden="true" tabindex="-1"></a>plt.ylabel(<span class="st">'num scaffolds'</span>)<span class="op">;</span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-display">
+<p><img src="2024-05-31-scaffold-splits-and-murcko-scaffolds1_files/figure-html/cell-17-output-1.png" class="img-fluid"></p>
+</div>
+</div>
+<p>We can summarize that with a histogram of the ratio of the number of scaffolds to the number of compounds:</p>
+<div class="cell" data-executetime="{&quot;end_time&quot;:&quot;2024-05-31T06:23:11.239584Z&quot;,&quot;start_time&quot;:&quot;2024-05-31T06:23:11.077383Z&quot;}" data-execution_count="13">
+<div class="sourceCode cell-code" id="cb29"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb29-1"><a href="#cb29-1" aria-hidden="true" tabindex="-1"></a>frac <span class="op">=</span> [x[<span class="dv">2</span>]<span class="op">/</span>x[<span class="dv">1</span>] <span class="cf">for</span> x <span class="kw">in</span> accum]</span>
+<span id="cb29-2"><a href="#cb29-2" aria-hidden="true" tabindex="-1"></a>plt.figure(figsize<span class="op">=</span>(<span class="dv">6</span>,<span class="dv">5</span>))</span>
+<span id="cb29-3"><a href="#cb29-3" aria-hidden="true" tabindex="-1"></a>plt.hist(frac,bins<span class="op">=</span><span class="dv">20</span>)</span>
+<span id="cb29-4"><a href="#cb29-4" aria-hidden="true" tabindex="-1"></a>plt.xlabel(<span class="st">'$num_</span><span class="sc">{scaffolds}</span><span class="st"> / num_</span><span class="sc">{compounds}</span><span class="st">$'</span>)<span class="op">;</span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-display">
+<p><img src="2024-05-31-scaffold-splits-and-murcko-scaffolds1_files/figure-html/cell-18-output-1.png" class="img-fluid"></p>
+</div>
+</div>
+<div class="cell" data-executetime="{&quot;end_time&quot;:&quot;2024-05-31T06:23:25.050185Z&quot;,&quot;start_time&quot;:&quot;2024-05-31T06:23:25.046021Z&quot;}" data-execution_count="14">
+<div class="sourceCode cell-code" id="cb30"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb30-1"><a href="#cb30-1" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f'mean: </span><span class="sc">{</span>np<span class="sc">.</span>mean(frac)<span class="sc">:.1f}</span><span class="ss">, median: </span><span class="sc">{</span>np<span class="sc">.</span>median(frac)<span class="sc">:.1f}</span><span class="ss">'</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>mean: 0.4, median: 0.4</code></pre>
+</div>
+</div>
+</section>
+<section id="manually-extracted-scaffolds" class="level1">
+<h1>Manually extracted scaffolds</h1>
+<p>To see what’s going on in more detail, let’s look at a few randomly selected assays/papers:</p>
+<div class="cell" data-executetime="{&quot;end_time&quot;:&quot;2024-05-31T06:55:21.866570Z&quot;,&quot;start_time&quot;:&quot;2024-05-31T06:55:21.859677Z&quot;}" data-execution_count="20">
+<div class="sourceCode cell-code" id="cb32"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb32-1"><a href="#cb32-1" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> random</span>
+<span id="cb32-2"><a href="#cb32-2" aria-hidden="true" tabindex="-1"></a>acp <span class="op">=</span> accum[:]</span>
+<span id="cb32-3"><a href="#cb32-3" aria-hidden="true" tabindex="-1"></a>random.seed(<span class="bn">0xf00d</span>)</span>
+<span id="cb32-4"><a href="#cb32-4" aria-hidden="true" tabindex="-1"></a>random.shuffle(acp)</span>
+<span id="cb32-5"><a href="#cb32-5" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> i,tpl <span class="kw">in</span> <span class="bu">enumerate</span>(acp[:<span class="dv">5</span>]):</span>
+<span id="cb32-6"><a href="#cb32-6" aria-hidden="true" tabindex="-1"></a>    assay,nc,ns <span class="op">=</span> tpl</span>
+<span id="cb32-7"><a href="#cb32-7" aria-hidden="true" tabindex="-1"></a>    <span class="bu">print</span>(<span class="ss">f'https://www.ebi.ac.uk/chembl/assay_report_card/</span><span class="sc">{</span>assay<span class="sc">}</span><span class="ss">/  </span><span class="sc">{</span>ns<span class="sc">}</span><span class="ss">   </span><span class="sc">{</span>nc<span class="sc">}</span><span class="ss">'</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>https://www.ebi.ac.uk/chembl/assay_report_card/CHEMBL4049094/  13   34
+https://www.ebi.ac.uk/chembl/assay_report_card/CHEMBL859243/  10   39
+https://www.ebi.ac.uk/chembl/assay_report_card/CHEMBL4710796/  16   23
+https://www.ebi.ac.uk/chembl/assay_report_card/CHEMBL3131699/  21   28
+https://www.ebi.ac.uk/chembl/assay_report_card/CHEMBL4183750/  9   25</code></pre>
+</div>
+</div>
+<p>Get the compounds for each assay from the database:</p>
+<div class="cell" data-executetime="{&quot;end_time&quot;:&quot;2024-05-31T08:41:00.885036Z&quot;,&quot;start_time&quot;:&quot;2024-05-31T08:40:59.418519Z&quot;}" data-execution_count="21">
+<div class="sourceCode cell-code" id="cb34"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb34-1"><a href="#cb34-1" aria-hidden="true" tabindex="-1"></a><span class="op">%</span>config SqlMagic.feedback <span class="op">=</span> <span class="va">False</span></span>
+<span id="cb34-2"><a href="#cb34-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb34-3"><a href="#cb34-3" aria-hidden="true" tabindex="-1"></a>cmpd_accum <span class="op">=</span> {}</span>
+<span id="cb34-4"><a href="#cb34-4" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> aid,_,_ <span class="kw">in</span> acp[:<span class="dv">5</span>]:</span>
+<span id="cb34-5"><a href="#cb34-5" aria-hidden="true" tabindex="-1"></a>    structs <span class="op">=</span> <span class="op">%</span>sql postgresql:<span class="op">//</span>glandrum<span class="op">@</span>stoat<span class="op">/</span>chembl_33 <span class="op">\</span></span>
+<span id="cb34-6"><a href="#cb34-6" aria-hidden="true" tabindex="-1"></a>      select distinct on (canonical_smiles) cids.chembl_id compound_chembl_id,canonical_smiles <span class="op">\</span></span>
+<span id="cb34-7"><a href="#cb34-7" aria-hidden="true" tabindex="-1"></a>        <span class="im">from</span> activities <span class="op">\</span></span>
+<span id="cb34-8"><a href="#cb34-8" aria-hidden="true" tabindex="-1"></a>            join assays using (assay_id) <span class="op">\</span></span>
+<span id="cb34-9"><a href="#cb34-9" aria-hidden="true" tabindex="-1"></a>            join compound_structures using (molregno) <span class="op">\</span></span>
+<span id="cb34-10"><a href="#cb34-10" aria-hidden="true" tabindex="-1"></a>            join chembl_id_lookup cids on (molregno<span class="op">=</span>entity_id <span class="kw">and</span> entity_type<span class="op">=</span><span class="st">'COMPOUND'</span>)<span class="op">\</span></span>
+<span id="cb34-11"><a href="#cb34-11" aria-hidden="true" tabindex="-1"></a>        where assays.chembl_id<span class="op">=</span>:aid <span class="op">\</span></span>
+<span id="cb34-12"><a href="#cb34-12" aria-hidden="true" tabindex="-1"></a>          <span class="kw">and</span> standard_type<span class="op">=</span><span class="st">'Ki'</span></span>
+<span id="cb34-13"><a href="#cb34-13" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb34-14"><a href="#cb34-14" aria-hidden="true" tabindex="-1"></a>    nms,smis <span class="op">=</span> <span class="bu">zip</span>(<span class="op">*</span>structs)</span>
+<span id="cb34-15"><a href="#cb34-15" aria-hidden="true" tabindex="-1"></a>    mols <span class="op">=</span> [Chem.MolFromSmiles(x) <span class="cf">for</span> x <span class="kw">in</span> smis]</span>
+<span id="cb34-16"><a href="#cb34-16" aria-hidden="true" tabindex="-1"></a>    cmpd_accum[aid] <span class="op">=</span> mols</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+<div class="cell" data-executetime="{&quot;end_time&quot;:&quot;2024-05-31T08:44:30.245322Z&quot;,&quot;start_time&quot;:&quot;2024-05-31T08:44:30.242882Z&quot;}" data-execution_count="24">
+<div class="sourceCode cell-code" id="cb35"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb35-1"><a href="#cb35-1" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> rdkit.Chem <span class="im">import</span> rdDepictor</span>
+<span id="cb35-2"><a href="#cb35-2" aria-hidden="true" tabindex="-1"></a>rdDepictor.SetPreferCoordGen(<span class="va">True</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+<p>I went through each of the papers and came up with a scaffold based for each on what the authors of the paper report as the scaffold. If there was no reported scaffold or something which was less-than-useful, I constructed on myself:</p>
+<div class="cell" data-executetime="{&quot;end_time&quot;:&quot;2024-05-31T11:17:19.874772Z&quot;,&quot;start_time&quot;:&quot;2024-05-31T11:17:19.834653Z&quot;}" data-execution_count="69">
+<div class="sourceCode cell-code" id="cb36"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb36-1"><a href="#cb36-1" aria-hidden="true" tabindex="-1"></a>scaffolds_from_papers <span class="op">=</span> {</span>
+<span id="cb36-2"><a href="#cb36-2" aria-hidden="true" tabindex="-1"></a>    <span class="st">'CHEMBL4049094'</span>:<span class="st">'*n1ncc(n1)C(=O)NC(C*)C(=O)NC1(CC1)C#N'</span>,</span>
+<span id="cb36-3"><a href="#cb36-3" aria-hidden="true" tabindex="-1"></a>    <span class="st">'CHEMBL859243'</span>:<span class="st">'*CC(N1CCCC1)C(=O)c1ccccc1'</span>,</span>
+<span id="cb36-4"><a href="#cb36-4" aria-hidden="true" tabindex="-1"></a>    <span class="st">'CHEMBL4710796'</span>:<span class="st">'*c1n[nH]c(=S)n1N=C-*'</span>,</span>
+<span id="cb36-5"><a href="#cb36-5" aria-hidden="true" tabindex="-1"></a>    <span class="st">'CHEMBL3131699'</span>:<span class="st">'CC(C)(C)NC(=O)Nc1nc(Cl)c(*)n(C1=O)CC(=O)Nc1ccccc1C(=O)NS(=O)(=O)*'</span>,</span>
+<span id="cb36-6"><a href="#cb36-6" aria-hidden="true" tabindex="-1"></a>    <span class="st">'CHEMBL4183750'</span>:<span class="st">'*C(=O)c1ccc(cc1)c1c(OC)ccc(c1)C1=NN(*)C(=O)C2C1CC=CC2'</span></span>
+<span id="cb36-7"><a href="#cb36-7" aria-hidden="true" tabindex="-1"></a>}</span>
+<span id="cb36-8"><a href="#cb36-8" aria-hidden="true" tabindex="-1"></a>ps <span class="op">=</span> Chem.AdjustQueryParameters.NoAdjustments()</span>
+<span id="cb36-9"><a href="#cb36-9" aria-hidden="true" tabindex="-1"></a>ps.makeDummiesQueries <span class="op">=</span> <span class="va">True</span></span>
+<span id="cb36-10"><a href="#cb36-10" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> k <span class="kw">in</span> scaffolds_from_papers:</span>
+<span id="cb36-11"><a href="#cb36-11" aria-hidden="true" tabindex="-1"></a>    scaffolds_from_papers[k] <span class="op">=</span> Chem.AdjustQueryProperties(Chem.MolFromSmiles(scaffolds_from_papers[k]),ps)</span>
+<span id="cb36-12"><a href="#cb36-12" aria-hidden="true" tabindex="-1"></a>    </span>
+<span id="cb36-13"><a href="#cb36-13" aria-hidden="true" tabindex="-1"></a>Draw.MolsToGridImage(scaffolds_from_papers.values(),</span>
+<span id="cb36-14"><a href="#cb36-14" aria-hidden="true" tabindex="-1"></a>                     legends<span class="op">=</span><span class="bu">list</span>(scaffolds_from_papers.keys()),</span>
+<span id="cb36-15"><a href="#cb36-15" aria-hidden="true" tabindex="-1"></a>                     subImgSize<span class="op">=</span>(<span class="dv">350</span>,<span class="dv">300</span>))</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-display" data-execution_count="69">
+<p><img src="2024-05-31-scaffold-splits-and-murcko-scaffolds1_files/figure-html/cell-23-output-1.png" class="img-fluid"></p>
+</div>
+</div>
+<p>Confirm that these single scaffolds actually cover a reasonable number of the compounds in the paper:</p>
+<div class="cell" data-executetime="{&quot;end_time&quot;:&quot;2024-05-31T11:17:20.272973Z&quot;,&quot;start_time&quot;:&quot;2024-05-31T11:17:20.265701Z&quot;}" data-execution_count="70">
+<div class="sourceCode cell-code" id="cb37"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb37-1"><a href="#cb37-1" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> k <span class="kw">in</span> scaffolds_from_papers:</span>
+<span id="cb37-2"><a href="#cb37-2" aria-hidden="true" tabindex="-1"></a>    nMatches <span class="op">=</span> <span class="bu">len</span>([<span class="dv">1</span> <span class="cf">for</span> x <span class="kw">in</span> cmpd_accum[k] <span class="cf">if</span> x.HasSubstructMatch(scaffolds_from_papers[k])])</span>
+<span id="cb37-3"><a href="#cb37-3" aria-hidden="true" tabindex="-1"></a>    <span class="bu">print</span>(<span class="ss">f'assay </span><span class="sc">{</span>k<span class="sc">}</span><span class="ss">:  num compounds=</span><span class="sc">{</span><span class="bu">len</span>(cmpd_accum[k])<span class="sc">}</span><span class="ss"> num matching scaffold=</span><span class="sc">{</span>nMatches<span class="sc">}</span><span class="ss">'</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>assay CHEMBL4049094:  num compounds=34 num matching scaffold=34
+assay CHEMBL859243:  num compounds=39 num matching scaffold=31
+assay CHEMBL4710796:  num compounds=23 num matching scaffold=22
+assay CHEMBL3131699:  num compounds=28 num matching scaffold=22
+assay CHEMBL4183750:  num compounds=25 num matching scaffold=21</code></pre>
+</div>
+</div>
+<p>Notice that in each case these individual scaffolds cover most of the compounds in the assay. This is a large contrast to the results from the Murcko decomposition, where even the most populous scaffolds typically cover less than half the compounds in the assay (see below).</p>
+<p>And, finally, let’s just look at those scaffolds together with the most populated Murcko scaffolds from each paper:</p>
+<div class="cell" data-executetime="{&quot;end_time&quot;:&quot;2024-05-31T11:16:49.981899Z&quot;,&quot;start_time&quot;:&quot;2024-05-31T11:16:49.822127Z&quot;}" data-execution_count="66">
+<div class="sourceCode cell-code" id="cb39"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb39-1"><a href="#cb39-1" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> collections <span class="im">import</span> Counter</span>
+<span id="cb39-2"><a href="#cb39-2" aria-hidden="true" tabindex="-1"></a>rows <span class="op">=</span> []</span>
+<span id="cb39-3"><a href="#cb39-3" aria-hidden="true" tabindex="-1"></a>labels <span class="op">=</span> []</span>
+<span id="cb39-4"><a href="#cb39-4" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> k <span class="kw">in</span> scaffolds_from_papers:</span>
+<span id="cb39-5"><a href="#cb39-5" aria-hidden="true" tabindex="-1"></a>    scaffs <span class="op">=</span> {}</span>
+<span id="cb39-6"><a href="#cb39-6" aria-hidden="true" tabindex="-1"></a>    counts <span class="op">=</span> Counter()</span>
+<span id="cb39-7"><a href="#cb39-7" aria-hidden="true" tabindex="-1"></a>    <span class="cf">for</span> m <span class="kw">in</span> cmpd_accum[k]:</span>
+<span id="cb39-8"><a href="#cb39-8" aria-hidden="true" tabindex="-1"></a>        scaff <span class="op">=</span> Chem.MurckoDecompose(m)</span>
+<span id="cb39-9"><a href="#cb39-9" aria-hidden="true" tabindex="-1"></a>        Chem.SanitizeMol(scaff)</span>
+<span id="cb39-10"><a href="#cb39-10" aria-hidden="true" tabindex="-1"></a>        smi <span class="op">=</span> Chem.MolToSmiles(scaff)</span>
+<span id="cb39-11"><a href="#cb39-11" aria-hidden="true" tabindex="-1"></a>        counts[smi] <span class="op">+=</span> <span class="dv">1</span></span>
+<span id="cb39-12"><a href="#cb39-12" aria-hidden="true" tabindex="-1"></a>        scaffs[smi] <span class="op">=</span> scaff</span>
+<span id="cb39-13"><a href="#cb39-13" aria-hidden="true" tabindex="-1"></a>    row <span class="op">=</span> [scaffolds_from_papers[k]]</span>
+<span id="cb39-14"><a href="#cb39-14" aria-hidden="true" tabindex="-1"></a>    lrow <span class="op">=</span> [k]</span>
+<span id="cb39-15"><a href="#cb39-15" aria-hidden="true" tabindex="-1"></a>    top <span class="op">=</span> counts.most_common(<span class="dv">3</span>)</span>
+<span id="cb39-16"><a href="#cb39-16" aria-hidden="true" tabindex="-1"></a>    <span class="cf">for</span> smi,cnt <span class="kw">in</span> top:</span>
+<span id="cb39-17"><a href="#cb39-17" aria-hidden="true" tabindex="-1"></a>        row.append(scaffs[smi])</span>
+<span id="cb39-18"><a href="#cb39-18" aria-hidden="true" tabindex="-1"></a>        lrow.append(<span class="bu">str</span>(cnt))</span>
+<span id="cb39-19"><a href="#cb39-19" aria-hidden="true" tabindex="-1"></a>    rows.extend(row)</span>
+<span id="cb39-20"><a href="#cb39-20" aria-hidden="true" tabindex="-1"></a>    labels.extend(lrow)</span>
+<span id="cb39-21"><a href="#cb39-21" aria-hidden="true" tabindex="-1"></a>Draw.MolsToGridImage(rows,</span>
+<span id="cb39-22"><a href="#cb39-22" aria-hidden="true" tabindex="-1"></a>                     legends<span class="op">=</span>labels,</span>
+<span id="cb39-23"><a href="#cb39-23" aria-hidden="true" tabindex="-1"></a>                     molsPerRow<span class="op">=</span><span class="dv">4</span>,</span>
+<span id="cb39-24"><a href="#cb39-24" aria-hidden="true" tabindex="-1"></a>                     subImgSize<span class="op">=</span>(<span class="dv">350</span>,<span class="dv">300</span>))</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-display" data-execution_count="66">
+<p><img src="2024-05-31-scaffold-splits-and-murcko-scaffolds1_files/figure-html/cell-25-output-1.png" class="img-fluid"></p>
+</div>
+</div>
+<p>Each row above has the hand-sketched scaffold in the first column and the three most common scaffolds along with their frequency in the remaining columns.</p>
+<p>You can see that, with the exception of the second row (assay CHEMBL859243), the scaffolds found by the Murcko decomposition do not track particularly well with the scaffold extracted from the paper.</p>
+
+
+</section>
+
+</main> <!-- /main -->
+<script id="quarto-html-after-body" type="application/javascript">
+window.document.addEventListener("DOMContentLoaded", function (event) {
+  const toggleBodyColorMode = (bsSheetEl) => {
+    const mode = bsSheetEl.getAttribute("data-mode");
+    const bodyEl = window.document.querySelector("body");
+    if (mode === "dark") {
+      bodyEl.classList.add("quarto-dark");
+      bodyEl.classList.remove("quarto-light");
+    } else {
+      bodyEl.classList.add("quarto-light");
+      bodyEl.classList.remove("quarto-dark");
+    }
+  }
+  const toggleBodyColorPrimary = () => {
+    const bsSheetEl = window.document.querySelector("link#quarto-bootstrap");
+    if (bsSheetEl) {
+      toggleBodyColorMode(bsSheetEl);
+    }
+  }
+  toggleBodyColorPrimary();  
+  const disableStylesheet = (stylesheets) => {
+    for (let i=0; i < stylesheets.length; i++) {
+      const stylesheet = stylesheets[i];
+      stylesheet.rel = 'prefetch';
+    }
+  }
+  const enableStylesheet = (stylesheets) => {
+    for (let i=0; i < stylesheets.length; i++) {
+      const stylesheet = stylesheets[i];
+      stylesheet.rel = 'stylesheet';
+    }
+  }
+  const manageTransitions = (selector, allowTransitions) => {
+    const els = window.document.querySelectorAll(selector);
+    for (let i=0; i < els.length; i++) {
+      const el = els[i];
+      if (allowTransitions) {
+        el.classList.remove('notransition');
+      } else {
+        el.classList.add('notransition');
+      }
+    }
+  }
+  const toggleColorMode = (alternate) => {
+    // Switch the stylesheets
+    const alternateStylesheets = window.document.querySelectorAll('link.quarto-color-scheme.quarto-color-alternate');
+    manageTransitions('#quarto-margin-sidebar .nav-link', false);
+    if (alternate) {
+      enableStylesheet(alternateStylesheets);
+      for (const sheetNode of alternateStylesheets) {
+        if (sheetNode.id === "quarto-bootstrap") {
+          toggleBodyColorMode(sheetNode);
+        }
+      }
+    } else {
+      disableStylesheet(alternateStylesheets);
+      toggleBodyColorPrimary();
+    }
+    manageTransitions('#quarto-margin-sidebar .nav-link', true);
+    // Switch the toggles
+    const toggles = window.document.querySelectorAll('.quarto-color-scheme-toggle');
+    for (let i=0; i < toggles.length; i++) {
+      const toggle = toggles[i];
+      if (toggle) {
+        if (alternate) {
+          toggle.classList.add("alternate");     
+        } else {
+          toggle.classList.remove("alternate");
+        }
+      }
+    }
+    // Hack to workaround the fact that safari doesn't
+    // properly recolor the scrollbar when toggling (#1455)
+    if (navigator.userAgent.indexOf('Safari') > 0 && navigator.userAgent.indexOf('Chrome') == -1) {
+      manageTransitions("body", false);
+      window.scrollTo(0, 1);
+      setTimeout(() => {
+        window.scrollTo(0, 0);
+        manageTransitions("body", true);
+      }, 40);  
+    }
+  }
+  const isFileUrl = () => { 
+    return window.location.protocol === 'file:';
+  }
+  const hasAlternateSentinel = () => {  
+    let styleSentinel = getColorSchemeSentinel();
+    if (styleSentinel !== null) {
+      return styleSentinel === "alternate";
+    } else {
+      return false;
+    }
+  }
+  const setStyleSentinel = (alternate) => {
+    const value = alternate ? "alternate" : "default";
+    if (!isFileUrl()) {
+      window.localStorage.setItem("quarto-color-scheme", value);
+    } else {
+      localAlternateSentinel = value;
+    }
+  }
+  const getColorSchemeSentinel = () => {
+    if (!isFileUrl()) {
+      const storageValue = window.localStorage.getItem("quarto-color-scheme");
+      return storageValue != null ? storageValue : localAlternateSentinel;
+    } else {
+      return localAlternateSentinel;
+    }
+  }
+  let localAlternateSentinel = 'default';
+  // Dark / light mode switch
+  window.quartoToggleColorScheme = () => {
+    // Read the current dark / light value 
+    let toAlternate = !hasAlternateSentinel();
+    toggleColorMode(toAlternate);
+    setStyleSentinel(toAlternate);
+  };
+  // Ensure there is a toggle, if there isn't float one in the top right
+  if (window.document.querySelector('.quarto-color-scheme-toggle') === null) {
+    const a = window.document.createElement('a');
+    a.classList.add('top-right');
+    a.classList.add('quarto-color-scheme-toggle');
+    a.href = "";
+    a.onclick = function() { try { window.quartoToggleColorScheme(); } catch {} return false; };
+    const i = window.document.createElement("i");
+    i.classList.add('bi');
+    a.appendChild(i);
+    window.document.body.appendChild(a);
+  }
+  // Switch to dark mode if need be
+  if (hasAlternateSentinel()) {
+    toggleColorMode(true);
+  } else {
+    toggleColorMode(false);
+  }
+  const icon = "";
+  const anchorJS = new window.AnchorJS();
+  anchorJS.options = {
+    placement: 'right',
+    icon: icon
+  };
+  anchorJS.add('.anchored');
+  const clipboard = new window.ClipboardJS('.code-copy-button', {
+    target: function(trigger) {
+      return trigger.previousElementSibling;
+    }
+  });
+  clipboard.on('success', function(e) {
+    // button target
+    const button = e.trigger;
+    // don't keep focus
+    button.blur();
+    // flash "checked"
+    button.classList.add('code-copy-button-checked');
+    var currentTitle = button.getAttribute("title");
+    button.setAttribute("title", "Copied!");
+    let tooltip;
+    if (window.bootstrap) {
+      button.setAttribute("data-bs-toggle", "tooltip");
+      button.setAttribute("data-bs-placement", "left");
+      button.setAttribute("data-bs-title", "Copied!");
+      tooltip = new bootstrap.Tooltip(button, 
+        { trigger: "manual", 
+          customClass: "code-copy-button-tooltip",
+          offset: [0, -8]});
+      tooltip.show();    
+    }
+    setTimeout(function() {
+      if (tooltip) {
+        tooltip.hide();
+        button.removeAttribute("data-bs-title");
+        button.removeAttribute("data-bs-toggle");
+        button.removeAttribute("data-bs-placement");
+      }
+      button.setAttribute("title", currentTitle);
+      button.classList.remove('code-copy-button-checked');
+    }, 1000);
+    // clear code selection
+    e.clearSelection();
+  });
+  function tippyHover(el, contentFn) {
+    const config = {
+      allowHTML: true,
+      content: contentFn,
+      maxWidth: 500,
+      delay: 100,
+      arrow: false,
+      appendTo: function(el) {
+          return el.parentElement;
+      },
+      interactive: true,
+      interactiveBorder: 10,
+      theme: 'quarto',
+      placement: 'bottom-start'
+    };
+    window.tippy(el, config); 
+  }
+  const noterefs = window.document.querySelectorAll('a[role="doc-noteref"]');
+  for (var i=0; i<noterefs.length; i++) {
+    const ref = noterefs[i];
+    tippyHover(ref, function() {
+      // use id or data attribute instead here
+      let href = ref.getAttribute('data-footnote-href') || ref.getAttribute('href');
+      try { href = new URL(href).hash; } catch {}
+      const id = href.replace(/^#\/?/, "");
+      const note = window.document.getElementById(id);
+      return note.innerHTML;
+    });
+  }
+  const findCites = (el) => {
+    const parentEl = el.parentElement;
+    if (parentEl) {
+      const cites = parentEl.dataset.cites;
+      if (cites) {
+        return {
+          el,
+          cites: cites.split(' ')
+        };
+      } else {
+        return findCites(el.parentElement)
+      }
+    } else {
+      return undefined;
+    }
+  };
+  var bibliorefs = window.document.querySelectorAll('a[role="doc-biblioref"]');
+  for (var i=0; i<bibliorefs.length; i++) {
+    const ref = bibliorefs[i];
+    const citeInfo = findCites(ref);
+    if (citeInfo) {
+      tippyHover(citeInfo.el, function() {
+        var popup = window.document.createElement('div');
+        citeInfo.cites.forEach(function(cite) {
+          var citeDiv = window.document.createElement('div');
+          citeDiv.classList.add('hanging-indent');
+          citeDiv.classList.add('csl-entry');
+          var biblioDiv = window.document.getElementById('ref-' + cite);
+          if (biblioDiv) {
+            citeDiv.innerHTML = biblioDiv.innerHTML;
+          }
+          popup.appendChild(citeDiv);
+        });
+        return popup.innerHTML;
+      });
+    }
+  }
+});
+</script>
+<script src="https://utteranc.es/client.js" repo="greglandrum/rdkit-blog" issue-term="pathname" theme="github-light" crossorigin="anonymous" async="">
+</script>
+</div> <!-- /content -->
+
+
+
+</body></html>
