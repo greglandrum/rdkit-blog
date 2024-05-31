@@ -12,7 +12,7 @@ toc: true
 
 ---
 
-**Updated 24.05.2023**
+**Updated 09.03.2024**
 
 It has been tricky to contribute code or documentation to the RDKit if you're a Python programmer who doesn't want to deal with the complexities of getting an RDKit build working. We want to make it straightforward for people to contribute, so I'm working on some recipes to make thigs easier. This is an attempt at that.
 
@@ -48,8 +48,10 @@ The next step is to create the conda environment that we're going to use to hold
 ```
 conda create -y -n py311_rdkit_beta python=3.11
 conda activate py311_rdkit_beta
-conda install -y -c conda-forge rdkit
+conda install -y -c conda-forge rdkit pytest
 ```
+
+If you have `mamba` installed, you can use that instead of `conda` in the `create` and `install` commands to have things run more quickly.
 
 These instructions set up an environment using python 3.11; feel free to change that if you'd prefer another python version. You will need to adjust the path below.
 If you have other Python packages that you'd like to work with, go ahead and install them into the environment now.
