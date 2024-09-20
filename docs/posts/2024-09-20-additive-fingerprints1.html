@@ -1,0 +1,1101 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en"><head>
+
+<meta charset="utf-8">
+<meta name="generator" content="quarto-1.2.269">
+
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+
+<meta name="dcterms.date" content="2024-09-20">
+<meta name="description" content="Generating molecular fingerprints from fragment fingerprints">
+
+<title>RDKit blog - Additive fingerprints</title>
+<style>
+code{white-space: pre-wrap;}
+span.smallcaps{font-variant: small-caps;}
+div.columns{display: flex; gap: min(4vw, 1.5em);}
+div.column{flex: auto; overflow-x: auto;}
+div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+ul.task-list{list-style: none;}
+ul.task-list li input[type="checkbox"] {
+  width: 0.8em;
+  margin: 0 0.8em 0.2em -1.6em;
+  vertical-align: middle;
+}
+pre > code.sourceCode { white-space: pre; position: relative; }
+pre > code.sourceCode > span { display: inline-block; line-height: 1.25; }
+pre > code.sourceCode > span:empty { height: 1.2em; }
+.sourceCode { overflow: visible; }
+code.sourceCode > span { color: inherit; text-decoration: inherit; }
+div.sourceCode { margin: 1em 0; }
+pre.sourceCode { margin: 0; }
+@media screen {
+div.sourceCode { overflow: auto; }
+}
+@media print {
+pre > code.sourceCode { white-space: pre-wrap; }
+pre > code.sourceCode > span { text-indent: -5em; padding-left: 5em; }
+}
+pre.numberSource code
+  { counter-reset: source-line 0; }
+pre.numberSource code > span
+  { position: relative; left: -4em; counter-increment: source-line; }
+pre.numberSource code > span > a:first-child::before
+  { content: counter(source-line);
+    position: relative; left: -1em; text-align: right; vertical-align: baseline;
+    border: none; display: inline-block;
+    -webkit-touch-callout: none; -webkit-user-select: none;
+    -khtml-user-select: none; -moz-user-select: none;
+    -ms-user-select: none; user-select: none;
+    padding: 0 4px; width: 4em;
+    color: #aaaaaa;
+  }
+pre.numberSource { margin-left: 3em; border-left: 1px solid #aaaaaa;  padding-left: 4px; }
+div.sourceCode
+  {   }
+@media screen {
+pre > code.sourceCode > span > a:first-child::before { text-decoration: underline; }
+}
+code span.al { color: #ff0000; font-weight: bold; } /* Alert */
+code span.an { color: #60a0b0; font-weight: bold; font-style: italic; } /* Annotation */
+code span.at { color: #7d9029; } /* Attribute */
+code span.bn { color: #40a070; } /* BaseN */
+code span.bu { color: #008000; } /* BuiltIn */
+code span.cf { color: #007020; font-weight: bold; } /* ControlFlow */
+code span.ch { color: #4070a0; } /* Char */
+code span.cn { color: #880000; } /* Constant */
+code span.co { color: #60a0b0; font-style: italic; } /* Comment */
+code span.cv { color: #60a0b0; font-weight: bold; font-style: italic; } /* CommentVar */
+code span.do { color: #ba2121; font-style: italic; } /* Documentation */
+code span.dt { color: #902000; } /* DataType */
+code span.dv { color: #40a070; } /* DecVal */
+code span.er { color: #ff0000; font-weight: bold; } /* Error */
+code span.ex { } /* Extension */
+code span.fl { color: #40a070; } /* Float */
+code span.fu { color: #06287e; } /* Function */
+code span.im { color: #008000; font-weight: bold; } /* Import */
+code span.in { color: #60a0b0; font-weight: bold; font-style: italic; } /* Information */
+code span.kw { color: #007020; font-weight: bold; } /* Keyword */
+code span.op { color: #666666; } /* Operator */
+code span.ot { color: #007020; } /* Other */
+code span.pp { color: #bc7a00; } /* Preprocessor */
+code span.sc { color: #4070a0; } /* SpecialChar */
+code span.ss { color: #bb6688; } /* SpecialString */
+code span.st { color: #4070a0; } /* String */
+code span.va { color: #19177c; } /* Variable */
+code span.vs { color: #4070a0; } /* VerbatimString */
+code span.wa { color: #60a0b0; font-weight: bold; font-style: italic; } /* Warning */
+</style>
+
+
+<script src="../site_libs/quarto-nav/quarto-nav.js"></script>
+<script src="../site_libs/quarto-nav/headroom.min.js"></script>
+<script src="../site_libs/clipboard/clipboard.min.js"></script>
+<script src="../site_libs/quarto-search/autocomplete.umd.js"></script>
+<script src="../site_libs/quarto-search/fuse.min.js"></script>
+<script src="../site_libs/quarto-search/quarto-search.js"></script>
+<meta name="quarto:offset" content="../">
+<link href="../posts/icons/favicon.ico" rel="icon">
+<script src="../site_libs/quarto-html/quarto.js"></script>
+<script src="../site_libs/quarto-html/popper.min.js"></script>
+<script src="../site_libs/quarto-html/tippy.umd.min.js"></script>
+<script src="../site_libs/quarto-html/anchor.min.js"></script>
+<link href="../site_libs/quarto-html/tippy.css" rel="stylesheet">
+<link href="../site_libs/quarto-html/quarto-syntax-highlighting.css" rel="stylesheet" class="quarto-color-scheme" id="quarto-text-highlighting-styles">
+<link href="../site_libs/quarto-html/quarto-syntax-highlighting-dark.css" rel="prefetch" class="quarto-color-scheme quarto-color-alternate" id="quarto-text-highlighting-styles">
+<script src="../site_libs/bootstrap/bootstrap.min.js"></script>
+<link href="../site_libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
+<link href="../site_libs/bootstrap/bootstrap.min.css" rel="stylesheet" class="quarto-color-scheme" id="quarto-bootstrap" data-mode="light">
+<link href="../site_libs/bootstrap/bootstrap-dark.min.css" rel="prefetch" class="quarto-color-scheme quarto-color-alternate" id="quarto-bootstrap" data-mode="dark">
+<script id="quarto-search-options" type="application/json">{
+  "location": "navbar",
+  "copy-button": false,
+  "collapse-after": 3,
+  "panel-placement": "end",
+  "type": "overlay",
+  "limit": 20,
+  "language": {
+    "search-no-results-text": "No results",
+    "search-matching-documents-text": "matching documents",
+    "search-copy-link-title": "Copy link to search",
+    "search-hide-matches-text": "Hide additional matches",
+    "search-more-match-text": "more match in this document",
+    "search-more-matches-text": "more matches in this document",
+    "search-clear-button-title": "Clear",
+    "search-detached-cancel-button-title": "Cancel",
+    "search-submit-button-title": "Submit"
+  }
+}</script>
+<script defer="" async="" data-host="greglandrum.github.io" src="https://liteanalytics.com/lite.js"></script>
+
+
+<link rel="stylesheet" href="../styles.css">
+</head>
+
+<body class="nav-fixed">
+
+<div id="quarto-search-results"></div>
+  <header id="quarto-header" class="headroom fixed-top">
+    <nav class="navbar navbar-expand-lg navbar-dark ">
+      <div class="navbar-container container-fluid">
+      <div class="navbar-brand-container">
+    <a class="navbar-brand" href="../index.html">
+    <span class="navbar-title">RDKit blog</span>
+    </a>
+  </div>
+          <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarCollapse" aria-controls="navbarCollapse" aria-expanded="false" aria-label="Toggle navigation" onclick="if (window.quartoToggleHeadroom) { window.quartoToggleHeadroom(); }">
+  <span class="navbar-toggler-icon"></span>
+</button>
+          <div class="collapse navbar-collapse" id="navbarCollapse">
+            <ul class="navbar-nav navbar-nav-scroll ms-auto">
+  <li class="nav-item">
+    <a class="nav-link" href="../about.html">
+ <span class="menu-text">RDKit experiments, tips, and tutorials</span></a>
+  </li>  
+  <li class="nav-item compact">
+    <a class="nav-link" href="https://github.com/rdkit/rdkit"><i class="bi bi-github" role="img">
+</i> 
+ <span class="menu-text"></span></a>
+  </li>  
+  <li class="nav-item compact">
+    <a class="nav-link" href="https://twitter.com/rdkit_org"><i class="bi bi-twitter" role="img">
+</i> 
+ <span class="menu-text"></span></a>
+  </li>  
+  <li class="nav-item compact">
+    <a class="nav-link" href="../index.xml"><i class="bi bi-rss" role="img">
+</i> 
+ <span class="menu-text"></span></a>
+  </li>  
+</ul>
+              <div class="quarto-toggle-container">
+                  <a href="" class="quarto-color-scheme-toggle nav-link" onclick="window.quartoToggleColorScheme(); return false;" title="Toggle dark mode"><i class="bi"></i></a>
+              </div>
+              <div id="quarto-search" class="" title="Search"></div>
+          </div> <!-- /navcollapse -->
+      </div> <!-- /container-fluid -->
+    </nav>
+</header>
+<!-- content -->
+<div id="quarto-content" class="quarto-container page-columns page-rows-contents page-layout-article page-navbar">
+<!-- sidebar -->
+<!-- margin-sidebar -->
+    <div id="quarto-margin-sidebar" class="sidebar margin-sidebar">
+        <nav id="TOC" role="doc-toc" class="toc-active">
+    <h2 id="toc-title">On this page</h2>
+   
+  <ul>
+  <li><a href="#validation" id="toc-validation" class="nav-link active" data-scroll-target="#validation">Validation</a>
+  <ul class="collapse">
+  <li><a href="#tolerances-for-searching" id="toc-tolerances-for-searching" class="nav-link" data-scroll-target="#tolerances-for-searching">Tolerances for searching</a></li>
+  </ul></li>
+  <li><a href="#what-about-if-we-dont-use-the-constant-offset" id="toc-what-about-if-we-dont-use-the-constant-offset" class="nav-link" data-scroll-target="#what-about-if-we-dont-use-the-constant-offset">What about if we don’t use the constant offset?</a></li>
+  </ul>
+</nav>
+    </div>
+<!-- main -->
+<main class="content" id="quarto-document-content">
+
+<header id="title-block-header" class="quarto-title-block default">
+<div class="quarto-title">
+<h1 class="title">Additive fingerprints</h1>
+  <div class="quarto-categories">
+    <div class="quarto-category">tutorial</div>
+    <div class="quarto-category">conformers</div>
+  </div>
+  </div>
+
+<div>
+  <div class="description">
+    Generating molecular fingerprints from fragment fingerprints
+  </div>
+</div>
+
+
+<div class="quarto-title-meta">
+
+    
+    <div>
+    <div class="quarto-title-meta-heading">Published</div>
+    <div class="quarto-title-meta-contents">
+      <p class="date">September 20, 2024</p>
+    </div>
+  </div>
+  
+    
+  </div>
+  
+
+</header>
+
+<p>This is a reformatted and lightly revised version of a <a href="https://rdkit.blogspot.com/2019/11/additive-fingerprints.html">blog post from 2019</a>.</p>
+<p>The goal here is to evaluate one strategy for enabling similarity search of virtual libraries defined via molecular fragments that can be combined using simple rules. One obvious approach is to just enumerate the molecules in the library, generate their fingerprints, and the calculate similarity. This is clearly impractical if the libraries are really big, so I want to see if it’s possible to make things faster by skipping the enumeration step and approximating the fingerprint of a molecule with the sum of the fingerprints that make it up plus constant correction terms.</p>
+<p>For example, suppose I form a molecule by combining the two fragments <code>c1ccccc1-[16*]</code> and <code>CCCCO-[3*]</code> to make <code>c1ccccc1-OCCCC</code>, I want to see how closely I can approximate the fingerprint of the final molecule by adding the fingerprints of the two fragments together with a correction term that is characteristic of the bond type being formed (in this case the <code>16-3</code> combination rule). This obviously won’t work well with fingerprints like Atom Pairs that include terms encompassing the entire molecule, but may be useful for more “local” descriptors like the Morgan fingerprint, topological torsions, or the RDKit fingerprint.</p>
+<p>This isn’t a really new idea - it’s inspired by the idea behind <a href="http://pubs.acs.org/doi/abs/10.1021/ci0504871">Truchon and Bayly’s GLARE algorithm</a> and I’ve explored it a bit in the past - but I haven’t seen it published and never really dug into it. That’s what this post (likely a series of posts) is for.</p>
+<p>Demonstrating that this really works requires a fair amount of effort, but we can get a good initial readout by comparing the calculated similarities between a bunch of real molecules calculated with their “real” fingerprints and then with the “additive” fingerprints. I’ll start here with the Morgan fingerprint, since that’s one of the more popular ones in the RDKit (and one where the approach seems likely to work). If that goes well, I’ll try another fingerprint type or two and maybe do some more comprehensive validation.</p>
+<blockquote class="blockquote">
+<p>Since the original post was published, a <a href="https://pubs.acs.org/doi/full/10.1021/acs.jcim.0c00850">paper from Matthias Rarey’s group</a> explored an efficient strategy for searching combinatorial library spaces using topological fingerprints.</p>
+</blockquote>
+<div class="cell" data-executetime="{&quot;end_time&quot;:&quot;2024-09-20T05:20:59.978449Z&quot;,&quot;start_time&quot;:&quot;2024-09-20T05:20:59.965723Z&quot;}" data-execution_count="19">
+<div class="sourceCode cell-code" id="cb1"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> numpy <span class="im">as</span> np</span>
+<span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> rdkit <span class="im">import</span> DataStructs</span>
+<span id="cb1-3"><a href="#cb1-3" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> rdkit <span class="im">import</span> Chem</span>
+<span id="cb1-4"><a href="#cb1-4" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> rdkit.Chem <span class="im">import</span> rdFingerprintGenerator</span>
+<span id="cb1-5"><a href="#cb1-5" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> rdkit.Chem.Draw <span class="im">import</span> IPythonConsole</span>
+<span id="cb1-6"><a href="#cb1-6" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> rdkit.Chem.MolStandardize <span class="im">import</span> rdMolStandardize</span>
+<span id="cb1-7"><a href="#cb1-7" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> rdkit.Chem <span class="im">import</span> Draw</span>
+<span id="cb1-8"><a href="#cb1-8" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> rdkit.Chem <span class="im">import</span> BRICS</span>
+<span id="cb1-9"><a href="#cb1-9" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> rdkit</span>
+<span id="cb1-10"><a href="#cb1-10" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(rdkit.__version__)</span>
+<span id="cb1-11"><a href="#cb1-11" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> matplotlib <span class="im">import</span> pyplot <span class="im">as</span> plt</span>
+<span id="cb1-12"><a href="#cb1-12" aria-hidden="true" tabindex="-1"></a><span class="op">%</span>matplotlib inline</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>2024.03.5</code></pre>
+</div>
+</div>
+<p>Start by reading in the set of molecules we’ll work with. This dataset was described in a recent <a href="https://rdkit.blogspot.com/2019/10/a-new-lessel-and-briem-like-dataset.html">RDKit blog post</a>.</p>
+<p>Bring in the molecules and do salt stripping:</p>
+<div class="cell" data-executetime="{&quot;end_time&quot;:&quot;2024-09-20T05:20:14.197264Z&quot;,&quot;start_time&quot;:&quot;2024-09-20T05:20:08.117933Z&quot;}" data-execution_count="2">
+<div class="sourceCode cell-code" id="cb3"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> rdkit <span class="im">import</span> rdBase</span>
+<span id="cb3-2"><a href="#cb3-2" aria-hidden="true" tabindex="-1"></a>rdBase.DisableLog(<span class="st">'rdApp.info'</span>)</span>
+<span id="cb3-3"><a href="#cb3-3" aria-hidden="true" tabindex="-1"></a>ms <span class="op">=</span> [rdMolStandardize.FragmentParent(x) <span class="cf">for</span> x <span class="kw">in</span> Chem.SmilesMolSupplier(<span class="st">'../data/BLSets_selected_actives.txt'</span>)]</span>
+<span id="cb3-4"><a href="#cb3-4" aria-hidden="true" tabindex="-1"></a>_ <span class="op">=</span> [Chem.GetSymmSSSR(m) <span class="cf">for</span> m <span class="kw">in</span> ms]</span>
+<span id="cb3-5"><a href="#cb3-5" aria-hidden="true" tabindex="-1"></a><span class="bu">len</span>(ms)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-display" data-execution_count="2">
+<pre><code>6359</code></pre>
+</div>
+</div>
+<p>In order to fragment the molecules we’re going to be using the <a href="http://doi.wiley.com/10.1002/cmdc.200800178">BRICS fragmentation rules</a> as implemented in the RDKit. Note that the RDKit implementation has differs from the published BRICS rules in that atom types 2 and 5 (both Ns) have been combined with each other. This is, unfortunately not (yet) documented outside of the code itself, but there’s an explanation here: https://github.com/rdkit/rdkit/blob/master/Code/GraphMol/ChemTransforms/MolFragmenter.cpp#L101</p>
+<p>For the purposes of this evaluation as to whether or not additive fingerprints work, we will only be using the ten most common BRICS bonds in the dataset. Let’s start by finding those.</p>
+<p>This is what the list of BRICS bonds for each molecule looks like:</p>
+<div class="cell" data-executetime="{&quot;end_time&quot;:&quot;2024-09-20T05:20:14.202874Z&quot;,&quot;start_time&quot;:&quot;2024-09-20T05:20:14.198923Z&quot;}" data-execution_count="3">
+<div class="sourceCode cell-code" id="cb5"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a><span class="bu">list</span>(BRICS.FindBRICSBonds(ms[<span class="dv">0</span>]))</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-display" data-execution_count="3">
+<pre><code>[((2, 1), ('1', '5')),
+ ((8, 7), ('1', '5')),
+ ((6, 7), ('4', '5')),
+ ((15, 20), ('5', '12')),
+ ((8, 10), ('6', '13')),
+ ((6, 30), ('8', '15')),
+ ((23, 24), ('8', '16'))]</code></pre>
+</div>
+</div>
+<p>The first element of each tuple contains the indices of the atoms defining the bond, the second element has the BRICS atom types of those atoms. For example, the first BRICS bond in the molecule above is between atom 2 (BRICS type 1) and atom 1 (BRICS type 5).</p>
+<p>Loop over all the molecules and count the number of times each bond type occurs:</p>
+<div class="cell" data-executetime="{&quot;end_time&quot;:&quot;2024-09-20T05:20:16.710986Z&quot;,&quot;start_time&quot;:&quot;2024-09-20T05:20:14.203972Z&quot;}" data-execution_count="4">
+<div class="sourceCode cell-code" id="cb7"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb7-1"><a href="#cb7-1" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> collections <span class="im">import</span> defaultdict, Counter</span>
+<span id="cb7-2"><a href="#cb7-2" aria-hidden="true" tabindex="-1"></a>cntr <span class="op">=</span> Counter()</span>
+<span id="cb7-3"><a href="#cb7-3" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> m <span class="kw">in</span> ms:</span>
+<span id="cb7-4"><a href="#cb7-4" aria-hidden="true" tabindex="-1"></a>    bbnds <span class="op">=</span> BRICS.FindBRICSBonds(m)</span>
+<span id="cb7-5"><a href="#cb7-5" aria-hidden="true" tabindex="-1"></a>    <span class="cf">for</span> aids,lbls <span class="kw">in</span> bbnds:</span>
+<span id="cb7-6"><a href="#cb7-6" aria-hidden="true" tabindex="-1"></a>        cntr[lbls] <span class="op">+=</span> <span class="dv">1</span></span>
+<span id="cb7-7"><a href="#cb7-7" aria-hidden="true" tabindex="-1"></a>freqs <span class="op">=</span> <span class="bu">sorted</span>([(y,x) <span class="cf">for</span> x,y <span class="kw">in</span> cntr.items()],reverse<span class="op">=</span><span class="va">True</span>)</span>
+<span id="cb7-8"><a href="#cb7-8" aria-hidden="true" tabindex="-1"></a>freqs[:<span class="dv">10</span>]</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-display" data-execution_count="4">
+<pre><code>[(7337, ('4', '5')),
+ (4619, ('1', '5')),
+ (3488, ('8', '16')),
+ (2599, ('3', '16')),
+ (1817, ('5', '16')),
+ (1507, ('3', '4')),
+ (997, ('6', '16')),
+ (853, ('5', '15')),
+ (789, ('8', '14')),
+ (714, ('8', '15'))]</code></pre>
+</div>
+</div>
+<p>The top two bond types are <code>4-5</code>(alkyl C - amine) and <code>1-5</code> (the amide bond).</p>
+<p>Keep those top 10:</p>
+<div class="cell" data-executetime="{&quot;end_time&quot;:&quot;2024-09-20T05:20:16.714314Z&quot;,&quot;start_time&quot;:&quot;2024-09-20T05:20:16.712437Z&quot;}" data-execution_count="5">
+<div class="sourceCode cell-code" id="cb9"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb9-1"><a href="#cb9-1" aria-hidden="true" tabindex="-1"></a>bondsToKeep <span class="op">=</span> [y <span class="cf">for</span> x,y <span class="kw">in</span> freqs[:<span class="dv">10</span>]]</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+<p>In order to clarify what the more complex code below does, here’s a worked example demonstrating fragmenting a single molecule along two bonds, both between BRICS atom types 1 and 5 (these bonds and the types come from the example above where we found the molecule’s BRICS bonds):</p>
+<div class="cell" data-executetime="{&quot;end_time&quot;:&quot;2024-09-20T05:20:18.088028Z&quot;,&quot;start_time&quot;:&quot;2024-09-20T05:20:16.715288Z&quot;}" data-execution_count="6">
+<div class="sourceCode cell-code" id="cb10"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb10-1"><a href="#cb10-1" aria-hidden="true" tabindex="-1"></a>tm<span class="op">=</span>Chem.FragmentOnSomeBonds(ms[<span class="dv">0</span>],[ms[<span class="dv">0</span>].GetBondBetweenAtoms(<span class="dv">2</span>,<span class="dv">1</span>).GetIdx(),ms[<span class="dv">0</span>].GetBondBetweenAtoms(<span class="dv">8</span>,<span class="dv">7</span>).GetIdx()],</span>
+<span id="cb10-2"><a href="#cb10-2" aria-hidden="true" tabindex="-1"></a>                         dummyLabels<span class="op">=</span>[[<span class="dv">1</span>,<span class="dv">5</span>],[<span class="dv">1</span>,<span class="dv">5</span>]])</span>
+<span id="cb10-3"><a href="#cb10-3" aria-hidden="true" tabindex="-1"></a>[Chem.MolToSmiles(x) <span class="cf">for</span> x <span class="kw">in</span> tm]</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-display" data-execution_count="6">
+<pre><code>['[1*]C(=O)C(=O)C(NC(=O)[C@@H]1CC[C@H]2CN(S(=O)(=O)Cc3ccccc3)CC(=O)N21)[C@H]1CC[C@H](N)CC1.[5*]NC',
+ '[1*]C(=O)[C@@H]1CC[C@H]2CN(S(=O)(=O)Cc3ccccc3)CC(=O)N21.[5*]NC(C(=O)C(=O)NC)[C@H]1CC[C@H](N)CC1']</code></pre>
+</div>
+</div>
+<p>To make it visual, here’s a drawing of the two fragmentations:</p>
+<div class="cell" data-executetime="{&quot;end_time&quot;:&quot;2024-09-20T05:20:18.262798Z&quot;,&quot;start_time&quot;:&quot;2024-09-20T05:20:18.092745Z&quot;}" data-execution_count="7">
+<div class="sourceCode cell-code" id="cb12"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb12-1"><a href="#cb12-1" aria-hidden="true" tabindex="-1"></a>fms <span class="op">=</span> Chem.FragmentOnSomeBonds(ms[<span class="dv">0</span>],[ms[<span class="dv">0</span>].GetBondBetweenAtoms(<span class="dv">2</span>,<span class="dv">1</span>).GetIdx(),ms[<span class="dv">0</span>].GetBondBetweenAtoms(<span class="dv">8</span>,<span class="dv">7</span>).GetIdx()],</span>
+<span id="cb12-2"><a href="#cb12-2" aria-hidden="true" tabindex="-1"></a>                         dummyLabels<span class="op">=</span>[[<span class="dv">1</span>,<span class="dv">5</span>],[<span class="dv">1</span>,<span class="dv">5</span>]])</span>
+<span id="cb12-3"><a href="#cb12-3" aria-hidden="true" tabindex="-1"></a>Draw.MolsToGridImage(fms,subImgSize<span class="op">=</span>(<span class="dv">300</span>,<span class="dv">250</span>))</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-display" data-execution_count="7">
+<p><img src="2024-09-20-additive-fingerprints1_files/figure-html/cell-8-output-1.png" class="img-fluid"></p>
+</div>
+</div>
+<p>Let’s define some functions that we’ll use for the rest of this:</p>
+<div class="cell" data-executetime="{&quot;end_time&quot;:&quot;2024-09-20T05:20:18.348232Z&quot;,&quot;start_time&quot;:&quot;2024-09-20T05:20:18.264046Z&quot;}" data-execution_count="8">
+<div class="sourceCode cell-code" id="cb13"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb13-1"><a href="#cb13-1" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> splitMol(mol,bondsToKeep):</span>
+<span id="cb13-2"><a href="#cb13-2" aria-hidden="true" tabindex="-1"></a>    <span class="co">''' fragments a molecule on a particular set of BRICS bonds. </span></span>
+<span id="cb13-3"><a href="#cb13-3" aria-hidden="true" tabindex="-1"></a><span class="co">    Partially sanitizes the results </span></span>
+<span id="cb13-4"><a href="#cb13-4" aria-hidden="true" tabindex="-1"></a><span class="co">    '''</span></span>
+<span id="cb13-5"><a href="#cb13-5" aria-hidden="true" tabindex="-1"></a>    bbnds <span class="op">=</span> BRICS.FindBRICSBonds(mol)</span>
+<span id="cb13-6"><a href="#cb13-6" aria-hidden="true" tabindex="-1"></a>    bndsToTry <span class="op">=</span> []</span>
+<span id="cb13-7"><a href="#cb13-7" aria-hidden="true" tabindex="-1"></a>    lbls <span class="op">=</span> []</span>
+<span id="cb13-8"><a href="#cb13-8" aria-hidden="true" tabindex="-1"></a>    <span class="cf">for</span> aids,lbl <span class="kw">in</span> bbnds:</span>
+<span id="cb13-9"><a href="#cb13-9" aria-hidden="true" tabindex="-1"></a>        <span class="cf">if</span> lbl <span class="kw">in</span> bondsToKeep:</span>
+<span id="cb13-10"><a href="#cb13-10" aria-hidden="true" tabindex="-1"></a>            bndsToTry.append(mol.GetBondBetweenAtoms(aids[<span class="dv">0</span>],aids[<span class="dv">1</span>]).GetIdx())</span>
+<span id="cb13-11"><a href="#cb13-11" aria-hidden="true" tabindex="-1"></a>            lbls.append([<span class="bu">int</span>(x) <span class="cf">for</span> x <span class="kw">in</span> lbl])</span>
+<span id="cb13-12"><a href="#cb13-12" aria-hidden="true" tabindex="-1"></a>    <span class="cf">if</span> <span class="kw">not</span> bndsToTry:</span>
+<span id="cb13-13"><a href="#cb13-13" aria-hidden="true" tabindex="-1"></a>        <span class="cf">return</span> []</span>
+<span id="cb13-14"><a href="#cb13-14" aria-hidden="true" tabindex="-1"></a>    res <span class="op">=</span> Chem.FragmentOnSomeBonds(mol,bndsToTry,dummyLabels<span class="op">=</span>lbls)</span>
+<span id="cb13-15"><a href="#cb13-15" aria-hidden="true" tabindex="-1"></a>    <span class="co"># We need at least a partial sanitization for the rest of what we will be doing:</span></span>
+<span id="cb13-16"><a href="#cb13-16" aria-hidden="true" tabindex="-1"></a>    <span class="cf">for</span> entry <span class="kw">in</span> res:</span>
+<span id="cb13-17"><a href="#cb13-17" aria-hidden="true" tabindex="-1"></a>        entry.UpdatePropertyCache(<span class="va">False</span>)</span>
+<span id="cb13-18"><a href="#cb13-18" aria-hidden="true" tabindex="-1"></a>        Chem.FastFindRings(entry)</span>
+<span id="cb13-19"><a href="#cb13-19" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> res</span>
+<span id="cb13-20"><a href="#cb13-20" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb13-21"><a href="#cb13-21" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> getDifferenceFPs(mol,bondsToKeep,fpgen):</span>
+<span id="cb13-22"><a href="#cb13-22" aria-hidden="true" tabindex="-1"></a>    <span class="co">''' generates the difference fingerprint between the molecule</span></span>
+<span id="cb13-23"><a href="#cb13-23" aria-hidden="true" tabindex="-1"></a><span class="co">    and each of its fragmentations based on the BRICS bond types passed in.</span></span>
+<span id="cb13-24"><a href="#cb13-24" aria-hidden="true" tabindex="-1"></a><span class="co">    </span></span>
+<span id="cb13-25"><a href="#cb13-25" aria-hidden="true" tabindex="-1"></a><span class="co">    This calculates the sum of the fragment fingerprints by just generating the</span></span>
+<span id="cb13-26"><a href="#cb13-26" aria-hidden="true" tabindex="-1"></a><span class="co">    fingerprint of the fragmented molecule, so whole-molecule fingerprints like</span></span>
+<span id="cb13-27"><a href="#cb13-27" aria-hidden="true" tabindex="-1"></a><span class="co">    atom pairs will not work here. That's fine since they are unlikely to be useful</span></span>
+<span id="cb13-28"><a href="#cb13-28" aria-hidden="true" tabindex="-1"></a><span class="co">    with this approach anyway</span></span>
+<span id="cb13-29"><a href="#cb13-29" aria-hidden="true" tabindex="-1"></a><span class="co">    '''</span></span>
+<span id="cb13-30"><a href="#cb13-30" aria-hidden="true" tabindex="-1"></a>    frags <span class="op">=</span> splitMol(mol,bondsToKeep)</span>
+<span id="cb13-31"><a href="#cb13-31" aria-hidden="true" tabindex="-1"></a>    <span class="cf">if</span> <span class="kw">not</span> frags:</span>
+<span id="cb13-32"><a href="#cb13-32" aria-hidden="true" tabindex="-1"></a>        <span class="cf">return</span> []</span>
+<span id="cb13-33"><a href="#cb13-33" aria-hidden="true" tabindex="-1"></a>    res <span class="op">=</span> []</span>
+<span id="cb13-34"><a href="#cb13-34" aria-hidden="true" tabindex="-1"></a>    <span class="co"># get the fingerprint for the molecule:</span></span>
+<span id="cb13-35"><a href="#cb13-35" aria-hidden="true" tabindex="-1"></a>    molfp <span class="op">=</span> fpgen.GetCountFingerprint(mol)</span>
+<span id="cb13-36"><a href="#cb13-36" aria-hidden="true" tabindex="-1"></a>    <span class="co"># now loop over each fragmentation</span></span>
+<span id="cb13-37"><a href="#cb13-37" aria-hidden="true" tabindex="-1"></a>    <span class="cf">for</span> frag <span class="kw">in</span> frags:</span>
+<span id="cb13-38"><a href="#cb13-38" aria-hidden="true" tabindex="-1"></a>        <span class="co"># generate the fingerprint of the fragmented molecule</span></span>
+<span id="cb13-39"><a href="#cb13-39" aria-hidden="true" tabindex="-1"></a>        <span class="co"># (equivalent to the sum of the fingerprints of the fragments)</span></span>
+<span id="cb13-40"><a href="#cb13-40" aria-hidden="true" tabindex="-1"></a>        ffp <span class="op">=</span> fpgen.GetCountFingerprint(frag)</span>
+<span id="cb13-41"><a href="#cb13-41" aria-hidden="true" tabindex="-1"></a>        <span class="co"># and keep the difference</span></span>
+<span id="cb13-42"><a href="#cb13-42" aria-hidden="true" tabindex="-1"></a>        res.append(molfp<span class="op">-</span>ffp)</span>
+<span id="cb13-43"><a href="#cb13-43" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> res</span>
+<span id="cb13-44"><a href="#cb13-44" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb13-45"><a href="#cb13-45" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> getSumFP(fragMol,fpgen,delta):</span>
+<span id="cb13-46"><a href="#cb13-46" aria-hidden="true" tabindex="-1"></a>    <span class="co">''' Constructs the sum fingerprint for a fragmented molecule using</span></span>
+<span id="cb13-47"><a href="#cb13-47" aria-hidden="true" tabindex="-1"></a><span class="co">    delta as a constant offset</span></span>
+<span id="cb13-48"><a href="#cb13-48" aria-hidden="true" tabindex="-1"></a><span class="co">    </span></span>
+<span id="cb13-49"><a href="#cb13-49" aria-hidden="true" tabindex="-1"></a><span class="co">    note that any elements of the fingerprint that are negative after adding the</span></span>
+<span id="cb13-50"><a href="#cb13-50" aria-hidden="true" tabindex="-1"></a><span class="co">    constant offset will be set to zero</span></span>
+<span id="cb13-51"><a href="#cb13-51" aria-hidden="true" tabindex="-1"></a><span class="co">    </span></span>
+<span id="cb13-52"><a href="#cb13-52" aria-hidden="true" tabindex="-1"></a><span class="co">    '''</span></span>
+<span id="cb13-53"><a href="#cb13-53" aria-hidden="true" tabindex="-1"></a>    ffp <span class="op">=</span> fpgen.GetCountFingerprint(fragMol)</span>
+<span id="cb13-54"><a href="#cb13-54" aria-hidden="true" tabindex="-1"></a>    <span class="cf">for</span> idx,v <span class="kw">in</span> delta.GetNonzeroElements().items():</span>
+<span id="cb13-55"><a href="#cb13-55" aria-hidden="true" tabindex="-1"></a>        tv <span class="op">=</span> ffp[idx] <span class="op">+</span> v</span>
+<span id="cb13-56"><a href="#cb13-56" aria-hidden="true" tabindex="-1"></a>        <span class="cf">if</span> tv<span class="op">&lt;</span><span class="dv">0</span>:</span>
+<span id="cb13-57"><a href="#cb13-57" aria-hidden="true" tabindex="-1"></a>            tv <span class="op">=</span> <span class="dv">0</span><span class="op">;</span></span>
+<span id="cb13-58"><a href="#cb13-58" aria-hidden="true" tabindex="-1"></a>        ffp[idx] <span class="op">=</span> tv</span>
+<span id="cb13-59"><a href="#cb13-59" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> ffp</span>
+<span id="cb13-60"><a href="#cb13-60" aria-hidden="true" tabindex="-1"></a>        </span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+<div class="cell" data-executetime="{&quot;end_time&quot;:&quot;2024-09-20T05:20:18.450797Z&quot;,&quot;start_time&quot;:&quot;2024-09-20T05:20:18.379029Z&quot;}" data-execution_count="9">
+<div class="sourceCode cell-code" id="cb14"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb14-1"><a href="#cb14-1" aria-hidden="true" tabindex="-1"></a><span class="co"># demonstrate what splitMol returns:</span></span>
+<span id="cb14-2"><a href="#cb14-2" aria-hidden="true" tabindex="-1"></a>frags <span class="op">=</span> splitMol(ms[<span class="dv">0</span>],bondsToKeep[<span class="dv">2</span>:<span class="dv">3</span>])</span>
+<span id="cb14-3"><a href="#cb14-3" aria-hidden="true" tabindex="-1"></a>Draw.MolsToGridImage(frags)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-display" data-execution_count="9">
+<p><img src="2024-09-20-additive-fingerprints1_files/figure-html/cell-10-output-1.png" class="img-fluid"></p>
+</div>
+</div>
+<p>Now walk through the analysis with a single bond type: <code>1-5</code></p>
+<p>The first thing we need to do is determine the constant offset term for this bond type. We will do that by generating difference fingerprints for all the fragmentations it generates and then averaging those difference fingerprints.</p>
+<p>Start by generating the difference fingerprints for all the fragmentations using that bond type:</p>
+<div class="cell" data-executetime="{&quot;end_time&quot;:&quot;2024-09-20T05:20:22.585306Z&quot;,&quot;start_time&quot;:&quot;2024-09-20T05:20:19.109765Z&quot;}" data-execution_count="10">
+<div class="sourceCode cell-code" id="cb15"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb15-1"><a href="#cb15-1" aria-hidden="true" tabindex="-1"></a><span class="co"># for this analysis we will use a 4096 "bit" count-based Morgan fingerprints with a radius of 2</span></span>
+<span id="cb15-2"><a href="#cb15-2" aria-hidden="true" tabindex="-1"></a>fpgen <span class="op">=</span> rdFingerprintGenerator.GetMorganGenerator(radius<span class="op">=</span><span class="dv">2</span>,fpSize<span class="op">=</span><span class="dv">4096</span>)</span>
+<span id="cb15-3"><a href="#cb15-3" aria-hidden="true" tabindex="-1"></a>dfps<span class="op">=</span> []</span>
+<span id="cb15-4"><a href="#cb15-4" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> m <span class="kw">in</span> ms:</span>
+<span id="cb15-5"><a href="#cb15-5" aria-hidden="true" tabindex="-1"></a>    dfps.extend(getDifferenceFPs(m,bondsToKeep[<span class="dv">1</span>:<span class="dv">2</span>],fpgen))</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+<p>Now find the average value of the difference fingerprint, being careful to keep only integer values:</p>
+<div class="cell" data-executetime="{&quot;end_time&quot;:&quot;2024-09-20T05:20:22.628417Z&quot;,&quot;start_time&quot;:&quot;2024-09-20T05:20:22.586574Z&quot;}" data-execution_count="11">
+<div class="sourceCode cell-code" id="cb16"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb16-1"><a href="#cb16-1" aria-hidden="true" tabindex="-1"></a>delta1 <span class="op">=</span> dfps[<span class="dv">0</span>]</span>
+<span id="cb16-2"><a href="#cb16-2" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> dfp <span class="kw">in</span> dfps[<span class="dv">1</span>:]:</span>
+<span id="cb16-3"><a href="#cb16-3" aria-hidden="true" tabindex="-1"></a>    delta1 <span class="op">+=</span> dfp</span>
+<span id="cb16-4"><a href="#cb16-4" aria-hidden="true" tabindex="-1"></a>nfps <span class="op">=</span> <span class="bu">len</span>(dfps)</span>
+<span id="cb16-5"><a href="#cb16-5" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> k,v <span class="kw">in</span> delta1.GetNonzeroElements().items():</span>
+<span id="cb16-6"><a href="#cb16-6" aria-hidden="true" tabindex="-1"></a>    delta1[k] <span class="op">=</span> <span class="bu">round</span>(v<span class="op">/</span>nfps)</span>
+<span id="cb16-7"><a href="#cb16-7" aria-hidden="true" tabindex="-1"></a>delta1.GetNonzeroElements()</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-display" data-execution_count="11">
+<pre><code>{226: -2, 264: -1, 1831: -1}</code></pre>
+</div>
+</div>
+<p>To quickly summarize that this is telling us: We can simulate the MFP2 fingerprint for a molecule by adding the MFP2 fingerprints of its bond type <code>1-5</code> fragments and then substracting one each from the values for bits 264 and 1831 and two from the value for bit 226.</p>
+<p>Let’s look at how well that works across all the molecules. We start by generating the full FP and the <code>1-5</code> fragment FP for every molecule that has a <code>1-5</code> fragment:</p>
+<div class="cell" data-executetime="{&quot;end_time&quot;:&quot;2024-09-20T05:20:26.476872Z&quot;,&quot;start_time&quot;:&quot;2024-09-20T05:20:22.629421Z&quot;}" data-execution_count="12">
+<div class="sourceCode cell-code" id="cb18"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb18-1"><a href="#cb18-1" aria-hidden="true" tabindex="-1"></a>allfps <span class="op">=</span> []</span>
+<span id="cb18-2"><a href="#cb18-2" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> m <span class="kw">in</span> ms:</span>
+<span id="cb18-3"><a href="#cb18-3" aria-hidden="true" tabindex="-1"></a>    frags <span class="op">=</span> splitMol(m,bondsToKeep[<span class="dv">1</span>:<span class="dv">2</span>])</span>
+<span id="cb18-4"><a href="#cb18-4" aria-hidden="true" tabindex="-1"></a>    <span class="cf">if</span> <span class="kw">not</span> frags:</span>
+<span id="cb18-5"><a href="#cb18-5" aria-hidden="true" tabindex="-1"></a>        <span class="cf">continue</span></span>
+<span id="cb18-6"><a href="#cb18-6" aria-hidden="true" tabindex="-1"></a>    fp1 <span class="op">=</span> fpgen.GetCountFingerprint(m)</span>
+<span id="cb18-7"><a href="#cb18-7" aria-hidden="true" tabindex="-1"></a>    ffps <span class="op">=</span> [getSumFP(x,fpgen,delta1) <span class="cf">for</span> x <span class="kw">in</span> frags]</span>
+<span id="cb18-8"><a href="#cb18-8" aria-hidden="true" tabindex="-1"></a>    allfps.append((fp1,ffps))</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+<div class="cell" data-executetime="{&quot;end_time&quot;:&quot;2024-09-20T05:20:26.481011Z&quot;,&quot;start_time&quot;:&quot;2024-09-20T05:20:26.478207Z&quot;}" data-execution_count="13">
+<div class="sourceCode cell-code" id="cb19"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb19-1"><a href="#cb19-1" aria-hidden="true" tabindex="-1"></a><span class="bu">len</span>(allfps)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-display" data-execution_count="13">
+<pre><code>2801</code></pre>
+</div>
+</div>
+<p>And calculate the similarity of each molecule to itself by calculating the Tanimoto similarity between the full fingerprint and the fragment fingerprint:</p>
+<div class="cell" data-executetime="{&quot;end_time&quot;:&quot;2024-09-20T05:20:26.588111Z&quot;,&quot;start_time&quot;:&quot;2024-09-20T05:20:26.481896Z&quot;}" data-execution_count="14">
+<div class="sourceCode cell-code" id="cb21"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb21-1"><a href="#cb21-1" aria-hidden="true" tabindex="-1"></a>self_tanis <span class="op">=</span> []</span>
+<span id="cb21-2"><a href="#cb21-2" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> fp1,ffps <span class="kw">in</span> allfps:</span>
+<span id="cb21-3"><a href="#cb21-3" aria-hidden="true" tabindex="-1"></a>    self_tanis.extend([DataStructs.TanimotoSimilarity(fp1,x) <span class="cf">for</span> x <span class="kw">in</span> ffps])</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+<p>Visualize those:</p>
+<div class="cell" data-executetime="{&quot;end_time&quot;:&quot;2024-09-20T05:20:34.867463Z&quot;,&quot;start_time&quot;:&quot;2024-09-20T05:20:34.751222Z&quot;}" data-execution_count="16">
+<div class="sourceCode cell-code" id="cb22"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb22-1"><a href="#cb22-1" aria-hidden="true" tabindex="-1"></a>plt.hist(self_tanis,bins<span class="op">=</span><span class="dv">20</span>)<span class="op">;</span></span>
+<span id="cb22-2"><a href="#cb22-2" aria-hidden="true" tabindex="-1"></a>plt.title(<span class="st">"self similarity, fusion 1-5"</span>)<span class="op">;</span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-display">
+<p><img src="2024-09-20-additive-fingerprints1_files/figure-html/cell-16-output-1.png" class="img-fluid"></p>
+</div>
+</div>
+<p>Though that’s interesting, and good to see that the self-similarities aren’t all too far from 1.0, we’re actually more interested in using the fingerprints for comparing different molecules to each other.</p>
+<p>Look at a bunch of random pairs of molecules that are at least 0.3 similar to each other (the <a href="https://greglandrum.github.io/rdkit-blog/posts/2021-05-18-fingerprint-thresholds1.html">noise threshold</a> for count-based MFP2 is around 0.3), and then look at how different the similarities between their normal and fragment fingerprints are.</p>
+<div class="cell" data-executetime="{&quot;end_time&quot;:&quot;2024-09-20T05:20:40.232712Z&quot;,&quot;start_time&quot;:&quot;2024-09-20T05:20:39.588025Z&quot;}" data-execution_count="17">
+<div class="sourceCode cell-code" id="cb23"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb23-1"><a href="#cb23-1" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> random</span>
+<span id="cb23-2"><a href="#cb23-2" aria-hidden="true" tabindex="-1"></a>random.seed(<span class="bn">0xf00d</span>)</span>
+<span id="cb23-3"><a href="#cb23-3" aria-hidden="true" tabindex="-1"></a>ps1 <span class="op">=</span> <span class="bu">list</span>(<span class="bu">range</span>(<span class="bu">len</span>(allfps)))</span>
+<span id="cb23-4"><a href="#cb23-4" aria-hidden="true" tabindex="-1"></a>random.shuffle(ps1)</span>
+<span id="cb23-5"><a href="#cb23-5" aria-hidden="true" tabindex="-1"></a>ps1 <span class="op">=</span> ps1[:<span class="dv">500</span>]</span>
+<span id="cb23-6"><a href="#cb23-6" aria-hidden="true" tabindex="-1"></a>ps2 <span class="op">=</span> <span class="bu">list</span>(<span class="bu">range</span>(<span class="bu">len</span>(allfps)))</span>
+<span id="cb23-7"><a href="#cb23-7" aria-hidden="true" tabindex="-1"></a>random.shuffle(ps2)</span>
+<span id="cb23-8"><a href="#cb23-8" aria-hidden="true" tabindex="-1"></a>ps2 <span class="op">=</span> ps2[:<span class="dv">500</span>]</span>
+<span id="cb23-9"><a href="#cb23-9" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb23-10"><a href="#cb23-10" aria-hidden="true" tabindex="-1"></a>nCompared <span class="op">=</span> <span class="dv">0</span></span>
+<span id="cb23-11"><a href="#cb23-11" aria-hidden="true" tabindex="-1"></a>other_tanidiff <span class="op">=</span> []</span>
+<span id="cb23-12"><a href="#cb23-12" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> i <span class="kw">in</span> ps1:</span>
+<span id="cb23-13"><a href="#cb23-13" aria-hidden="true" tabindex="-1"></a>    fp1,frags1 <span class="op">=</span> allfps[i]</span>
+<span id="cb23-14"><a href="#cb23-14" aria-hidden="true" tabindex="-1"></a>    <span class="cf">for</span> j <span class="kw">in</span> ps2:</span>
+<span id="cb23-15"><a href="#cb23-15" aria-hidden="true" tabindex="-1"></a>        fp2,frags2 <span class="op">=</span> allfps[j]</span>
+<span id="cb23-16"><a href="#cb23-16" aria-hidden="true" tabindex="-1"></a>        refTani <span class="op">=</span> DataStructs.TanimotoSimilarity(fp1,fp2)</span>
+<span id="cb23-17"><a href="#cb23-17" aria-hidden="true" tabindex="-1"></a>        <span class="cf">if</span> refTani <span class="op">&lt;</span> <span class="fl">0.3</span>:</span>
+<span id="cb23-18"><a href="#cb23-18" aria-hidden="true" tabindex="-1"></a>            <span class="cf">continue</span></span>
+<span id="cb23-19"><a href="#cb23-19" aria-hidden="true" tabindex="-1"></a>        nCompared <span class="op">+=</span> <span class="dv">1</span></span>
+<span id="cb23-20"><a href="#cb23-20" aria-hidden="true" tabindex="-1"></a>        ltanis <span class="op">=</span> []</span>
+<span id="cb23-21"><a href="#cb23-21" aria-hidden="true" tabindex="-1"></a>        <span class="cf">for</span> f1 <span class="kw">in</span> frags1:</span>
+<span id="cb23-22"><a href="#cb23-22" aria-hidden="true" tabindex="-1"></a>            ltanis.extend(DataStructs.BulkTanimotoSimilarity(f1,frags2))</span>
+<span id="cb23-23"><a href="#cb23-23" aria-hidden="true" tabindex="-1"></a>        other_tanidiff.extend([refTani<span class="op">-</span>x <span class="cf">for</span> x <span class="kw">in</span> ltanis])</span>
+<span id="cb23-24"><a href="#cb23-24" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"considered </span><span class="sc">{</span>nCompared<span class="sc">}</span><span class="ss"> fingerprint pairs from </span><span class="sc">{</span><span class="bu">len</span>(allfps)<span class="op">**</span><span class="dv">2</span><span class="sc">}</span><span class="ss">"</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>considered 15382 fingerprint pairs from 7845601</code></pre>
+</div>
+</div>
+<div class="cell" data-executetime="{&quot;end_time&quot;:&quot;2024-09-20T05:22:06.692154Z&quot;,&quot;start_time&quot;:&quot;2024-09-20T05:22:06.476816Z&quot;}" data-execution_count="23">
+<div class="sourceCode cell-code" id="cb25"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb25-1"><a href="#cb25-1" aria-hidden="true" tabindex="-1"></a>median <span class="op">=</span> np.median(np.<span class="bu">abs</span>(other_tanidiff))</span>
+<span id="cb25-2"><a href="#cb25-2" aria-hidden="true" tabindex="-1"></a>bins <span class="op">=</span> np.quantile(np.<span class="bu">abs</span>(other_tanidiff),[<span class="fl">0.25</span>,<span class="fl">0.75</span>, <span class="fl">0.9</span>,<span class="fl">0.95</span>])</span>
+<span id="cb25-3"><a href="#cb25-3" aria-hidden="true" tabindex="-1"></a>iqr <span class="op">=</span> bins[<span class="dv">1</span>]<span class="op">-</span>bins[<span class="dv">0</span>]</span>
+<span id="cb25-4"><a href="#cb25-4" aria-hidden="true" tabindex="-1"></a>plt.hist(other_tanidiff,bins<span class="op">=</span><span class="dv">20</span>)<span class="op">;</span></span>
+<span id="cb25-5"><a href="#cb25-5" aria-hidden="true" tabindex="-1"></a>gzero <span class="op">=</span> np.<span class="bu">sum</span>(np.array(other_tanidiff)<span class="op">&gt;-</span><span class="fl">0.005</span>) <span class="op">/</span> <span class="bu">len</span>(other_tanidiff)</span>
+<span id="cb25-6"><a href="#cb25-6" aria-hidden="true" tabindex="-1"></a>plt.title(<span class="ss">f'MAD=</span><span class="sc">{</span>median<span class="sc">:.2f}</span><span class="ss">, IQR=</span><span class="sc">{</span>iqr<span class="sc">:.2f}</span><span class="ss">, 90%=</span><span class="sc">{</span>bins[<span class="dv">2</span>]<span class="sc">:.2f}</span><span class="ss">, 95%=</span><span class="sc">{</span>bins[<span class="dv">3</span>]<span class="sc">:.2f}</span><span class="ss">, </span><span class="sc">{</span>gzero<span class="sc">:.2f}</span><span class="ss">&gt;-.005'</span>)<span class="op">;</span></span>
+<span id="cb25-7"><a href="#cb25-7" aria-hidden="true" tabindex="-1"></a>plt.xlabel(<span class="st">'$</span><span class="ch">\\</span><span class="st">Delta$Similarity'</span>)<span class="op">;</span></span>
+<span id="cb25-8"><a href="#cb25-8" aria-hidden="true" tabindex="-1"></a>plt.ylabel(<span class="st">'count'</span>)<span class="op">;</span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-display">
+<p><img src="2024-09-20-additive-fingerprints1_files/figure-html/cell-18-output-1.png" class="img-fluid"></p>
+</div>
+</div>
+<p>The title of the plot shows statistics about the similarity differences: the median absolute deviation (MAD), the inter-quartile range (IQR), the 90% and 95% bins of the absolute deviations, and the fraction of the differences which are greater than -0.005 (I chose 0.005 as an conservative tolerance value for considering the similarities identical).</p>
+<p>That looks pretty good. For at least the <code>1-5</code> fragmentation, the similarity calculated with the fragment fingerprint is quite similar to that calculated with the full fingerprint. Even better: most of the deviation happens to the high-similarity side (87% exceed the -0.005 tolerance value), so we should be able to safely use the fragment-fingerprint similarity as a filter to identify interesting molecules.</p>
+<section id="validation" class="level1">
+<h1>Validation</h1>
+<p>Repeat that analysis for each of the top 10 fragmentations:</p>
+<div class="cell" data-executetime="{&quot;end_time&quot;:&quot;2024-09-20T03:30:09.764668Z&quot;,&quot;start_time&quot;:&quot;2024-09-20T03:28:44.748774Z&quot;}" data-execution_count="91">
+<div class="sourceCode cell-code" id="cb26"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb26-1"><a href="#cb26-1" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> random</span>
+<span id="cb26-2"><a href="#cb26-2" aria-hidden="true" tabindex="-1"></a>random.seed(<span class="bn">0xf00d</span>)</span>
+<span id="cb26-3"><a href="#cb26-3" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> collections <span class="im">import</span> defaultdict</span>
+<span id="cb26-4"><a href="#cb26-4" aria-hidden="true" tabindex="-1"></a>results <span class="op">=</span> {}</span>
+<span id="cb26-5"><a href="#cb26-5" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> btk <span class="kw">in</span> bondsToKeep:</span>
+<span id="cb26-6"><a href="#cb26-6" aria-hidden="true" tabindex="-1"></a>    <span class="bu">print</span>(<span class="ss">f"Doing </span><span class="sc">{</span>btk<span class="sc">}</span><span class="ss">"</span>)</span>
+<span id="cb26-7"><a href="#cb26-7" aria-hidden="true" tabindex="-1"></a>    fpgen <span class="op">=</span> rdFingerprintGenerator.GetMorganGenerator(radius<span class="op">=</span><span class="dv">2</span>,fpSize<span class="op">=</span><span class="dv">4096</span>)</span>
+<span id="cb26-8"><a href="#cb26-8" aria-hidden="true" tabindex="-1"></a>    dfps<span class="op">=</span> []</span>
+<span id="cb26-9"><a href="#cb26-9" aria-hidden="true" tabindex="-1"></a>    <span class="cf">for</span> m <span class="kw">in</span> ms:</span>
+<span id="cb26-10"><a href="#cb26-10" aria-hidden="true" tabindex="-1"></a>        dfps.extend(getDifferenceFPs(m,[btk],fpgen))</span>
+<span id="cb26-11"><a href="#cb26-11" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb26-12"><a href="#cb26-12" aria-hidden="true" tabindex="-1"></a>    delta1 <span class="op">=</span> dfps[<span class="dv">0</span>]</span>
+<span id="cb26-13"><a href="#cb26-13" aria-hidden="true" tabindex="-1"></a>    <span class="cf">for</span> dfp <span class="kw">in</span> dfps[<span class="dv">1</span>:]:</span>
+<span id="cb26-14"><a href="#cb26-14" aria-hidden="true" tabindex="-1"></a>        delta1 <span class="op">+=</span> dfp</span>
+<span id="cb26-15"><a href="#cb26-15" aria-hidden="true" tabindex="-1"></a>    nfps <span class="op">=</span> <span class="bu">len</span>(dfps)</span>
+<span id="cb26-16"><a href="#cb26-16" aria-hidden="true" tabindex="-1"></a>    <span class="cf">for</span> k,v <span class="kw">in</span> delta1.GetNonzeroElements().items():</span>
+<span id="cb26-17"><a href="#cb26-17" aria-hidden="true" tabindex="-1"></a>        delta1[k] <span class="op">=</span> <span class="bu">round</span>(v<span class="op">/</span>nfps)</span>
+<span id="cb26-18"><a href="#cb26-18" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb26-19"><a href="#cb26-19" aria-hidden="true" tabindex="-1"></a>    allfps <span class="op">=</span> []</span>
+<span id="cb26-20"><a href="#cb26-20" aria-hidden="true" tabindex="-1"></a>    <span class="cf">for</span> m <span class="kw">in</span> ms:</span>
+<span id="cb26-21"><a href="#cb26-21" aria-hidden="true" tabindex="-1"></a>        frags <span class="op">=</span> splitMol(m,[btk])</span>
+<span id="cb26-22"><a href="#cb26-22" aria-hidden="true" tabindex="-1"></a>        <span class="cf">if</span> <span class="kw">not</span> frags:</span>
+<span id="cb26-23"><a href="#cb26-23" aria-hidden="true" tabindex="-1"></a>            <span class="cf">continue</span></span>
+<span id="cb26-24"><a href="#cb26-24" aria-hidden="true" tabindex="-1"></a>        fp1 <span class="op">=</span> fpgen.GetCountFingerprint(m)</span>
+<span id="cb26-25"><a href="#cb26-25" aria-hidden="true" tabindex="-1"></a>        ffps <span class="op">=</span> [getSumFP(x,fpgen,delta1) <span class="cf">for</span> x <span class="kw">in</span> frags]</span>
+<span id="cb26-26"><a href="#cb26-26" aria-hidden="true" tabindex="-1"></a>        allfps.append((fp1,ffps))</span>
+<span id="cb26-27"><a href="#cb26-27" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb26-28"><a href="#cb26-28" aria-hidden="true" tabindex="-1"></a>    self_tanis <span class="op">=</span> []</span>
+<span id="cb26-29"><a href="#cb26-29" aria-hidden="true" tabindex="-1"></a>    <span class="cf">for</span> fp1,ffps <span class="kw">in</span> allfps:</span>
+<span id="cb26-30"><a href="#cb26-30" aria-hidden="true" tabindex="-1"></a>        self_tanis.extend([DataStructs.TanimotoSimilarity(fp1,x) <span class="cf">for</span> x <span class="kw">in</span> ffps])</span>
+<span id="cb26-31"><a href="#cb26-31" aria-hidden="true" tabindex="-1"></a>        </span>
+<span id="cb26-32"><a href="#cb26-32" aria-hidden="true" tabindex="-1"></a>    ps1 <span class="op">=</span> <span class="bu">list</span>(<span class="bu">range</span>(<span class="bu">len</span>(allfps)))</span>
+<span id="cb26-33"><a href="#cb26-33" aria-hidden="true" tabindex="-1"></a>    random.shuffle(ps1)</span>
+<span id="cb26-34"><a href="#cb26-34" aria-hidden="true" tabindex="-1"></a>    ps1 <span class="op">=</span> ps1[:<span class="dv">1000</span>]</span>
+<span id="cb26-35"><a href="#cb26-35" aria-hidden="true" tabindex="-1"></a>    ps2 <span class="op">=</span> <span class="bu">list</span>(<span class="bu">range</span>(<span class="bu">len</span>(allfps)))</span>
+<span id="cb26-36"><a href="#cb26-36" aria-hidden="true" tabindex="-1"></a>    random.shuffle(ps2)</span>
+<span id="cb26-37"><a href="#cb26-37" aria-hidden="true" tabindex="-1"></a>    ps2 <span class="op">=</span> ps2[:<span class="dv">1000</span>]</span>
+<span id="cb26-38"><a href="#cb26-38" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb26-39"><a href="#cb26-39" aria-hidden="true" tabindex="-1"></a>    nCompared <span class="op">=</span> <span class="dv">0</span></span>
+<span id="cb26-40"><a href="#cb26-40" aria-hidden="true" tabindex="-1"></a>    other_tanidiff1 <span class="op">=</span> defaultdict(<span class="bu">list</span>)</span>
+<span id="cb26-41"><a href="#cb26-41" aria-hidden="true" tabindex="-1"></a>    other_tanidiff2 <span class="op">=</span> defaultdict(<span class="bu">list</span>)</span>
+<span id="cb26-42"><a href="#cb26-42" aria-hidden="true" tabindex="-1"></a>    <span class="cf">for</span> i <span class="kw">in</span> ps1:</span>
+<span id="cb26-43"><a href="#cb26-43" aria-hidden="true" tabindex="-1"></a>        fp1,frags1 <span class="op">=</span> allfps[i]</span>
+<span id="cb26-44"><a href="#cb26-44" aria-hidden="true" tabindex="-1"></a>        <span class="cf">for</span> j <span class="kw">in</span> ps2:</span>
+<span id="cb26-45"><a href="#cb26-45" aria-hidden="true" tabindex="-1"></a>            fp2,frags2 <span class="op">=</span> allfps[j]</span>
+<span id="cb26-46"><a href="#cb26-46" aria-hidden="true" tabindex="-1"></a>            refTani <span class="op">=</span> DataStructs.TanimotoSimilarity(fp1,fp2)</span>
+<span id="cb26-47"><a href="#cb26-47" aria-hidden="true" tabindex="-1"></a>            <span class="cf">if</span> refTani <span class="op">&lt;</span> <span class="fl">0.3</span>:</span>
+<span id="cb26-48"><a href="#cb26-48" aria-hidden="true" tabindex="-1"></a>                <span class="cf">continue</span></span>
+<span id="cb26-49"><a href="#cb26-49" aria-hidden="true" tabindex="-1"></a>            nCompared <span class="op">+=</span> <span class="dv">1</span></span>
+<span id="cb26-50"><a href="#cb26-50" aria-hidden="true" tabindex="-1"></a>            ltanis <span class="op">=</span> []</span>
+<span id="cb26-51"><a href="#cb26-51" aria-hidden="true" tabindex="-1"></a>            <span class="cf">for</span> f1 <span class="kw">in</span> frags1:</span>
+<span id="cb26-52"><a href="#cb26-52" aria-hidden="true" tabindex="-1"></a>                ltanis.extend(DataStructs.BulkTanimotoSimilarity(f1,frags2))</span>
+<span id="cb26-53"><a href="#cb26-53" aria-hidden="true" tabindex="-1"></a>            <span class="cf">for</span> thresh <span class="kw">in</span> (<span class="fl">0.3</span>,<span class="fl">0.5</span>,<span class="fl">0.7</span>):</span>
+<span id="cb26-54"><a href="#cb26-54" aria-hidden="true" tabindex="-1"></a>                <span class="cf">if</span> refTani <span class="op">&lt;</span> thresh:</span>
+<span id="cb26-55"><a href="#cb26-55" aria-hidden="true" tabindex="-1"></a>                    <span class="cf">continue</span></span>
+<span id="cb26-56"><a href="#cb26-56" aria-hidden="true" tabindex="-1"></a>                other_tanidiff1[thresh].extend([refTani<span class="op">-</span>x <span class="cf">for</span> x <span class="kw">in</span> ltanis])</span>
+<span id="cb26-57"><a href="#cb26-57" aria-hidden="true" tabindex="-1"></a>                other_tanidiff2[thresh].extend([refTani<span class="op">-</span>x <span class="cf">for</span> x <span class="kw">in</span> DataStructs.BulkTanimotoSimilarity(fp1,frags2)])</span>
+<span id="cb26-58"><a href="#cb26-58" aria-hidden="true" tabindex="-1"></a>                other_tanidiff2[thresh].extend([refTani<span class="op">-</span>x <span class="cf">for</span> x <span class="kw">in</span> DataStructs.BulkTanimotoSimilarity(fp2,frags1)])</span>
+<span id="cb26-59"><a href="#cb26-59" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb26-60"><a href="#cb26-60" aria-hidden="true" tabindex="-1"></a>    <span class="bu">print</span>(<span class="ss">f"considered </span><span class="sc">{</span>nCompared<span class="sc">}</span><span class="ss"> fingerprint pairs from </span><span class="sc">{</span><span class="bu">len</span>(allfps)<span class="op">**</span><span class="dv">2</span><span class="sc">}</span><span class="ss">"</span>)</span>
+<span id="cb26-61"><a href="#cb26-61" aria-hidden="true" tabindex="-1"></a>    results[btk] <span class="op">=</span> (self_tanis,other_tanidiff1,other_tanidiff2)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>Doing ('4', '5')
+considered 66995 fingerprint pairs from 18326961
+Doing ('1', '5')
+considered 63242 fingerprint pairs from 7845601
+Doing ('8', '16')
+considered 54070 fingerprint pairs from 6095961
+Doing ('3', '16')
+considered 95650 fingerprint pairs from 4260096
+Doing ('5', '16')
+considered 217114 fingerprint pairs from 2725801
+Doing ('3', '4')
+considered 112805 fingerprint pairs from 1537600
+Doing ('6', '16')
+considered 98275 fingerprint pairs from 790321
+Doing ('5', '15')
+considered 53490 fingerprint pairs from 640000
+Doing ('8', '14')
+considered 43291 fingerprint pairs from 502681
+Doing ('8', '15')
+considered 35148 fingerprint pairs from 352836</code></pre>
+</div>
+</div>
+<p>Start, again, by looking at self similarities.</p>
+<div class="cell" data-executetime="{&quot;end_time&quot;:&quot;2024-09-20T03:30:32.384729Z&quot;,&quot;start_time&quot;:&quot;2024-09-20T03:30:31.317658Z&quot;}" data-execution_count="92">
+<div class="sourceCode cell-code" id="cb28"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb28-1"><a href="#cb28-1" aria-hidden="true" tabindex="-1"></a>plt.figure(figsize<span class="op">=</span>(<span class="dv">12</span>,<span class="dv">18</span>))</span>
+<span id="cb28-2"><a href="#cb28-2" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> i,btk <span class="kw">in</span> <span class="bu">enumerate</span>(results.keys()):</span>
+<span id="cb28-3"><a href="#cb28-3" aria-hidden="true" tabindex="-1"></a>    plt.subplot(<span class="dv">5</span>,<span class="dv">2</span>,i<span class="op">+</span><span class="dv">1</span>)</span>
+<span id="cb28-4"><a href="#cb28-4" aria-hidden="true" tabindex="-1"></a>    self_tanis,other_tanidiff1,other_tanidiff2 <span class="op">=</span> results[btk]</span>
+<span id="cb28-5"><a href="#cb28-5" aria-hidden="true" tabindex="-1"></a>    plt.hist(self_tanis,bins<span class="op">=</span><span class="dv">20</span>)<span class="op">;</span></span>
+<span id="cb28-6"><a href="#cb28-6" aria-hidden="true" tabindex="-1"></a>    plt.title(<span class="ss">f"self similarity, </span><span class="sc">{</span>btk<span class="sc">}</span><span class="ss">"</span>)<span class="op">;</span>    </span>
+<span id="cb28-7"><a href="#cb28-7" aria-hidden="true" tabindex="-1"></a>    plt.xlim((<span class="fl">0.6</span>,<span class="fl">1.0</span>))<span class="op">;</span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-display">
+<p><img src="2024-09-20-additive-fingerprints1_files/figure-html/cell-20-output-1.png" class="img-fluid"></p>
+</div>
+</div>
+<p>The differences here aren’t huge, but we definitely aren’t getting self-similarities of 1.</p>
+<p>Still, we aren’t really interested in self-similarity. How does the method do when we compute fragment-fragment similarities? This time we plot the difference between the similarities calculated with the full fingerprint and the fragment fingerprints.</p>
+<div class="cell" data-executetime="{&quot;end_time&quot;:&quot;2024-09-20T03:30:39.576749Z&quot;,&quot;start_time&quot;:&quot;2024-09-20T03:30:35.989374Z&quot;}" data-execution_count="93">
+<div class="sourceCode cell-code" id="cb29"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb29-1"><a href="#cb29-1" aria-hidden="true" tabindex="-1"></a>plt.figure(figsize<span class="op">=</span>(<span class="dv">12</span>,<span class="dv">18</span>))</span>
+<span id="cb29-2"><a href="#cb29-2" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> i,btk <span class="kw">in</span> <span class="bu">enumerate</span>(results.keys()):</span>
+<span id="cb29-3"><a href="#cb29-3" aria-hidden="true" tabindex="-1"></a>    plt.subplot(<span class="dv">5</span>,<span class="dv">2</span>,i<span class="op">+</span><span class="dv">1</span>)</span>
+<span id="cb29-4"><a href="#cb29-4" aria-hidden="true" tabindex="-1"></a>    self_tanis,other_tanidiff1,other_tanidiff2 <span class="op">=</span> results[btk]</span>
+<span id="cb29-5"><a href="#cb29-5" aria-hidden="true" tabindex="-1"></a>    other_tanidiff1 <span class="op">=</span> other_tanidiff1[<span class="fl">0.3</span>]</span>
+<span id="cb29-6"><a href="#cb29-6" aria-hidden="true" tabindex="-1"></a>    other_tanidiff2 <span class="op">=</span> other_tanidiff2[<span class="fl">0.3</span>]</span>
+<span id="cb29-7"><a href="#cb29-7" aria-hidden="true" tabindex="-1"></a>    plt.hist(other_tanidiff1,bins<span class="op">=</span><span class="dv">20</span>,label<span class="op">=</span><span class="ss">f'fragfp-fragfp </span><span class="sc">{</span>btk<span class="sc">}</span><span class="ss">'</span>)<span class="op">;</span></span>
+<span id="cb29-8"><a href="#cb29-8" aria-hidden="true" tabindex="-1"></a>    plt.legend()</span>
+<span id="cb29-9"><a href="#cb29-9" aria-hidden="true" tabindex="-1"></a>    median <span class="op">=</span> np.median(np.<span class="bu">abs</span>(other_tanidiff1))</span>
+<span id="cb29-10"><a href="#cb29-10" aria-hidden="true" tabindex="-1"></a>    std <span class="op">=</span> np.std(np.<span class="bu">abs</span>(other_tanidiff1))</span>
+<span id="cb29-11"><a href="#cb29-11" aria-hidden="true" tabindex="-1"></a>    bins <span class="op">=</span> np.quantile(np.<span class="bu">abs</span>(other_tanidiff1),[<span class="fl">0.25</span>,<span class="fl">0.75</span>, <span class="fl">0.9</span>,<span class="fl">0.95</span>])</span>
+<span id="cb29-12"><a href="#cb29-12" aria-hidden="true" tabindex="-1"></a>    iqr <span class="op">=</span> bins[<span class="dv">1</span>]<span class="op">-</span>bins[<span class="dv">0</span>]</span>
+<span id="cb29-13"><a href="#cb29-13" aria-hidden="true" tabindex="-1"></a>    gzero <span class="op">=</span> np.<span class="bu">sum</span>(np.array(other_tanidiff1)<span class="op">&gt;-</span><span class="fl">0.005</span>) <span class="op">/</span> <span class="bu">len</span>(other_tanidiff1)</span>
+<span id="cb29-14"><a href="#cb29-14" aria-hidden="true" tabindex="-1"></a>    plt.title(<span class="ss">f'MAD=</span><span class="sc">{</span>median<span class="sc">:.2f}</span><span class="ss">, IQR=</span><span class="sc">{</span>iqr<span class="sc">:.2f}</span><span class="ss">, 90%=</span><span class="sc">{</span>bins[<span class="dv">2</span>]<span class="sc">:.2f}</span><span class="ss">, 95%=</span><span class="sc">{</span>bins[<span class="dv">3</span>]<span class="sc">:.2f}</span><span class="ss">, </span><span class="sc">{</span>gzero<span class="sc">:.2f}</span><span class="ss">&gt;-.005'</span>)<span class="op">;</span></span>
+<span id="cb29-15"><a href="#cb29-15" aria-hidden="true" tabindex="-1"></a>    plt.xlim((<span class="op">-</span><span class="fl">0.1</span>,<span class="fl">0.25</span>))<span class="op">;</span></span>
+<span id="cb29-16"><a href="#cb29-16" aria-hidden="true" tabindex="-1"></a>plt.tight_layout()</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-display">
+<p><img src="2024-09-20-additive-fingerprints1_files/figure-html/cell-21-output-1.png" class="img-fluid"></p>
+</div>
+</div>
+<p>Those look good! In general the difference in similarities is within 0.05.</p>
+<p>And, finally, since we could also query the collection of fragment molecules with a full fingerprint, look at the difference between the full FP similarity and the full FP - fragment FP similarity:</p>
+<div class="cell" data-executetime="{&quot;end_time&quot;:&quot;2024-09-20T03:30:51.488192Z&quot;,&quot;start_time&quot;:&quot;2024-09-20T03:30:47.368017Z&quot;}" data-execution_count="94">
+<div class="sourceCode cell-code" id="cb30"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb30-1"><a href="#cb30-1" aria-hidden="true" tabindex="-1"></a>plt.figure(figsize<span class="op">=</span>(<span class="dv">12</span>,<span class="dv">18</span>))</span>
+<span id="cb30-2"><a href="#cb30-2" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> i,btk <span class="kw">in</span> <span class="bu">enumerate</span>(results.keys()):</span>
+<span id="cb30-3"><a href="#cb30-3" aria-hidden="true" tabindex="-1"></a>    plt.subplot(<span class="dv">5</span>,<span class="dv">2</span>,i<span class="op">+</span><span class="dv">1</span>)</span>
+<span id="cb30-4"><a href="#cb30-4" aria-hidden="true" tabindex="-1"></a>    self_tanis,other_tanidiff1,other_tanidiff2 <span class="op">=</span> results[btk]</span>
+<span id="cb30-5"><a href="#cb30-5" aria-hidden="true" tabindex="-1"></a>    other_tanidiff1 <span class="op">=</span> other_tanidiff1[<span class="fl">0.3</span>]</span>
+<span id="cb30-6"><a href="#cb30-6" aria-hidden="true" tabindex="-1"></a>    other_tanidiff2 <span class="op">=</span> other_tanidiff2[<span class="fl">0.3</span>]</span>
+<span id="cb30-7"><a href="#cb30-7" aria-hidden="true" tabindex="-1"></a>    plt.hist(other_tanidiff2,bins<span class="op">=</span><span class="dv">20</span>,label<span class="op">=</span><span class="ss">f'fp-fragfp </span><span class="sc">{</span>btk<span class="sc">}</span><span class="ss">'</span>)<span class="op">;</span></span>
+<span id="cb30-8"><a href="#cb30-8" aria-hidden="true" tabindex="-1"></a>    plt.legend()</span>
+<span id="cb30-9"><a href="#cb30-9" aria-hidden="true" tabindex="-1"></a>    median <span class="op">=</span> np.median(np.<span class="bu">abs</span>(other_tanidiff2))</span>
+<span id="cb30-10"><a href="#cb30-10" aria-hidden="true" tabindex="-1"></a>    std <span class="op">=</span> np.std(np.<span class="bu">abs</span>(other_tanidiff2))</span>
+<span id="cb30-11"><a href="#cb30-11" aria-hidden="true" tabindex="-1"></a>    bins <span class="op">=</span> np.quantile(np.<span class="bu">abs</span>(other_tanidiff2),[<span class="fl">0.25</span>,<span class="fl">0.75</span>, <span class="fl">0.9</span>,<span class="fl">0.95</span>])</span>
+<span id="cb30-12"><a href="#cb30-12" aria-hidden="true" tabindex="-1"></a>    iqr <span class="op">=</span> bins[<span class="dv">1</span>]<span class="op">-</span>bins[<span class="dv">0</span>]</span>
+<span id="cb30-13"><a href="#cb30-13" aria-hidden="true" tabindex="-1"></a>    gzero <span class="op">=</span> np.<span class="bu">sum</span>(np.array(other_tanidiff2)<span class="op">&gt;-</span><span class="fl">0.005</span>) <span class="op">/</span> <span class="bu">len</span>(other_tanidiff2)</span>
+<span id="cb30-14"><a href="#cb30-14" aria-hidden="true" tabindex="-1"></a>    plt.title(<span class="ss">f'MAD=</span><span class="sc">{</span>median<span class="sc">:.2f}</span><span class="ss">, IQR=</span><span class="sc">{</span>iqr<span class="sc">:.2f}</span><span class="ss">, 90%=</span><span class="sc">{</span>bins[<span class="dv">2</span>]<span class="sc">:.2f}</span><span class="ss">, 95%=</span><span class="sc">{</span>bins[<span class="dv">3</span>]<span class="sc">:.2f}</span><span class="ss">, </span><span class="sc">{</span>gzero<span class="sc">:.2f}</span><span class="ss">&gt;-.005'</span>)<span class="op">;</span></span>
+<span id="cb30-15"><a href="#cb30-15" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb30-16"><a href="#cb30-16" aria-hidden="true" tabindex="-1"></a>    plt.xlim((<span class="op">-</span><span class="fl">0.1</span>,<span class="fl">0.25</span>))<span class="op">;</span></span>
+<span id="cb30-17"><a href="#cb30-17" aria-hidden="true" tabindex="-1"></a>plt.tight_layout()</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-display">
+<p><img src="2024-09-20-additive-fingerprints1_files/figure-html/cell-22-output-1.png" class="img-fluid"></p>
+</div>
+</div>
+<p>Here the differences are larger than when we search with the fragment fps, but they still aren’t huge. This form of the query also has the characteristic that the similarity calculated against the fragment fps is usually lower than that calculated against the full fp.</p>
+<section id="tolerances-for-searching" class="level2">
+<h2 class="anchored" data-anchor-id="tolerances-for-searching">Tolerances for searching</h2>
+<p>Suppose we want to use the fragment fingerprints for similarity searching with a threshold and be sure that we don’t miss any results. How would we need to adjust the threshold?</p>
+<div class="cell" data-executetime="{&quot;end_time&quot;:&quot;2024-09-20T03:32:37.594990Z&quot;,&quot;start_time&quot;:&quot;2024-09-20T03:32:37.324895Z&quot;}" data-execution_count="97">
+<div class="sourceCode cell-code" id="cb31"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb31-1"><a href="#cb31-1" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> thresh <span class="kw">in</span> (<span class="fl">0.3</span>,<span class="fl">0.5</span>,<span class="fl">0.7</span>):</span>
+<span id="cb31-2"><a href="#cb31-2" aria-hidden="true" tabindex="-1"></a>    <span class="bu">print</span>(<span class="ss">f'Threshold: </span><span class="sc">{</span>thresh<span class="sc">}</span><span class="ss">'</span>)</span>
+<span id="cb31-3"><a href="#cb31-3" aria-hidden="true" tabindex="-1"></a>    <span class="bu">print</span>(<span class="st">'            </span><span class="ch">\t</span><span class="st">   frag-frag</span><span class="ch">\t</span><span class="st">   fp-frag'</span>)</span>
+<span id="cb31-4"><a href="#cb31-4" aria-hidden="true" tabindex="-1"></a>    <span class="cf">for</span> i,btk <span class="kw">in</span> <span class="bu">enumerate</span>(results.keys()):</span>
+<span id="cb31-5"><a href="#cb31-5" aria-hidden="true" tabindex="-1"></a>        self_tanis,other_tanidiff1,other_tanidiff2 <span class="op">=</span> results[btk]</span>
+<span id="cb31-6"><a href="#cb31-6" aria-hidden="true" tabindex="-1"></a>        bins1 <span class="op">=</span> np.quantile(other_tanidiff1[thresh],[<span class="fl">0.01</span>,<span class="fl">0.05</span>])</span>
+<span id="cb31-7"><a href="#cb31-7" aria-hidden="true" tabindex="-1"></a>        bins2 <span class="op">=</span> np.quantile(other_tanidiff2[thresh],[<span class="fl">0.01</span>,<span class="fl">0.05</span>])</span>
+<span id="cb31-8"><a href="#cb31-8" aria-hidden="true" tabindex="-1"></a>        <span class="bu">print</span>(<span class="ss">f'</span><span class="sc">{</span>btk<span class="sc">}</span><span class="ss">:</span><span class="ch">\t</span><span class="sc">{</span>bins1[<span class="dv">0</span>]<span class="sc">: 6.3f}</span><span class="ss"> </span><span class="sc">{</span>bins1[<span class="dv">1</span>]<span class="sc">: 6.3f}</span><span class="ch">\t</span><span class="sc">{</span>bins2[<span class="dv">0</span>]<span class="sc">: 6.3f}</span><span class="ss"> </span><span class="sc">{</span>bins2[<span class="dv">1</span>]<span class="sc">: 6.3f}</span><span class="ss">'</span>)</span>
+<span id="cb31-9"><a href="#cb31-9" aria-hidden="true" tabindex="-1"></a>    <span class="bu">print</span>(<span class="st">'-----------'</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>Threshold: 0.3
+                   frag-frag       fp-frag
+('4', '5'): -0.025 -0.015   -0.006  0.000
+('1', '5'): -0.022 -0.010   -0.004  0.000
+('8', '16'):    -0.032 -0.021   -0.012 -0.007
+('3', '16'):    -0.026 -0.021   -0.013 -0.010
+('5', '16'):    -0.029 -0.019   -0.016 -0.002
+('3', '4'): -0.032 -0.019   -0.018 -0.009
+('6', '16'):    -0.043 -0.029   -0.025 -0.015
+('5', '15'):    -0.048 -0.026   -0.005 -0.002
+('8', '14'):    -0.042 -0.016   -0.010 -0.002
+('8', '15'):    -0.053 -0.028   -0.014 -0.003
+-----------
+Threshold: 0.5
+                   frag-frag       fp-frag
+('4', '5'): -0.023 -0.008    0.000  0.004
+('1', '5'): -0.022 -0.004   -0.003  0.000
+('8', '16'):    -0.035 -0.019   -0.012 -0.004
+('3', '16'):    -0.030 -0.012   -0.011  0.000
+('5', '16'):    -0.028 -0.016    0.008  0.014
+('3', '4'): -0.028 -0.009   -0.005  0.004
+('6', '16'):    -0.036 -0.028   -0.004  0.006
+('5', '15'):    -0.060 -0.020   -0.006  0.026
+('8', '14'):    -0.050 -0.016   -0.008  0.000
+('8', '15'):    -0.056 -0.035    0.000  0.006
+-----------
+Threshold: 0.7
+                   frag-frag       fp-frag
+('4', '5'): -0.016 -0.003    0.000  0.008
+('1', '5'): -0.023 -0.002    0.000  0.005
+('8', '16'):    -0.035 -0.012   -0.009  0.006
+('3', '16'):    -0.034 -0.003   -0.009  0.029
+('5', '16'):    -0.029 -0.012    0.011  0.047
+('3', '4'): -0.022 -0.006   -0.001  0.014
+('6', '16'):    -0.034 -0.009    0.009  0.035
+('5', '15'):    -0.026 -0.012    0.036  0.058
+('8', '14'):    -0.061 -0.021    0.000  0.028
+('8', '15'):    -0.061 -0.032   -0.001  0.017
+-----------</code></pre>
+</div>
+</div>
+<p>In order to be sure of retrieving 99% of the actual results when searching using the full fingerprint of the query molecule against the fragment fingerprint of the database molecules (these are the fp-frag results), we’d need to use a search threshold of 0.275 (true threshold = 0.3), 0.488 (true threshold = 0.5), or 0.691 (true threshold = 0.7).</p>
+</section>
+</section>
+<section id="what-about-if-we-dont-use-the-constant-offset" class="level1">
+<h1>What about if we don’t use the constant offset?</h1>
+<p>I went into this convinced that the constant offset was important. What if we just use the simple additive fingerprints without including that offset?</p>
+<div class="cell" data-executetime="{&quot;end_time&quot;:&quot;2024-09-19T17:07:43.102411Z&quot;,&quot;start_time&quot;:&quot;2024-09-19T17:06:17.200690Z&quot;}" data-execution_count="41">
+<div class="sourceCode cell-code" id="cb33"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb33-1"><a href="#cb33-1" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> random</span>
+<span id="cb33-2"><a href="#cb33-2" aria-hidden="true" tabindex="-1"></a>random.seed(<span class="bn">0xf00d</span>)</span>
+<span id="cb33-3"><a href="#cb33-3" aria-hidden="true" tabindex="-1"></a>noconstant_results <span class="op">=</span> {}</span>
+<span id="cb33-4"><a href="#cb33-4" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> btk <span class="kw">in</span> bondsToKeep:</span>
+<span id="cb33-5"><a href="#cb33-5" aria-hidden="true" tabindex="-1"></a>    <span class="bu">print</span>(<span class="ss">f"Doing </span><span class="sc">{</span>btk<span class="sc">}</span><span class="ss">"</span>)</span>
+<span id="cb33-6"><a href="#cb33-6" aria-hidden="true" tabindex="-1"></a>    fpgen <span class="op">=</span> rdFingerprintGenerator.GetMorganGenerator(radius<span class="op">=</span><span class="dv">2</span>,fpSize<span class="op">=</span><span class="dv">4096</span>)</span>
+<span id="cb33-7"><a href="#cb33-7" aria-hidden="true" tabindex="-1"></a>    dfps<span class="op">=</span> []</span>
+<span id="cb33-8"><a href="#cb33-8" aria-hidden="true" tabindex="-1"></a>    <span class="cf">for</span> m <span class="kw">in</span> ms:</span>
+<span id="cb33-9"><a href="#cb33-9" aria-hidden="true" tabindex="-1"></a>        dfps.extend(getDifferenceFPs(m,[btk],fpgen))</span>
+<span id="cb33-10"><a href="#cb33-10" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb33-11"><a href="#cb33-11" aria-hidden="true" tabindex="-1"></a>    allfps <span class="op">=</span> []</span>
+<span id="cb33-12"><a href="#cb33-12" aria-hidden="true" tabindex="-1"></a>    <span class="cf">for</span> m <span class="kw">in</span> ms:</span>
+<span id="cb33-13"><a href="#cb33-13" aria-hidden="true" tabindex="-1"></a>        frags <span class="op">=</span> splitMol(m,[btk])</span>
+<span id="cb33-14"><a href="#cb33-14" aria-hidden="true" tabindex="-1"></a>        <span class="cf">if</span> <span class="kw">not</span> frags:</span>
+<span id="cb33-15"><a href="#cb33-15" aria-hidden="true" tabindex="-1"></a>            <span class="cf">continue</span></span>
+<span id="cb33-16"><a href="#cb33-16" aria-hidden="true" tabindex="-1"></a>        fp1 <span class="op">=</span> fpgen.GetCountFingerprint(m)</span>
+<span id="cb33-17"><a href="#cb33-17" aria-hidden="true" tabindex="-1"></a>        ffps <span class="op">=</span> [fpgen.GetCountFingerprint(x) <span class="cf">for</span> x <span class="kw">in</span> frags]</span>
+<span id="cb33-18"><a href="#cb33-18" aria-hidden="true" tabindex="-1"></a>        allfps.append((fp1,ffps))</span>
+<span id="cb33-19"><a href="#cb33-19" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb33-20"><a href="#cb33-20" aria-hidden="true" tabindex="-1"></a>    self_tanis <span class="op">=</span> []</span>
+<span id="cb33-21"><a href="#cb33-21" aria-hidden="true" tabindex="-1"></a>    <span class="cf">for</span> fp1,ffps <span class="kw">in</span> allfps:</span>
+<span id="cb33-22"><a href="#cb33-22" aria-hidden="true" tabindex="-1"></a>        self_tanis.extend([DataStructs.TanimotoSimilarity(fp1,x) <span class="cf">for</span> x <span class="kw">in</span> ffps])</span>
+<span id="cb33-23"><a href="#cb33-23" aria-hidden="true" tabindex="-1"></a>        </span>
+<span id="cb33-24"><a href="#cb33-24" aria-hidden="true" tabindex="-1"></a>    ps1 <span class="op">=</span> <span class="bu">list</span>(<span class="bu">range</span>(<span class="bu">len</span>(allfps)))</span>
+<span id="cb33-25"><a href="#cb33-25" aria-hidden="true" tabindex="-1"></a>    random.shuffle(ps1)</span>
+<span id="cb33-26"><a href="#cb33-26" aria-hidden="true" tabindex="-1"></a>    ps1 <span class="op">=</span> ps1[:<span class="dv">1000</span>]</span>
+<span id="cb33-27"><a href="#cb33-27" aria-hidden="true" tabindex="-1"></a>    ps2 <span class="op">=</span> <span class="bu">list</span>(<span class="bu">range</span>(<span class="bu">len</span>(allfps)))</span>
+<span id="cb33-28"><a href="#cb33-28" aria-hidden="true" tabindex="-1"></a>    random.shuffle(ps2)</span>
+<span id="cb33-29"><a href="#cb33-29" aria-hidden="true" tabindex="-1"></a>    ps2 <span class="op">=</span> ps2[:<span class="dv">1000</span>]</span>
+<span id="cb33-30"><a href="#cb33-30" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb33-31"><a href="#cb33-31" aria-hidden="true" tabindex="-1"></a>    nCompared <span class="op">=</span> <span class="dv">0</span></span>
+<span id="cb33-32"><a href="#cb33-32" aria-hidden="true" tabindex="-1"></a>    other_tanidiff1 <span class="op">=</span> []</span>
+<span id="cb33-33"><a href="#cb33-33" aria-hidden="true" tabindex="-1"></a>    other_tanidiff2 <span class="op">=</span> []</span>
+<span id="cb33-34"><a href="#cb33-34" aria-hidden="true" tabindex="-1"></a>    <span class="cf">for</span> i <span class="kw">in</span> ps1:</span>
+<span id="cb33-35"><a href="#cb33-35" aria-hidden="true" tabindex="-1"></a>        fp1,frags1 <span class="op">=</span> allfps[i]</span>
+<span id="cb33-36"><a href="#cb33-36" aria-hidden="true" tabindex="-1"></a>        <span class="cf">for</span> j <span class="kw">in</span> ps2:</span>
+<span id="cb33-37"><a href="#cb33-37" aria-hidden="true" tabindex="-1"></a>            fp2,frags2 <span class="op">=</span> allfps[j]</span>
+<span id="cb33-38"><a href="#cb33-38" aria-hidden="true" tabindex="-1"></a>            refTani <span class="op">=</span> DataStructs.TanimotoSimilarity(fp1,fp2)</span>
+<span id="cb33-39"><a href="#cb33-39" aria-hidden="true" tabindex="-1"></a>            <span class="cf">if</span> refTani <span class="op">&lt;</span> <span class="fl">0.3</span>:</span>
+<span id="cb33-40"><a href="#cb33-40" aria-hidden="true" tabindex="-1"></a>                <span class="cf">continue</span></span>
+<span id="cb33-41"><a href="#cb33-41" aria-hidden="true" tabindex="-1"></a>            nCompared <span class="op">+=</span> <span class="dv">1</span></span>
+<span id="cb33-42"><a href="#cb33-42" aria-hidden="true" tabindex="-1"></a>            ltanis <span class="op">=</span> []</span>
+<span id="cb33-43"><a href="#cb33-43" aria-hidden="true" tabindex="-1"></a>            <span class="cf">for</span> f1 <span class="kw">in</span> frags1:</span>
+<span id="cb33-44"><a href="#cb33-44" aria-hidden="true" tabindex="-1"></a>                ltanis.extend(DataStructs.BulkTanimotoSimilarity(f1,frags2))</span>
+<span id="cb33-45"><a href="#cb33-45" aria-hidden="true" tabindex="-1"></a>            other_tanidiff1.extend([refTani<span class="op">-</span>x <span class="cf">for</span> x <span class="kw">in</span> ltanis])</span>
+<span id="cb33-46"><a href="#cb33-46" aria-hidden="true" tabindex="-1"></a>            other_tanidiff2.extend([refTani<span class="op">-</span>x <span class="cf">for</span> x <span class="kw">in</span> DataStructs.BulkTanimotoSimilarity(fp1,frags2)])</span>
+<span id="cb33-47"><a href="#cb33-47" aria-hidden="true" tabindex="-1"></a>            other_tanidiff2.extend([refTani<span class="op">-</span>x <span class="cf">for</span> x <span class="kw">in</span> DataStructs.BulkTanimotoSimilarity(fp2,frags1)])</span>
+<span id="cb33-48"><a href="#cb33-48" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb33-49"><a href="#cb33-49" aria-hidden="true" tabindex="-1"></a>    <span class="bu">print</span>(<span class="ss">f"considered </span><span class="sc">{</span>nCompared<span class="sc">}</span><span class="ss"> fingerprint pairs from </span><span class="sc">{</span><span class="bu">len</span>(allfps)<span class="op">**</span><span class="dv">2</span><span class="sc">}</span><span class="ss">"</span>)</span>
+<span id="cb33-50"><a href="#cb33-50" aria-hidden="true" tabindex="-1"></a>    noconstant_results[btk] <span class="op">=</span> (self_tanis,other_tanidiff1,other_tanidiff2)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>Doing ('4', '5')
+considered 66995 fingerprint pairs from 18326961
+Doing ('1', '5')
+considered 63242 fingerprint pairs from 7845601
+Doing ('8', '16')
+considered 54070 fingerprint pairs from 6095961
+Doing ('3', '16')
+considered 95650 fingerprint pairs from 4260096
+Doing ('5', '16')
+considered 217114 fingerprint pairs from 2725801
+Doing ('3', '4')
+considered 112805 fingerprint pairs from 1537600
+Doing ('6', '16')
+considered 98275 fingerprint pairs from 790321
+Doing ('5', '15')
+considered 53490 fingerprint pairs from 640000
+Doing ('8', '14')
+considered 43291 fingerprint pairs from 502681
+Doing ('8', '15')
+considered 35148 fingerprint pairs from 352836</code></pre>
+</div>
+</div>
+<div class="cell" data-executetime="{&quot;end_time&quot;:&quot;2024-09-19T17:22:48.750129Z&quot;,&quot;start_time&quot;:&quot;2024-09-19T17:22:47.112204Z&quot;}" data-execution_count="51">
+<div class="sourceCode cell-code" id="cb35"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb35-1"><a href="#cb35-1" aria-hidden="true" tabindex="-1"></a>plt.figure(figsize<span class="op">=</span>(<span class="dv">16</span>,<span class="dv">18</span>))</span>
+<span id="cb35-2"><a href="#cb35-2" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> i,btk <span class="kw">in</span> <span class="bu">enumerate</span>(noconstant_results.keys()):</span>
+<span id="cb35-3"><a href="#cb35-3" aria-hidden="true" tabindex="-1"></a>    subplot(<span class="dv">5</span>,<span class="dv">2</span>,i<span class="op">+</span><span class="dv">1</span>)</span>
+<span id="cb35-4"><a href="#cb35-4" aria-hidden="true" tabindex="-1"></a>    self_tanis,other_tanidiff1,other_tanidiff2 <span class="op">=</span> results[btk]</span>
+<span id="cb35-5"><a href="#cb35-5" aria-hidden="true" tabindex="-1"></a>    self_tanis_2,other_tanidiff1_2,other_tanidiff2_2 <span class="op">=</span> noconstant_results[btk]</span>
+<span id="cb35-6"><a href="#cb35-6" aria-hidden="true" tabindex="-1"></a>    plt.hist([self_tanis,self_tanis_2],bins<span class="op">=</span><span class="dv">20</span>, label<span class="op">=</span>[<span class="st">'with constant'</span>,<span class="st">'no constant'</span>])<span class="op">;</span></span>
+<span id="cb35-7"><a href="#cb35-7" aria-hidden="true" tabindex="-1"></a>    plt.title(<span class="ss">f"self similarity, </span><span class="sc">{</span>btk<span class="sc">}</span><span class="ss">"</span>)<span class="op">;</span></span>
+<span id="cb35-8"><a href="#cb35-8" aria-hidden="true" tabindex="-1"></a>    plt.legend()</span>
+<span id="cb35-9"><a href="#cb35-9" aria-hidden="true" tabindex="-1"></a>    plt.xlim((<span class="fl">0.6</span>,<span class="fl">1.0</span>))</span>
+<span id="cb35-10"><a href="#cb35-10" aria-hidden="true" tabindex="-1"></a>plt.tight_layout()</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-display">
+<p><img src="2024-09-20-additive-fingerprints1_files/figure-html/cell-25-output-1.png" class="img-fluid"></p>
+</div>
+</div>
+<p>Here the red histograms are clearly shifted to the left; the constant is helping.</p>
+<div class="cell" data-executetime="{&quot;end_time&quot;:&quot;2024-09-19T17:22:57.089543Z&quot;,&quot;start_time&quot;:&quot;2024-09-19T17:22:55.280399Z&quot;}" data-execution_count="52">
+<div class="sourceCode cell-code" id="cb36"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb36-1"><a href="#cb36-1" aria-hidden="true" tabindex="-1"></a>plt.figure(figsize<span class="op">=</span>(<span class="dv">16</span>,<span class="dv">18</span>))</span>
+<span id="cb36-2"><a href="#cb36-2" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> i,btk <span class="kw">in</span> <span class="bu">enumerate</span>(noconstant_results.keys()):</span>
+<span id="cb36-3"><a href="#cb36-3" aria-hidden="true" tabindex="-1"></a>    plt.subplot(<span class="dv">5</span>,<span class="dv">2</span>,i<span class="op">+</span><span class="dv">1</span>)</span>
+<span id="cb36-4"><a href="#cb36-4" aria-hidden="true" tabindex="-1"></a>    self_tanis,other_tanidiff1,other_tanidiff2 <span class="op">=</span> results[btk]</span>
+<span id="cb36-5"><a href="#cb36-5" aria-hidden="true" tabindex="-1"></a>    self_tanis_2,other_tanidiff1_2,other_tanidiff2_2 <span class="op">=</span> noconstant_results[btk]</span>
+<span id="cb36-6"><a href="#cb36-6" aria-hidden="true" tabindex="-1"></a>    plt.hist([other_tanidiff1,other_tanidiff1_2],bins<span class="op">=</span><span class="dv">20</span>, label<span class="op">=</span>[<span class="st">'with constant'</span>,<span class="st">'no constant'</span>])<span class="op">;</span></span>
+<span id="cb36-7"><a href="#cb36-7" aria-hidden="true" tabindex="-1"></a>    plt.legend()<span class="op">;</span></span>
+<span id="cb36-8"><a href="#cb36-8" aria-hidden="true" tabindex="-1"></a>    plt.title(<span class="ss">f"fragfp-fragfp comparison, </span><span class="sc">{</span>btk<span class="sc">}</span><span class="ss">"</span>)<span class="op">;</span></span>
+<span id="cb36-9"><a href="#cb36-9" aria-hidden="true" tabindex="-1"></a>    <span class="co">#yscale('log')</span></span>
+<span id="cb36-10"><a href="#cb36-10" aria-hidden="true" tabindex="-1"></a>    plt.xlim((<span class="op">-</span><span class="fl">0.1</span>,<span class="fl">0.25</span>))<span class="op">;</span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-display">
+<p><img src="2024-09-20-additive-fingerprints1_files/figure-html/cell-26-output-1.png" class="img-fluid"></p>
+</div>
+</div>
+<p>Here the differences aren’t as pronounced. It looks like the constant term has the consequence of making the similarity a bit lower(the red histograms are shifted a bit to the left). The difference is, in any case, not large</p>
+<div class="cell" data-executetime="{&quot;end_time&quot;:&quot;2024-09-19T17:23:03.162915Z&quot;,&quot;start_time&quot;:&quot;2024-09-19T17:23:01.313284Z&quot;}" data-execution_count="53">
+<div class="sourceCode cell-code" id="cb37"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb37-1"><a href="#cb37-1" aria-hidden="true" tabindex="-1"></a>plt.figure(figsize<span class="op">=</span>(<span class="dv">16</span>,<span class="dv">18</span>))</span>
+<span id="cb37-2"><a href="#cb37-2" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> i,btk <span class="kw">in</span> <span class="bu">enumerate</span>(noconstant_results.keys()):</span>
+<span id="cb37-3"><a href="#cb37-3" aria-hidden="true" tabindex="-1"></a>    plt.subplot(<span class="dv">5</span>,<span class="dv">2</span>,i<span class="op">+</span><span class="dv">1</span>)</span>
+<span id="cb37-4"><a href="#cb37-4" aria-hidden="true" tabindex="-1"></a>    self_tanis,other_tanidiff1,other_tanidiff2 <span class="op">=</span> results[btk]</span>
+<span id="cb37-5"><a href="#cb37-5" aria-hidden="true" tabindex="-1"></a>    self_tanis_2,other_tanidiff1_2,other_tanidiff2_2 <span class="op">=</span> noconstant_results[btk]</span>
+<span id="cb37-6"><a href="#cb37-6" aria-hidden="true" tabindex="-1"></a>    plt.hist([other_tanidiff2,other_tanidiff2_2],bins<span class="op">=</span><span class="dv">20</span>, label<span class="op">=</span>[<span class="st">'with constant'</span>,<span class="st">'no constant'</span>])<span class="op">;</span></span>
+<span id="cb37-7"><a href="#cb37-7" aria-hidden="true" tabindex="-1"></a>    plt.legend()<span class="op">;</span></span>
+<span id="cb37-8"><a href="#cb37-8" aria-hidden="true" tabindex="-1"></a>    plt.title(<span class="ss">f"fp-fragfp comparison, </span><span class="sc">{</span>btk<span class="sc">}</span><span class="ss">"</span>)<span class="op">;</span></span>
+<span id="cb37-9"><a href="#cb37-9" aria-hidden="true" tabindex="-1"></a>    <span class="co">#yscale('log')</span></span>
+<span id="cb37-10"><a href="#cb37-10" aria-hidden="true" tabindex="-1"></a>    plt.xlim((<span class="op">-</span><span class="fl">0.1</span>,<span class="fl">0.3</span>))<span class="op">;</span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-display">
+<p><img src="2024-09-20-additive-fingerprints1_files/figure-html/cell-27-output-1.png" class="img-fluid"></p>
+</div>
+</div>
+<p>Here we again have a clear signal: leaving the constant term out causes a larger similarity difference (the red histograms are shifted to the right).</p>
+<p>I’m going to wrap this one up here. I think the approach clearly works, but there’s some more to do in a future blog post or two: - look at how well the constants generated on this set work on a completely different set of molecules. - look at fragmenting the molecule multiple times (i.e.&nbsp;combining more than 2 fragments to form a molecule) - look at an asymmetric similarity measure like Tversky. This is what we’d want to use if we were searching a large fragment space and incrementally building up the results molecules (like in the <a href="https://dx.doi.org/10.1023/A:1011144622059">FTrees-FS paper</a>).</p>
+
+
+</section>
+
+</main> <!-- /main -->
+<script id="quarto-html-after-body" type="application/javascript">
+window.document.addEventListener("DOMContentLoaded", function (event) {
+  const toggleBodyColorMode = (bsSheetEl) => {
+    const mode = bsSheetEl.getAttribute("data-mode");
+    const bodyEl = window.document.querySelector("body");
+    if (mode === "dark") {
+      bodyEl.classList.add("quarto-dark");
+      bodyEl.classList.remove("quarto-light");
+    } else {
+      bodyEl.classList.add("quarto-light");
+      bodyEl.classList.remove("quarto-dark");
+    }
+  }
+  const toggleBodyColorPrimary = () => {
+    const bsSheetEl = window.document.querySelector("link#quarto-bootstrap");
+    if (bsSheetEl) {
+      toggleBodyColorMode(bsSheetEl);
+    }
+  }
+  toggleBodyColorPrimary();  
+  const disableStylesheet = (stylesheets) => {
+    for (let i=0; i < stylesheets.length; i++) {
+      const stylesheet = stylesheets[i];
+      stylesheet.rel = 'prefetch';
+    }
+  }
+  const enableStylesheet = (stylesheets) => {
+    for (let i=0; i < stylesheets.length; i++) {
+      const stylesheet = stylesheets[i];
+      stylesheet.rel = 'stylesheet';
+    }
+  }
+  const manageTransitions = (selector, allowTransitions) => {
+    const els = window.document.querySelectorAll(selector);
+    for (let i=0; i < els.length; i++) {
+      const el = els[i];
+      if (allowTransitions) {
+        el.classList.remove('notransition');
+      } else {
+        el.classList.add('notransition');
+      }
+    }
+  }
+  const toggleColorMode = (alternate) => {
+    // Switch the stylesheets
+    const alternateStylesheets = window.document.querySelectorAll('link.quarto-color-scheme.quarto-color-alternate');
+    manageTransitions('#quarto-margin-sidebar .nav-link', false);
+    if (alternate) {
+      enableStylesheet(alternateStylesheets);
+      for (const sheetNode of alternateStylesheets) {
+        if (sheetNode.id === "quarto-bootstrap") {
+          toggleBodyColorMode(sheetNode);
+        }
+      }
+    } else {
+      disableStylesheet(alternateStylesheets);
+      toggleBodyColorPrimary();
+    }
+    manageTransitions('#quarto-margin-sidebar .nav-link', true);
+    // Switch the toggles
+    const toggles = window.document.querySelectorAll('.quarto-color-scheme-toggle');
+    for (let i=0; i < toggles.length; i++) {
+      const toggle = toggles[i];
+      if (toggle) {
+        if (alternate) {
+          toggle.classList.add("alternate");     
+        } else {
+          toggle.classList.remove("alternate");
+        }
+      }
+    }
+    // Hack to workaround the fact that safari doesn't
+    // properly recolor the scrollbar when toggling (#1455)
+    if (navigator.userAgent.indexOf('Safari') > 0 && navigator.userAgent.indexOf('Chrome') == -1) {
+      manageTransitions("body", false);
+      window.scrollTo(0, 1);
+      setTimeout(() => {
+        window.scrollTo(0, 0);
+        manageTransitions("body", true);
+      }, 40);  
+    }
+  }
+  const isFileUrl = () => { 
+    return window.location.protocol === 'file:';
+  }
+  const hasAlternateSentinel = () => {  
+    let styleSentinel = getColorSchemeSentinel();
+    if (styleSentinel !== null) {
+      return styleSentinel === "alternate";
+    } else {
+      return false;
+    }
+  }
+  const setStyleSentinel = (alternate) => {
+    const value = alternate ? "alternate" : "default";
+    if (!isFileUrl()) {
+      window.localStorage.setItem("quarto-color-scheme", value);
+    } else {
+      localAlternateSentinel = value;
+    }
+  }
+  const getColorSchemeSentinel = () => {
+    if (!isFileUrl()) {
+      const storageValue = window.localStorage.getItem("quarto-color-scheme");
+      return storageValue != null ? storageValue : localAlternateSentinel;
+    } else {
+      return localAlternateSentinel;
+    }
+  }
+  let localAlternateSentinel = 'default';
+  // Dark / light mode switch
+  window.quartoToggleColorScheme = () => {
+    // Read the current dark / light value 
+    let toAlternate = !hasAlternateSentinel();
+    toggleColorMode(toAlternate);
+    setStyleSentinel(toAlternate);
+  };
+  // Ensure there is a toggle, if there isn't float one in the top right
+  if (window.document.querySelector('.quarto-color-scheme-toggle') === null) {
+    const a = window.document.createElement('a');
+    a.classList.add('top-right');
+    a.classList.add('quarto-color-scheme-toggle');
+    a.href = "";
+    a.onclick = function() { try { window.quartoToggleColorScheme(); } catch {} return false; };
+    const i = window.document.createElement("i");
+    i.classList.add('bi');
+    a.appendChild(i);
+    window.document.body.appendChild(a);
+  }
+  // Switch to dark mode if need be
+  if (hasAlternateSentinel()) {
+    toggleColorMode(true);
+  } else {
+    toggleColorMode(false);
+  }
+  const icon = "";
+  const anchorJS = new window.AnchorJS();
+  anchorJS.options = {
+    placement: 'right',
+    icon: icon
+  };
+  anchorJS.add('.anchored');
+  const clipboard = new window.ClipboardJS('.code-copy-button', {
+    target: function(trigger) {
+      return trigger.previousElementSibling;
+    }
+  });
+  clipboard.on('success', function(e) {
+    // button target
+    const button = e.trigger;
+    // don't keep focus
+    button.blur();
+    // flash "checked"
+    button.classList.add('code-copy-button-checked');
+    var currentTitle = button.getAttribute("title");
+    button.setAttribute("title", "Copied!");
+    let tooltip;
+    if (window.bootstrap) {
+      button.setAttribute("data-bs-toggle", "tooltip");
+      button.setAttribute("data-bs-placement", "left");
+      button.setAttribute("data-bs-title", "Copied!");
+      tooltip = new bootstrap.Tooltip(button, 
+        { trigger: "manual", 
+          customClass: "code-copy-button-tooltip",
+          offset: [0, -8]});
+      tooltip.show();    
+    }
+    setTimeout(function() {
+      if (tooltip) {
+        tooltip.hide();
+        button.removeAttribute("data-bs-title");
+        button.removeAttribute("data-bs-toggle");
+        button.removeAttribute("data-bs-placement");
+      }
+      button.setAttribute("title", currentTitle);
+      button.classList.remove('code-copy-button-checked');
+    }, 1000);
+    // clear code selection
+    e.clearSelection();
+  });
+  function tippyHover(el, contentFn) {
+    const config = {
+      allowHTML: true,
+      content: contentFn,
+      maxWidth: 500,
+      delay: 100,
+      arrow: false,
+      appendTo: function(el) {
+          return el.parentElement;
+      },
+      interactive: true,
+      interactiveBorder: 10,
+      theme: 'quarto',
+      placement: 'bottom-start'
+    };
+    window.tippy(el, config); 
+  }
+  const noterefs = window.document.querySelectorAll('a[role="doc-noteref"]');
+  for (var i=0; i<noterefs.length; i++) {
+    const ref = noterefs[i];
+    tippyHover(ref, function() {
+      // use id or data attribute instead here
+      let href = ref.getAttribute('data-footnote-href') || ref.getAttribute('href');
+      try { href = new URL(href).hash; } catch {}
+      const id = href.replace(/^#\/?/, "");
+      const note = window.document.getElementById(id);
+      return note.innerHTML;
+    });
+  }
+  const findCites = (el) => {
+    const parentEl = el.parentElement;
+    if (parentEl) {
+      const cites = parentEl.dataset.cites;
+      if (cites) {
+        return {
+          el,
+          cites: cites.split(' ')
+        };
+      } else {
+        return findCites(el.parentElement)
+      }
+    } else {
+      return undefined;
+    }
+  };
+  var bibliorefs = window.document.querySelectorAll('a[role="doc-biblioref"]');
+  for (var i=0; i<bibliorefs.length; i++) {
+    const ref = bibliorefs[i];
+    const citeInfo = findCites(ref);
+    if (citeInfo) {
+      tippyHover(citeInfo.el, function() {
+        var popup = window.document.createElement('div');
+        citeInfo.cites.forEach(function(cite) {
+          var citeDiv = window.document.createElement('div');
+          citeDiv.classList.add('hanging-indent');
+          citeDiv.classList.add('csl-entry');
+          var biblioDiv = window.document.getElementById('ref-' + cite);
+          if (biblioDiv) {
+            citeDiv.innerHTML = biblioDiv.innerHTML;
+          }
+          popup.appendChild(citeDiv);
+        });
+        return popup.innerHTML;
+      });
+    }
+  }
+});
+</script>
+<script src="https://utteranc.es/client.js" repo="greglandrum/rdkit-blog" issue-term="pathname" theme="github-light" crossorigin="anonymous" async="">
+</script>
+</div> <!-- /content -->
+<footer class="footer">
+  <div class="nav-footer">
+    <div class="nav-footer-left">Copyright (C) 2024 Greg Landrum</div>   
+    <div class="nav-footer-right"><a href="https://www.rdkit.org"><img src="https://www.rdkit.org/logo.small.png" class="img-fluid" alt="RDKit" width="64"></a></div>
+  </div>
+</footer>
+
+
+
+</body></html>
