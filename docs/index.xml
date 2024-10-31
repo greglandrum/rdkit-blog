@@ -10,7 +10,254 @@
 <atom:link href="https://greglandrum.github.io/rdkit-blog/index.xml" rel="self" type="application/rss+xml"/>
 <description>RDKit experiments, tips, and tutorials</description>
 <generator>quarto-1.2.269</generator>
-<lastBuildDate>Mon, 21 Oct 2024 22:00:00 GMT</lastBuildDate>
+<lastBuildDate>Wed, 30 Oct 2024 23:00:00 GMT</lastBuildDate>
+<item>
+  <title>Using lwreg with the RDKit cartridge</title>
+  <link>https://greglandrum.github.io/rdkit-blog/posts/2024-10-31-lwreg-and-the-cartridge.html</link>
+  <description><![CDATA[ 
+
+
+
+<p>We recently published an <a href="https://pubs.acs.org/doi/full/10.1021/acs.jcim.4c01133">application note</a> introducing <a href="https://github.com/rinikerlab/lightweight-registration">lwreg</a>, an open-source chemical registration system with a simple Python API that can be easily integrated into computational workflows. We think lwreg is really useful and hope others agree with us.</p>
+<p>One of the key ideas behind lwreg is that it should not require any chemical intelligence in the database it uses to store its results. See the paper for more details, but the kinds of identity queries (i.e.&nbsp;“is this molecule or something closely related already registered?”) that a registration system needs to support can be answered with standard text queries. Having said that, there are times when it’s useful to ask questions like “Are there any registered molecules in the database that contain this substructure?”. One easy way to allow this kind of query is to install the RDKit cartridge in the database.</p>
+<p>This post shows how to use the RDKit cartridge together with an lwreg instance that is using PostgreSQL as the database backend. Since installing PostgreSQL and the cartridge can be challenging for a normal user, I also show how to do that installation and get a database that’s suitable for local use. The instructions below should work on Windows, Linux, or the Mac.</p>
+<p>Many thanks to Jessica Braun, the other main lwreg developer, for her feedback on a draft of this post, which will eventually end up, in some modified form, in the lwreg documentation.</p>
+<section id="setting-up-a-local-postgresql-installation" class="level1">
+<h1>Setting up a local PostgreSQL installation</h1>
+<p>You probably wouldn’t want to use this setup in any very serious way, but it’s great for learning and could certainly work as a way to configure a personal database. I put this notebook together in Windows on my laptop, but it should work on Linux or the Mac too.</p>
+<blockquote class="blockquote">
+<p><strong>Aside</strong> If you want to do this more seriously without a huge amount of complication, your best bet is probably to setup a docker container that runs postgresql and the cartridge and to use that within lwreg. I will try to put together a post showing how to do this in the not-too-distant future.</p>
+</blockquote>
+<p>As usual, I assume that you’re using conda since it makes installing the RDKit and all other dependencies incredibly easy.</p>
+<p>Create a conda environment using the lwreg environment.yml file:</p>
+<pre><code>conda env create -f https://github.com/rinikerlab/lightweight-registration/raw/refs/heads/main/environment.yml</code></pre>
+<p>This creates an environment named <code>py311_lwreg</code>. Activate that and install lwreg, postgresql, and the rdkit-postgresql cartridge:</p>
+<pre><code>conda activate py311_lwreg
+python -m pip install git+https://github.com/rinikerlab/lightweight-registration
+conda install postgresql
+conda install rdkit-postgresql</code></pre>
+<p>We need an environment for postgresql to use to store its database files, create that and then tell postgresql to initialize that directory, you will obviously need to pick a different path:</p>
+<pre><code>mkdir c:/users/glandrum/database
+initdb -D /c/Users/glandrum/database/psql17</code></pre>
+<p>Start the postgresql server:</p>
+<pre><code>pg_ctl -D /c/Users/glandrum/database/psql17 -l /c/Users/glandrum/database/psql17.log start</code></pre>
+<blockquote class="blockquote">
+<p><strong>Note</strong> If you run the server this way, it will be killed when the shell you launched it from exits. You will need to run this start command each time you want to start using lwreg.</p>
+</blockquote>
+<p>Finally create the database that we’re going to work with here:</p>
+<pre><code>createdb gl_structuredemo</code></pre>
+<p>Now everything is set up, let’s get started!</p>
+<div class="cell" data-executetime="{&quot;end_time&quot;:&quot;2024-10-22T11:09:39.332071Z&quot;,&quot;start_time&quot;:&quot;2024-10-22T11:09:39.224564Z&quot;}" data-execution_count="1">
+<div class="sourceCode cell-code" id="cb6" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb6-1"><span class="im" style="color: #00769E;">from</span> rdkit <span class="im" style="color: #00769E;">import</span> Chem</span>
+<span id="cb6-2"><span class="im" style="color: #00769E;">from</span> rdkit.Chem <span class="im" style="color: #00769E;">import</span> Draw</span>
+<span id="cb6-3"><span class="im" style="color: #00769E;">from</span> rdkit.Chem.Draw <span class="im" style="color: #00769E;">import</span> IPythonConsole</span>
+<span id="cb6-4"></span>
+<span id="cb6-5"><span class="im" style="color: #00769E;">from</span> lwreg <span class="im" style="color: #00769E;">import</span> utils</span></code></pre></div>
+</div>
+<p>Set up our the configuration we’re going to use for lwreg:</p>
+<div class="cell" data-executetime="{&quot;end_time&quot;:&quot;2024-10-22T11:09:40.114736Z&quot;,&quot;start_time&quot;:&quot;2024-10-22T11:09:40.112260Z&quot;}" data-execution_count="2">
+<div class="sourceCode cell-code" id="cb7" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb7-1">cfg <span class="op" style="color: #5E5E5E;">=</span> utils.defaultConfig()</span>
+<span id="cb7-2">cfg[<span class="st" style="color: #20794D;">'host'</span>] <span class="op" style="color: #5E5E5E;">=</span> <span class="st" style="color: #20794D;">'localhost'</span></span>
+<span id="cb7-3">cfg[<span class="st" style="color: #20794D;">'dbtype'</span>] <span class="op" style="color: #5E5E5E;">=</span> <span class="st" style="color: #20794D;">'postgresql'</span></span>
+<span id="cb7-4">cfg[<span class="st" style="color: #20794D;">'dbname'</span>] <span class="op" style="color: #5E5E5E;">=</span> <span class="st" style="color: #20794D;">'gl_structuredemo'</span></span>
+<span id="cb7-5"><span class="co" style="color: #5E5E5E;"># for this use case we're going to be registering 3D structures and want to keep the conformers:</span></span>
+<span id="cb7-6">cfg[<span class="st" style="color: #20794D;">'registerConformers'</span>] <span class="op" style="color: #5E5E5E;">=</span> <span class="va" style="color: #111111;">True</span></span>
+<span id="cb7-7"><span class="co" style="color: #5E5E5E;"># we don't want lwreg to do any standardization of the molecules when we load them:</span></span>
+<span id="cb7-8">cfg[<span class="st" style="color: #20794D;">'standardization'</span>] <span class="op" style="color: #5E5E5E;">=</span> <span class="st" style="color: #20794D;">'none'</span></span>
+<span id="cb7-9">utils.set_default_config(cfg)</span></code></pre></div>
+</div>
+<div class="cell" data-executetime="{&quot;end_time&quot;:&quot;2024-10-22T11:09:42.685683Z&quot;,&quot;start_time&quot;:&quot;2024-10-22T11:09:40.639774Z&quot;}" data-execution_count="3">
+<div class="sourceCode cell-code" id="cb8" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb8-1">utils.initdb()</span></code></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>This will destroy any existing information in the registration database.</code></pre>
+</div>
+<div class="cell-output cell-output-stdout">
+<pre><code>  are you sure? [yes/no]:  yes</code></pre>
+</div>
+<div class="cell-output cell-output-display" data-execution_count="3">
+<pre><code>True</code></pre>
+</div>
+</div>
+<p>Start by loading some structures (these are some subsets of molecules I’ve extracted from the COD for another project). You obviously won’t have these files, but you can provide any SDF files that contain 3D molecules.</p>
+<div class="cell" data-executetime="{&quot;end_time&quot;:&quot;2024-10-22T11:09:54.140270Z&quot;,&quot;start_time&quot;:&quot;2024-10-22T11:09:43.439889Z&quot;}" data-execution_count="4">
+<div class="sourceCode cell-code" id="cb12" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb12-1">mrns <span class="op" style="color: #5E5E5E;">=</span> utils.bulk_register(sdfile<span class="op" style="color: #5E5E5E;">=</span><span class="st" style="color: #20794D;">'c:/users/glandrum/ETH/Datasets/COD/COD_2024Feb14.organic.chembl_selected.sdf'</span>)</span>
+<span id="cb12-2">mrns <span class="op" style="color: #5E5E5E;">=</span> utils.bulk_register(sdfile<span class="op" style="color: #5E5E5E;">=</span><span class="st" style="color: #20794D;">'c:/users/glandrum/ETH/Datasets/COD/COD_2024Feb14.organic.macrocycles.sdf'</span>)</span>
+<span id="cb12-3">mrns <span class="op" style="color: #5E5E5E;">=</span> utils.bulk_register(sdfile<span class="op" style="color: #5E5E5E;">=</span><span class="st" style="color: #20794D;">'c:/users/glandrum/ETH/Datasets/COD/COD_2024Feb14.organic.cages.sdf'</span>)</span></code></pre></div>
+</div>
+<div class="cell" data-executetime="{&quot;end_time&quot;:&quot;2024-10-22T11:09:54.144985Z&quot;,&quot;start_time&quot;:&quot;2024-10-22T11:09:54.141497Z&quot;}" data-execution_count="5">
+<div class="sourceCode cell-code" id="cb13" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb13-1"><span class="bu" style="color: null;">len</span>(utils.get_all_registry_numbers())</span></code></pre></div>
+<div class="cell-output cell-output-display" data-execution_count="5">
+<pre><code>2416</code></pre>
+</div>
+</div>
+</section>
+<section id="using-the-rdkit-cartridge-with-data-from-the-lwreg-tables." class="level1">
+<h1>Using the RDKit cartridge with data from the lwreg tables.</h1>
+<p>We start by installing the cartridge in our database (if it’s not already installed) and create a new schema to hold the RDKit tables.</p>
+<div class="cell" data-executetime="{&quot;end_time&quot;:&quot;2024-10-22T11:10:00.483038Z&quot;,&quot;start_time&quot;:&quot;2024-10-22T11:10:00.479904Z&quot;}" data-execution_count="6">
+<div class="sourceCode cell-code" id="cb15" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb15-1">cn <span class="op" style="color: #5E5E5E;">=</span> utils.<span class="ex" style="color: null;">connect</span>(config<span class="op" style="color: #5E5E5E;">=</span>cfg)</span>
+<span id="cb15-2">curs <span class="op" style="color: #5E5E5E;">=</span> cn.cursor()</span>
+<span id="cb15-3">curs.execute(<span class="st" style="color: #20794D;">'create extension if not exists rdkit'</span>)</span>
+<span id="cb15-4">curs.execute(<span class="st" style="color: #20794D;">'create schema if not exists rdk'</span>)</span>
+<span id="cb15-5">cn.commit()</span></code></pre></div>
+</div>
+<p>Now create the <code>rdk.mols</code> table to hold RDKit molecules, populate it with molecules created from the mol blocks in lwreg’s <code>molblocks</code> table, and then create an index on the molecule column to allow us to quickly do substructure searches.</p>
+<div class="cell" data-executetime="{&quot;end_time&quot;:&quot;2024-10-22T11:10:03.636493Z&quot;,&quot;start_time&quot;:&quot;2024-10-22T11:10:02.448169Z&quot;}" data-execution_count="7">
+<div class="sourceCode cell-code" id="cb16" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb16-1">curs.execute(<span class="st" style="color: #20794D;">'drop table if exists rdk.mols cascade'</span>)</span>
+<span id="cb16-2"><span class="co" style="color: #5E5E5E;"># the second argument to mol_from_ctab() here tells the cartridge to not store the molecule's conformers, we don't need them</span></span>
+<span id="cb16-3">curs.execute(<span class="st" style="color: #20794D;">'select molregno, mol_from_ctab(molblock::cstring,false) m into rdk.mols from molblocks'</span>)</span>
+<span id="cb16-4">curs.execute(<span class="st" style="color: #20794D;">'create index molidx on rdk.mols using gist(m)'</span>)</span>
+<span id="cb16-5">cn.commit()</span></code></pre></div>
+</div>
+<p>Now let’s do some queries.</p>
+<p>Start by looking for one of the torsions that’s used for ETKDGv3:</p>
+<div class="cell" data-execution_count="8">
+<div class="sourceCode cell-code" id="cb17" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb17-1">smi <span class="op" style="color: #5E5E5E;">=</span> <span class="st" style="color: #20794D;">'[cH0:1][c:2]([cH1])!@;-[O:3][C:4]'</span></span>
+<span id="cb17-2">curs.execute(<span class="st" style="color: #20794D;">"select * from rdk.mols where m @&gt; </span><span class="sc" style="color: #5E5E5E;">%s</span><span class="st" style="color: #20794D;">::qmol"</span>,(smi,))</span>
+<span id="cb17-3">d <span class="op" style="color: #5E5E5E;">=</span> curs.fetchall()</span>
+<span id="cb17-4"><span class="bu" style="color: null;">len</span>(d)</span></code></pre></div>
+<div class="cell-output cell-output-display" data-execution_count="8">
+<pre><code>99</code></pre>
+</div>
+</div>
+<p>And look at the results with just the torsion substructure highlighted:</p>
+<div class="cell" data-executetime="{&quot;end_time&quot;:&quot;2024-10-22T11:10:14.912387Z&quot;,&quot;start_time&quot;:&quot;2024-10-22T11:10:14.896591Z&quot;}" data-execution_count="9">
+<div class="sourceCode cell-code" id="cb19" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb19-1">q <span class="op" style="color: #5E5E5E;">=</span> Chem.MolFromSmarts(smi)</span>
+<span id="cb19-2">labelledAts <span class="op" style="color: #5E5E5E;">=</span> [x.GetIdx() <span class="cf" style="color: #003B4F;">for</span> x <span class="kw" style="color: #003B4F;">in</span> q.GetAtoms() <span class="cf" style="color: #003B4F;">if</span> x.GetAtomMapNum()]</span>
+<span id="cb19-3"></span>
+<span id="cb19-4">ms <span class="op" style="color: #5E5E5E;">=</span> [Chem.MolFromSmiles(x[<span class="dv" style="color: #AD0000;">1</span>]) <span class="cf" style="color: #003B4F;">for</span> x <span class="kw" style="color: #003B4F;">in</span> d]</span>
+<span id="cb19-5">ats <span class="op" style="color: #5E5E5E;">=</span> []</span>
+<span id="cb19-6"><span class="cf" style="color: #003B4F;">for</span> m <span class="kw" style="color: #003B4F;">in</span> ms:</span>
+<span id="cb19-7">    matches <span class="op" style="color: #5E5E5E;">=</span> m.GetSubstructMatches(q)</span>
+<span id="cb19-8">    tl <span class="op" style="color: #5E5E5E;">=</span> []</span>
+<span id="cb19-9">    <span class="cf" style="color: #003B4F;">for</span> tm <span class="kw" style="color: #003B4F;">in</span> matches:</span>
+<span id="cb19-10">        tl.extend([tm[i] <span class="cf" style="color: #003B4F;">for</span> i <span class="kw" style="color: #003B4F;">in</span> labelledAts])</span>
+<span id="cb19-11">    ats.append(tl)</span>
+<span id="cb19-12">    </span>
+<span id="cb19-13">Draw.MolsToGridImage(ms[:<span class="dv" style="color: #AD0000;">6</span>],subImgSize<span class="op" style="color: #5E5E5E;">=</span>(<span class="dv" style="color: #AD0000;">350</span>,<span class="dv" style="color: #AD0000;">300</span>),highlightAtomLists<span class="op" style="color: #5E5E5E;">=</span>ats)</span></code></pre></div>
+<div class="cell-output cell-output-display" data-execution_count="9">
+<p><img src="https://greglandrum.github.io/rdkit-blog/posts/2024-10-31-lwreg-and-the-cartridge_files/figure-html/cell-10-output-1.png" class="img-fluid"></p>
+</div>
+</div>
+<p>Now let’s do a query to retrieve conformers for the molecules that match that substructure:</p>
+<div class="cell" data-execution_count="10">
+<div class="sourceCode cell-code" id="cb20" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb20-1">curs.execute(<span class="st" style="color: #20794D;">"select molregno,conf_id,molblock from rdk.mols join conformers using (molregno) where m@&gt;</span><span class="sc" style="color: #5E5E5E;">%s</span><span class="st" style="color: #20794D;">::qmol"</span>,(smi,))</span>
+<span id="cb20-2">d <span class="op" style="color: #5E5E5E;">=</span> curs.fetchall()</span>
+<span id="cb20-3"><span class="bu" style="color: null;">len</span>(d)</span></code></pre></div>
+<div class="cell-output cell-output-display" data-execution_count="10">
+<pre><code>106</code></pre>
+</div>
+</div>
+<p>And collect information about the values of the dihedral that we’re interested in across those conformers:</p>
+<div class="cell" data-execution_count="11">
+<div class="sourceCode cell-code" id="cb22" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb22-1"><span class="im" style="color: #00769E;">from</span> rdkit.Chem <span class="im" style="color: #00769E;">import</span> rdMolTransforms</span>
+<span id="cb22-2"></span>
+<span id="cb22-3">q <span class="op" style="color: #5E5E5E;">=</span> Chem.MolFromSmarts(smi)</span>
+<span id="cb22-4">labelledAts <span class="op" style="color: #5E5E5E;">=</span> [x.GetIdx() <span class="cf" style="color: #003B4F;">for</span> x <span class="kw" style="color: #003B4F;">in</span> q.GetAtoms() <span class="cf" style="color: #003B4F;">if</span> x.GetAtomMapNum()]</span>
+<span id="cb22-5"></span>
+<span id="cb22-6">ms <span class="op" style="color: #5E5E5E;">=</span> [Chem.MolFromMolBlock(x[<span class="dv" style="color: #AD0000;">2</span>],removeHs<span class="op" style="color: #5E5E5E;">=</span><span class="va" style="color: #111111;">False</span>) <span class="cf" style="color: #003B4F;">for</span> x <span class="kw" style="color: #003B4F;">in</span> d]</span>
+<span id="cb22-7">vals <span class="op" style="color: #5E5E5E;">=</span> []</span>
+<span id="cb22-8"><span class="cf" style="color: #003B4F;">for</span> m <span class="kw" style="color: #003B4F;">in</span> ms:</span>
+<span id="cb22-9">    matches <span class="op" style="color: #5E5E5E;">=</span> m.GetSubstructMatches(q)</span>
+<span id="cb22-10">    conf <span class="op" style="color: #5E5E5E;">=</span> m.GetConformer()</span>
+<span id="cb22-11">    <span class="cf" style="color: #003B4F;">for</span> tm <span class="kw" style="color: #003B4F;">in</span> matches:</span>
+<span id="cb22-12">        aids <span class="op" style="color: #5E5E5E;">=</span> [tm[i] <span class="cf" style="color: #003B4F;">for</span> i <span class="kw" style="color: #003B4F;">in</span> labelledAts]</span>
+<span id="cb22-13">        vals.append(rdMolTransforms.GetDihedralDeg(conf,<span class="op" style="color: #5E5E5E;">*</span>aids))    </span></code></pre></div>
+</div>
+<div class="cell" data-execution_count="12">
+<div class="sourceCode cell-code" id="cb23" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb23-1"><span class="bu" style="color: null;">len</span>(vals)</span></code></pre></div>
+<div class="cell-output cell-output-display" data-execution_count="12">
+<pre><code>219</code></pre>
+</div>
+</div>
+<p>Do a histogram of the dihedral values:</p>
+<div class="cell" data-execution_count="13">
+<div class="sourceCode cell-code" id="cb25" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb25-1"><span class="im" style="color: #00769E;">from</span> matplotlib <span class="im" style="color: #00769E;">import</span> pyplot <span class="im" style="color: #00769E;">as</span> plt</span>
+<span id="cb25-2"><span class="op" style="color: #5E5E5E;">%</span>matplotlib inline</span>
+<span id="cb25-3"></span>
+<span id="cb25-4">plt.hist(vals,bins<span class="op" style="color: #5E5E5E;">=</span><span class="dv" style="color: #AD0000;">20</span>)<span class="op" style="color: #5E5E5E;">;</span></span>
+<span id="cb25-5">plt.xlabel(<span class="st" style="color: #20794D;">'dihedral'</span>)</span>
+<span id="cb25-6">plt.ylabel(<span class="st" style="color: #20794D;">'count'</span>)</span>
+<span id="cb25-7">plt.title(smi)<span class="op" style="color: #5E5E5E;">;</span></span></code></pre></div>
+<div class="cell-output cell-output-display">
+<p><img src="https://greglandrum.github.io/rdkit-blog/posts/2024-10-31-lwreg-and-the-cartridge_files/figure-html/cell-14-output-1.png" class="img-fluid"></p>
+</div>
+</div>
+</section>
+<section id="keeping-the-rdkit-tables-up-to-date-when-molecules-are-added-to-lwreg" class="level1">
+<h1>Keeping the RDKit tables up-to-date when molecules are added to lwreg</h1>
+<p>Our next step is to make sure that RDKit tables in the database are automatically updated when new molecules are added to lwreg. We can do this in PostgreSQL by adding a <code>trigger</code> to the <code>molblock</code> table that is called after a new row is inserted into the <code>molblock</code> table. The trigger is called with the data from the new row, so we can just insert the new molregno and the molecule constructed from the new molblock into the <code>rdk.mols</code> table.</p>
+<p>Note: if using this in production, you probably would need to do some error handling in the trigger. That’s beyond the scope of this blog post (in this case that means: “I don’t know how to do it”).</p>
+<p>The PostgreSQL docs have <a href="https://www.postgresql.org/docs/current/sql-createtrigger.html">more information about creating triggers</a>.</p>
+<div class="cell" data-executetime="{&quot;end_time&quot;:&quot;2024-10-22T11:16:21.299002Z&quot;,&quot;start_time&quot;:&quot;2024-10-22T11:16:21.295452Z&quot;}" data-execution_count="14">
+<div class="sourceCode cell-code" id="cb26" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb26-1">curs.execute(<span class="st" style="color: #20794D;">'''CREATE OR REPLACE FUNCTION copy_new_mol() RETURNS TRIGGER AS</span></span>
+<span id="cb26-2"><span class="st" style="color: #20794D;">$BODY$</span></span>
+<span id="cb26-3"><span class="st" style="color: #20794D;">BEGIN</span></span>
+<span id="cb26-4"><span class="st" style="color: #20794D;">    INSERT INTO</span></span>
+<span id="cb26-5"><span class="st" style="color: #20794D;">        rdk.mols(molregno,m)</span></span>
+<span id="cb26-6"><span class="st" style="color: #20794D;">        VALUES(new.molregno,mol_from_ctab(new.molblock::cstring,false));</span></span>
+<span id="cb26-7"><span class="st" style="color: #20794D;">           RETURN new;</span></span>
+<span id="cb26-8"><span class="st" style="color: #20794D;">END;</span></span>
+<span id="cb26-9"><span class="st" style="color: #20794D;">$BODY$</span></span>
+<span id="cb26-10"><span class="st" style="color: #20794D;">language plpgsql;'''</span>)</span>
+<span id="cb26-11">curs.execute(<span class="st" style="color: #20794D;">'''CREATE OR REPLACE TRIGGER mol_insert_trigger</span></span>
+<span id="cb26-12"><span class="st" style="color: #20794D;">     AFTER INSERT ON molblocks</span></span>
+<span id="cb26-13"><span class="st" style="color: #20794D;">     FOR EACH ROW</span></span>
+<span id="cb26-14"><span class="st" style="color: #20794D;">     EXECUTE FUNCTION copy_new_mol();'''</span>)</span>
+<span id="cb26-15"></span></code></pre></div>
+</div>
+<p>Demonstrate that this worked by creating two new molecules that share a core, generating a conformer for each one, and registering each one.</p>
+<div class="cell" data-executetime="{&quot;end_time&quot;:&quot;2024-10-22T11:16:22.597143Z&quot;,&quot;start_time&quot;:&quot;2024-10-22T11:16:22.558824Z&quot;}" data-execution_count="15">
+<div class="sourceCode cell-code" id="cb27" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb27-1"><span class="im" style="color: #00769E;">from</span> rdkit.Chem <span class="im" style="color: #00769E;">import</span> rdDistGeom</span>
+<span id="cb27-2">newMol <span class="op" style="color: #5E5E5E;">=</span> Chem.AddHs(Chem.MolFromSmiles(<span class="st" style="color: #20794D;">'c1c(O)csn1'</span>))</span>
+<span id="cb27-3">rdDistGeom.EmbedMolecule(newMol,randomSeed<span class="op" style="color: #5E5E5E;">=</span><span class="bn" style="color: #AD0000;">0xf00d</span>)</span>
+<span id="cb27-4">tm <span class="op" style="color: #5E5E5E;">=</span> Chem.RemoveHs(newMol)</span>
+<span id="cb27-5">utils.register(mol<span class="op" style="color: #5E5E5E;">=</span>tm)</span></code></pre></div>
+<div class="cell-output cell-output-display" data-execution_count="15">
+<pre><code>(2792, 2792)</code></pre>
+</div>
+</div>
+<div class="cell" data-executetime="{&quot;end_time&quot;:&quot;2024-10-22T11:16:23.239172Z&quot;,&quot;start_time&quot;:&quot;2024-10-22T11:16:23.215311Z&quot;}" data-execution_count="16">
+<div class="sourceCode cell-code" id="cb29" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb29-1">newMol <span class="op" style="color: #5E5E5E;">=</span> Chem.AddHs(Chem.MolFromSmiles(<span class="st" style="color: #20794D;">'c1c(OC)csn1'</span>))</span>
+<span id="cb29-2">rdDistGeom.EmbedMolecule(newMol,randomSeed<span class="op" style="color: #5E5E5E;">=</span><span class="bn" style="color: #AD0000;">0xf00d</span>)</span>
+<span id="cb29-3">tm <span class="op" style="color: #5E5E5E;">=</span> Chem.RemoveHs(newMol)</span>
+<span id="cb29-4">utils.register(mol<span class="op" style="color: #5E5E5E;">=</span>tm)</span></code></pre></div>
+<div class="cell-output cell-output-display" data-execution_count="16">
+<pre><code>(2793, 2793)</code></pre>
+</div>
+</div>
+<p>Now show that we can retrieve those two just-registered molecules with a substructure query for the core:</p>
+<div class="cell" data-executetime="{&quot;end_time&quot;:&quot;2024-10-22T11:16:26.029405Z&quot;,&quot;start_time&quot;:&quot;2024-10-22T11:16:26.023016Z&quot;}" data-execution_count="17">
+<div class="sourceCode cell-code" id="cb31" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb31-1">sma <span class="op" style="color: #5E5E5E;">=</span> <span class="st" style="color: #20794D;">'c1c(O)csn1'</span></span>
+<span id="cb31-2">curs.execute(<span class="st" style="color: #20794D;">"select * from rdk.mols where m@&gt;</span><span class="sc" style="color: #5E5E5E;">%s</span><span class="st" style="color: #20794D;">::qmol limit 10"</span>,(sma,))</span>
+<span id="cb31-3">d <span class="op" style="color: #5E5E5E;">=</span> curs.fetchall()</span>
+<span id="cb31-4"><span class="bu" style="color: null;">len</span>(d)</span></code></pre></div>
+<div class="cell-output cell-output-display" data-execution_count="17">
+<pre><code>2</code></pre>
+</div>
+</div>
+<div class="cell" data-executetime="{&quot;end_time&quot;:&quot;2024-10-22T11:16:28.809396Z&quot;,&quot;start_time&quot;:&quot;2024-10-22T11:16:28.807000Z&quot;}" data-execution_count="18">
+<div class="sourceCode cell-code" id="cb33" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb33-1">d[<span class="dv" style="color: #AD0000;">0</span>]</span></code></pre></div>
+<div class="cell-output cell-output-display" data-execution_count="18">
+<pre><code>(2792, 'Oc1cnsc1')</code></pre>
+</div>
+</div>
+<div class="cell" data-execution_count="20">
+<div class="sourceCode cell-code" id="cb35" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb35-1">d[<span class="dv" style="color: #AD0000;">1</span>]</span></code></pre></div>
+<div class="cell-output cell-output-display" data-execution_count="20">
+<pre><code>(2793, 'COc1cnsc1')</code></pre>
+</div>
+</div>
+
+
+</section>
+
+ ]]></description>
+  <category>cartridge</category>
+  <category>tutorial</category>
+  <guid>https://greglandrum.github.io/rdkit-blog/posts/2024-10-31-lwreg-and-the-cartridge.html</guid>
+  <pubDate>Wed, 30 Oct 2024 23:00:00 GMT</pubDate>
+</item>
 <item>
   <title>Using the ACS1996 drawing style in PandasTools</title>
   <link>https://greglandrum.github.io/rdkit-blog/posts/2024-10-22-using-acs1996-style-in-pandastools.html</link>
@@ -6782,373 +7029,6 @@ Q 174.3 83.2, 175.8 83.2
   <guid>https://greglandrum.github.io/rdkit-blog/posts/2023-10-21-2d-molecular-templates.html</guid>
   <pubDate>Fri, 20 Oct 2023 22:00:00 GMT</pubDate>
   <media:content url="https://greglandrum.github.io/rdkit-blog/posts/images/blog/2d-templates-1.png" medium="image" type="image/png" height="80" width="144"/>
-</item>
-<item>
-  <title>What’s new in the 2023.09.1 release, part 1</title>
-  <link>https://greglandrum.github.io/rdkit-blog/posts/2023-10-17-release-new-stuff-1.html</link>
-  <description><![CDATA[ 
-
-
-
-<p>This is the first of a few posts covering some of the new features added to the RDKit in the 2023.09.1 release.</p>
-<p>The full release notes are <a href="https://github.com/rdkit/rdkit/releases/tag/Release_2023_09_1">available here</a>.</p>
-<p>Note: starting in this release cycle we are going to try changing the RDKit release model to include new features in minor releases. So the 2023.09.2 release may potentially include new features. There’s some description of the thinking behind this change in <a href="https://greglandrum.github.io/rdkit-blog/posts/2023-08-25-about-rdkit-versioning.html">this blog post</a>.</p>
-<div class="cell" data-execution_count="1">
-<div class="sourceCode cell-code" id="cb1" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb1-1"><span class="im" style="color: #00769E;">from</span> rdkit <span class="im" style="color: #00769E;">import</span> Chem</span>
-<span id="cb1-2"><span class="im" style="color: #00769E;">from</span> rdkit.Chem.Draw <span class="im" style="color: #00769E;">import</span> IPythonConsole</span>
-<span id="cb1-3"><span class="im" style="color: #00769E;">from</span> rdkit.Chem <span class="im" style="color: #00769E;">import</span> Draw</span>
-<span id="cb1-4"><span class="im" style="color: #00769E;">import</span> rdkit</span>
-<span id="cb1-5"><span class="bu" style="color: null;">print</span>(rdkit.__version__)</span></code></pre></div>
-<div class="cell-output cell-output-stdout">
-<pre><code>2023.09.1</code></pre>
-</div>
-</div>
-<section id="generalized-substructure-search" class="level1">
-<h1>Generalized substructure search</h1>
-<p>I wrote a <a href="https://greglandrum.github.io/rdkit-blog/posts/2021-08-03-generalized-substructure-search.html">blog post</a> on this topic a while ago. The functionality in this release builds on and refines the ideas in that post.</p>
-<p>Here are some molecules we’ll do queries against</p>
-<div class="cell" data-execution_count="2">
-<div class="sourceCode cell-code" id="cb3" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb3-1">data <span class="op" style="color: #5E5E5E;">=</span> [(<span class="st" style="color: #20794D;">'CHEMBL1622258'</span>,<span class="st" style="color: #20794D;">'CCn1c(=N)n(CCO)c2ccccc21'</span>),</span>
-<span id="cb3-2">        (<span class="st" style="color: #20794D;">'CHEMBL464157'</span>,<span class="st" style="color: #20794D;">'CCn1c(N)nc2ccccc21'</span>),</span>
-<span id="cb3-3">        (<span class="st" style="color: #20794D;">'CHEMBL256226'</span>,<span class="st" style="color: #20794D;">'Cc1cccc2c1n(C)c(=N)n2CC(=O)c1ccc(Cl)cc1'</span>),</span>
-<span id="cb3-4">        (<span class="st" style="color: #20794D;">'CHEMBL4560326'</span>,<span class="st" style="color: #20794D;">'COC(=O)Nc1nc2c(C)cccc2[nH]1'</span>),</span>
-<span id="cb3-5">        (<span class="st" style="color: #20794D;">'CHEMBL402567'</span>,<span class="st" style="color: #20794D;">'Cc1ccc2c(c1)n(CC(=O)c1ccc(Cl)cc1)c(=N)n2C'</span>),</span>
-<span id="cb3-6">        (<span class="st" style="color: #20794D;">'CHEMBL9514'</span>,<span class="st" style="color: #20794D;">'COC(=O)Nc1nc2cc(C(=O)c3cccs3)ccc2[nH]1'</span>),</span>
-<span id="cb3-7">        (<span class="st" style="color: #20794D;">'CHEMBL1981059'</span>,<span class="st" style="color: #20794D;">'Cc1cc2[nH]c(=NS(=O)(=O)c3cc(C)c(Cl)cc3S)[nH]c2cc1C'</span>),</span>
-<span id="cb3-8">        (<span class="st" style="color: #20794D;">'CHEMBL483978'</span>,<span class="st" style="color: #20794D;">'Cc1cccc(-c2ccc3nc(N)[nH]c3c2)c1'</span>),</span>
-<span id="cb3-9">       ]</span>
-<span id="cb3-10"></span>
-<span id="cb3-11">nms,smis <span class="op" style="color: #5E5E5E;">=</span> <span class="bu" style="color: null;">zip</span>(<span class="op" style="color: #5E5E5E;">*</span>data)</span>
-<span id="cb3-12">mols <span class="op" style="color: #5E5E5E;">=</span> [Chem.MolFromSmiles(x) <span class="cf" style="color: #003B4F;">for</span> x <span class="kw" style="color: #003B4F;">in</span> smis]</span>
-<span id="cb3-13">Draw.MolsToGridImage(mols,legends<span class="op" style="color: #5E5E5E;">=</span>nms)</span></code></pre></div>
-<div class="cell-output cell-output-display" data-execution_count="2">
-<p><img src="https://greglandrum.github.io/rdkit-blog/posts/2023-10-17-release-new-stuff-1_files/figure-html/cell-3-output-1.png" class="img-fluid"></p>
-</div>
-</div>
-<p>And a query which has both a variable attachment point and some possible tautomers.</p>
-<div class="cell" data-execution_count="3">
-<div class="sourceCode cell-code" id="cb4" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb4-1">qry <span class="op" style="color: #5E5E5E;">=</span> Chem.MolFromMolBlock(<span class="st" style="color: #20794D;">'''</span></span>
-<span id="cb4-2"><span class="st" style="color: #20794D;">  Mrv2211 10142305482D          </span></span>
-<span id="cb4-3"></span>
-<span id="cb4-4"><span class="st" style="color: #20794D;">  0  0  0     0  0            999 V3000</span></span>
-<span id="cb4-5"><span class="st" style="color: #20794D;">M  V30 BEGIN CTAB</span></span>
-<span id="cb4-6"><span class="st" style="color: #20794D;">M  V30 COUNTS 12 12 0 0 0</span></span>
-<span id="cb4-7"><span class="st" style="color: #20794D;">M  V30 BEGIN ATOM</span></span>
-<span id="cb4-8"><span class="st" style="color: #20794D;">M  V30 1 C -4.7499 1.9567 0 0</span></span>
-<span id="cb4-9"><span class="st" style="color: #20794D;">M  V30 2 C -6.0836 1.1867 0 0</span></span>
-<span id="cb4-10"><span class="st" style="color: #20794D;">M  V30 3 C -6.0836 -0.3534 0 0</span></span>
-<span id="cb4-11"><span class="st" style="color: #20794D;">M  V30 4 C -4.7499 -1.1234 0 0</span></span>
-<span id="cb4-12"><span class="st" style="color: #20794D;">M  V30 5 C -3.4163 -0.3534 0 0</span></span>
-<span id="cb4-13"><span class="st" style="color: #20794D;">M  V30 6 C -3.4163 1.1867 0 0</span></span>
-<span id="cb4-14"><span class="st" style="color: #20794D;">M  V30 7 N -1.9692 1.7134 0 0</span></span>
-<span id="cb4-15"><span class="st" style="color: #20794D;">M  V30 8 N -1.8822 -0.7768 0 0</span></span>
-<span id="cb4-16"><span class="st" style="color: #20794D;">M  V30 9 C -1.0211 0.4999 0 0</span></span>
-<span id="cb4-17"><span class="st" style="color: #20794D;">M  V30 10 * -5.639 -0.0967 0 0</span></span>
-<span id="cb4-18"><span class="st" style="color: #20794D;">M  V30 11 C -5.639 -2.4067 0 0</span></span>
-<span id="cb4-19"><span class="st" style="color: #20794D;">M  V30 12 N 0.518 0.5537 0 0</span></span>
-<span id="cb4-20"><span class="st" style="color: #20794D;">M  V30 END ATOM</span></span>
-<span id="cb4-21"><span class="st" style="color: #20794D;">M  V30 BEGIN BOND</span></span>
-<span id="cb4-22"><span class="st" style="color: #20794D;">M  V30 1 1 1 2</span></span>
-<span id="cb4-23"><span class="st" style="color: #20794D;">M  V30 2 2 2 3</span></span>
-<span id="cb4-24"><span class="st" style="color: #20794D;">M  V30 3 1 3 4</span></span>
-<span id="cb4-25"><span class="st" style="color: #20794D;">M  V30 4 2 4 5</span></span>
-<span id="cb4-26"><span class="st" style="color: #20794D;">M  V30 5 1 5 6</span></span>
-<span id="cb4-27"><span class="st" style="color: #20794D;">M  V30 6 2 1 6</span></span>
-<span id="cb4-28"><span class="st" style="color: #20794D;">M  V30 7 1 8 9</span></span>
-<span id="cb4-29"><span class="st" style="color: #20794D;">M  V30 8 1 7 6</span></span>
-<span id="cb4-30"><span class="st" style="color: #20794D;">M  V30 9 1 5 8</span></span>
-<span id="cb4-31"><span class="st" style="color: #20794D;">M  V30 10 2 7 9</span></span>
-<span id="cb4-32"><span class="st" style="color: #20794D;">M  V30 11 1 10 11 ENDPTS=(2 4 3) ATTACH=ANY</span></span>
-<span id="cb4-33"><span class="st" style="color: #20794D;">M  V30 12 1 9 12</span></span>
-<span id="cb4-34"><span class="st" style="color: #20794D;">M  V30 END BOND</span></span>
-<span id="cb4-35"><span class="st" style="color: #20794D;">M  V30 END CTAB</span></span>
-<span id="cb4-36"><span class="st" style="color: #20794D;">M  END</span></span>
-<span id="cb4-37"><span class="st" style="color: #20794D;">'''</span>)</span>
-<span id="cb4-38">qry</span></code></pre></div>
-<div class="cell-output cell-output-display" data-execution_count="3">
-<p><img src="https://greglandrum.github.io/rdkit-blog/posts/2023-10-17-release-new-stuff-1_files/figure-html/cell-4-output-1.png" class="img-fluid"></p>
-</div>
-</div>
-<div class="cell" data-execution_count="4">
-<div class="sourceCode cell-code" id="cb5" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb5-1"><span class="kw" style="color: #003B4F;">def</span> filter_and_draw_with_highlights(mols,query_func):</span>
-<span id="cb5-2">    keep <span class="op" style="color: #5E5E5E;">=</span> []</span>
-<span id="cb5-3">    matches <span class="op" style="color: #5E5E5E;">=</span> []</span>
-<span id="cb5-4">    <span class="cf" style="color: #003B4F;">for</span> mol <span class="kw" style="color: #003B4F;">in</span> mols:</span>
-<span id="cb5-5">        match <span class="op" style="color: #5E5E5E;">=</span> query_func(mol)</span>
-<span id="cb5-6">        <span class="cf" style="color: #003B4F;">if</span> match:</span>
-<span id="cb5-7">            keep.append(mol)</span>
-<span id="cb5-8">            matches.append(match)</span>
-<span id="cb5-9">    <span class="cf" style="color: #003B4F;">return</span> Draw.MolsToGridImage(keep,highlightAtomLists<span class="op" style="color: #5E5E5E;">=</span>matches,subImgSize<span class="op" style="color: #5E5E5E;">=</span>(<span class="dv" style="color: #AD0000;">300</span>,<span class="dv" style="color: #AD0000;">250</span>))</span>
-<span id="cb5-10">filter_and_draw_with_highlights(mols,<span class="kw" style="color: #003B4F;">lambda</span> x,q<span class="op" style="color: #5E5E5E;">=</span>qry: x.GetSubstructMatch(qry))</span></code></pre></div>
-<div class="cell-output cell-output-display" data-execution_count="4">
-<p><img src="https://greglandrum.github.io/rdkit-blog/posts/2023-10-17-release-new-stuff-1_files/figure-html/cell-5-output-1.png" class="img-fluid"></p>
-</div>
-</div>
-<p>Some of those matches are surprising/ugly since the RDKit is just treating the variable attachment point as a carbon connected to a dummy atom which is not bound to the main scaffold, basically this:</p>
-<div class="cell" data-execution_count="5">
-<div class="sourceCode cell-code" id="cb6" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb6-1">Chem.MolFromSmiles(Chem.MolToSmiles(qry))</span></code></pre></div>
-<div class="cell-output cell-output-display" data-execution_count="5">
-<p><img src="https://greglandrum.github.io/rdkit-blog/posts/2023-10-17-release-new-stuff-1_files/figure-html/cell-6-output-1.png" class="img-fluid"></p>
-</div>
-</div>
-<p>In order to actually use the query feature, we need to create an extended query molecule and then use the generalized substructure search functionality:</p>
-<div class="cell" data-execution_count="6">
-<div class="sourceCode cell-code" id="cb7" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb7-1"><span class="im" style="color: #00769E;">from</span> rdkit.Chem <span class="im" style="color: #00769E;">import</span> rdGeneralizedSubstruct</span>
-<span id="cb7-2">xqm <span class="op" style="color: #5E5E5E;">=</span> rdGeneralizedSubstruct.CreateExtendedQueryMol(qry)</span></code></pre></div>
-</div>
-<div class="cell" data-execution_count="7">
-<div class="sourceCode cell-code" id="cb8" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb8-1">filter_and_draw_with_highlights(mols,<span class="kw" style="color: #003B4F;">lambda</span> x,q<span class="op" style="color: #5E5E5E;">=</span>xqm: rdGeneralizedSubstruct.MolGetSubstructMatch(x,q))</span></code></pre></div>
-<div class="cell-output cell-output-display" data-execution_count="7">
-<p><img src="https://greglandrum.github.io/rdkit-blog/posts/2023-10-17-release-new-stuff-1_files/figure-html/cell-8-output-1.png" class="img-fluid"></p>
-</div>
-</div>
-<p><code>CreateExtendedQueryMol()</code> can also call <code>AdjustQueryProperties()</code>. Here’s a demo of using that to only return matches where there are no additional ring substitutions:</p>
-<div class="cell" data-execution_count="8">
-<div class="sourceCode cell-code" id="cb9" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb9-1">ps <span class="op" style="color: #5E5E5E;">=</span> Chem.AdjustQueryParameters.NoAdjustments()</span>
-<span id="cb9-2">ps.adjustDegreeFlags <span class="op" style="color: #5E5E5E;">=</span> Chem.AdjustQueryWhichFlags.ADJUST_IGNORECHAINS</span>
-<span id="cb9-3">ps.adjustDegree <span class="op" style="color: #5E5E5E;">=</span> <span class="va" style="color: #111111;">True</span></span>
-<span id="cb9-4">xqm <span class="op" style="color: #5E5E5E;">=</span> rdGeneralizedSubstruct.CreateExtendedQueryMol(qry,adjustQueryProperties<span class="op" style="color: #5E5E5E;">=</span><span class="va" style="color: #111111;">True</span>,adjustQueryParameters<span class="op" style="color: #5E5E5E;">=</span>ps)</span>
-<span id="cb9-5"></span>
-<span id="cb9-6">filter_and_draw_with_highlights(mols,<span class="kw" style="color: #003B4F;">lambda</span> x,q<span class="op" style="color: #5E5E5E;">=</span>xqm: rdGeneralizedSubstruct.MolGetSubstructMatch(x,q))</span></code></pre></div>
-<div class="cell-output cell-output-display" data-execution_count="8">
-<p><img src="https://greglandrum.github.io/rdkit-blog/posts/2023-10-17-release-new-stuff-1_files/figure-html/cell-9-output-1.png" class="img-fluid"></p>
-</div>
-</div>
-</section>
-<section id="using-generics-and-generalized-substructure-search-with-the-postgresql-cartridge" class="level1">
-<h1>Using generics and generalized substructure search with the PostgreSQL cartridge</h1>
-<p>The generalized substructure functionality is also available in the cartridge as is the ability to search with “Beilstein” generic queries.</p>
-<div class="cell" data-executetime="{&quot;end_time&quot;:&quot;2023-10-13T14:59:48.563175Z&quot;,&quot;start_time&quot;:&quot;2023-10-13T14:59:48.218011Z&quot;}" data-execution_count="2">
-<div class="sourceCode cell-code" id="cb10" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb10-1"><span class="im" style="color: #00769E;">from</span> rdkit <span class="im" style="color: #00769E;">import</span> Chem</span>
-<span id="cb10-2"><span class="im" style="color: #00769E;">from</span> rdkit.Chem <span class="im" style="color: #00769E;">import</span> Draw</span>
-<span id="cb10-3"><span class="op" style="color: #5E5E5E;">%</span>load_ext sql</span></code></pre></div>
-</div>
-<p>Start with a generic query:</p>
-<div class="cell" data-execution_count="2">
-<div class="sourceCode cell-code" id="cb11" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb11-1">Chem.MolFromSmiles(<span class="st" style="color: #20794D;">'O=C(-*)(-*) |$;;ARY_p;ARY_p$|'</span>)</span></code></pre></div>
-<div class="cell-output cell-output-display" data-execution_count="2">
-<p><img src="https://greglandrum.github.io/rdkit-blog/posts/2023-10-17-release-new-stuff-1_files/figure-html/cell-11-output-1.png" class="img-fluid"></p>
-</div>
-</div>
-<p>By default query the generics are just used as dummy atoms, so the results we get from the query ignore the “ARY” groups:</p>
-<div class="cell" data-executetime="{&quot;end_time&quot;:&quot;2023-10-13T14:59:52.026634Z&quot;,&quot;start_time&quot;:&quot;2023-10-13T14:59:50.928911Z&quot;}" data-execution_count="3">
-<div class="sourceCode cell-code" id="cb12" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb12-1">d <span class="op" style="color: #5E5E5E;">=</span> <span class="op" style="color: #5E5E5E;">%</span>sql postgresql:<span class="op" style="color: #5E5E5E;">//</span>localhost<span class="op" style="color: #5E5E5E;">/</span>chembl_31 <span class="op" style="color: #5E5E5E;">\</span></span>
-<span id="cb12-2">  select <span class="op" style="color: #5E5E5E;">*</span> <span class="im" style="color: #00769E;">from</span> rdk.million_mols where m <span class="op" style="color: #5E5E5E;">@&gt;&gt;</span> mol_adjust_query_properties(<span class="st" style="color: #20794D;">'O=C(-*)(-*) |$;;ARY_p;ARY_p$|'</span>::mol, <span class="op" style="color: #5E5E5E;">\</span></span>
-<span id="cb12-3">                        <span class="st" style="color: #20794D;">'{"adjustDegree": false, "makeDummiesQueries": true}'</span>)<span class="op" style="color: #5E5E5E;">\</span></span>
-<span id="cb12-4">            order by molregno asc limit <span class="dv" style="color: #AD0000;">10</span><span class="op" style="color: #5E5E5E;">;</span></span>
-<span id="cb12-5">ms <span class="op" style="color: #5E5E5E;">=</span> [Chem.MolFromSmiles(y) <span class="cf" style="color: #003B4F;">for</span> x,y <span class="kw" style="color: #003B4F;">in</span> d]</span>
-<span id="cb12-6">Draw.MolsToGridImage(ms,molsPerRow<span class="op" style="color: #5E5E5E;">=</span><span class="dv" style="color: #AD0000;">4</span>)</span></code></pre></div>
-<div class="cell-output cell-output-stdout">
-<pre><code>10 rows affected.</code></pre>
-</div>
-<div class="cell-output cell-output-display" data-execution_count="3">
-<p><img src="https://greglandrum.github.io/rdkit-blog/posts/2023-10-17-release-new-stuff-1_files/figure-html/cell-12-output-2.png" class="img-fluid"></p>
-</div>
-</div>
-<p>But by passing <code>setGenericQueryFromProperties</code> to <code>mol_adjust_query_properties()</code> we tell the cartridge to use the generics groups:</p>
-<div class="cell" data-execution_count="4">
-<div class="sourceCode cell-code" id="cb14" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb14-1"><span class="op" style="color: #5E5E5E;">%</span>sql postgresql:<span class="op" style="color: #5E5E5E;">//</span>localhost<span class="op" style="color: #5E5E5E;">/</span>chembl_31 <span class="op" style="color: #5E5E5E;">\</span></span>
-<span id="cb14-2">  select  <span class="st" style="color: #20794D;">'CC(=O)C'</span>::mol <span class="op" style="color: #5E5E5E;">@&gt;&gt;</span> mol_adjust_query_properties(<span class="st" style="color: #20794D;">'O=C(-*)(-*) |$;;ARY_p;ARY_p$|'</span>::mol, <span class="op" style="color: #5E5E5E;">\</span></span>
-<span id="cb14-3">                        <span class="st" style="color: #20794D;">'{"setGenericQueryFromProperties": true, "adjustDegree": false}'</span>)<span class="op" style="color: #5E5E5E;">;</span></span></code></pre></div>
-<div class="cell-output cell-output-stdout">
-<pre><code>1 rows affected.</code></pre>
-</div>
-<div class="cell-output cell-output-display" data-execution_count="4">
-
-<table>
-    <thead>
-        <tr>
-            <th>?column?</th>
-        </tr>
-    </thead>
-    <tbody>
-        <tr>
-            <td>False</td>
-        </tr>
-    </tbody>
-</table>
-</div>
-</div>
-<div class="cell" data-execution_count="5">
-<div class="sourceCode cell-code" id="cb16" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb16-1">d <span class="op" style="color: #5E5E5E;">=</span> <span class="op" style="color: #5E5E5E;">%</span>sql postgresql:<span class="op" style="color: #5E5E5E;">//</span>localhost<span class="op" style="color: #5E5E5E;">/</span>chembl_31 <span class="op" style="color: #5E5E5E;">\</span></span>
-<span id="cb16-2">  select <span class="op" style="color: #5E5E5E;">*</span> <span class="im" style="color: #00769E;">from</span> rdk.million_mols where m <span class="op" style="color: #5E5E5E;">@&gt;&gt;</span> mol_adjust_query_properties(<span class="st" style="color: #20794D;">'O=C(-*)(-*) |$;;ARY_p;ARY_p$|'</span>::mol, <span class="op" style="color: #5E5E5E;">\</span></span>
-<span id="cb16-3">                        <span class="st" style="color: #20794D;">'{"setGenericQueryFromProperties": true, "adjustDegree": false, "makeDummiesQueries": true}'</span>)<span class="op" style="color: #5E5E5E;">\</span></span>
-<span id="cb16-4">            order by molregno asc limit <span class="dv" style="color: #AD0000;">10</span><span class="op" style="color: #5E5E5E;">;</span></span>
-<span id="cb16-5">ms <span class="op" style="color: #5E5E5E;">=</span> [Chem.MolFromSmiles(y) <span class="cf" style="color: #003B4F;">for</span> x,y <span class="kw" style="color: #003B4F;">in</span> d]</span>
-<span id="cb16-6">Draw.MolsToGridImage(ms,molsPerRow<span class="op" style="color: #5E5E5E;">=</span><span class="dv" style="color: #AD0000;">4</span>)</span></code></pre></div>
-<div class="cell-output cell-output-stdout">
-<pre><code>10 rows affected.</code></pre>
-</div>
-<div class="cell-output cell-output-display" data-execution_count="5">
-<p><img src="https://greglandrum.github.io/rdkit-blog/posts/2023-10-17-release-new-stuff-1_files/figure-html/cell-14-output-2.png" class="img-fluid"></p>
-</div>
-</div>
-<p>Now let’s look at using generalized substructure search by starting with a query molecule drawn as a tautomer which doesn’t exist in ChEMBL:</p>
-<div class="cell" data-execution_count="6">
-<div class="sourceCode cell-code" id="cb18" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb18-1">mb <span class="op" style="color: #5E5E5E;">=</span> <span class="st" style="color: #20794D;">'''</span></span>
-<span id="cb18-2"><span class="st" style="color: #20794D;">     RDKit          2D</span></span>
-<span id="cb18-3"></span>
-<span id="cb18-4"><span class="st" style="color: #20794D;">  0  0  0  0  0  0  0  0  0  0999 V3000</span></span>
-<span id="cb18-5"><span class="st" style="color: #20794D;">M  V30 BEGIN CTAB</span></span>
-<span id="cb18-6"><span class="st" style="color: #20794D;">M  V30 COUNTS 7 7 1 0 0</span></span>
-<span id="cb18-7"><span class="st" style="color: #20794D;">M  V30 BEGIN ATOM</span></span>
-<span id="cb18-8"><span class="st" style="color: #20794D;">M  V30 1 C 1.208608 -2.457143 0.000000 0</span></span>
-<span id="cb18-9"><span class="st" style="color: #20794D;">M  V30 2 C 2.445787 -1.742857 0.000000 0</span></span>
-<span id="cb18-10"><span class="st" style="color: #20794D;">M  V30 3 C 2.445787 -0.314286 0.000000 0</span></span>
-<span id="cb18-11"><span class="st" style="color: #20794D;">M  V30 4 N 1.208608 0.400000 0.000000 0</span></span>
-<span id="cb18-12"><span class="st" style="color: #20794D;">M  V30 5 C -0.028571 -0.314286 0.000000 0</span></span>
-<span id="cb18-13"><span class="st" style="color: #20794D;">M  V30 6 C -0.028571 -1.742857 0.000000 0</span></span>
-<span id="cb18-14"><span class="st" style="color: #20794D;">M  V30 7 O -1.265751 0.400000 0.000000 0</span></span>
-<span id="cb18-15"><span class="st" style="color: #20794D;">M  V30 END ATOM</span></span>
-<span id="cb18-16"><span class="st" style="color: #20794D;">M  V30 BEGIN BOND</span></span>
-<span id="cb18-17"><span class="st" style="color: #20794D;">M  V30 1 1 1 2</span></span>
-<span id="cb18-18"><span class="st" style="color: #20794D;">M  V30 2 1 2 3</span></span>
-<span id="cb18-19"><span class="st" style="color: #20794D;">M  V30 3 1 3 4</span></span>
-<span id="cb18-20"><span class="st" style="color: #20794D;">M  V30 4 2 4 5</span></span>
-<span id="cb18-21"><span class="st" style="color: #20794D;">M  V30 5 1 5 6</span></span>
-<span id="cb18-22"><span class="st" style="color: #20794D;">M  V30 6 1 6 1</span></span>
-<span id="cb18-23"><span class="st" style="color: #20794D;">M  V30 7 1 5 7</span></span>
-<span id="cb18-24"><span class="st" style="color: #20794D;">M  V30 END BOND</span></span>
-<span id="cb18-25"><span class="st" style="color: #20794D;">M  V30 BEGIN SGROUP</span></span>
-<span id="cb18-26"><span class="st" style="color: #20794D;">M  V30 1 DAT 0 ATOMS=(1 7) FIELDDISP="    0.0000    0.0000    DR    ALL  0 0" -</span></span>
-<span id="cb18-27"><span class="st" style="color: #20794D;">M  V30 QUERYTYPE=SMARTSQ QUERYOP== FIELDDATA="[#8&amp;X1]"</span></span>
-<span id="cb18-28"><span class="st" style="color: #20794D;">M  V30 END SGROUP</span></span>
-<span id="cb18-29"><span class="st" style="color: #20794D;">M  V30 END CTAB</span></span>
-<span id="cb18-30"><span class="st" style="color: #20794D;">M  END</span></span>
-<span id="cb18-31"><span class="st" style="color: #20794D;">$$$$</span></span>
-<span id="cb18-32"><span class="st" style="color: #20794D;">'''</span></span>
-<span id="cb18-33">m <span class="op" style="color: #5E5E5E;">=</span> Chem.MolFromMolBlock(mb)</span>
-<span id="cb18-34">m</span></code></pre></div>
-<div class="cell-output cell-output-display" data-execution_count="6">
-<p><img src="https://greglandrum.github.io/rdkit-blog/posts/2023-10-17-release-new-stuff-1_files/figure-html/cell-15-output-1.png" class="img-fluid"></p>
-</div>
-</div>
-<div class="cell" data-execution_count="7">
-<div class="sourceCode cell-code" id="cb19" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb19-1">Chem.MolToSmarts(m)</span></code></pre></div>
-<div class="cell-output cell-output-display" data-execution_count="7">
-<pre><code>'[#6]1-[#6]-[#6]-[#7]=[#6](-[#6]-1)-[#8&amp;X1]'</code></pre>
-</div>
-</div>
-<p>This doesn’t return any results:</p>
-<div class="cell" data-execution_count="8">
-<div class="sourceCode cell-code" id="cb21" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb21-1">d <span class="op" style="color: #5E5E5E;">=</span> <span class="op" style="color: #5E5E5E;">%</span>sql postgresql:<span class="op" style="color: #5E5E5E;">//</span>localhost<span class="op" style="color: #5E5E5E;">/</span>chembl_31 <span class="op" style="color: #5E5E5E;">\</span></span>
-<span id="cb21-2">  select <span class="op" style="color: #5E5E5E;">*</span> <span class="im" style="color: #00769E;">from</span> rdk.million_mols where m <span class="op" style="color: #5E5E5E;">@&gt;</span> mol_from_ctab(:mb)<span class="op" style="color: #5E5E5E;">\</span></span>
-<span id="cb21-3">            order by molregno asc limit <span class="dv" style="color: #AD0000;">10</span><span class="op" style="color: #5E5E5E;">;</span></span>
-<span id="cb21-4"><span class="cf" style="color: #003B4F;">if</span> <span class="kw" style="color: #003B4F;">not</span> <span class="bu" style="color: null;">len</span>(d):</span>
-<span id="cb21-5">    <span class="cf" style="color: #003B4F;">raise</span> <span class="pp" style="color: #AD0000;">ValueError</span>(<span class="st" style="color: #20794D;">'no matches!'</span>)</span>
-<span id="cb21-6">ms <span class="op" style="color: #5E5E5E;">=</span> [Chem.MolFromSmiles(y) <span class="cf" style="color: #003B4F;">for</span> x,y <span class="kw" style="color: #003B4F;">in</span> d]</span>
-<span id="cb21-7">Draw.MolsToGridImage(ms,molsPerRow<span class="op" style="color: #5E5E5E;">=</span><span class="dv" style="color: #AD0000;">4</span>)</span></code></pre></div>
-<div class="cell-output cell-output-stdout">
-<pre><code>0 rows affected.</code></pre>
-</div>
-<div class="cell-output cell-output-error">
-<pre><code>ValueError: no matches!</code></pre>
-</div>
-</div>
-<p>But we can enable generalized substructure search by calling <code>mol_to_xqmol()</code> (this creates an extended query molecule, discussed above) and using that for the substructure search:</p>
-<div class="cell" data-execution_count="9">
-<div class="sourceCode cell-code" id="cb24" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb24-1">d <span class="op" style="color: #5E5E5E;">=</span> <span class="op" style="color: #5E5E5E;">%</span>sql postgresql:<span class="op" style="color: #5E5E5E;">//</span>localhost<span class="op" style="color: #5E5E5E;">/</span>chembl_31 <span class="op" style="color: #5E5E5E;">\</span></span>
-<span id="cb24-2">  select <span class="op" style="color: #5E5E5E;">*</span> <span class="im" style="color: #00769E;">from</span> rdk.million_mols where m <span class="op" style="color: #5E5E5E;">@&gt;</span> mol_to_xqmol(mol_from_ctab(:mb))<span class="op" style="color: #5E5E5E;">\</span></span>
-<span id="cb24-3">            order by molregno asc limit <span class="dv" style="color: #AD0000;">10</span><span class="op" style="color: #5E5E5E;">;</span></span>
-<span id="cb24-4">ms <span class="op" style="color: #5E5E5E;">=</span> [Chem.MolFromSmiles(y) <span class="cf" style="color: #003B4F;">for</span> x,y <span class="kw" style="color: #003B4F;">in</span> d]</span>
-<span id="cb24-5">Draw.MolsToGridImage(ms,molsPerRow<span class="op" style="color: #5E5E5E;">=</span><span class="dv" style="color: #AD0000;">4</span>)</span></code></pre></div>
-<div class="cell-output cell-output-stdout">
-<pre><code>10 rows affected.</code></pre>
-</div>
-<div class="cell-output cell-output-display" data-execution_count="9">
-<p><img src="https://greglandrum.github.io/rdkit-blog/posts/2023-10-17-release-new-stuff-1_files/figure-html/cell-18-output-2.png" class="img-fluid"></p>
-</div>
-</div>
-<p>Here’s a demo that this works with link nodes and tautomers:</p>
-<div class="cell" data-execution_count="10">
-<div class="sourceCode cell-code" id="cb26" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb26-1">qry <span class="op" style="color: #5E5E5E;">=</span> Chem.MolFromSmiles(<span class="st" style="color: #20794D;">'OCc1nc2cccnc2[nH]1 |LN:1:2.3|'</span>)</span>
-<span id="cb26-2">qry</span></code></pre></div>
-<div class="cell-output cell-output-display" data-execution_count="10">
-<p><img src="https://greglandrum.github.io/rdkit-blog/posts/2023-10-17-release-new-stuff-1_files/figure-html/cell-19-output-1.png" class="img-fluid"></p>
-</div>
-</div>
-<div class="cell" data-execution_count="11">
-<div class="sourceCode cell-code" id="cb27" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb27-1">d <span class="op" style="color: #5E5E5E;">=</span> <span class="op" style="color: #5E5E5E;">%</span>sql postgresql:<span class="op" style="color: #5E5E5E;">//</span>localhost<span class="op" style="color: #5E5E5E;">/</span>chembl_31 <span class="op" style="color: #5E5E5E;">\</span></span>
-<span id="cb27-2">  select <span class="op" style="color: #5E5E5E;">*</span> <span class="im" style="color: #00769E;">from</span> rdk.million_mols where m <span class="op" style="color: #5E5E5E;">@&gt;</span> mol_to_xqmol(<span class="st" style="color: #20794D;">'OCc1nc2cccnc2[nH]1 |LN:1:2.3|'</span>)<span class="op" style="color: #5E5E5E;">\</span></span>
-<span id="cb27-3">            limit <span class="dv" style="color: #AD0000;">10</span><span class="op" style="color: #5E5E5E;">;</span></span>
-<span id="cb27-4">ms <span class="op" style="color: #5E5E5E;">=</span> [Chem.MolFromSmiles(y) <span class="cf" style="color: #003B4F;">for</span> x,y <span class="kw" style="color: #003B4F;">in</span> d]</span>
-<span id="cb27-5">Draw.MolsToGridImage(ms,molsPerRow<span class="op" style="color: #5E5E5E;">=</span><span class="dv" style="color: #AD0000;">4</span>)</span></code></pre></div>
-<div class="cell-output cell-output-stdout">
-<pre><code>6 rows affected.</code></pre>
-</div>
-<div class="cell-output cell-output-display" data-execution_count="11">
-<p><img src="https://greglandrum.github.io/rdkit-blog/posts/2023-10-17-release-new-stuff-1_files/figure-html/cell-20-output-2.png" class="img-fluid"></p>
-</div>
-</div>
-<p>And, as a final demo, link nodes, variable attachment points, and tautomers:</p>
-<div class="cell" data-execution_count="12">
-<div class="sourceCode cell-code" id="cb29" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb29-1">mb <span class="op" style="color: #5E5E5E;">=</span> <span class="st" style="color: #20794D;">'''qry </span></span>
-<span id="cb29-2"><span class="st" style="color: #20794D;">  Mrv2305 09052314502D          </span></span>
-<span id="cb29-3"></span>
-<span id="cb29-4"><span class="st" style="color: #20794D;">  0  0  0     0  0            999 V3000</span></span>
-<span id="cb29-5"><span class="st" style="color: #20794D;">M  V30 BEGIN CTAB</span></span>
-<span id="cb29-6"><span class="st" style="color: #20794D;">M  V30 COUNTS 13 13 0 0 0</span></span>
-<span id="cb29-7"><span class="st" style="color: #20794D;">M  V30 BEGIN ATOM</span></span>
-<span id="cb29-8"><span class="st" style="color: #20794D;">M  V30 1 N -4.75 1.9567 0 0</span></span>
-<span id="cb29-9"><span class="st" style="color: #20794D;">M  V30 2 C -6.0837 1.1867 0 0</span></span>
-<span id="cb29-10"><span class="st" style="color: #20794D;">M  V30 3 C -6.0837 -0.3534 0 0</span></span>
-<span id="cb29-11"><span class="st" style="color: #20794D;">M  V30 4 C -4.75 -1.1234 0 0</span></span>
-<span id="cb29-12"><span class="st" style="color: #20794D;">M  V30 5 C -3.4163 -0.3534 0 0</span></span>
-<span id="cb29-13"><span class="st" style="color: #20794D;">M  V30 6 C -3.4163 1.1867 0 0</span></span>
-<span id="cb29-14"><span class="st" style="color: #20794D;">M  V30 7 N -1.9692 1.7134 0 0</span></span>
-<span id="cb29-15"><span class="st" style="color: #20794D;">M  V30 8 N -1.8822 -0.7768 0 0</span></span>
-<span id="cb29-16"><span class="st" style="color: #20794D;">M  V30 9 C -1.0211 0.4999 0 0</span></span>
-<span id="cb29-17"><span class="st" style="color: #20794D;">M  V30 10 C 0.5179 0.5536 0 0</span></span>
-<span id="cb29-18"><span class="st" style="color: #20794D;">M  V30 11 N 1.2409 1.9133 0 0</span></span>
-<span id="cb29-19"><span class="st" style="color: #20794D;">M  V30 12 * -5.6391 -0.0967 0 0</span></span>
-<span id="cb29-20"><span class="st" style="color: #20794D;">M  V30 13 C -5.6391 -2.4067 0 0</span></span>
-<span id="cb29-21"><span class="st" style="color: #20794D;">M  V30 END ATOM</span></span>
-<span id="cb29-22"><span class="st" style="color: #20794D;">M  V30 BEGIN BOND</span></span>
-<span id="cb29-23"><span class="st" style="color: #20794D;">M  V30 1 1 1 2</span></span>
-<span id="cb29-24"><span class="st" style="color: #20794D;">M  V30 2 2 2 3</span></span>
-<span id="cb29-25"><span class="st" style="color: #20794D;">M  V30 3 1 3 4</span></span>
-<span id="cb29-26"><span class="st" style="color: #20794D;">M  V30 4 2 4 5</span></span>
-<span id="cb29-27"><span class="st" style="color: #20794D;">M  V30 5 1 5 6</span></span>
-<span id="cb29-28"><span class="st" style="color: #20794D;">M  V30 6 2 1 6</span></span>
-<span id="cb29-29"><span class="st" style="color: #20794D;">M  V30 7 1 8 9</span></span>
-<span id="cb29-30"><span class="st" style="color: #20794D;">M  V30 8 1 7 6</span></span>
-<span id="cb29-31"><span class="st" style="color: #20794D;">M  V30 9 1 5 8</span></span>
-<span id="cb29-32"><span class="st" style="color: #20794D;">M  V30 10 2 7 9</span></span>
-<span id="cb29-33"><span class="st" style="color: #20794D;">M  V30 11 1 9 10</span></span>
-<span id="cb29-34"><span class="st" style="color: #20794D;">M  V30 12 1 10 11</span></span>
-<span id="cb29-35"><span class="st" style="color: #20794D;">M  V30 13 1 12 13 ENDPTS=(3 4 3 2) ATTACH=ANY</span></span>
-<span id="cb29-36"><span class="st" style="color: #20794D;">M  V30 END BOND</span></span>
-<span id="cb29-37"><span class="st" style="color: #20794D;">M  V30 LINKNODE 1 2 2 10 9 10 11</span></span>
-<span id="cb29-38"><span class="st" style="color: #20794D;">M  V30 END CTAB</span></span>
-<span id="cb29-39"><span class="st" style="color: #20794D;">M  END'''</span></span>
-<span id="cb29-40">Chem.MolFromMolBlock(mb)</span></code></pre></div>
-<div class="cell-output cell-output-display" data-execution_count="12">
-<p><img src="https://greglandrum.github.io/rdkit-blog/posts/2023-10-17-release-new-stuff-1_files/figure-html/cell-21-output-1.png" class="img-fluid"></p>
-</div>
-</div>
-<div class="cell" data-execution_count="13">
-<div class="sourceCode cell-code" id="cb30" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb30-1">d <span class="op" style="color: #5E5E5E;">=</span> <span class="op" style="color: #5E5E5E;">%</span>sql postgresql:<span class="op" style="color: #5E5E5E;">//</span>localhost<span class="op" style="color: #5E5E5E;">/</span>chembl_31 <span class="op" style="color: #5E5E5E;">\</span></span>
-<span id="cb30-2">  select <span class="op" style="color: #5E5E5E;">*</span> <span class="im" style="color: #00769E;">from</span> rdk.million_mols where m <span class="op" style="color: #5E5E5E;">@&gt;</span> mol_to_xqmol(mol_from_ctab(:mb))<span class="op" style="color: #5E5E5E;">\</span></span>
-<span id="cb30-3">            limit <span class="dv" style="color: #AD0000;">10</span><span class="op" style="color: #5E5E5E;">;</span></span>
-<span id="cb30-4">ms <span class="op" style="color: #5E5E5E;">=</span> [Chem.MolFromSmiles(y) <span class="cf" style="color: #003B4F;">for</span> x,y <span class="kw" style="color: #003B4F;">in</span> d]</span>
-<span id="cb30-5">Draw.MolsToGridImage(ms,molsPerRow<span class="op" style="color: #5E5E5E;">=</span><span class="dv" style="color: #AD0000;">4</span>)</span></code></pre></div>
-<div class="cell-output cell-output-stdout">
-<pre><code>8 rows affected.</code></pre>
-</div>
-<div class="cell-output cell-output-display" data-execution_count="13">
-<p><img src="https://greglandrum.github.io/rdkit-blog/posts/2023-10-17-release-new-stuff-1_files/figure-html/cell-22-output-2.png" class="img-fluid"></p>
-</div>
-</div>
-
-
-</section>
-
- ]]></description>
-  <category>release</category>
-  <category>documentation</category>
-  <guid>https://greglandrum.github.io/rdkit-blog/posts/2023-10-17-release-new-stuff-1.html</guid>
-  <pubDate>Mon, 16 Oct 2023 22:00:00 GMT</pubDate>
-  <media:content url="https://greglandrum.github.io/rdkit-blog/posts/images/blog/2023-09-1-new-stuff-1.png" medium="image" type="image/png" height="48" width="144"/>
 </item>
 </channel>
 </rss>
