@@ -2,14 +2,14 @@
 <html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en"><head>
 
 <meta charset="utf-8">
-<meta name="generator" content="quarto-1.2.269">
+<meta name="generator" content="quarto-1.6.39">
 
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
 
 <meta name="dcterms.date" content="2023-08-13">
 <meta name="description" content="Should multiple splits be run?">
 
-<title>RDKit blog - Variability of x-fold cross validation results</title>
+<title>Variability of x-fold cross validation results – RDKit blog</title>
 <style>
 code{white-space: pre-wrap;}
 span.smallcaps{font-variant: small-caps;}
@@ -19,11 +19,12 @@ div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
 ul.task-list{list-style: none;}
 ul.task-list li input[type="checkbox"] {
   width: 0.8em;
-  margin: 0 0.8em 0.2em -1.6em;
+  margin: 0 0.8em 0.2em -1em; /* quarto-specific, see https://github.com/quarto-dev/quarto-cli/issues/4556 */ 
   vertical-align: middle;
 }
+/* CSS for syntax highlighting */
 pre > code.sourceCode { white-space: pre; position: relative; }
-pre > code.sourceCode > span { display: inline-block; line-height: 1.25; }
+pre > code.sourceCode > span { line-height: 1.25; }
 pre > code.sourceCode > span:empty { height: 1.2em; }
 .sourceCode { overflow: visible; }
 code.sourceCode > span { color: inherit; text-decoration: inherit; }
@@ -34,7 +35,7 @@ div.sourceCode { overflow: auto; }
 }
 @media print {
 pre > code.sourceCode { white-space: pre-wrap; }
-pre > code.sourceCode > span { text-indent: -5em; padding-left: 5em; }
+pre > code.sourceCode > span { display: inline-block; text-indent: -5em; padding-left: 5em; }
 }
 pre.numberSource code
   { counter-reset: source-line 0; }
@@ -48,47 +49,17 @@ pre.numberSource code > span > a:first-child::before
     -khtml-user-select: none; -moz-user-select: none;
     -ms-user-select: none; user-select: none;
     padding: 0 4px; width: 4em;
-    color: #aaaaaa;
   }
-pre.numberSource { margin-left: 3em; border-left: 1px solid #aaaaaa;  padding-left: 4px; }
+pre.numberSource { margin-left: 3em;  padding-left: 4px; }
 div.sourceCode
   {   }
 @media screen {
 pre > code.sourceCode > span > a:first-child::before { text-decoration: underline; }
 }
-code span.al { color: #ff0000; font-weight: bold; } /* Alert */
-code span.an { color: #60a0b0; font-weight: bold; font-style: italic; } /* Annotation */
-code span.at { color: #7d9029; } /* Attribute */
-code span.bn { color: #40a070; } /* BaseN */
-code span.bu { color: #008000; } /* BuiltIn */
-code span.cf { color: #007020; font-weight: bold; } /* ControlFlow */
-code span.ch { color: #4070a0; } /* Char */
-code span.cn { color: #880000; } /* Constant */
-code span.co { color: #60a0b0; font-style: italic; } /* Comment */
-code span.cv { color: #60a0b0; font-weight: bold; font-style: italic; } /* CommentVar */
-code span.do { color: #ba2121; font-style: italic; } /* Documentation */
-code span.dt { color: #902000; } /* DataType */
-code span.dv { color: #40a070; } /* DecVal */
-code span.er { color: #ff0000; font-weight: bold; } /* Error */
-code span.ex { } /* Extension */
-code span.fl { color: #40a070; } /* Float */
-code span.fu { color: #06287e; } /* Function */
-code span.im { color: #008000; font-weight: bold; } /* Import */
-code span.in { color: #60a0b0; font-weight: bold; font-style: italic; } /* Information */
-code span.kw { color: #007020; font-weight: bold; } /* Keyword */
-code span.op { color: #666666; } /* Operator */
-code span.ot { color: #007020; } /* Other */
-code span.pp { color: #bc7a00; } /* Preprocessor */
-code span.sc { color: #4070a0; } /* SpecialChar */
-code span.ss { color: #bb6688; } /* SpecialString */
-code span.st { color: #4070a0; } /* String */
-code span.va { color: #19177c; } /* Variable */
-code span.vs { color: #4070a0; } /* VerbatimString */
-code span.wa { color: #60a0b0; font-weight: bold; font-style: italic; } /* Warning */
 </style>
 
 
-<script src="../site_libs/quarto-nav/quarto-nav.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.5.1/jquery.min.js" integrity="sha512-bLT0Qm9VnAYZDflyKcBaQ2gg0hSYNQrJ8RilYldYQ1FxQYoCLtUjuuRuZo+fjqhx/qtq/1itJ0C2ejDxltZVFg==" crossorigin="anonymous"></script><script src="../site_libs/quarto-nav/quarto-nav.js"></script>
 <script src="../site_libs/quarto-nav/headroom.min.js"></script>
 <script src="../site_libs/clipboard/clipboard.min.js"></script>
 <script src="../site_libs/quarto-search/autocomplete.umd.js"></script>
@@ -101,19 +72,25 @@ code span.wa { color: #60a0b0; font-weight: bold; font-style: italic; } /* Warni
 <script src="../site_libs/quarto-html/tippy.umd.min.js"></script>
 <script src="../site_libs/quarto-html/anchor.min.js"></script>
 <link href="../site_libs/quarto-html/tippy.css" rel="stylesheet">
-<link href="../site_libs/quarto-html/quarto-syntax-highlighting.css" rel="stylesheet" class="quarto-color-scheme" id="quarto-text-highlighting-styles">
-<link href="../site_libs/quarto-html/quarto-syntax-highlighting-dark.css" rel="prefetch" class="quarto-color-scheme quarto-color-alternate" id="quarto-text-highlighting-styles">
+<link href="../site_libs/quarto-html/quarto-syntax-highlighting-e26003cea8cd680ca0c55a263523d882.css" rel="stylesheet" class="quarto-color-scheme" id="quarto-text-highlighting-styles">
+<link href="../site_libs/quarto-html/quarto-syntax-highlighting-dark-d166b450ba5a8e9f7a0ab969bf6592c1.css" rel="prefetch" class="quarto-color-scheme quarto-color-alternate" id="quarto-text-highlighting-styles">
 <script src="../site_libs/bootstrap/bootstrap.min.js"></script>
 <link href="../site_libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
-<link href="../site_libs/bootstrap/bootstrap.min.css" rel="stylesheet" class="quarto-color-scheme" id="quarto-bootstrap" data-mode="light">
-<link href="../site_libs/bootstrap/bootstrap-dark.min.css" rel="prefetch" class="quarto-color-scheme quarto-color-alternate" id="quarto-bootstrap" data-mode="dark">
+<link href="../site_libs/bootstrap/bootstrap-a1fb93aa6af6e5138998f4139e0aef3d.min.css" rel="stylesheet" append-hash="true" class="quarto-color-scheme" id="quarto-bootstrap" data-mode="light">
+<link href="../site_libs/bootstrap/bootstrap-dark-98e8d043add42333c0993713f12a6dca.min.css" rel="prefetch" append-hash="true" class="quarto-color-scheme quarto-color-alternate" id="quarto-bootstrap" data-mode="dark">
 <script id="quarto-search-options" type="application/json">{
   "location": "navbar",
   "copy-button": false,
   "collapse-after": 3,
   "panel-placement": "end",
   "type": "overlay",
-  "limit": 20,
+  "limit": 50,
+  "keyboard-shortcut": [
+    "f",
+    "/",
+    "s"
+  ],
+  "show-item-context": false,
   "language": {
     "search-no-results-text": "No results",
     "search-matching-documents-text": "matching documents",
@@ -122,14 +99,15 @@ code span.wa { color: #60a0b0; font-weight: bold; font-style: italic; } /* Warni
     "search-more-match-text": "more match in this document",
     "search-more-matches-text": "more matches in this document",
     "search-clear-button-title": "Clear",
+    "search-text-placeholder": "",
     "search-detached-cancel-button-title": "Cancel",
-    "search-submit-button-title": "Submit"
+    "search-submit-button-title": "Submit",
+    "search-label": "Search"
   }
 }</script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.6/require.min.js" integrity="sha512-c3Nl8+7g4LMSTdrm621y7kf9v3SDPnhxLNhcjFJbKECVnmZHTdo+IRO05sNLTH/D3vA6u1X32ehoLC7WFVdheg==" crossorigin="anonymous"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.5.1/jquery.min.js" integrity="sha512-bLT0Qm9VnAYZDflyKcBaQ2gg0hSYNQrJ8RilYldYQ1FxQYoCLtUjuuRuZo+fjqhx/qtq/1itJ0C2ejDxltZVFg==" crossorigin="anonymous"></script>
+
 <script type="application/javascript">define('jquery', [],function() {return window.jQuery;})</script>
-<script defer="" async="" data-host="greglandrum.github.io" src="https://liteanalytics.com/lite.js"></script>
 
 
 <link rel="stylesheet" href="../styles.css">
@@ -139,43 +117,48 @@ code span.wa { color: #60a0b0; font-weight: bold; font-style: italic; } /* Warni
 
 <div id="quarto-search-results"></div>
   <header id="quarto-header" class="headroom fixed-top">
-    <nav class="navbar navbar-expand-lg navbar-dark ">
+    <nav class="navbar navbar-expand-lg " data-bs-theme="dark">
       <div class="navbar-container container-fluid">
-      <div class="navbar-brand-container">
+      <div class="navbar-brand-container mx-auto">
     <a class="navbar-brand" href="../index.html">
     <span class="navbar-title">RDKit blog</span>
     </a>
   </div>
-          <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarCollapse" aria-controls="navbarCollapse" aria-expanded="false" aria-label="Toggle navigation" onclick="if (window.quartoToggleHeadroom) { window.quartoToggleHeadroom(); }">
+            <div id="quarto-search" class="" title="Search"></div>
+          <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarCollapse" aria-controls="navbarCollapse" role="menu" aria-expanded="false" aria-label="Toggle navigation" onclick="if (window.quartoToggleHeadroom) { window.quartoToggleHeadroom(); }">
   <span class="navbar-toggler-icon"></span>
 </button>
           <div class="collapse navbar-collapse" id="navbarCollapse">
             <ul class="navbar-nav navbar-nav-scroll ms-auto">
   <li class="nav-item">
-    <a class="nav-link" href="../about.html">
- <span class="menu-text">RDKit experiments, tips, and tutorials</span></a>
+    <a class="nav-link" href="../about.html"> 
+<span class="menu-text">RDKit experiments, tips, and tutorials</span></a>
   </li>  
   <li class="nav-item compact">
-    <a class="nav-link" href="https://github.com/rdkit/rdkit"><i class="bi bi-github" role="img">
+    <a class="nav-link" href="https://github.com/rdkit/rdkit"> <i class="bi bi-github" role="img">
 </i> 
- <span class="menu-text"></span></a>
+<span class="menu-text"></span></a>
   </li>  
   <li class="nav-item compact">
-    <a class="nav-link" href="https://twitter.com/rdkit_org"><i class="bi bi-twitter" role="img">
+    <a class="nav-link" href="https://bsky.app/profile/rdkit.bsky.social"> <i class="bi bi-twitter" role="img">
 </i> 
- <span class="menu-text"></span></a>
+<span class="menu-text"></span></a>
   </li>  
   <li class="nav-item compact">
-    <a class="nav-link" href="../index.xml"><i class="bi bi-rss" role="img">
+    <a class="nav-link" href="https://www.linkedin.com/groups/8192558/"> <i class="bi bi-linkedin" role="img">
 </i> 
- <span class="menu-text"></span></a>
+<span class="menu-text"></span></a>
+  </li>  
+  <li class="nav-item compact">
+    <a class="nav-link" href="../index.xml"> <i class="bi bi-rss" role="img">
+</i> 
+<span class="menu-text"></span></a>
   </li>  
 </ul>
-              <div class="quarto-toggle-container">
-                  <a href="" class="quarto-color-scheme-toggle nav-link" onclick="window.quartoToggleColorScheme(); return false;" title="Toggle dark mode"><i class="bi"></i></a>
-              </div>
-              <div id="quarto-search" class="" title="Search"></div>
           </div> <!-- /navcollapse -->
+            <div class="quarto-navbar-tools">
+  <a href="" class="quarto-color-scheme-toggle quarto-navigation-tool  px-1" onclick="window.quartoToggleColorScheme(); return false;" title="Toggle dark mode"><i class="bi"></i></a>
+</div>
       </div> <!-- /container-fluid -->
     </nav>
 </header>
@@ -229,7 +212,9 @@ code span.wa { color: #60a0b0; font-weight: bold; font-style: italic; } /* Warni
   </div>
   
 
+
 </header>
+
 
 <section id="intro" class="level1">
 <h1>Intro</h1>
@@ -241,13 +226,13 @@ code span.wa { color: #60a0b0; font-weight: bold; font-style: italic; } /* Warni
 <p>These boxplots look at Cohen’s kappa (left plot) and AUROC (right plot) for classifiers built on the MDCK dataset. The left pair of bars in each plot show the distribution of values for 100 random splits, the right pair show distributions for 50 different 5-fold cross validations. The left bar in each pair has the results for XGB, the right bar for RF.</p>
 <div class="quarto-figure quarto-figure-center">
 <figure class="figure">
-<p><img src="2023-08-13-xval-variability1_files/figure-html/f51735f7-1-image-2.png" class="img-fluid figure-img"></p>
-<p></p><figcaption class="figure-caption">image-2.png</figcaption><p></p>
+<p><img src="2023-08-13-xval-variability1_files/figure-html/cell-2-1-image-2.png" class="img-fluid figure-img"></p>
+<figcaption>image-2.png</figcaption>
 </figure>
 </div>
 <p>We can see that the distributions are significantly narrower for the 5-fold cross validation, but that there is still a spread of values. This spread becomes more significant if we are trying to use the cross validation to answer the question “Which method gives higher AUROC values for this data set, RF or XGB?”. The distribution makes it clear that RF is a bit better, but since the difference is small 16% of the cross validation splits would have lead to the other conclusion.</p>
 <p>It’s probably worth coming back to this at some point and doing a broader set of data sets and methods in order to be more certain about the conclusions, but I think this already indicates that it wouldn’t be a <em>terrible</em> idea to try different K-fold splits when comparing models where the performance differences are not large.</p>
-<div class="cell" data-executetime="{&quot;end_time&quot;:&quot;2023-08-12T04:38:44.880721Z&quot;,&quot;start_time&quot;:&quot;2023-08-12T04:38:44.861769Z&quot;}" data-execution_count="52">
+<div id="cell-3" class="cell" data-executetime="{&quot;end_time&quot;:&quot;2023-08-12T04:38:44.880721Z&quot;,&quot;start_time&quot;:&quot;2023-08-12T04:38:44.861769Z&quot;}" data-execution_count="52">
 <div class="sourceCode cell-code" id="cb1"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> rdkit <span class="im">import</span> Chem</span>
 <span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> rdkit.Chem <span class="im">import</span> rdFingerprintGenerator</span>
 <span id="cb1-3"><a href="#cb1-3" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> pandas <span class="im">as</span> pd</span>
@@ -261,106 +246,107 @@ code span.wa { color: #60a0b0; font-weight: bold; font-style: italic; } /* Warni
 <pre><code>2023.03.2</code></pre>
 </div>
 </div>
-<div class="cell" data-executetime="{&quot;end_time&quot;:&quot;2023-08-12T04:03:55.822062Z&quot;,&quot;start_time&quot;:&quot;2023-08-12T04:03:55.206961Z&quot;}" data-execution_count="3">
+<div id="cell-4" class="cell" data-executetime="{&quot;end_time&quot;:&quot;2023-08-12T04:03:55.822062Z&quot;,&quot;start_time&quot;:&quot;2023-08-12T04:03:55.206961Z&quot;}" data-execution_count="3">
 <div class="sourceCode cell-code" id="cb3"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a><span class="co"># data set from here: https://github.com/molecularinformatics/Computational-ADME/blob/main/ADME_public_set_3521.csv</span></span>
 <span id="cb3-2"><a href="#cb3-2" aria-hidden="true" tabindex="-1"></a><span class="co"># from this publication: https://pubs.acs.org/doi/10.1021/acs.jcim.3c00160</span></span>
 <span id="cb3-3"><a href="#cb3-3" aria-hidden="true" tabindex="-1"></a>df <span class="op">=</span> pd.read_csv(<span class="st">'../data/ADME_public_set_3521.csv'</span>)</span>
 <span id="cb3-4"><a href="#cb3-4" aria-hidden="true" tabindex="-1"></a>df.head()</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 <div class="cell-output cell-output-display" data-execution_count="3">
-
 <div>
 
-<table class="dataframe table table-sm table-striped">
-  <thead>
-    <tr>
-      <th></th>
-      <th>Internal ID</th>
-      <th>Vendor ID</th>
-      <th>SMILES</th>
-      <th>CollectionName</th>
-      <th>LOG HLM_CLint (mL/min/kg)</th>
-      <th>LOG MDR1-MDCK ER (B-A/A-B)</th>
-      <th>LOG SOLUBILITY PH 6.8 (ug/mL)</th>
-      <th>LOG PLASMA PROTEIN BINDING (HUMAN) (% unbound)</th>
-      <th>LOG PLASMA PROTEIN BINDING (RAT) (% unbound)</th>
-      <th>LOG RLM_CLint (mL/min/kg)</th>
-    </tr>
-  </thead>
-  <tbody>
-    <tr>
-      <th>0</th>
-      <td>Mol1</td>
-      <td>317714313</td>
-      <td>CNc1cc(Nc2cccn(-c3ccccn3)c2=O)nn2c(C(=O)N[C@@H...</td>
-      <td>emolecules</td>
-      <td>0.675687</td>
-      <td>1.493167</td>
-      <td>0.089905</td>
-      <td>0.991226</td>
-      <td>0.518514</td>
-      <td>1.392169</td>
-    </tr>
-    <tr>
-      <th>1</th>
-      <td>Mol2</td>
-      <td>324056965</td>
-      <td>CCOc1cc2nn(CCC(C)(C)O)cc2cc1NC(=O)c1cccc(C(F)F)n1</td>
-      <td>emolecules</td>
-      <td>0.675687</td>
-      <td>1.040780</td>
-      <td>0.550228</td>
-      <td>0.099681</td>
-      <td>0.268344</td>
-      <td>1.027920</td>
-    </tr>
-    <tr>
-      <th>2</th>
-      <td>Mol3</td>
-      <td>304005766</td>
-      <td>CN(c1ncc(F)cn1)[C@H]1CCCNC1</td>
-      <td>emolecules</td>
-      <td>0.675687</td>
-      <td>-0.358806</td>
-      <td>NaN</td>
-      <td>2.000000</td>
-      <td>2.000000</td>
-      <td>1.027920</td>
-    </tr>
-    <tr>
-      <th>3</th>
-      <td>Mol4</td>
-      <td>194963090</td>
-      <td>CC(C)(Oc1ccc(-c2cnc(N)c(-c3ccc(Cl)cc3)c2)cc1)C...</td>
-      <td>emolecules</td>
-      <td>0.675687</td>
-      <td>1.026662</td>
-      <td>1.657056</td>
-      <td>-1.158015</td>
-      <td>-1.403403</td>
-      <td>1.027920</td>
-    </tr>
-    <tr>
-      <th>4</th>
-      <td>Mol5</td>
-      <td>324059015</td>
-      <td>CC(C)(O)CCn1cc2cc(NC(=O)c3cccc(C(F)(F)F)n3)c(C...</td>
-      <td>emolecules</td>
-      <td>0.996380</td>
-      <td>1.010597</td>
-      <td>NaN</td>
-      <td>1.015611</td>
-      <td>1.092264</td>
-      <td>1.629093</td>
-    </tr>
-  </tbody>
+
+<table class="dataframe caption-top table table-sm table-striped small" data-quarto-postprocess="true" data-border="1">
+<thead>
+<tr class="header">
+<th data-quarto-table-cell-role="th"></th>
+<th data-quarto-table-cell-role="th">Internal ID</th>
+<th data-quarto-table-cell-role="th">Vendor ID</th>
+<th data-quarto-table-cell-role="th">SMILES</th>
+<th data-quarto-table-cell-role="th">CollectionName</th>
+<th data-quarto-table-cell-role="th">LOG HLM_CLint (mL/min/kg)</th>
+<th data-quarto-table-cell-role="th">LOG MDR1-MDCK ER (B-A/A-B)</th>
+<th data-quarto-table-cell-role="th">LOG SOLUBILITY PH 6.8 (ug/mL)</th>
+<th data-quarto-table-cell-role="th">LOG PLASMA PROTEIN BINDING (HUMAN) (% unbound)</th>
+<th data-quarto-table-cell-role="th">LOG PLASMA PROTEIN BINDING (RAT) (% unbound)</th>
+<th data-quarto-table-cell-role="th">LOG RLM_CLint (mL/min/kg)</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td data-quarto-table-cell-role="th">0</td>
+<td>Mol1</td>
+<td>317714313</td>
+<td>CNc1cc(Nc2cccn(-c3ccccn3)c2=O)nn2c(C(=O)N[C@@H...</td>
+<td>emolecules</td>
+<td>0.675687</td>
+<td>1.493167</td>
+<td>0.089905</td>
+<td>0.991226</td>
+<td>0.518514</td>
+<td>1.392169</td>
+</tr>
+<tr class="even">
+<td data-quarto-table-cell-role="th">1</td>
+<td>Mol2</td>
+<td>324056965</td>
+<td>CCOc1cc2nn(CCC(C)(C)O)cc2cc1NC(=O)c1cccc(C(F)F)n1</td>
+<td>emolecules</td>
+<td>0.675687</td>
+<td>1.040780</td>
+<td>0.550228</td>
+<td>0.099681</td>
+<td>0.268344</td>
+<td>1.027920</td>
+</tr>
+<tr class="odd">
+<td data-quarto-table-cell-role="th">2</td>
+<td>Mol3</td>
+<td>304005766</td>
+<td>CN(c1ncc(F)cn1)[C@H]1CCCNC1</td>
+<td>emolecules</td>
+<td>0.675687</td>
+<td>-0.358806</td>
+<td>NaN</td>
+<td>2.000000</td>
+<td>2.000000</td>
+<td>1.027920</td>
+</tr>
+<tr class="even">
+<td data-quarto-table-cell-role="th">3</td>
+<td>Mol4</td>
+<td>194963090</td>
+<td>CC(C)(Oc1ccc(-c2cnc(N)c(-c3ccc(Cl)cc3)c2)cc1)C...</td>
+<td>emolecules</td>
+<td>0.675687</td>
+<td>1.026662</td>
+<td>1.657056</td>
+<td>-1.158015</td>
+<td>-1.403403</td>
+<td>1.027920</td>
+</tr>
+<tr class="odd">
+<td data-quarto-table-cell-role="th">4</td>
+<td>Mol5</td>
+<td>324059015</td>
+<td>CC(C)(O)CCn1cc2cc(NC(=O)c3cccc(C(F)(F)F)n3)c(C...</td>
+<td>emolecules</td>
+<td>0.996380</td>
+<td>1.010597</td>
+<td>NaN</td>
+<td>1.015611</td>
+<td>1.092264</td>
+<td>1.629093</td>
+</tr>
+</tbody>
 </table>
+
 </div>
 </div>
 </div>
 </section>
 <section id="hlm-data-set" class="level1">
 <h1>HLM data set</h1>
-<div class="cell" data-executetime="{&quot;end_time&quot;:&quot;2023-08-12T04:13:33.538603Z&quot;,&quot;start_time&quot;:&quot;2023-08-12T04:13:33.535009Z&quot;}" data-execution_count="18">
+<div id="cell-6" class="cell" data-executetime="{&quot;end_time&quot;:&quot;2023-08-12T04:13:33.538603Z&quot;,&quot;start_time&quot;:&quot;2023-08-12T04:13:33.535009Z&quot;}" data-execution_count="18">
 <div class="sourceCode cell-code" id="cb4"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a>hlm_df <span class="op">=</span> df[df[<span class="st">'LOG HLM_CLint (mL/min/kg)'</span>].notnull()].copy()</span>
 <span id="cb4-2"><a href="#cb4-2" aria-hidden="true" tabindex="-1"></a>hlm_df.shape</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 <div class="cell-output cell-output-display" data-execution_count="18">
@@ -368,28 +354,32 @@ code span.wa { color: #60a0b0; font-weight: bold; font-style: italic; } /* Warni
 </div>
 </div>
 <p>Take a look at the distribution of values to figure out where to place the “active/inactive” bin for classification.</p>
-<div class="cell" data-executetime="{&quot;end_time&quot;:&quot;2023-08-12T04:13:34.601089Z&quot;,&quot;start_time&quot;:&quot;2023-08-12T04:13:34.458066Z&quot;}" data-execution_count="19">
+<div id="cell-8" class="cell" data-executetime="{&quot;end_time&quot;:&quot;2023-08-12T04:13:34.601089Z&quot;,&quot;start_time&quot;:&quot;2023-08-12T04:13:34.458066Z&quot;}" data-execution_count="19">
 <div class="sourceCode cell-code" id="cb6"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb6-1"><a href="#cb6-1" aria-hidden="true" tabindex="-1"></a>plt.hist(hlm_df[<span class="st">'LOG HLM_CLint (mL/min/kg)'</span>])<span class="op">;</span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 <div class="cell-output cell-output-display">
-<p><img src="2023-08-13-xval-variability1_files/figure-html/cell-5-output-1.png" class="img-fluid"></p>
+<div>
+<figure class="figure">
+<p><img src="2023-08-13-xval-variability1_files/figure-html/cell-5-output-1.png" class="img-fluid figure-img"></p>
+</figure>
 </div>
 </div>
-<div class="cell" data-executetime="{&quot;end_time&quot;:&quot;2023-08-12T04:13:35.078765Z&quot;,&quot;start_time&quot;:&quot;2023-08-12T04:13:35.065015Z&quot;}" data-execution_count="20">
+</div>
+<div id="cell-9" class="cell" data-executetime="{&quot;end_time&quot;:&quot;2023-08-12T04:13:35.078765Z&quot;,&quot;start_time&quot;:&quot;2023-08-12T04:13:35.065015Z&quot;}" data-execution_count="20">
 <div class="sourceCode cell-code" id="cb7"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb7-1"><a href="#cb7-1" aria-hidden="true" tabindex="-1"></a>hlm_df[hlm_df[<span class="st">'LOG HLM_CLint (mL/min/kg)'</span>]<span class="op">&gt;</span><span class="fl">1.5</span>].shape</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 <div class="cell-output cell-output-display" data-execution_count="20">
 <pre><code>(1162, 10)</code></pre>
 </div>
 </div>
-<div class="cell" data-executetime="{&quot;end_time&quot;:&quot;2023-08-12T04:13:35.734956Z&quot;,&quot;start_time&quot;:&quot;2023-08-12T04:13:35.729615Z&quot;}" data-execution_count="21">
+<div id="cell-10" class="cell" data-executetime="{&quot;end_time&quot;:&quot;2023-08-12T04:13:35.734956Z&quot;,&quot;start_time&quot;:&quot;2023-08-12T04:13:35.729615Z&quot;}" data-execution_count="21">
 <div class="sourceCode cell-code" id="cb9"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb9-1"><a href="#cb9-1" aria-hidden="true" tabindex="-1"></a>hlm_df[<span class="st">'active'</span>] <span class="op">=</span> [<span class="bu">int</span>(x) <span class="cf">for</span> x <span class="kw">in</span> hlm_df[<span class="st">'LOG HLM_CLint (mL/min/kg)'</span>]<span class="op">&gt;</span><span class="fl">1.5</span>]</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </div>
 <p>We’ll use standard fingerprints for this:</p>
-<div class="cell" data-executetime="{&quot;end_time&quot;:&quot;2023-08-12T04:13:43.984967Z&quot;,&quot;start_time&quot;:&quot;2023-08-12T04:13:43.407159Z&quot;}" data-execution_count="22">
+<div id="cell-12" class="cell" data-executetime="{&quot;end_time&quot;:&quot;2023-08-12T04:13:43.984967Z&quot;,&quot;start_time&quot;:&quot;2023-08-12T04:13:43.407159Z&quot;}" data-execution_count="22">
 <div class="sourceCode cell-code" id="cb10"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb10-1"><a href="#cb10-1" aria-hidden="true" tabindex="-1"></a>ms <span class="op">=</span> [Chem.MolFromSmiles(x) <span class="cf">for</span> x <span class="kw">in</span> hlm_df[<span class="st">'SMILES'</span>]]</span>
 <span id="cb10-2"><a href="#cb10-2" aria-hidden="true" tabindex="-1"></a>fpg <span class="op">=</span> rdFingerprintGenerator.GetMorganGenerator(radius<span class="op">=</span><span class="dv">3</span>,fpSize<span class="op">=</span><span class="dv">2048</span>)</span>
 <span id="cb10-3"><a href="#cb10-3" aria-hidden="true" tabindex="-1"></a>fps <span class="op">=</span> [fpg.GetCountFingerprintAsNumPy(x) <span class="cf">for</span> x <span class="kw">in</span> ms]</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </div>
-<div class="cell" data-executetime="{&quot;end_time&quot;:&quot;2023-08-12T04:21:23.149691Z&quot;,&quot;start_time&quot;:&quot;2023-08-12T04:21:23.147053Z&quot;}" data-execution_count="28">
+<div id="cell-13" class="cell" data-executetime="{&quot;end_time&quot;:&quot;2023-08-12T04:21:23.149691Z&quot;,&quot;start_time&quot;:&quot;2023-08-12T04:21:23.147053Z&quot;}" data-execution_count="28">
 <div class="sourceCode cell-code" id="cb11"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb11-1"><a href="#cb11-1" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> sklearn.ensemble <span class="im">import</span> RandomForestClassifier</span>
 <span id="cb11-2"><a href="#cb11-2" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> xgboost <span class="im">import</span> XGBClassifier</span>
 <span id="cb11-3"><a href="#cb11-3" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> sklearn.metrics <span class="im">import</span> (</span>
@@ -404,7 +394,7 @@ code span.wa { color: #60a0b0; font-weight: bold; font-style: italic; } /* Warni
 <span id="cb11-12"><a href="#cb11-12" aria-hidden="true" tabindex="-1"></a>}</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </div>
 <p>Start by doing 100 random splits to get a sense for the amount of variability there.</p>
-<div class="cell" data-executetime="{&quot;end_time&quot;:&quot;2023-08-12T04:33:02.217418Z&quot;,&quot;start_time&quot;:&quot;2023-08-12T04:27:55.824796Z&quot;}" data-execution_count="47">
+<div id="cell-15" class="cell" data-executetime="{&quot;end_time&quot;:&quot;2023-08-12T04:33:02.217418Z&quot;,&quot;start_time&quot;:&quot;2023-08-12T04:27:55.824796Z&quot;}" data-execution_count="47">
 <div class="sourceCode cell-code" id="cb12"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb12-1"><a href="#cb12-1" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> sklearn.model_selection <span class="im">import</span> train_test_split</span>
 <span id="cb12-2"><a href="#cb12-2" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb12-3"><a href="#cb12-3" aria-hidden="true" tabindex="-1"></a>acts <span class="op">=</span> hlm_df[<span class="st">'active'</span>].to_list()</span>
@@ -456,13 +446,13 @@ iteration 90
 iteration 100</code></pre>
 </div>
 </div>
-<div class="cell" data-executetime="{&quot;end_time&quot;:&quot;2023-08-12T04:35:33.745662Z&quot;,&quot;start_time&quot;:&quot;2023-08-12T04:35:33.739278Z&quot;}" data-execution_count="51">
+<div id="cell-16" class="cell" data-executetime="{&quot;end_time&quot;:&quot;2023-08-12T04:35:33.745662Z&quot;,&quot;start_time&quot;:&quot;2023-08-12T04:35:33.739278Z&quot;}" data-execution_count="51">
 <div class="sourceCode cell-code" id="cb14"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb14-1"><a href="#cb14-1" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> pickle</span>
 <span id="cb14-2"><a href="#cb14-2" aria-hidden="true" tabindex="-1"></a><span class="cf">with</span> <span class="bu">open</span>(<span class="st">'./results/xc_variability_random_splits.pkl'</span>,<span class="st">'wb+'</span>) <span class="im">as</span> outf:</span>
 <span id="cb14-3"><a href="#cb14-3" aria-hidden="true" tabindex="-1"></a>    pickle.dump((rf_accum,xgb_accum),outf)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </div>
 <p>Look at the distribution of values for the normal random splits:</p>
-<div class="cell" data-executetime="{&quot;end_time&quot;:&quot;2023-08-12T04:33:48.120033Z&quot;,&quot;start_time&quot;:&quot;2023-08-12T04:33:47.647901Z&quot;}" data-execution_count="49">
+<div id="cell-18" class="cell" data-executetime="{&quot;end_time&quot;:&quot;2023-08-12T04:33:48.120033Z&quot;,&quot;start_time&quot;:&quot;2023-08-12T04:33:47.647901Z&quot;}" data-execution_count="49">
 <div class="sourceCode cell-code" id="cb15"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb15-1"><a href="#cb15-1" aria-hidden="true" tabindex="-1"></a>plt.figure(figsize<span class="op">=</span>(<span class="dv">10</span>,<span class="dv">10</span>))</span>
 <span id="cb15-2"><a href="#cb15-2" aria-hidden="true" tabindex="-1"></a>plt.subplot(<span class="dv">2</span>,<span class="dv">2</span>,<span class="dv">1</span>)</span>
 <span id="cb15-3"><a href="#cb15-3" aria-hidden="true" tabindex="-1"></a>plt.hist([x[<span class="st">'cohen_kappa_score'</span>] <span class="cf">for</span> x <span class="kw">in</span> xgb_accum])<span class="op">;</span></span>
@@ -482,11 +472,15 @@ iteration 100</code></pre>
 <span id="cb15-17"><a href="#cb15-17" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb15-18"><a href="#cb15-18" aria-hidden="true" tabindex="-1"></a>plt.tight_layout()</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 <div class="cell-output cell-output-display">
-<p><img src="2023-08-13-xval-variability1_files/figure-html/cell-12-output-1.png" class="img-fluid"></p>
+<div>
+<figure class="figure">
+<p><img src="2023-08-13-xval-variability1_files/figure-html/cell-12-output-1.png" class="img-fluid figure-img"></p>
+</figure>
+</div>
 </div>
 </div>
 <p>Now do 50 different 5-fold cross validation runs</p>
-<div class="cell" data-executetime="{&quot;end_time&quot;:&quot;2023-08-12T05:11:13.456827Z&quot;,&quot;start_time&quot;:&quot;2023-08-12T04:58:15.060039Z&quot;}" data-execution_count="66">
+<div id="cell-20" class="cell" data-executetime="{&quot;end_time&quot;:&quot;2023-08-12T05:11:13.456827Z&quot;,&quot;start_time&quot;:&quot;2023-08-12T04:58:15.060039Z&quot;}" data-execution_count="66">
 <div class="sourceCode cell-code" id="cb16"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb16-1"><a href="#cb16-1" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> sklearn.model_selection <span class="im">import</span> StratifiedKFold</span>
 <span id="cb16-2"><a href="#cb16-2" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb16-3"><a href="#cb16-3" aria-hidden="true" tabindex="-1"></a>acts <span class="op">=</span> hlm_df[<span class="st">'active'</span>].to_numpy()</span>
@@ -591,13 +585,13 @@ iteration 49
 iteration 50</code></pre>
 </div>
 </div>
-<div class="cell" data-executetime="{&quot;end_time&quot;:&quot;2023-08-12T05:41:34.384400Z&quot;,&quot;start_time&quot;:&quot;2023-08-12T05:41:34.361518Z&quot;}" data-execution_count="67">
+<div id="cell-21" class="cell" data-executetime="{&quot;end_time&quot;:&quot;2023-08-12T05:41:34.384400Z&quot;,&quot;start_time&quot;:&quot;2023-08-12T05:41:34.361518Z&quot;}" data-execution_count="67">
 <div class="sourceCode cell-code" id="cb18"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb18-1"><a href="#cb18-1" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> pickle</span>
 <span id="cb18-2"><a href="#cb18-2" aria-hidden="true" tabindex="-1"></a><span class="cf">with</span> <span class="bu">open</span>(<span class="st">'./results/xc_variability_xc.pkl'</span>,<span class="st">'wb+'</span>) <span class="im">as</span> outf:</span>
 <span id="cb18-3"><a href="#cb18-3" aria-hidden="true" tabindex="-1"></a>    pickle.dump((rf_xc_accum,xgb_xc_accum),outf)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </div>
 <p>And look at the variability</p>
-<div class="cell" data-executetime="{&quot;end_time&quot;:&quot;2023-08-12T05:41:36.385915Z&quot;,&quot;start_time&quot;:&quot;2023-08-12T05:41:35.910400Z&quot;}" data-execution_count="68">
+<div id="cell-23" class="cell" data-executetime="{&quot;end_time&quot;:&quot;2023-08-12T05:41:36.385915Z&quot;,&quot;start_time&quot;:&quot;2023-08-12T05:41:35.910400Z&quot;}" data-execution_count="68">
 <div class="sourceCode cell-code" id="cb19"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb19-1"><a href="#cb19-1" aria-hidden="true" tabindex="-1"></a>plt.figure(figsize<span class="op">=</span>(<span class="dv">10</span>,<span class="dv">10</span>))</span>
 <span id="cb19-2"><a href="#cb19-2" aria-hidden="true" tabindex="-1"></a>plt.subplot(<span class="dv">2</span>,<span class="dv">2</span>,<span class="dv">1</span>)</span>
 <span id="cb19-3"><a href="#cb19-3" aria-hidden="true" tabindex="-1"></a>plt.hist([np.mean(x[<span class="st">'cohen_kappa_score'</span>]) <span class="cf">for</span> x <span class="kw">in</span> xgb_xc_accum])<span class="op">;</span></span>
@@ -617,38 +611,46 @@ iteration 50</code></pre>
 <span id="cb19-17"><a href="#cb19-17" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb19-18"><a href="#cb19-18" aria-hidden="true" tabindex="-1"></a>plt.tight_layout()</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 <div class="cell-output cell-output-display">
-<p><img src="2023-08-13-xval-variability1_files/figure-html/cell-15-output-1.png" class="img-fluid"></p>
+<div>
+<figure class="figure">
+<p><img src="2023-08-13-xval-variability1_files/figure-html/cell-15-output-1.png" class="img-fluid figure-img"></p>
+</figure>
+</div>
 </div>
 </div>
 </section>
 <section id="mdck-dataset" class="level1">
 <h1>MDCK dataset</h1>
-<div class="cell" data-executetime="{&quot;end_time&quot;:&quot;2023-08-12T15:58:34.969723Z&quot;,&quot;start_time&quot;:&quot;2023-08-12T15:58:34.956643Z&quot;}" data-scrolled="true" data-execution_count="78">
+<div id="cell-25" class="cell" data-executetime="{&quot;end_time&quot;:&quot;2023-08-12T15:58:34.969723Z&quot;,&quot;start_time&quot;:&quot;2023-08-12T15:58:34.956643Z&quot;}" data-scrolled="true" data-execution_count="78">
 <div class="sourceCode cell-code" id="cb20"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb20-1"><a href="#cb20-1" aria-hidden="true" tabindex="-1"></a>mdck_df <span class="op">=</span> df[df[<span class="st">'LOG MDR1-MDCK ER (B-A/A-B)'</span>].notnull()].copy()</span>
 <span id="cb20-2"><a href="#cb20-2" aria-hidden="true" tabindex="-1"></a>mdck_df.shape</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 <div class="cell-output cell-output-display" data-execution_count="78">
 <pre><code>(2642, 10)</code></pre>
 </div>
 </div>
-<div class="cell" data-executetime="{&quot;end_time&quot;:&quot;2023-08-12T15:57:38.081457Z&quot;,&quot;start_time&quot;:&quot;2023-08-12T15:57:37.978117Z&quot;}" data-execution_count="76">
+<div id="cell-26" class="cell" data-executetime="{&quot;end_time&quot;:&quot;2023-08-12T15:57:38.081457Z&quot;,&quot;start_time&quot;:&quot;2023-08-12T15:57:37.978117Z&quot;}" data-execution_count="76">
 <div class="sourceCode cell-code" id="cb22"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb22-1"><a href="#cb22-1" aria-hidden="true" tabindex="-1"></a>plt.hist(mdck_df[<span class="st">'LOG MDR1-MDCK ER (B-A/A-B)'</span>])<span class="op">;</span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 <div class="cell-output cell-output-display">
-<p><img src="2023-08-13-xval-variability1_files/figure-html/cell-17-output-1.png" class="img-fluid"></p>
+<div>
+<figure class="figure">
+<p><img src="2023-08-13-xval-variability1_files/figure-html/cell-17-output-1.png" class="img-fluid figure-img"></p>
+</figure>
 </div>
 </div>
-<div class="cell" data-executetime="{&quot;end_time&quot;:&quot;2023-08-12T15:58:40.171885Z&quot;,&quot;start_time&quot;:&quot;2023-08-12T15:58:40.168430Z&quot;}" data-execution_count="79">
+</div>
+<div id="cell-27" class="cell" data-executetime="{&quot;end_time&quot;:&quot;2023-08-12T15:58:40.171885Z&quot;,&quot;start_time&quot;:&quot;2023-08-12T15:58:40.168430Z&quot;}" data-execution_count="79">
 <div class="sourceCode cell-code" id="cb23"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb23-1"><a href="#cb23-1" aria-hidden="true" tabindex="-1"></a>mdck_df[mdck_df[<span class="st">'LOG MDR1-MDCK ER (B-A/A-B)'</span>]<span class="op">&gt;</span><span class="dv">1</span>].shape</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 <div class="cell-output cell-output-display" data-execution_count="79">
 <pre><code>(587, 10)</code></pre>
 </div>
 </div>
-<div class="cell" data-executetime="{&quot;end_time&quot;:&quot;2023-08-12T15:59:40.796574Z&quot;,&quot;start_time&quot;:&quot;2023-08-12T15:59:40.296022Z&quot;}" data-execution_count="80">
+<div id="cell-28" class="cell" data-executetime="{&quot;end_time&quot;:&quot;2023-08-12T15:59:40.796574Z&quot;,&quot;start_time&quot;:&quot;2023-08-12T15:59:40.296022Z&quot;}" data-execution_count="80">
 <div class="sourceCode cell-code" id="cb25"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb25-1"><a href="#cb25-1" aria-hidden="true" tabindex="-1"></a>mdck_df[<span class="st">'active'</span>] <span class="op">=</span> [<span class="bu">int</span>(x) <span class="cf">for</span> x <span class="kw">in</span> mdck_df[<span class="st">'LOG MDR1-MDCK ER (B-A/A-B)'</span>]<span class="op">&gt;</span><span class="dv">1</span>]</span>
 <span id="cb25-2"><a href="#cb25-2" aria-hidden="true" tabindex="-1"></a>ms <span class="op">=</span> [Chem.MolFromSmiles(x) <span class="cf">for</span> x <span class="kw">in</span> mdck_df[<span class="st">'SMILES'</span>]]</span>
 <span id="cb25-3"><a href="#cb25-3" aria-hidden="true" tabindex="-1"></a>fpg <span class="op">=</span> rdFingerprintGenerator.GetMorganGenerator(radius<span class="op">=</span><span class="dv">3</span>,fpSize<span class="op">=</span><span class="dv">2048</span>)</span>
 <span id="cb25-4"><a href="#cb25-4" aria-hidden="true" tabindex="-1"></a>fps <span class="op">=</span> [fpg.GetCountFingerprintAsNumPy(x) <span class="cf">for</span> x <span class="kw">in</span> ms]</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </div>
-<div class="cell" data-executetime="{&quot;end_time&quot;:&quot;2023-08-12T16:05:00.369650Z&quot;,&quot;start_time&quot;:&quot;2023-08-12T16:00:44.099973Z&quot;}" data-execution_count="81">
+<div id="cell-29" class="cell" data-executetime="{&quot;end_time&quot;:&quot;2023-08-12T16:05:00.369650Z&quot;,&quot;start_time&quot;:&quot;2023-08-12T16:00:44.099973Z&quot;}" data-execution_count="81">
 <div class="sourceCode cell-code" id="cb26"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb26-1"><a href="#cb26-1" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> sklearn.model_selection <span class="im">import</span> train_test_split</span>
 <span id="cb26-2"><a href="#cb26-2" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb26-3"><a href="#cb26-3" aria-hidden="true" tabindex="-1"></a>acts <span class="op">=</span> mdck_df[<span class="st">'active'</span>].to_list()</span>
@@ -702,7 +704,7 @@ iteration 90
 iteration 100</code></pre>
 </div>
 </div>
-<div class="cell" data-executetime="{&quot;end_time&quot;:&quot;2023-08-12T16:15:41.678580Z&quot;,&quot;start_time&quot;:&quot;2023-08-12T16:05:00.371506Z&quot;}" data-execution_count="82">
+<div id="cell-30" class="cell" data-executetime="{&quot;end_time&quot;:&quot;2023-08-12T16:15:41.678580Z&quot;,&quot;start_time&quot;:&quot;2023-08-12T16:05:00.371506Z&quot;}" data-execution_count="82">
 <div class="sourceCode cell-code" id="cb28"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb28-1"><a href="#cb28-1" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> sklearn.model_selection <span class="im">import</span> StratifiedKFold</span>
 <span id="cb28-2"><a href="#cb28-2" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb28-3"><a href="#cb28-3" aria-hidden="true" tabindex="-1"></a>acts <span class="op">=</span> mdck_df[<span class="st">'active'</span>].to_numpy()</span>
@@ -809,7 +811,7 @@ iteration 49
 iteration 50</code></pre>
 </div>
 </div>
-<div class="cell" data-executetime="{&quot;end_time&quot;:&quot;2023-08-13T04:01:28.781418Z&quot;,&quot;start_time&quot;:&quot;2023-08-13T04:01:28.227755Z&quot;}" data-execution_count="98">
+<div id="cell-31" class="cell" data-executetime="{&quot;end_time&quot;:&quot;2023-08-13T04:01:28.781418Z&quot;,&quot;start_time&quot;:&quot;2023-08-13T04:01:28.227755Z&quot;}" data-execution_count="98">
 <div class="sourceCode cell-code" id="cb30"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb30-1"><a href="#cb30-1" aria-hidden="true" tabindex="-1"></a>plt.figure(figsize<span class="op">=</span>(<span class="dv">10</span>,<span class="dv">10</span>))</span>
 <span id="cb30-2"><a href="#cb30-2" aria-hidden="true" tabindex="-1"></a>plt.subplot(<span class="dv">2</span>,<span class="dv">2</span>,<span class="dv">1</span>)</span>
 <span id="cb30-3"><a href="#cb30-3" aria-hidden="true" tabindex="-1"></a>plt.hist([x[<span class="st">'cohen_kappa_score'</span>] <span class="cf">for</span> x <span class="kw">in</span> mdck_xgb_accum])<span class="op">;</span></span>
@@ -829,10 +831,14 @@ iteration 50</code></pre>
 <span id="cb30-17"><a href="#cb30-17" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb30-18"><a href="#cb30-18" aria-hidden="true" tabindex="-1"></a>plt.tight_layout()</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 <div class="cell-output cell-output-display">
-<p><img src="2023-08-13-xval-variability1_files/figure-html/cell-22-output-1.png" class="img-fluid"></p>
+<div>
+<figure class="figure">
+<p><img src="2023-08-13-xval-variability1_files/figure-html/cell-22-output-1.png" class="img-fluid figure-img"></p>
+</figure>
 </div>
 </div>
-<div class="cell" data-executetime="{&quot;end_time&quot;:&quot;2023-08-13T03:41:19.035693Z&quot;,&quot;start_time&quot;:&quot;2023-08-13T03:41:18.555154Z&quot;}" data-execution_count="83">
+</div>
+<div id="cell-32" class="cell" data-executetime="{&quot;end_time&quot;:&quot;2023-08-13T03:41:19.035693Z&quot;,&quot;start_time&quot;:&quot;2023-08-13T03:41:18.555154Z&quot;}" data-execution_count="83">
 <div class="sourceCode cell-code" id="cb31"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb31-1"><a href="#cb31-1" aria-hidden="true" tabindex="-1"></a>plt.figure(figsize<span class="op">=</span>(<span class="dv">10</span>,<span class="dv">10</span>))</span>
 <span id="cb31-2"><a href="#cb31-2" aria-hidden="true" tabindex="-1"></a>plt.subplot(<span class="dv">2</span>,<span class="dv">2</span>,<span class="dv">1</span>)</span>
 <span id="cb31-3"><a href="#cb31-3" aria-hidden="true" tabindex="-1"></a>plt.hist([np.mean(x[<span class="st">'cohen_kappa_score'</span>]) <span class="cf">for</span> x <span class="kw">in</span> mdck_xgb_xc_accum])<span class="op">;</span></span>
@@ -852,26 +858,34 @@ iteration 50</code></pre>
 <span id="cb31-17"><a href="#cb31-17" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb31-18"><a href="#cb31-18" aria-hidden="true" tabindex="-1"></a>plt.tight_layout()</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 <div class="cell-output cell-output-display">
-<p><img src="2023-08-13-xval-variability1_files/figure-html/cell-23-output-1.png" class="img-fluid"></p>
+<div>
+<figure class="figure">
+<p><img src="2023-08-13-xval-variability1_files/figure-html/cell-23-output-1.png" class="img-fluid figure-img"></p>
+</figure>
+</div>
 </div>
 </div>
 </section>
 <section id="ppb-data-set-smaller" class="level1">
 <h1>PPB data set (smaller)</h1>
-<div class="cell" data-executetime="{&quot;end_time&quot;:&quot;2023-08-13T03:57:17.853357Z&quot;,&quot;start_time&quot;:&quot;2023-08-13T03:57:17.722078Z&quot;}" data-execution_count="94">
+<div id="cell-34" class="cell" data-executetime="{&quot;end_time&quot;:&quot;2023-08-13T03:57:17.853357Z&quot;,&quot;start_time&quot;:&quot;2023-08-13T03:57:17.722078Z&quot;}" data-execution_count="94">
 <div class="sourceCode cell-code" id="cb32"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb32-1"><a href="#cb32-1" aria-hidden="true" tabindex="-1"></a>ppb_df <span class="op">=</span> df[df[<span class="st">'LOG PLASMA PROTEIN BINDING (HUMAN) (</span><span class="sc">% u</span><span class="st">nbound)'</span>].notnull()].copy()</span>
 <span id="cb32-2"><a href="#cb32-2" aria-hidden="true" tabindex="-1"></a>plt.hist(ppb_df[<span class="st">'LOG PLASMA PROTEIN BINDING (HUMAN) (</span><span class="sc">% u</span><span class="st">nbound)'</span>])<span class="op">;</span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 <div class="cell-output cell-output-display">
-<p><img src="2023-08-13-xval-variability1_files/figure-html/cell-24-output-1.png" class="img-fluid"></p>
+<div>
+<figure class="figure">
+<p><img src="2023-08-13-xval-variability1_files/figure-html/cell-24-output-1.png" class="img-fluid figure-img"></p>
+</figure>
 </div>
 </div>
-<div class="cell" data-executetime="{&quot;end_time&quot;:&quot;2023-08-13T03:57:18.851827Z&quot;,&quot;start_time&quot;:&quot;2023-08-13T03:57:18.801619Z&quot;}" data-execution_count="95">
+</div>
+<div id="cell-35" class="cell" data-executetime="{&quot;end_time&quot;:&quot;2023-08-13T03:57:18.851827Z&quot;,&quot;start_time&quot;:&quot;2023-08-13T03:57:18.801619Z&quot;}" data-execution_count="95">
 <div class="sourceCode cell-code" id="cb33"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb33-1"><a href="#cb33-1" aria-hidden="true" tabindex="-1"></a>ppb_df[<span class="st">'active'</span>] <span class="op">=</span> [<span class="bu">int</span>(x) <span class="cf">for</span> x <span class="kw">in</span> ppb_df[<span class="st">'LOG PLASMA PROTEIN BINDING (HUMAN) (</span><span class="sc">% u</span><span class="st">nbound)'</span>]<span class="op">&gt;</span><span class="dv">1</span>]</span>
 <span id="cb33-2"><a href="#cb33-2" aria-hidden="true" tabindex="-1"></a>ms <span class="op">=</span> [Chem.MolFromSmiles(x) <span class="cf">for</span> x <span class="kw">in</span> ppb_df[<span class="st">'SMILES'</span>]]</span>
 <span id="cb33-3"><a href="#cb33-3" aria-hidden="true" tabindex="-1"></a>fpg <span class="op">=</span> rdFingerprintGenerator.GetMorganGenerator(radius<span class="op">=</span><span class="dv">3</span>,fpSize<span class="op">=</span><span class="dv">2048</span>)</span>
 <span id="cb33-4"><a href="#cb33-4" aria-hidden="true" tabindex="-1"></a>fps <span class="op">=</span> [fpg.GetCountFingerprintAsNumPy(x) <span class="cf">for</span> x <span class="kw">in</span> ms]</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </div>
-<div class="cell" data-executetime="{&quot;end_time&quot;:&quot;2023-08-13T03:59:14.214501Z&quot;,&quot;start_time&quot;:&quot;2023-08-13T03:58:26.900902Z&quot;}" data-execution_count="96">
+<div id="cell-36" class="cell" data-executetime="{&quot;end_time&quot;:&quot;2023-08-13T03:59:14.214501Z&quot;,&quot;start_time&quot;:&quot;2023-08-13T03:58:26.900902Z&quot;}" data-execution_count="96">
 <div class="sourceCode cell-code" id="cb34"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb34-1"><a href="#cb34-1" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> sklearn.model_selection <span class="im">import</span> train_test_split</span>
 <span id="cb34-2"><a href="#cb34-2" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb34-3"><a href="#cb34-3" aria-hidden="true" tabindex="-1"></a>acts <span class="op">=</span> ppb_df[<span class="st">'active'</span>].to_list()</span>
@@ -925,7 +939,7 @@ iteration 90
 iteration 100</code></pre>
 </div>
 </div>
-<div class="cell" data-executetime="{&quot;end_time&quot;:&quot;2023-08-13T04:05:47.261848Z&quot;,&quot;start_time&quot;:&quot;2023-08-13T04:03:47.598369Z&quot;}" data-execution_count="102">
+<div id="cell-37" class="cell" data-executetime="{&quot;end_time&quot;:&quot;2023-08-13T04:05:47.261848Z&quot;,&quot;start_time&quot;:&quot;2023-08-13T04:03:47.598369Z&quot;}" data-execution_count="102">
 <div class="sourceCode cell-code" id="cb36"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb36-1"><a href="#cb36-1" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> sklearn.model_selection <span class="im">import</span> StratifiedKFold</span>
 <span id="cb36-2"><a href="#cb36-2" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb36-3"><a href="#cb36-3" aria-hidden="true" tabindex="-1"></a>acts <span class="op">=</span> ppb_df[<span class="st">'active'</span>].to_numpy()</span>
@@ -1032,7 +1046,7 @@ iteration 49
 iteration 50</code></pre>
 </div>
 </div>
-<div class="cell" data-executetime="{&quot;end_time&quot;:&quot;2023-08-13T04:01:40.613118Z&quot;,&quot;start_time&quot;:&quot;2023-08-13T04:01:40.132730Z&quot;}" data-execution_count="99">
+<div id="cell-38" class="cell" data-executetime="{&quot;end_time&quot;:&quot;2023-08-13T04:01:40.613118Z&quot;,&quot;start_time&quot;:&quot;2023-08-13T04:01:40.132730Z&quot;}" data-execution_count="99">
 <div class="sourceCode cell-code" id="cb38"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb38-1"><a href="#cb38-1" aria-hidden="true" tabindex="-1"></a>plt.figure(figsize<span class="op">=</span>(<span class="dv">10</span>,<span class="dv">10</span>))</span>
 <span id="cb38-2"><a href="#cb38-2" aria-hidden="true" tabindex="-1"></a>plt.subplot(<span class="dv">2</span>,<span class="dv">2</span>,<span class="dv">1</span>)</span>
 <span id="cb38-3"><a href="#cb38-3" aria-hidden="true" tabindex="-1"></a>plt.hist([x[<span class="st">'cohen_kappa_score'</span>] <span class="cf">for</span> x <span class="kw">in</span> ppb_xgb_accum])<span class="op">;</span></span>
@@ -1052,10 +1066,14 @@ iteration 50</code></pre>
 <span id="cb38-17"><a href="#cb38-17" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb38-18"><a href="#cb38-18" aria-hidden="true" tabindex="-1"></a>plt.tight_layout()</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 <div class="cell-output cell-output-display">
-<p><img src="2023-08-13-xval-variability1_files/figure-html/cell-28-output-1.png" class="img-fluid"></p>
+<div>
+<figure class="figure">
+<p><img src="2023-08-13-xval-variability1_files/figure-html/cell-28-output-1.png" class="img-fluid figure-img"></p>
+</figure>
 </div>
 </div>
-<div class="cell" data-executetime="{&quot;end_time&quot;:&quot;2023-08-13T04:14:18.908471Z&quot;,&quot;start_time&quot;:&quot;2023-08-13T04:14:18.461093Z&quot;}" data-execution_count="105">
+</div>
+<div id="cell-39" class="cell" data-executetime="{&quot;end_time&quot;:&quot;2023-08-13T04:14:18.908471Z&quot;,&quot;start_time&quot;:&quot;2023-08-13T04:14:18.461093Z&quot;}" data-execution_count="105">
 <div class="sourceCode cell-code" id="cb39"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb39-1"><a href="#cb39-1" aria-hidden="true" tabindex="-1"></a>plt.figure(figsize<span class="op">=</span>(<span class="dv">10</span>,<span class="dv">10</span>))</span>
 <span id="cb39-2"><a href="#cb39-2" aria-hidden="true" tabindex="-1"></a>plt.subplot(<span class="dv">2</span>,<span class="dv">2</span>,<span class="dv">1</span>)</span>
 <span id="cb39-3"><a href="#cb39-3" aria-hidden="true" tabindex="-1"></a>plt.hist([np.mean(x[<span class="st">'cohen_kappa_score'</span>]) <span class="cf">for</span> x <span class="kw">in</span> ppb_xgb_xc_accum])<span class="op">;</span></span>
@@ -1075,13 +1093,17 @@ iteration 50</code></pre>
 <span id="cb39-17"><a href="#cb39-17" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb39-18"><a href="#cb39-18" aria-hidden="true" tabindex="-1"></a>plt.tight_layout()</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 <div class="cell-output cell-output-display">
-<p><img src="2023-08-13-xval-variability1_files/figure-html/cell-29-output-1.png" class="img-fluid"></p>
+<div>
+<figure class="figure">
+<p><img src="2023-08-13-xval-variability1_files/figure-html/cell-29-output-1.png" class="img-fluid figure-img"></p>
+</figure>
+</div>
 </div>
 </div>
 </section>
 <section id="alternate-ways-of-looking-at-the-results" class="level1">
 <h1>Alternate ways of looking at the results</h1>
-<div class="cell" data-executetime="{&quot;end_time&quot;:&quot;2023-08-13T04:25:26.500424Z&quot;,&quot;start_time&quot;:&quot;2023-08-13T04:25:26.297396Z&quot;}" data-scrolled="true" data-execution_count="118">
+<div id="cell-41" class="cell" data-executetime="{&quot;end_time&quot;:&quot;2023-08-13T04:25:26.500424Z&quot;,&quot;start_time&quot;:&quot;2023-08-13T04:25:26.297396Z&quot;}" data-scrolled="true" data-execution_count="118">
 <div class="sourceCode cell-code" id="cb40"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb40-1"><a href="#cb40-1" aria-hidden="true" tabindex="-1"></a>title <span class="op">=</span> <span class="st">'PPB'</span></span>
 <span id="cb40-2"><a href="#cb40-2" aria-hidden="true" tabindex="-1"></a>t_rf <span class="op">=</span> ppb_rf_accum</span>
 <span id="cb40-3"><a href="#cb40-3" aria-hidden="true" tabindex="-1"></a>t_xgb <span class="op">=</span> ppb_xgb_accum</span>
@@ -1107,10 +1129,14 @@ iteration 50</code></pre>
 <span id="cb40-23"><a href="#cb40-23" aria-hidden="true" tabindex="-1"></a>            ),labels<span class="op">=</span>(<span class="st">'XGB'</span>,<span class="st">'RF'</span>,<span class="st">'XGB-XC'</span>,<span class="st">'RF-XC'</span>))<span class="op">;</span></span>
 <span id="cb40-24"><a href="#cb40-24" aria-hidden="true" tabindex="-1"></a>plt.ylabel(<span class="st">'AUROC'</span>)<span class="op">;</span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 <div class="cell-output cell-output-display">
-<p><img src="2023-08-13-xval-variability1_files/figure-html/cell-30-output-1.png" class="img-fluid"></p>
+<div>
+<figure class="figure">
+<p><img src="2023-08-13-xval-variability1_files/figure-html/cell-30-output-1.png" class="img-fluid figure-img"></p>
+</figure>
 </div>
 </div>
-<div class="cell" data-executetime="{&quot;end_time&quot;:&quot;2023-08-13T04:25:44.837978Z&quot;,&quot;start_time&quot;:&quot;2023-08-13T04:25:44.657455Z&quot;}" data-execution_count="119">
+</div>
+<div id="cell-42" class="cell" data-executetime="{&quot;end_time&quot;:&quot;2023-08-13T04:25:44.837978Z&quot;,&quot;start_time&quot;:&quot;2023-08-13T04:25:44.657455Z&quot;}" data-execution_count="119">
 <div class="sourceCode cell-code" id="cb41"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb41-1"><a href="#cb41-1" aria-hidden="true" tabindex="-1"></a>title <span class="op">=</span> <span class="st">'MDCK'</span></span>
 <span id="cb41-2"><a href="#cb41-2" aria-hidden="true" tabindex="-1"></a>t_rf <span class="op">=</span> mdck_rf_accum</span>
 <span id="cb41-3"><a href="#cb41-3" aria-hidden="true" tabindex="-1"></a>t_xgb <span class="op">=</span> mdck_xgb_accum</span>
@@ -1136,10 +1162,14 @@ iteration 50</code></pre>
 <span id="cb41-23"><a href="#cb41-23" aria-hidden="true" tabindex="-1"></a>            ),labels<span class="op">=</span>(<span class="st">'XGB'</span>,<span class="st">'RF'</span>,<span class="st">'XGB-XC'</span>,<span class="st">'RF-XC'</span>))<span class="op">;</span></span>
 <span id="cb41-24"><a href="#cb41-24" aria-hidden="true" tabindex="-1"></a>plt.ylabel(<span class="st">'AUROC'</span>)<span class="op">;</span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 <div class="cell-output cell-output-display">
-<p><img src="2023-08-13-xval-variability1_files/figure-html/cell-31-output-1.png" class="img-fluid"></p>
+<div>
+<figure class="figure">
+<p><img src="2023-08-13-xval-variability1_files/figure-html/cell-31-output-1.png" class="img-fluid figure-img"></p>
+</figure>
 </div>
 </div>
-<div class="cell" data-executetime="{&quot;end_time&quot;:&quot;2023-08-13T04:26:27.667537Z&quot;,&quot;start_time&quot;:&quot;2023-08-13T04:26:27.481540Z&quot;}" data-execution_count="120">
+</div>
+<div id="cell-43" class="cell" data-executetime="{&quot;end_time&quot;:&quot;2023-08-13T04:26:27.667537Z&quot;,&quot;start_time&quot;:&quot;2023-08-13T04:26:27.481540Z&quot;}" data-execution_count="120">
 <div class="sourceCode cell-code" id="cb42"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb42-1"><a href="#cb42-1" aria-hidden="true" tabindex="-1"></a>title <span class="op">=</span> <span class="st">'HLM'</span></span>
 <span id="cb42-2"><a href="#cb42-2" aria-hidden="true" tabindex="-1"></a>t_rf <span class="op">=</span> rf_accum</span>
 <span id="cb42-3"><a href="#cb42-3" aria-hidden="true" tabindex="-1"></a>t_xgb <span class="op">=</span> xgb_accum</span>
@@ -1165,11 +1195,15 @@ iteration 50</code></pre>
 <span id="cb42-23"><a href="#cb42-23" aria-hidden="true" tabindex="-1"></a>            ),labels<span class="op">=</span>(<span class="st">'XGB'</span>,<span class="st">'RF'</span>,<span class="st">'XGB-XC'</span>,<span class="st">'RF-XC'</span>))<span class="op">;</span></span>
 <span id="cb42-24"><a href="#cb42-24" aria-hidden="true" tabindex="-1"></a>plt.ylabel(<span class="st">'AUROC'</span>)<span class="op">;</span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 <div class="cell-output cell-output-display">
-<p><img src="2023-08-13-xval-variability1_files/figure-html/cell-32-output-1.png" class="img-fluid"></p>
+<div>
+<figure class="figure">
+<p><img src="2023-08-13-xval-variability1_files/figure-html/cell-32-output-1.png" class="img-fluid figure-img"></p>
+</figure>
+</div>
 </div>
 </div>
 <p>How often do we reach different conclusions?</p>
-<div class="cell" data-executetime="{&quot;end_time&quot;:&quot;2023-08-13T05:23:49.758153Z&quot;,&quot;start_time&quot;:&quot;2023-08-13T05:23:49.555382Z&quot;}" data-execution_count="137">
+<div id="cell-45" class="cell" data-executetime="{&quot;end_time&quot;:&quot;2023-08-13T05:23:49.758153Z&quot;,&quot;start_time&quot;:&quot;2023-08-13T05:23:49.555382Z&quot;}" data-execution_count="137">
 <div class="sourceCode cell-code" id="cb43"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb43-1"><a href="#cb43-1" aria-hidden="true" tabindex="-1"></a>title <span class="op">=</span> <span class="st">'PPB'</span></span>
 <span id="cb43-2"><a href="#cb43-2" aria-hidden="true" tabindex="-1"></a>t_rf <span class="op">=</span> ppb_rf_accum</span>
 <span id="cb43-3"><a href="#cb43-3" aria-hidden="true" tabindex="-1"></a>t_xgb <span class="op">=</span> ppb_xgb_accum</span>
@@ -1195,10 +1229,14 @@ iteration 50</code></pre>
 AUC fraction&gt;0: 0.16</code></pre>
 </div>
 <div class="cell-output cell-output-display">
-<p><img src="2023-08-13-xval-variability1_files/figure-html/cell-33-output-2.png" class="img-fluid"></p>
+<div>
+<figure class="figure">
+<p><img src="2023-08-13-xval-variability1_files/figure-html/cell-33-output-2.png" class="img-fluid figure-img"></p>
+</figure>
 </div>
 </div>
-<div class="cell" data-executetime="{&quot;end_time&quot;:&quot;2023-08-13T05:24:12.420351Z&quot;,&quot;start_time&quot;:&quot;2023-08-13T05:24:12.211477Z&quot;}" data-execution_count="139">
+</div>
+<div id="cell-46" class="cell" data-executetime="{&quot;end_time&quot;:&quot;2023-08-13T05:24:12.420351Z&quot;,&quot;start_time&quot;:&quot;2023-08-13T05:24:12.211477Z&quot;}" data-execution_count="139">
 <div class="sourceCode cell-code" id="cb45"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb45-1"><a href="#cb45-1" aria-hidden="true" tabindex="-1"></a>title <span class="op">=</span> <span class="st">'MDCK'</span></span>
 <span id="cb45-2"><a href="#cb45-2" aria-hidden="true" tabindex="-1"></a>t_rf <span class="op">=</span> mdck_rf_accum</span>
 <span id="cb45-3"><a href="#cb45-3" aria-hidden="true" tabindex="-1"></a>t_xgb <span class="op">=</span> mdck_xgb_accum</span>
@@ -1225,10 +1263,14 @@ AUC fraction&gt;0: 0.16</code></pre>
 AUC fraction&gt;0: 0.16</code></pre>
 </div>
 <div class="cell-output cell-output-display">
-<p><img src="2023-08-13-xval-variability1_files/figure-html/cell-34-output-2.png" class="img-fluid"></p>
+<div>
+<figure class="figure">
+<p><img src="2023-08-13-xval-variability1_files/figure-html/cell-34-output-2.png" class="img-fluid figure-img"></p>
+</figure>
 </div>
 </div>
-<div class="cell" data-executetime="{&quot;end_time&quot;:&quot;2023-08-13T05:24:10.062386Z&quot;,&quot;start_time&quot;:&quot;2023-08-13T05:24:09.852200Z&quot;}" data-execution_count="138">
+</div>
+<div id="cell-47" class="cell" data-executetime="{&quot;end_time&quot;:&quot;2023-08-13T05:24:10.062386Z&quot;,&quot;start_time&quot;:&quot;2023-08-13T05:24:09.852200Z&quot;}" data-execution_count="138">
 <div class="sourceCode cell-code" id="cb47"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb47-1"><a href="#cb47-1" aria-hidden="true" tabindex="-1"></a>title <span class="op">=</span> <span class="st">'HLM'</span></span>
 <span id="cb47-2"><a href="#cb47-2" aria-hidden="true" tabindex="-1"></a>t_rf <span class="op">=</span> rf_accum</span>
 <span id="cb47-3"><a href="#cb47-3" aria-hidden="true" tabindex="-1"></a>t_xgb <span class="op">=</span> xgb_accum</span>
@@ -1255,7 +1297,11 @@ AUC fraction&gt;0: 0.16</code></pre>
 AUC fraction&gt;0: 1.00</code></pre>
 </div>
 <div class="cell-output cell-output-display">
-<p><img src="2023-08-13-xval-variability1_files/figure-html/cell-35-output-2.png" class="img-fluid"></p>
+<div>
+<figure class="figure">
+<p><img src="2023-08-13-xval-variability1_files/figure-html/cell-35-output-2.png" class="img-fluid figure-img"></p>
+</figure>
+</div>
 </div>
 </div>
 
@@ -1304,6 +1350,33 @@ window.document.addEventListener("DOMContentLoaded", function (event) {
       } else {
         el.classList.add('notransition');
       }
+    }
+  }
+  const toggleGiscusIfUsed = (isAlternate, darkModeDefault) => {
+    const baseTheme = document.querySelector('#giscus-base-theme')?.value ?? 'light';
+    const alternateTheme = document.querySelector('#giscus-alt-theme')?.value ?? 'dark';
+    let newTheme = '';
+    if(darkModeDefault) {
+      newTheme = isAlternate ? baseTheme : alternateTheme;
+    } else {
+      newTheme = isAlternate ? alternateTheme : baseTheme;
+    }
+    const changeGiscusTheme = () => {
+      // From: https://github.com/giscus/giscus/issues/336
+      const sendMessage = (message) => {
+        const iframe = document.querySelector('iframe.giscus-frame');
+        if (!iframe) return;
+        iframe.contentWindow.postMessage({ giscus: message }, 'https://giscus.app');
+      }
+      sendMessage({
+        setConfig: {
+          theme: newTheme
+        }
+      });
+    }
+    const isGiscussLoaded = window.document.querySelector('iframe.giscus-frame') !== null;
+    if (isGiscussLoaded) {
+      changeGiscusTheme();
     }
   }
   const toggleColorMode = (alternate) => {
@@ -1372,13 +1445,15 @@ window.document.addEventListener("DOMContentLoaded", function (event) {
       return localAlternateSentinel;
     }
   }
-  let localAlternateSentinel = 'default';
+  const darkModeDefault = false;
+  let localAlternateSentinel = darkModeDefault ? 'alternate' : 'default';
   // Dark / light mode switch
   window.quartoToggleColorScheme = () => {
     // Read the current dark / light value 
     let toAlternate = !hasAlternateSentinel();
     toggleColorMode(toAlternate);
     setStyleSentinel(toAlternate);
+    toggleGiscusIfUsed(toAlternate, darkModeDefault);
   };
   // Ensure there is a toggle, if there isn't float one in the top right
   if (window.document.querySelector('.quarto-color-scheme-toggle') === null) {
@@ -1405,12 +1480,15 @@ window.document.addEventListener("DOMContentLoaded", function (event) {
     icon: icon
   };
   anchorJS.add('.anchored');
-  const clipboard = new window.ClipboardJS('.code-copy-button', {
-    target: function(trigger) {
-      return trigger.previousElementSibling;
+  const isCodeAnnotation = (el) => {
+    for (const clz of el.classList) {
+      if (clz.startsWith('code-annotation-')) {                     
+        return true;
+      }
     }
-  });
-  clipboard.on('success', function(e) {
+    return false;
+  }
+  const onCopySuccess = function(e) {
     // button target
     const button = e.trigger;
     // don't keep focus
@@ -1442,11 +1520,48 @@ window.document.addEventListener("DOMContentLoaded", function (event) {
     }, 1000);
     // clear code selection
     e.clearSelection();
+  }
+  const getTextToCopy = function(trigger) {
+      const codeEl = trigger.previousElementSibling.cloneNode(true);
+      for (const childEl of codeEl.children) {
+        if (isCodeAnnotation(childEl)) {
+          childEl.remove();
+        }
+      }
+      return codeEl.innerText;
+  }
+  const clipboard = new window.ClipboardJS('.code-copy-button:not([data-in-quarto-modal])', {
+    text: getTextToCopy
   });
-  function tippyHover(el, contentFn) {
+  clipboard.on('success', onCopySuccess);
+  if (window.document.getElementById('quarto-embedded-source-code-modal')) {
+    const clipboardModal = new window.ClipboardJS('.code-copy-button[data-in-quarto-modal]', {
+      text: getTextToCopy,
+      container: window.document.getElementById('quarto-embedded-source-code-modal')
+    });
+    clipboardModal.on('success', onCopySuccess);
+  }
+    var localhostRegex = new RegExp(/^(?:http|https):\/\/localhost\:?[0-9]*\//);
+    var mailtoRegex = new RegExp(/^mailto:/);
+      var filterRegex = new RegExp("https:\/\/greglandrum\.github\.io\/rdkit-blog\/");
+    var isInternal = (href) => {
+        return filterRegex.test(href) || localhostRegex.test(href) || mailtoRegex.test(href);
+    }
+    // Inspect non-navigation links and adorn them if external
+ 	var links = window.document.querySelectorAll('a[href]:not(.nav-link):not(.navbar-brand):not(.toc-action):not(.sidebar-link):not(.sidebar-item-toggle):not(.pagination-link):not(.no-external):not([aria-hidden]):not(.dropdown-item):not(.quarto-navigation-tool):not(.about-link)');
+    for (var i=0; i<links.length; i++) {
+      const link = links[i];
+      if (!isInternal(link.href)) {
+        // undo the damage that might have been done by quarto-nav.js in the case of
+        // links that we want to consider external
+        if (link.dataset.originalHref !== undefined) {
+          link.href = link.dataset.originalHref;
+        }
+      }
+    }
+  function tippyHover(el, contentFn, onTriggerFn, onUntriggerFn) {
     const config = {
       allowHTML: true,
-      content: contentFn,
       maxWidth: 500,
       delay: 100,
       arrow: false,
@@ -1456,8 +1571,17 @@ window.document.addEventListener("DOMContentLoaded", function (event) {
       interactive: true,
       interactiveBorder: 10,
       theme: 'quarto',
-      placement: 'bottom-start'
+      placement: 'bottom-start',
     };
+    if (contentFn) {
+      config.content = contentFn;
+    }
+    if (onTriggerFn) {
+      config.onTrigger = onTriggerFn;
+    }
+    if (onUntriggerFn) {
+      config.onUntrigger = onUntriggerFn;
+    }
     window.tippy(el, config); 
   }
   const noterefs = window.document.querySelectorAll('a[role="doc-noteref"]');
@@ -1469,9 +1593,244 @@ window.document.addEventListener("DOMContentLoaded", function (event) {
       try { href = new URL(href).hash; } catch {}
       const id = href.replace(/^#\/?/, "");
       const note = window.document.getElementById(id);
-      return note.innerHTML;
+      if (note) {
+        return note.innerHTML;
+      } else {
+        return "";
+      }
     });
   }
+  const xrefs = window.document.querySelectorAll('a.quarto-xref');
+  const processXRef = (id, note) => {
+    // Strip column container classes
+    const stripColumnClz = (el) => {
+      el.classList.remove("page-full", "page-columns");
+      if (el.children) {
+        for (const child of el.children) {
+          stripColumnClz(child);
+        }
+      }
+    }
+    stripColumnClz(note)
+    if (id === null || id.startsWith('sec-')) {
+      // Special case sections, only their first couple elements
+      const container = document.createElement("div");
+      if (note.children && note.children.length > 2) {
+        container.appendChild(note.children[0].cloneNode(true));
+        for (let i = 1; i < note.children.length; i++) {
+          const child = note.children[i];
+          if (child.tagName === "P" && child.innerText === "") {
+            continue;
+          } else {
+            container.appendChild(child.cloneNode(true));
+            break;
+          }
+        }
+        if (window.Quarto?.typesetMath) {
+          window.Quarto.typesetMath(container);
+        }
+        return container.innerHTML
+      } else {
+        if (window.Quarto?.typesetMath) {
+          window.Quarto.typesetMath(note);
+        }
+        return note.innerHTML;
+      }
+    } else {
+      // Remove any anchor links if they are present
+      const anchorLink = note.querySelector('a.anchorjs-link');
+      if (anchorLink) {
+        anchorLink.remove();
+      }
+      if (window.Quarto?.typesetMath) {
+        window.Quarto.typesetMath(note);
+      }
+      if (note.classList.contains("callout")) {
+        return note.outerHTML;
+      } else {
+        return note.innerHTML;
+      }
+    }
+  }
+  for (var i=0; i<xrefs.length; i++) {
+    const xref = xrefs[i];
+    tippyHover(xref, undefined, function(instance) {
+      instance.disable();
+      let url = xref.getAttribute('href');
+      let hash = undefined; 
+      if (url.startsWith('#')) {
+        hash = url;
+      } else {
+        try { hash = new URL(url).hash; } catch {}
+      }
+      if (hash) {
+        const id = hash.replace(/^#\/?/, "");
+        const note = window.document.getElementById(id);
+        if (note !== null) {
+          try {
+            const html = processXRef(id, note.cloneNode(true));
+            instance.setContent(html);
+          } finally {
+            instance.enable();
+            instance.show();
+          }
+        } else {
+          // See if we can fetch this
+          fetch(url.split('#')[0])
+          .then(res => res.text())
+          .then(html => {
+            const parser = new DOMParser();
+            const htmlDoc = parser.parseFromString(html, "text/html");
+            const note = htmlDoc.getElementById(id);
+            if (note !== null) {
+              const html = processXRef(id, note);
+              instance.setContent(html);
+            } 
+          }).finally(() => {
+            instance.enable();
+            instance.show();
+          });
+        }
+      } else {
+        // See if we can fetch a full url (with no hash to target)
+        // This is a special case and we should probably do some content thinning / targeting
+        fetch(url)
+        .then(res => res.text())
+        .then(html => {
+          const parser = new DOMParser();
+          const htmlDoc = parser.parseFromString(html, "text/html");
+          const note = htmlDoc.querySelector('main.content');
+          if (note !== null) {
+            // This should only happen for chapter cross references
+            // (since there is no id in the URL)
+            // remove the first header
+            if (note.children.length > 0 && note.children[0].tagName === "HEADER") {
+              note.children[0].remove();
+            }
+            const html = processXRef(null, note);
+            instance.setContent(html);
+          } 
+        }).finally(() => {
+          instance.enable();
+          instance.show();
+        });
+      }
+    }, function(instance) {
+    });
+  }
+      let selectedAnnoteEl;
+      const selectorForAnnotation = ( cell, annotation) => {
+        let cellAttr = 'data-code-cell="' + cell + '"';
+        let lineAttr = 'data-code-annotation="' +  annotation + '"';
+        const selector = 'span[' + cellAttr + '][' + lineAttr + ']';
+        return selector;
+      }
+      const selectCodeLines = (annoteEl) => {
+        const doc = window.document;
+        const targetCell = annoteEl.getAttribute("data-target-cell");
+        const targetAnnotation = annoteEl.getAttribute("data-target-annotation");
+        const annoteSpan = window.document.querySelector(selectorForAnnotation(targetCell, targetAnnotation));
+        const lines = annoteSpan.getAttribute("data-code-lines").split(",");
+        const lineIds = lines.map((line) => {
+          return targetCell + "-" + line;
+        })
+        let top = null;
+        let height = null;
+        let parent = null;
+        if (lineIds.length > 0) {
+            //compute the position of the single el (top and bottom and make a div)
+            const el = window.document.getElementById(lineIds[0]);
+            top = el.offsetTop;
+            height = el.offsetHeight;
+            parent = el.parentElement.parentElement;
+          if (lineIds.length > 1) {
+            const lastEl = window.document.getElementById(lineIds[lineIds.length - 1]);
+            const bottom = lastEl.offsetTop + lastEl.offsetHeight;
+            height = bottom - top;
+          }
+          if (top !== null && height !== null && parent !== null) {
+            // cook up a div (if necessary) and position it 
+            let div = window.document.getElementById("code-annotation-line-highlight");
+            if (div === null) {
+              div = window.document.createElement("div");
+              div.setAttribute("id", "code-annotation-line-highlight");
+              div.style.position = 'absolute';
+              parent.appendChild(div);
+            }
+            div.style.top = top - 2 + "px";
+            div.style.height = height + 4 + "px";
+            div.style.left = 0;
+            let gutterDiv = window.document.getElementById("code-annotation-line-highlight-gutter");
+            if (gutterDiv === null) {
+              gutterDiv = window.document.createElement("div");
+              gutterDiv.setAttribute("id", "code-annotation-line-highlight-gutter");
+              gutterDiv.style.position = 'absolute';
+              const codeCell = window.document.getElementById(targetCell);
+              const gutter = codeCell.querySelector('.code-annotation-gutter');
+              gutter.appendChild(gutterDiv);
+            }
+            gutterDiv.style.top = top - 2 + "px";
+            gutterDiv.style.height = height + 4 + "px";
+          }
+          selectedAnnoteEl = annoteEl;
+        }
+      };
+      const unselectCodeLines = () => {
+        const elementsIds = ["code-annotation-line-highlight", "code-annotation-line-highlight-gutter"];
+        elementsIds.forEach((elId) => {
+          const div = window.document.getElementById(elId);
+          if (div) {
+            div.remove();
+          }
+        });
+        selectedAnnoteEl = undefined;
+      };
+        // Handle positioning of the toggle
+    window.addEventListener(
+      "resize",
+      throttle(() => {
+        elRect = undefined;
+        if (selectedAnnoteEl) {
+          selectCodeLines(selectedAnnoteEl);
+        }
+      }, 10)
+    );
+    function throttle(fn, ms) {
+    let throttle = false;
+    let timer;
+      return (...args) => {
+        if(!throttle) { // first call gets through
+            fn.apply(this, args);
+            throttle = true;
+        } else { // all the others get throttled
+            if(timer) clearTimeout(timer); // cancel #2
+            timer = setTimeout(() => {
+              fn.apply(this, args);
+              timer = throttle = false;
+            }, ms);
+        }
+      };
+    }
+      // Attach click handler to the DT
+      const annoteDls = window.document.querySelectorAll('dt[data-target-cell]');
+      for (const annoteDlNode of annoteDls) {
+        annoteDlNode.addEventListener('click', (event) => {
+          const clickedEl = event.target;
+          if (clickedEl !== selectedAnnoteEl) {
+            unselectCodeLines();
+            const activeEl = window.document.querySelector('dt[data-target-cell].code-annotation-active');
+            if (activeEl) {
+              activeEl.classList.remove('code-annotation-active');
+            }
+            selectCodeLines(clickedEl);
+            clickedEl.classList.add('code-annotation-active');
+          } else {
+            // Unselect the line
+            unselectCodeLines();
+            clickedEl.classList.remove('code-annotation-active');
+          }
+        });
+      }
   const findCites = (el) => {
     const parentEl = el.parentElement;
     if (parentEl) {
@@ -1516,10 +1875,18 @@ window.document.addEventListener("DOMContentLoaded", function (event) {
 </div> <!-- /content -->
 <footer class="footer">
   <div class="nav-footer">
-    <div class="nav-footer-left">Copyright (C) 2024 Greg Landrum</div>   
-    <div class="nav-footer-right"><a href="https://www.rdkit.org"><img src="https://www.rdkit.org/logo.small.png" class="img-fluid" alt="RDKit" width="64"></a></div>
+    <div class="nav-footer-left">
+<p>Copyright (C) 2024 Greg Landrum</p>
+</div>   
+    <div class="nav-footer-center">
+      &nbsp;
+    </div>
+    <div class="nav-footer-right">
+<p><a href="https://www.rdkit.org"><img src="https://www.rdkit.org/logo.small.png" class="img-fluid" alt="RDKit" width="64"></a></p>
+</div>
   </div>
 </footer>
+
 
 
 

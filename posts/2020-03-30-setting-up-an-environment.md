@@ -12,7 +12,7 @@ toc: true
 
 ---
 
-**Updated 09.03.2024**
+**Updated 28.11.2024**
 
 It has been tricky to contribute code or documentation to the RDKit if you're a Python programmer who doesn't want to deal with the complexities of getting an RDKit build working. We want to make it straightforward for people to contribute, so I'm working on some recipes to make thigs easier. This is an attempt at that.
 
@@ -33,7 +33,7 @@ Prerequisites:
 You should start by changing into the directory where you want to clone the RDKit source repository and then running:
 
 ```
-git clone https://github.com/rdkit/rdkit.git
+git clone --depth=1 https://github.com/rdkit/rdkit.git
 ```
 
 That will clone the repo from github into a local directory called rdkit. We now change into that directory and use it to set our RDBASE environment variable:
@@ -46,28 +46,28 @@ export RDBASE=`pwd`
 The next step is to create the conda environment that we're going to use to hold the RDKit binary components and install the most recent version of the RDKit into that environment:
 
 ```
-conda create -y -n py311_rdkit_beta python=3.11
-conda activate py311_rdkit_beta
+conda create -y -n py312_rdkit_beta python=3.12
+conda activate py312_rdkit_beta
 conda install -y -c conda-forge rdkit pytest
 ```
 
 If you have `mamba` installed, you can use that instead of `conda` in the `create` and `install` commands to have things run more quickly.
 
-These instructions set up an environment using python 3.11; feel free to change that if you'd prefer another python version. You will need to adjust the path below.
+These instructions set up an environment using python 3.12; feel free to change that if you'd prefer another python version. You will need to adjust the path below.
 If you have other Python packages that you'd like to work with, go ahead and install them into the environment now.
 
 Next we copy the RDKit binary components from that environment into our local clone of the RDKit repo.
 
 On Linux and the Mac you can do this as follows:
 ```
-cd $CONDA_PREFIX/lib/python3.11/site-packages/rdkit
+cd $CONDA_PREFIX/lib/python3.12/site-packages/rdkit
 rsync -a -m --include '*/' --include='*.so' --include='inchi.py' --exclude='*' . $RDBASE/rdkit
 ```
 NOTE: that rsync command should be one long line.
 
 On Windows that's:
 ```
-cd $CONDA_PREFIX/lib/python3.11/site-packages/rdkit
+cd $CONDA_PREFIX/lib/python3.12/site-packages/rdkit
 find . -name '*.pyd' -exec cp --parents \{\} $RDBASE/rdkit \; 
 cp Chem/inchi.py $RDBASE/rdkit/Chem
 ```
@@ -91,24 +91,32 @@ c:\Users\glandrum\Code\rdkit_tmp\rdkit\Chem\__init__.py
 ```
 
 # Running the tests
-If you're planning on making an RDKit contribution, it's important to know how to run the Python tests to make sure that your changes work and don't break anything else. For historic reasons the RDKit uses a self-written framework for running tests, but it's easy enough to use. You need to run the script  $RDBASE/rdkit/TestRunner.py and point it to the test_list.py file containing the tests to be run. For example, if you want to run all the tests in the directory $RDBASE/rdkit/Chem (this corresponds to the python module rdkit.Chem), you would do:
+If you're planning on making an RDKit contribution, it's important to know how to run the Python tests to make sure that your changes work and don't break anything else. The RDKit uses pytest to run its python-based tests. For example, if you want to run all of the python tests you would do:
 
 ```
-cd $RDBASE/rdkit/Chem
-python $RDBASE/rdkit/TestRunner.py test_list.py
+cd $RDBASE/rdkit
+pytest
 ```
 
 That will take a while and generate a lot of output, including things that look like exceptions and errors, but should finish with something like:
 
 ```
-Script: test_list.py.  Passed 40 tests in 69.70 seconds
+================================================== 715 passed, 15 skipped, 1 warning in 25.48s ==================================================
 ```
+
+If you just want to run the tests for the `rdkit.Chem` module, you can do:
+```
+cd $RDBASE/rdkit
+pytest Chem
+```
+For more fine-grained control over which tests run, take a look at the [pytest documentation](https://docs.pytest.org/en/stable/how-to/usage.html).
+
 
 # Finishing up
-You're set. The one thing to remember is that whenever you want to use this environment in a new terminal window or shell, you need to activate the py311_rdkit_beta conda environment (don't delete it!), set RDBASE, and set your PYTHONPATH:
+You're set. The one thing to remember is that whenever you want to use this environment in a new terminal window or shell, you need to activate the py312_rdkit_beta conda environment (don't delete it!), set RDBASE, and set your PYTHONPATH:
 
 ```
-conda activate py311_rdkit_beta
+conda activate py312_rdkit_beta
 cd your_local_rdkit_clone  # <- replace this with the real name of the directory
 export RDBASE=`pwd`
 export PYTHONPATH="$RDBASE"
@@ -117,13 +125,13 @@ export PYTHONPATH="$RDBASE"
 # The recipe
 Here's the complete recipe for linux and the Mac:
 ```
-git clone https://github.com/rdkit/rdkit.git
+git clone --depth=1 https://github.com/rdkit/rdkit.git
 cd rdkit
 export RDBASE=`pwd`
-conda create -y -n py311_rdkit_beta python=3.11
-conda activate py311_rdkit_beta
-conda install -y -c conda-forge rdkit
-cd $CONDA_PREFIX/lib/python3.11/site-packages/rdkit
+conda create -y -n py312_rdkit_beta python=3.12
+conda activate py312_rdkit_beta
+conda install -y -c conda-forge rdkit pytest
+cd $CONDA_PREFIX/lib/python3.12/site-packages/rdkit
 rsync -a -m --include '*/' --include='*.so' --include='inchi.py' --exclude='*' . $RDBASE/rdkit
 export PYTHONPATH="$RDBASE"
 cd $RDBASE/rdkit
@@ -131,13 +139,13 @@ python -c 'from rdkit import Chem;print(Chem.__file__)'
 ```
 and for Windows:
 ```
-git clone https://github.com/rdkit/rdkit.git
+git clone --depth=1 https://github.com/rdkit/rdkit.git
 cd rdkit
 export RDBASE=`pwd`
-conda create -y -n py311_rdkit_beta python=3.11
-conda activate py311_rdkit_beta
-conda install -y -c conda-forge rdkit
-cd $CONDA_PREFIX/lib/python3.11/site-packages/rdkit
+conda create -y -n py312_rdkit_beta python=3.12
+conda activate py312_rdkit_beta
+conda install -y -c conda-forge rdkit pytest
+cd $CONDA_PREFIX/lib/python3.12/site-packages/rdkit
 find . -name '*.pyd' -exec cp --parents \{\} $RDBASE/rdkit \; 
 cp Chem/inchi.py $RDBASE/rdkit/Chem 
 export PYTHONPATH="$RDBASE"

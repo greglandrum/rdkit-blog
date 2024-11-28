@@ -2,14 +2,14 @@
 <html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en"><head>
 
 <meta charset="utf-8">
-<meta name="generator" content="quarto-1.2.269">
+<meta name="generator" content="quarto-1.6.39">
 
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
 
 <meta name="dcterms.date" content="2024-05-31">
 <meta name="description" content="I get a bit ranty… again.">
 
-<title>RDKit blog - The problem(s) with scaffold splits, part 1</title>
+<title>The problem(s) with scaffold splits, part 1 – RDKit blog</title>
 <style>
 code{white-space: pre-wrap;}
 span.smallcaps{font-variant: small-caps;}
@@ -19,11 +19,12 @@ div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
 ul.task-list{list-style: none;}
 ul.task-list li input[type="checkbox"] {
   width: 0.8em;
-  margin: 0 0.8em 0.2em -1.6em;
+  margin: 0 0.8em 0.2em -1em; /* quarto-specific, see https://github.com/quarto-dev/quarto-cli/issues/4556 */ 
   vertical-align: middle;
 }
+/* CSS for syntax highlighting */
 pre > code.sourceCode { white-space: pre; position: relative; }
-pre > code.sourceCode > span { display: inline-block; line-height: 1.25; }
+pre > code.sourceCode > span { line-height: 1.25; }
 pre > code.sourceCode > span:empty { height: 1.2em; }
 .sourceCode { overflow: visible; }
 code.sourceCode > span { color: inherit; text-decoration: inherit; }
@@ -34,7 +35,7 @@ div.sourceCode { overflow: auto; }
 }
 @media print {
 pre > code.sourceCode { white-space: pre-wrap; }
-pre > code.sourceCode > span { text-indent: -5em; padding-left: 5em; }
+pre > code.sourceCode > span { display: inline-block; text-indent: -5em; padding-left: 5em; }
 }
 pre.numberSource code
   { counter-reset: source-line 0; }
@@ -48,43 +49,13 @@ pre.numberSource code > span > a:first-child::before
     -khtml-user-select: none; -moz-user-select: none;
     -ms-user-select: none; user-select: none;
     padding: 0 4px; width: 4em;
-    color: #aaaaaa;
   }
-pre.numberSource { margin-left: 3em; border-left: 1px solid #aaaaaa;  padding-left: 4px; }
+pre.numberSource { margin-left: 3em;  padding-left: 4px; }
 div.sourceCode
   {   }
 @media screen {
 pre > code.sourceCode > span > a:first-child::before { text-decoration: underline; }
 }
-code span.al { color: #ff0000; font-weight: bold; } /* Alert */
-code span.an { color: #60a0b0; font-weight: bold; font-style: italic; } /* Annotation */
-code span.at { color: #7d9029; } /* Attribute */
-code span.bn { color: #40a070; } /* BaseN */
-code span.bu { color: #008000; } /* BuiltIn */
-code span.cf { color: #007020; font-weight: bold; } /* ControlFlow */
-code span.ch { color: #4070a0; } /* Char */
-code span.cn { color: #880000; } /* Constant */
-code span.co { color: #60a0b0; font-style: italic; } /* Comment */
-code span.cv { color: #60a0b0; font-weight: bold; font-style: italic; } /* CommentVar */
-code span.do { color: #ba2121; font-style: italic; } /* Documentation */
-code span.dt { color: #902000; } /* DataType */
-code span.dv { color: #40a070; } /* DecVal */
-code span.er { color: #ff0000; font-weight: bold; } /* Error */
-code span.ex { } /* Extension */
-code span.fl { color: #40a070; } /* Float */
-code span.fu { color: #06287e; } /* Function */
-code span.im { color: #008000; font-weight: bold; } /* Import */
-code span.in { color: #60a0b0; font-weight: bold; font-style: italic; } /* Information */
-code span.kw { color: #007020; font-weight: bold; } /* Keyword */
-code span.op { color: #666666; } /* Operator */
-code span.ot { color: #007020; } /* Other */
-code span.pp { color: #bc7a00; } /* Preprocessor */
-code span.sc { color: #4070a0; } /* SpecialChar */
-code span.ss { color: #bb6688; } /* SpecialString */
-code span.st { color: #4070a0; } /* String */
-code span.va { color: #19177c; } /* Variable */
-code span.vs { color: #4070a0; } /* VerbatimString */
-code span.wa { color: #60a0b0; font-weight: bold; font-style: italic; } /* Warning */
 </style>
 
 
@@ -101,19 +72,25 @@ code span.wa { color: #60a0b0; font-weight: bold; font-style: italic; } /* Warni
 <script src="../site_libs/quarto-html/tippy.umd.min.js"></script>
 <script src="../site_libs/quarto-html/anchor.min.js"></script>
 <link href="../site_libs/quarto-html/tippy.css" rel="stylesheet">
-<link href="../site_libs/quarto-html/quarto-syntax-highlighting.css" rel="stylesheet" class="quarto-color-scheme" id="quarto-text-highlighting-styles">
-<link href="../site_libs/quarto-html/quarto-syntax-highlighting-dark.css" rel="prefetch" class="quarto-color-scheme quarto-color-alternate" id="quarto-text-highlighting-styles">
+<link href="../site_libs/quarto-html/quarto-syntax-highlighting-e26003cea8cd680ca0c55a263523d882.css" rel="stylesheet" class="quarto-color-scheme" id="quarto-text-highlighting-styles">
+<link href="../site_libs/quarto-html/quarto-syntax-highlighting-dark-d166b450ba5a8e9f7a0ab969bf6592c1.css" rel="prefetch" class="quarto-color-scheme quarto-color-alternate" id="quarto-text-highlighting-styles">
 <script src="../site_libs/bootstrap/bootstrap.min.js"></script>
 <link href="../site_libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
-<link href="../site_libs/bootstrap/bootstrap.min.css" rel="stylesheet" class="quarto-color-scheme" id="quarto-bootstrap" data-mode="light">
-<link href="../site_libs/bootstrap/bootstrap-dark.min.css" rel="prefetch" class="quarto-color-scheme quarto-color-alternate" id="quarto-bootstrap" data-mode="dark">
+<link href="../site_libs/bootstrap/bootstrap-a1fb93aa6af6e5138998f4139e0aef3d.min.css" rel="stylesheet" append-hash="true" class="quarto-color-scheme" id="quarto-bootstrap" data-mode="light">
+<link href="../site_libs/bootstrap/bootstrap-dark-98e8d043add42333c0993713f12a6dca.min.css" rel="prefetch" append-hash="true" class="quarto-color-scheme quarto-color-alternate" id="quarto-bootstrap" data-mode="dark">
 <script id="quarto-search-options" type="application/json">{
   "location": "navbar",
   "copy-button": false,
   "collapse-after": 3,
   "panel-placement": "end",
   "type": "overlay",
-  "limit": 20,
+  "limit": 50,
+  "keyboard-shortcut": [
+    "f",
+    "/",
+    "s"
+  ],
+  "show-item-context": false,
   "language": {
     "search-no-results-text": "No results",
     "search-matching-documents-text": "matching documents",
@@ -122,11 +99,12 @@ code span.wa { color: #60a0b0; font-weight: bold; font-style: italic; } /* Warni
     "search-more-match-text": "more match in this document",
     "search-more-matches-text": "more matches in this document",
     "search-clear-button-title": "Clear",
+    "search-text-placeholder": "",
     "search-detached-cancel-button-title": "Cancel",
-    "search-submit-button-title": "Submit"
+    "search-submit-button-title": "Submit",
+    "search-label": "Search"
   }
 }</script>
-<script defer="" async="" data-host="greglandrum.github.io" src="https://liteanalytics.com/lite.js"></script>
 
 
 <link rel="stylesheet" href="../styles.css">
@@ -136,43 +114,48 @@ code span.wa { color: #60a0b0; font-weight: bold; font-style: italic; } /* Warni
 
 <div id="quarto-search-results"></div>
   <header id="quarto-header" class="headroom fixed-top">
-    <nav class="navbar navbar-expand-lg navbar-dark ">
+    <nav class="navbar navbar-expand-lg " data-bs-theme="dark">
       <div class="navbar-container container-fluid">
-      <div class="navbar-brand-container">
+      <div class="navbar-brand-container mx-auto">
     <a class="navbar-brand" href="../index.html">
     <span class="navbar-title">RDKit blog</span>
     </a>
   </div>
-          <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarCollapse" aria-controls="navbarCollapse" aria-expanded="false" aria-label="Toggle navigation" onclick="if (window.quartoToggleHeadroom) { window.quartoToggleHeadroom(); }">
+            <div id="quarto-search" class="" title="Search"></div>
+          <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarCollapse" aria-controls="navbarCollapse" role="menu" aria-expanded="false" aria-label="Toggle navigation" onclick="if (window.quartoToggleHeadroom) { window.quartoToggleHeadroom(); }">
   <span class="navbar-toggler-icon"></span>
 </button>
           <div class="collapse navbar-collapse" id="navbarCollapse">
             <ul class="navbar-nav navbar-nav-scroll ms-auto">
   <li class="nav-item">
-    <a class="nav-link" href="../about.html">
- <span class="menu-text">RDKit experiments, tips, and tutorials</span></a>
+    <a class="nav-link" href="../about.html"> 
+<span class="menu-text">RDKit experiments, tips, and tutorials</span></a>
   </li>  
   <li class="nav-item compact">
-    <a class="nav-link" href="https://github.com/rdkit/rdkit"><i class="bi bi-github" role="img">
+    <a class="nav-link" href="https://github.com/rdkit/rdkit"> <i class="bi bi-github" role="img">
 </i> 
- <span class="menu-text"></span></a>
+<span class="menu-text"></span></a>
   </li>  
   <li class="nav-item compact">
-    <a class="nav-link" href="https://twitter.com/rdkit_org"><i class="bi bi-twitter" role="img">
+    <a class="nav-link" href="https://bsky.app/profile/rdkit.bsky.social"> <i class="bi bi-twitter" role="img">
 </i> 
- <span class="menu-text"></span></a>
+<span class="menu-text"></span></a>
   </li>  
   <li class="nav-item compact">
-    <a class="nav-link" href="../index.xml"><i class="bi bi-rss" role="img">
+    <a class="nav-link" href="https://www.linkedin.com/groups/8192558/"> <i class="bi bi-linkedin" role="img">
 </i> 
- <span class="menu-text"></span></a>
+<span class="menu-text"></span></a>
+  </li>  
+  <li class="nav-item compact">
+    <a class="nav-link" href="../index.xml"> <i class="bi bi-rss" role="img">
+</i> 
+<span class="menu-text"></span></a>
   </li>  
 </ul>
-              <div class="quarto-toggle-container">
-                  <a href="" class="quarto-color-scheme-toggle nav-link" onclick="window.quartoToggleColorScheme(); return false;" title="Toggle dark mode"><i class="bi"></i></a>
-              </div>
-              <div id="quarto-search" class="" title="Search"></div>
           </div> <!-- /navcollapse -->
+            <div class="quarto-navbar-tools">
+  <a href="" class="quarto-color-scheme-toggle quarto-navigation-tool  px-1" onclick="window.quartoToggleColorScheme(); return false;" title="Toggle dark mode"><i class="bi"></i></a>
+</div>
       </div> <!-- /container-fluid -->
     </nav>
 </header>
@@ -230,7 +213,9 @@ code span.wa { color: #60a0b0; font-weight: bold; font-style: italic; } /* Warni
   </div>
   
 
+
 </header>
+
 
 <section id="introduction" class="level1">
 <h1>Introduction</h1>
@@ -248,7 +233,7 @@ code span.wa { color: #60a0b0; font-weight: bold; font-style: italic; } /* Warni
 <blockquote class="blockquote">
 <p>Final Note: The analysis in this post is focused on the type of data sets that commonly show up during lead finding or lead optimization. A Murcko scaffold analysis likely to be less wrong when partitioning datasets of diverse compounds that don’t contain SAR series. Of course, in these cases a standard neighbor split works just as well.</p>
 </blockquote>
-<div class="cell" data-executetime="{&quot;end_time&quot;:&quot;2024-05-31T08:44:09.599524Z&quot;,&quot;start_time&quot;:&quot;2024-05-31T08:44:09.595151Z&quot;}" data-execution_count="23">
+<div id="ac78811d" class="cell" data-executetime="{&quot;end_time&quot;:&quot;2024-05-31T08:44:09.599524Z&quot;,&quot;start_time&quot;:&quot;2024-05-31T08:44:09.595151Z&quot;}" data-execution_count="23">
 <div class="sourceCode cell-code" id="cb1"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> numpy <span class="im">as</span> np</span>
 <span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb1-3"><a href="#cb1-3" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> rdkit <span class="im">import</span> Chem</span>
@@ -272,7 +257,7 @@ code span.wa { color: #60a0b0; font-weight: bold; font-style: italic; } /* Warni
 <section id="grabbing-the-data-from-chembl" class="level1">
 <h1>Grabbing the data from ChEMBL</h1>
 <p>We pull all the compounds for each of the Ki assays in ChEMBL33 that are taken from a document with a DOI and a publication year. Then we keep the assays containing between 20 and 100 compounds - the idea of the upper limit here is to try and limit ourselves to the primary literature,</p>
-<div class="cell" data-executetime="{&quot;end_time&quot;:&quot;2024-04-20T04:16:46.214901Z&quot;,&quot;start_time&quot;:&quot;2024-04-20T04:16:43.237443Z&quot;}" data-execution_count="2">
+<div id="f6cd42bd" class="cell" data-executetime="{&quot;end_time&quot;:&quot;2024-04-20T04:16:46.214901Z&quot;,&quot;start_time&quot;:&quot;2024-04-20T04:16:43.237443Z&quot;}" data-execution_count="2">
 <div class="sourceCode cell-code" id="cb3"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a><span class="op">%</span>sql postgresql:<span class="op">//</span>glandrum<span class="op">@</span>stoat<span class="op">/</span>chembl_33 <span class="op">\</span></span>
 <span id="cb3-2"><a href="#cb3-2" aria-hidden="true" tabindex="-1"></a>  drop table <span class="cf">if</span> exists assay_counts</span>
 <span id="cb3-3"><a href="#cb3-3" aria-hidden="true" tabindex="-1"></a>    </span>
@@ -297,7 +282,7 @@ code span.wa { color: #60a0b0; font-weight: bold; font-style: italic; } /* Warni
 </div>
 </div>
 <p>We now have a list with assay ChEMBL ID, assay ID (a primary key used in the database), and the number of compounds with data in the assay:</p>
-<div class="cell" data-executetime="{&quot;end_time&quot;:&quot;2024-03-10T05:55:29.542942Z&quot;,&quot;start_time&quot;:&quot;2024-03-10T05:55:29.540228Z&quot;}" data-execution_count="48">
+<div id="ff6c8fab" class="cell" data-executetime="{&quot;end_time&quot;:&quot;2024-03-10T05:55:29.542942Z&quot;,&quot;start_time&quot;:&quot;2024-03-10T05:55:29.540228Z&quot;}" data-execution_count="48">
 <div class="sourceCode cell-code" id="cb6"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb6-1"><a href="#cb6-1" aria-hidden="true" tabindex="-1"></a>aids[:<span class="dv">4</span>]</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 <div class="cell-output cell-output-display" data-execution_count="48">
 <pre><code>[('CHEMBL857972', 157, 66),
@@ -307,7 +292,7 @@ code span.wa { color: #60a0b0; font-weight: bold; font-style: italic; } /* Warni
 </div>
 </div>
 <p>Randomly reorder the assays:</p>
-<div class="cell" data-executetime="{&quot;end_time&quot;:&quot;2024-03-10T05:55:38.641883Z&quot;,&quot;start_time&quot;:&quot;2024-03-10T05:55:38.636297Z&quot;}" data-execution_count="49">
+<div id="3c5faa29" class="cell" data-executetime="{&quot;end_time&quot;:&quot;2024-03-10T05:55:38.641883Z&quot;,&quot;start_time&quot;:&quot;2024-03-10T05:55:38.636297Z&quot;}" data-execution_count="49">
 <div class="sourceCode cell-code" id="cb8"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb8-1"><a href="#cb8-1" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> random</span>
 <span id="cb8-2"><a href="#cb8-2" aria-hidden="true" tabindex="-1"></a>random.seed(<span class="bn">0xC0FFEE</span>)</span>
 <span id="cb8-3"><a href="#cb8-3" aria-hidden="true" tabindex="-1"></a>random.shuffle(aids)</span>
@@ -322,7 +307,7 @@ code span.wa { color: #60a0b0; font-weight: bold; font-style: italic; } /* Warni
 </section>
 <section id="looking-at-some-of-example-results" class="level1">
 <h1>Looking at some of example results</h1>
-<div class="cell" data-executetime="{&quot;end_time&quot;:&quot;2024-03-10T06:13:12.476522Z&quot;,&quot;start_time&quot;:&quot;2024-03-10T06:13:12.470018Z&quot;}" data-execution_count="61">
+<div id="a78072c3" class="cell" data-executetime="{&quot;end_time&quot;:&quot;2024-03-10T06:13:12.476522Z&quot;,&quot;start_time&quot;:&quot;2024-03-10T06:13:12.470018Z&quot;}" data-execution_count="61">
 <div class="sourceCode cell-code" id="cb10"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb10-1"><a href="#cb10-1" aria-hidden="true" tabindex="-1"></a>aid <span class="op">=</span> <span class="st">'CHEMBL1803423'</span>  <span class="co"># this was the first hit from ChEMBL 32</span></span>
 <span id="cb10-2"><a href="#cb10-2" aria-hidden="true" tabindex="-1"></a>aid <span class="op">=</span> aids[<span class="dv">0</span>][<span class="dv">0</span>]</span>
 <span id="cb10-3"><a href="#cb10-3" aria-hidden="true" tabindex="-1"></a>structs <span class="op">=</span> <span class="op">%</span>sql postgresql:<span class="op">//</span>glandrum<span class="op">@</span>stoat<span class="op">/</span>chembl_33 <span class="op">\</span></span>
@@ -343,16 +328,20 @@ code span.wa { color: #60a0b0; font-weight: bold; font-style: italic; } /* Warni
 </div>
 </div>
 <p>Here are the compounds from that assay:</p>
-<div class="cell" data-executetime="{&quot;end_time&quot;:&quot;2024-03-10T06:06:15.354701Z&quot;,&quot;start_time&quot;:&quot;2024-03-10T06:06:15.325187Z&quot;}" data-execution_count="57">
+<div id="22025413" class="cell" data-executetime="{&quot;end_time&quot;:&quot;2024-03-10T06:06:15.354701Z&quot;,&quot;start_time&quot;:&quot;2024-03-10T06:06:15.325187Z&quot;}" data-execution_count="57">
 <div class="sourceCode cell-code" id="cb13"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb13-1"><a href="#cb13-1" aria-hidden="true" tabindex="-1"></a>nms,smis <span class="op">=</span> <span class="bu">zip</span>(<span class="op">*</span>structs)</span>
 <span id="cb13-2"><a href="#cb13-2" aria-hidden="true" tabindex="-1"></a>mols <span class="op">=</span> [Chem.MolFromSmiles(x) <span class="cf">for</span> x <span class="kw">in</span> smis]</span>
 <span id="cb13-3"><a href="#cb13-3" aria-hidden="true" tabindex="-1"></a>Draw.MolsToGridImage(mols[:<span class="dv">6</span>],legends<span class="op">=</span>nms,subImgSize<span class="op">=</span>(<span class="dv">250</span>,<span class="dv">200</span>))</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 <div class="cell-output cell-output-display" data-execution_count="57">
-<p><img src="2024-05-31-scaffold-splits-and-murcko-scaffolds1_files/figure-html/cell-7-output-1.png" class="img-fluid"></p>
+<div>
+<figure class="figure">
+<p><img src="2024-05-31-scaffold-splits-and-murcko-scaffolds1_files/figure-html/cell-7-output-1.png" class="img-fluid figure-img"></p>
+</figure>
+</div>
 </div>
 </div>
 <p>Generate the Murcko scaffolds:</p>
-<div class="cell" data-executetime="{&quot;end_time&quot;:&quot;2024-03-10T06:06:17.068323Z&quot;,&quot;start_time&quot;:&quot;2024-03-10T06:06:17.031225Z&quot;}" data-execution_count="58">
+<div id="074767d2" class="cell" data-executetime="{&quot;end_time&quot;:&quot;2024-03-10T06:06:17.068323Z&quot;,&quot;start_time&quot;:&quot;2024-03-10T06:06:17.031225Z&quot;}" data-execution_count="58">
 <div class="sourceCode cell-code" id="cb14"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb14-1"><a href="#cb14-1" aria-hidden="true" tabindex="-1"></a>scaffs <span class="op">=</span> []</span>
 <span id="cb14-2"><a href="#cb14-2" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> m <span class="kw">in</span> mols:</span>
 <span id="cb14-3"><a href="#cb14-3" aria-hidden="true" tabindex="-1"></a>    scaff <span class="op">=</span> Chem.MurckoDecompose(m)</span>
@@ -365,16 +354,20 @@ code span.wa { color: #60a0b0; font-weight: bold; font-style: italic; } /* Warni
 </div>
 </div>
 <p>There are twelve unique “scaffolds”. Draw the first six of them:</p>
-<div class="cell" data-executetime="{&quot;end_time&quot;:&quot;2024-03-10T06:06:18.282630Z&quot;,&quot;start_time&quot;:&quot;2024-03-10T06:06:18.260959Z&quot;}" data-execution_count="59">
+<div id="972749be" class="cell" data-executetime="{&quot;end_time&quot;:&quot;2024-03-10T06:06:18.282630Z&quot;,&quot;start_time&quot;:&quot;2024-03-10T06:06:18.260959Z&quot;}" data-execution_count="59">
 <div class="sourceCode cell-code" id="cb16"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb16-1"><a href="#cb16-1" aria-hidden="true" tabindex="-1"></a>unique_scaffs <span class="op">=</span> [Chem.MolFromSmiles(smi) <span class="cf">for</span> smi <span class="kw">in</span> <span class="bu">set</span>(scaff_smis)]</span>
 <span id="cb16-2"><a href="#cb16-2" aria-hidden="true" tabindex="-1"></a>Draw.MolsToGridImage(unique_scaffs[:<span class="dv">6</span>],subImgSize<span class="op">=</span>(<span class="dv">250</span>,<span class="dv">200</span>))</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 <div class="cell-output cell-output-display" data-execution_count="59">
-<p><img src="2024-05-31-scaffold-splits-and-murcko-scaffolds1_files/figure-html/cell-9-output-1.png" class="img-fluid"></p>
+<div>
+<figure class="figure">
+<p><img src="2024-05-31-scaffold-splits-and-murcko-scaffolds1_files/figure-html/cell-9-output-1.png" class="img-fluid figure-img"></p>
+</figure>
+</div>
 </div>
 </div>
 <p>Some of these are quite similar to each other and others, like the first and last in the second row, are clearly structurally related - the last entry in the second row is a substructure of the first entry in that row.</p>
 <p>Look at the compounds from another assay:</p>
-<div class="cell" data-executetime="{&quot;end_time&quot;:&quot;2024-03-10T06:13:25.501136Z&quot;,&quot;start_time&quot;:&quot;2024-03-10T06:13:25.469349Z&quot;}" data-execution_count="62">
+<div id="3483bd3e" class="cell" data-executetime="{&quot;end_time&quot;:&quot;2024-03-10T06:13:25.501136Z&quot;,&quot;start_time&quot;:&quot;2024-03-10T06:13:25.469349Z&quot;}" data-execution_count="62">
 <div class="sourceCode cell-code" id="cb17"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb17-1"><a href="#cb17-1" aria-hidden="true" tabindex="-1"></a>aid <span class="op">=</span> aids[<span class="dv">1</span>][<span class="dv">0</span>]</span>
 <span id="cb17-2"><a href="#cb17-2" aria-hidden="true" tabindex="-1"></a>structs <span class="op">=</span> <span class="op">%</span>sql postgresql:<span class="op">//</span>glandrum<span class="op">@</span>stoat<span class="op">/</span>chembl_33 <span class="op">\</span></span>
 <span id="cb17-3"><a href="#cb17-3" aria-hidden="true" tabindex="-1"></a>  select distinct on (canonical_smiles) cids.chembl_id compound_chembl_id,canonical_smiles <span class="op">\</span></span>
@@ -392,11 +385,15 @@ code span.wa { color: #60a0b0; font-weight: bold; font-style: italic; } /* Warni
 <pre><code>32 rows affected.</code></pre>
 </div>
 <div class="cell-output cell-output-display" data-execution_count="62">
-<p><img src="2024-05-31-scaffold-splits-and-murcko-scaffolds1_files/figure-html/cell-10-output-2.png" class="img-fluid"></p>
+<div>
+<figure class="figure">
+<p><img src="2024-05-31-scaffold-splits-and-murcko-scaffolds1_files/figure-html/cell-10-output-2.png" class="img-fluid figure-img"></p>
+</figure>
+</div>
 </div>
 </div>
 <p>And generate the scaffolds:</p>
-<div class="cell" data-executetime="{&quot;end_time&quot;:&quot;2024-03-10T06:13:53.674681Z&quot;,&quot;start_time&quot;:&quot;2024-03-10T06:13:53.608917Z&quot;}" data-execution_count="63">
+<div id="4d2441e4" class="cell" data-executetime="{&quot;end_time&quot;:&quot;2024-03-10T06:13:53.674681Z&quot;,&quot;start_time&quot;:&quot;2024-03-10T06:13:53.608917Z&quot;}" data-execution_count="63">
 <div class="sourceCode cell-code" id="cb19"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb19-1"><a href="#cb19-1" aria-hidden="true" tabindex="-1"></a>scaffs <span class="op">=</span> []</span>
 <span id="cb19-2"><a href="#cb19-2" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> m <span class="kw">in</span> mols:</span>
 <span id="cb19-3"><a href="#cb19-3" aria-hidden="true" tabindex="-1"></a>    scaff <span class="op">=</span> Chem.MurckoDecompose(m)</span>
@@ -410,7 +407,11 @@ code span.wa { color: #60a0b0; font-weight: bold; font-style: italic; } /* Warni
 <pre><code>20</code></pre>
 </div>
 <div class="cell-output cell-output-display" data-execution_count="63">
-<p><img src="2024-05-31-scaffold-splits-and-murcko-scaffolds1_files/figure-html/cell-11-output-2.png" class="img-fluid"></p>
+<div>
+<figure class="figure">
+<p><img src="2024-05-31-scaffold-splits-and-murcko-scaffolds1_files/figure-html/cell-11-output-2.png" class="img-fluid figure-img"></p>
+</figure>
+</div>
 </div>
 </div>
 <p>This time there are 20 scaffolds and some of them are QUITE similar to each other.</p>
@@ -418,7 +419,7 @@ code span.wa { color: #60a0b0; font-weight: bold; font-style: italic; } /* Warni
 <section id="number-of-scaffolds-per-assay" class="level1">
 <h1>Number of scaffolds per assay</h1>
 <p>Do the compound extraction and scaffold calculation for all of the assays:</p>
-<div class="cell" data-executetime="{&quot;end_time&quot;:&quot;2024-03-10T06:38:02.463123Z&quot;,&quot;start_time&quot;:&quot;2024-03-10T06:35:59.902309Z&quot;}" data-scrolled="true" data-execution_count="69">
+<div id="d40066cc" class="cell" data-executetime="{&quot;end_time&quot;:&quot;2024-03-10T06:38:02.463123Z&quot;,&quot;start_time&quot;:&quot;2024-03-10T06:35:59.902309Z&quot;}" data-scrolled="true" data-execution_count="69">
 <div class="sourceCode cell-code" id="cb21"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb21-1"><a href="#cb21-1" aria-hidden="true" tabindex="-1"></a><span class="op">%</span>config SqlMagic.feedback <span class="op">=</span> <span class="va">False</span></span>
 <span id="cb21-2"><a href="#cb21-2" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb21-3"><a href="#cb21-3" aria-hidden="true" tabindex="-1"></a>accum <span class="op">=</span> []</span>
@@ -516,28 +517,32 @@ Done 7000 of 7148
 Done 7100 of 7148</code></pre>
 </div>
 </div>
-<div class="cell" data-executetime="{&quot;end_time&quot;:&quot;2024-03-10T06:38:02.469222Z&quot;,&quot;start_time&quot;:&quot;2024-03-10T06:38:02.464415Z&quot;}" data-execution_count="70">
+<div id="17106f25" class="cell" data-executetime="{&quot;end_time&quot;:&quot;2024-03-10T06:38:02.469222Z&quot;,&quot;start_time&quot;:&quot;2024-03-10T06:38:02.464415Z&quot;}" data-execution_count="70">
 <div class="sourceCode cell-code" id="cb23"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb23-1"><a href="#cb23-1" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> pickle</span>
 <span id="cb23-2"><a href="#cb23-2" aria-hidden="true" tabindex="-1"></a><span class="cf">with</span> <span class="bu">open</span>(<span class="st">'./results/murcko_scaffs.pkl'</span>,<span class="st">'wb+'</span>) <span class="im">as</span> outf:</span>
 <span id="cb23-3"><a href="#cb23-3" aria-hidden="true" tabindex="-1"></a>    pickle.dump(accum,outf)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </div>
-<div class="cell" data-executetime="{&quot;end_time&quot;:&quot;2024-05-31T06:19:08.749247Z&quot;,&quot;start_time&quot;:&quot;2024-05-31T06:19:08.673610Z&quot;}" data-execution_count="2">
+<div id="1ccf47b0" class="cell" data-executetime="{&quot;end_time&quot;:&quot;2024-05-31T06:19:08.749247Z&quot;,&quot;start_time&quot;:&quot;2024-05-31T06:19:08.673610Z&quot;}" data-execution_count="2">
 <div class="sourceCode cell-code" id="cb24"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb24-1"><a href="#cb24-1" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> pickle</span>
 <span id="cb24-2"><a href="#cb24-2" aria-hidden="true" tabindex="-1"></a><span class="cf">with</span> <span class="bu">open</span>(<span class="st">'./results/murcko_scaffs.pkl'</span>,<span class="st">'rb'</span>) <span class="im">as</span> inf:</span>
 <span id="cb24-3"><a href="#cb24-3" aria-hidden="true" tabindex="-1"></a>    accum <span class="op">=</span> pickle.load(inf)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </div>
 <p>How many scaffolds are there in each assay?</p>
-<div class="cell" data-executetime="{&quot;end_time&quot;:&quot;2024-05-31T06:20:57.765887Z&quot;,&quot;start_time&quot;:&quot;2024-05-31T06:20:57.664715Z&quot;}" data-execution_count="7">
+<div id="33b7f130" class="cell" data-executetime="{&quot;end_time&quot;:&quot;2024-05-31T06:20:57.765887Z&quot;,&quot;start_time&quot;:&quot;2024-05-31T06:20:57.664715Z&quot;}" data-execution_count="7">
 <div class="sourceCode cell-code" id="cb25"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb25-1"><a href="#cb25-1" aria-hidden="true" tabindex="-1"></a>plt.figure(figsize<span class="op">=</span>(<span class="dv">6</span>,<span class="dv">6</span>))</span>
 <span id="cb25-2"><a href="#cb25-2" aria-hidden="true" tabindex="-1"></a>nscaffs <span class="op">=</span> [x[<span class="dv">2</span>] <span class="cf">for</span> x <span class="kw">in</span> accum]</span>
 <span id="cb25-3"><a href="#cb25-3" aria-hidden="true" tabindex="-1"></a>plt.hist(nscaffs,bins<span class="op">=</span><span class="dv">20</span>)</span>
 <span id="cb25-4"><a href="#cb25-4" aria-hidden="true" tabindex="-1"></a>plt.xlabel(<span class="st">'num scaffolds'</span>)<span class="op">;</span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 <div class="cell-output cell-output-display">
-<p><img src="2024-05-31-scaffold-splits-and-murcko-scaffolds1_files/figure-html/cell-15-output-1.png" class="img-fluid"></p>
+<div>
+<figure class="figure">
+<p><img src="2024-05-31-scaffold-splits-and-murcko-scaffolds1_files/figure-html/cell-15-output-1.png" class="img-fluid figure-img"></p>
+</figure>
+</div>
 </div>
 </div>
 <p>Stats of that:</p>
-<div class="cell" data-executetime="{&quot;end_time&quot;:&quot;2024-05-31T06:21:56.019931Z&quot;,&quot;start_time&quot;:&quot;2024-05-31T06:21:56.016973Z&quot;}" data-execution_count="10">
+<div id="ed6b0bf3" class="cell" data-executetime="{&quot;end_time&quot;:&quot;2024-05-31T06:21:56.019931Z&quot;,&quot;start_time&quot;:&quot;2024-05-31T06:21:56.016973Z&quot;}" data-execution_count="10">
 <div class="sourceCode cell-code" id="cb26"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb26-1"><a href="#cb26-1" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f'mean: </span><span class="sc">{</span>np<span class="sc">.</span>mean(nscaffs)<span class="sc">:.1f}</span><span class="ss">, median: </span><span class="sc">{</span>np<span class="sc">.</span>median(nscaffs)<span class="sc">:.1f}</span><span class="ss">'</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 <div class="cell-output cell-output-stdout">
 <pre><code>mean: 13.2, median: 12.0</code></pre>
@@ -545,26 +550,34 @@ Done 7100 of 7148</code></pre>
 </div>
 <p>That’s a lot of scaffolds for each assay.</p>
 <p>Since each assay contains a different number of compounds, it’s interesting to look at the relationship between the number of compounds and the number of scaffolds:</p>
-<div class="cell" data-executetime="{&quot;end_time&quot;:&quot;2024-05-31T06:23:10.864843Z&quot;,&quot;start_time&quot;:&quot;2024-05-31T06:23:10.729686Z&quot;}" data-execution_count="12">
+<div id="733800f6" class="cell" data-executetime="{&quot;end_time&quot;:&quot;2024-05-31T06:23:10.864843Z&quot;,&quot;start_time&quot;:&quot;2024-05-31T06:23:10.729686Z&quot;}" data-execution_count="12">
 <div class="sourceCode cell-code" id="cb28"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb28-1"><a href="#cb28-1" aria-hidden="true" tabindex="-1"></a>plt.figure(figsize<span class="op">=</span>(<span class="dv">6</span>,<span class="dv">6</span>))</span>
 <span id="cb28-2"><a href="#cb28-2" aria-hidden="true" tabindex="-1"></a>plt.scatter([x[<span class="dv">1</span>] <span class="cf">for</span> x <span class="kw">in</span> accum],[x[<span class="dv">2</span>] <span class="cf">for</span> x <span class="kw">in</span> accum],alpha<span class="op">=</span><span class="fl">0.2</span>)</span>
 <span id="cb28-3"><a href="#cb28-3" aria-hidden="true" tabindex="-1"></a>plt.xlabel(<span class="st">'num compounds'</span>)</span>
 <span id="cb28-4"><a href="#cb28-4" aria-hidden="true" tabindex="-1"></a>plt.ylabel(<span class="st">'num scaffolds'</span>)<span class="op">;</span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 <div class="cell-output cell-output-display">
-<p><img src="2024-05-31-scaffold-splits-and-murcko-scaffolds1_files/figure-html/cell-17-output-1.png" class="img-fluid"></p>
+<div>
+<figure class="figure">
+<p><img src="2024-05-31-scaffold-splits-and-murcko-scaffolds1_files/figure-html/cell-17-output-1.png" class="img-fluid figure-img"></p>
+</figure>
+</div>
 </div>
 </div>
 <p>We can summarize that with a histogram of the ratio of the number of scaffolds to the number of compounds:</p>
-<div class="cell" data-executetime="{&quot;end_time&quot;:&quot;2024-05-31T06:23:11.239584Z&quot;,&quot;start_time&quot;:&quot;2024-05-31T06:23:11.077383Z&quot;}" data-execution_count="13">
+<div id="608eef5d" class="cell" data-executetime="{&quot;end_time&quot;:&quot;2024-05-31T06:23:11.239584Z&quot;,&quot;start_time&quot;:&quot;2024-05-31T06:23:11.077383Z&quot;}" data-execution_count="13">
 <div class="sourceCode cell-code" id="cb29"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb29-1"><a href="#cb29-1" aria-hidden="true" tabindex="-1"></a>frac <span class="op">=</span> [x[<span class="dv">2</span>]<span class="op">/</span>x[<span class="dv">1</span>] <span class="cf">for</span> x <span class="kw">in</span> accum]</span>
 <span id="cb29-2"><a href="#cb29-2" aria-hidden="true" tabindex="-1"></a>plt.figure(figsize<span class="op">=</span>(<span class="dv">6</span>,<span class="dv">5</span>))</span>
 <span id="cb29-3"><a href="#cb29-3" aria-hidden="true" tabindex="-1"></a>plt.hist(frac,bins<span class="op">=</span><span class="dv">20</span>)</span>
 <span id="cb29-4"><a href="#cb29-4" aria-hidden="true" tabindex="-1"></a>plt.xlabel(<span class="st">'$num_</span><span class="sc">{scaffolds}</span><span class="st"> / num_</span><span class="sc">{compounds}</span><span class="st">$'</span>)<span class="op">;</span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 <div class="cell-output cell-output-display">
-<p><img src="2024-05-31-scaffold-splits-and-murcko-scaffolds1_files/figure-html/cell-18-output-1.png" class="img-fluid"></p>
+<div>
+<figure class="figure">
+<p><img src="2024-05-31-scaffold-splits-and-murcko-scaffolds1_files/figure-html/cell-18-output-1.png" class="img-fluid figure-img"></p>
+</figure>
 </div>
 </div>
-<div class="cell" data-executetime="{&quot;end_time&quot;:&quot;2024-05-31T06:23:25.050185Z&quot;,&quot;start_time&quot;:&quot;2024-05-31T06:23:25.046021Z&quot;}" data-execution_count="14">
+</div>
+<div id="78086d69" class="cell" data-executetime="{&quot;end_time&quot;:&quot;2024-05-31T06:23:25.050185Z&quot;,&quot;start_time&quot;:&quot;2024-05-31T06:23:25.046021Z&quot;}" data-execution_count="14">
 <div class="sourceCode cell-code" id="cb30"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb30-1"><a href="#cb30-1" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f'mean: </span><span class="sc">{</span>np<span class="sc">.</span>mean(frac)<span class="sc">:.1f}</span><span class="ss">, median: </span><span class="sc">{</span>np<span class="sc">.</span>median(frac)<span class="sc">:.1f}</span><span class="ss">'</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 <div class="cell-output cell-output-stdout">
 <pre><code>mean: 0.4, median: 0.4</code></pre>
@@ -574,7 +587,7 @@ Done 7100 of 7148</code></pre>
 <section id="manually-extracted-scaffolds" class="level1">
 <h1>Manually extracted scaffolds</h1>
 <p>To see what’s going on in more detail, let’s look at a few randomly selected assays/papers:</p>
-<div class="cell" data-executetime="{&quot;end_time&quot;:&quot;2024-05-31T06:55:21.866570Z&quot;,&quot;start_time&quot;:&quot;2024-05-31T06:55:21.859677Z&quot;}" data-execution_count="20">
+<div id="581d8d52" class="cell" data-executetime="{&quot;end_time&quot;:&quot;2024-05-31T06:55:21.866570Z&quot;,&quot;start_time&quot;:&quot;2024-05-31T06:55:21.859677Z&quot;}" data-execution_count="20">
 <div class="sourceCode cell-code" id="cb32"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb32-1"><a href="#cb32-1" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> random</span>
 <span id="cb32-2"><a href="#cb32-2" aria-hidden="true" tabindex="-1"></a>acp <span class="op">=</span> accum[:]</span>
 <span id="cb32-3"><a href="#cb32-3" aria-hidden="true" tabindex="-1"></a>random.seed(<span class="bn">0xf00d</span>)</span>
@@ -591,7 +604,7 @@ https://www.ebi.ac.uk/chembl/assay_report_card/CHEMBL4183750/  9   25</code></pr
 </div>
 </div>
 <p>Get the compounds for each assay from the database:</p>
-<div class="cell" data-executetime="{&quot;end_time&quot;:&quot;2024-05-31T08:41:00.885036Z&quot;,&quot;start_time&quot;:&quot;2024-05-31T08:40:59.418519Z&quot;}" data-execution_count="21">
+<div id="e3d2eee1" class="cell" data-executetime="{&quot;end_time&quot;:&quot;2024-05-31T08:41:00.885036Z&quot;,&quot;start_time&quot;:&quot;2024-05-31T08:40:59.418519Z&quot;}" data-execution_count="21">
 <div class="sourceCode cell-code" id="cb34"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb34-1"><a href="#cb34-1" aria-hidden="true" tabindex="-1"></a><span class="op">%</span>config SqlMagic.feedback <span class="op">=</span> <span class="va">False</span></span>
 <span id="cb34-2"><a href="#cb34-2" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb34-3"><a href="#cb34-3" aria-hidden="true" tabindex="-1"></a>cmpd_accum <span class="op">=</span> {}</span>
@@ -609,12 +622,12 @@ https://www.ebi.ac.uk/chembl/assay_report_card/CHEMBL4183750/  9   25</code></pr
 <span id="cb34-15"><a href="#cb34-15" aria-hidden="true" tabindex="-1"></a>    mols <span class="op">=</span> [Chem.MolFromSmiles(x) <span class="cf">for</span> x <span class="kw">in</span> smis]</span>
 <span id="cb34-16"><a href="#cb34-16" aria-hidden="true" tabindex="-1"></a>    cmpd_accum[aid] <span class="op">=</span> mols</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </div>
-<div class="cell" data-executetime="{&quot;end_time&quot;:&quot;2024-05-31T08:44:30.245322Z&quot;,&quot;start_time&quot;:&quot;2024-05-31T08:44:30.242882Z&quot;}" data-execution_count="24">
+<div id="f017648c" class="cell" data-executetime="{&quot;end_time&quot;:&quot;2024-05-31T08:44:30.245322Z&quot;,&quot;start_time&quot;:&quot;2024-05-31T08:44:30.242882Z&quot;}" data-execution_count="24">
 <div class="sourceCode cell-code" id="cb35"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb35-1"><a href="#cb35-1" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> rdkit.Chem <span class="im">import</span> rdDepictor</span>
 <span id="cb35-2"><a href="#cb35-2" aria-hidden="true" tabindex="-1"></a>rdDepictor.SetPreferCoordGen(<span class="va">True</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </div>
 <p>I went through each of the papers and came up with a scaffold based for each on what the authors of the paper report as the scaffold. If there was no reported scaffold or something which was less-than-useful, I constructed on myself:</p>
-<div class="cell" data-executetime="{&quot;end_time&quot;:&quot;2024-05-31T11:17:19.874772Z&quot;,&quot;start_time&quot;:&quot;2024-05-31T11:17:19.834653Z&quot;}" data-execution_count="69">
+<div id="ec90df78" class="cell" data-executetime="{&quot;end_time&quot;:&quot;2024-05-31T11:17:19.874772Z&quot;,&quot;start_time&quot;:&quot;2024-05-31T11:17:19.834653Z&quot;}" data-execution_count="69">
 <div class="sourceCode cell-code" id="cb36"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb36-1"><a href="#cb36-1" aria-hidden="true" tabindex="-1"></a>scaffolds_from_papers <span class="op">=</span> {</span>
 <span id="cb36-2"><a href="#cb36-2" aria-hidden="true" tabindex="-1"></a>    <span class="st">'CHEMBL4049094'</span>:<span class="st">'*n1ncc(n1)C(=O)NC(C*)C(=O)NC1(CC1)C#N'</span>,</span>
 <span id="cb36-3"><a href="#cb36-3" aria-hidden="true" tabindex="-1"></a>    <span class="st">'CHEMBL859243'</span>:<span class="st">'*CC(N1CCCC1)C(=O)c1ccccc1'</span>,</span>
@@ -631,11 +644,15 @@ https://www.ebi.ac.uk/chembl/assay_report_card/CHEMBL4183750/  9   25</code></pr
 <span id="cb36-14"><a href="#cb36-14" aria-hidden="true" tabindex="-1"></a>                     legends<span class="op">=</span><span class="bu">list</span>(scaffolds_from_papers.keys()),</span>
 <span id="cb36-15"><a href="#cb36-15" aria-hidden="true" tabindex="-1"></a>                     subImgSize<span class="op">=</span>(<span class="dv">350</span>,<span class="dv">300</span>))</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 <div class="cell-output cell-output-display" data-execution_count="69">
-<p><img src="2024-05-31-scaffold-splits-and-murcko-scaffolds1_files/figure-html/cell-23-output-1.png" class="img-fluid"></p>
+<div>
+<figure class="figure">
+<p><img src="2024-05-31-scaffold-splits-and-murcko-scaffolds1_files/figure-html/cell-23-output-1.png" class="img-fluid figure-img"></p>
+</figure>
+</div>
 </div>
 </div>
 <p>Confirm that these single scaffolds actually cover a reasonable number of the compounds in the paper:</p>
-<div class="cell" data-executetime="{&quot;end_time&quot;:&quot;2024-05-31T11:17:20.272973Z&quot;,&quot;start_time&quot;:&quot;2024-05-31T11:17:20.265701Z&quot;}" data-execution_count="70">
+<div id="ba5ef4dd" class="cell" data-executetime="{&quot;end_time&quot;:&quot;2024-05-31T11:17:20.272973Z&quot;,&quot;start_time&quot;:&quot;2024-05-31T11:17:20.265701Z&quot;}" data-execution_count="70">
 <div class="sourceCode cell-code" id="cb37"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb37-1"><a href="#cb37-1" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> k <span class="kw">in</span> scaffolds_from_papers:</span>
 <span id="cb37-2"><a href="#cb37-2" aria-hidden="true" tabindex="-1"></a>    nMatches <span class="op">=</span> <span class="bu">len</span>([<span class="dv">1</span> <span class="cf">for</span> x <span class="kw">in</span> cmpd_accum[k] <span class="cf">if</span> x.HasSubstructMatch(scaffolds_from_papers[k])])</span>
 <span id="cb37-3"><a href="#cb37-3" aria-hidden="true" tabindex="-1"></a>    <span class="bu">print</span>(<span class="ss">f'assay </span><span class="sc">{</span>k<span class="sc">}</span><span class="ss">:  num compounds=</span><span class="sc">{</span><span class="bu">len</span>(cmpd_accum[k])<span class="sc">}</span><span class="ss"> num matching scaffold=</span><span class="sc">{</span>nMatches<span class="sc">}</span><span class="ss">'</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
@@ -649,7 +666,7 @@ assay CHEMBL4183750:  num compounds=25 num matching scaffold=21</code></pre>
 </div>
 <p>Notice that in each case these individual scaffolds cover most of the compounds in the assay. This is a large contrast to the results from the Murcko decomposition, where even the most populous scaffolds typically cover less than half the compounds in the assay (see below).</p>
 <p>And, finally, let’s just look at those scaffolds together with the most populated Murcko scaffolds from each paper:</p>
-<div class="cell" data-executetime="{&quot;end_time&quot;:&quot;2024-05-31T11:16:49.981899Z&quot;,&quot;start_time&quot;:&quot;2024-05-31T11:16:49.822127Z&quot;}" data-execution_count="66">
+<div id="48e19d55" class="cell" data-executetime="{&quot;end_time&quot;:&quot;2024-05-31T11:16:49.981899Z&quot;,&quot;start_time&quot;:&quot;2024-05-31T11:16:49.822127Z&quot;}" data-execution_count="66">
 <div class="sourceCode cell-code" id="cb39"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb39-1"><a href="#cb39-1" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> collections <span class="im">import</span> Counter</span>
 <span id="cb39-2"><a href="#cb39-2" aria-hidden="true" tabindex="-1"></a>rows <span class="op">=</span> []</span>
 <span id="cb39-3"><a href="#cb39-3" aria-hidden="true" tabindex="-1"></a>labels <span class="op">=</span> []</span>
@@ -675,7 +692,11 @@ assay CHEMBL4183750:  num compounds=25 num matching scaffold=21</code></pre>
 <span id="cb39-23"><a href="#cb39-23" aria-hidden="true" tabindex="-1"></a>                     molsPerRow<span class="op">=</span><span class="dv">4</span>,</span>
 <span id="cb39-24"><a href="#cb39-24" aria-hidden="true" tabindex="-1"></a>                     subImgSize<span class="op">=</span>(<span class="dv">350</span>,<span class="dv">300</span>))</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 <div class="cell-output cell-output-display" data-execution_count="66">
-<p><img src="2024-05-31-scaffold-splits-and-murcko-scaffolds1_files/figure-html/cell-25-output-1.png" class="img-fluid"></p>
+<div>
+<figure class="figure">
+<p><img src="2024-05-31-scaffold-splits-and-murcko-scaffolds1_files/figure-html/cell-25-output-1.png" class="img-fluid figure-img"></p>
+</figure>
+</div>
 </div>
 </div>
 <p>Each row above has the hand-sketched scaffold in the first column and the three most common scaffolds along with their frequency in the remaining columns.</p>
@@ -726,6 +747,33 @@ window.document.addEventListener("DOMContentLoaded", function (event) {
       } else {
         el.classList.add('notransition');
       }
+    }
+  }
+  const toggleGiscusIfUsed = (isAlternate, darkModeDefault) => {
+    const baseTheme = document.querySelector('#giscus-base-theme')?.value ?? 'light';
+    const alternateTheme = document.querySelector('#giscus-alt-theme')?.value ?? 'dark';
+    let newTheme = '';
+    if(darkModeDefault) {
+      newTheme = isAlternate ? baseTheme : alternateTheme;
+    } else {
+      newTheme = isAlternate ? alternateTheme : baseTheme;
+    }
+    const changeGiscusTheme = () => {
+      // From: https://github.com/giscus/giscus/issues/336
+      const sendMessage = (message) => {
+        const iframe = document.querySelector('iframe.giscus-frame');
+        if (!iframe) return;
+        iframe.contentWindow.postMessage({ giscus: message }, 'https://giscus.app');
+      }
+      sendMessage({
+        setConfig: {
+          theme: newTheme
+        }
+      });
+    }
+    const isGiscussLoaded = window.document.querySelector('iframe.giscus-frame') !== null;
+    if (isGiscussLoaded) {
+      changeGiscusTheme();
     }
   }
   const toggleColorMode = (alternate) => {
@@ -794,13 +842,15 @@ window.document.addEventListener("DOMContentLoaded", function (event) {
       return localAlternateSentinel;
     }
   }
-  let localAlternateSentinel = 'default';
+  const darkModeDefault = false;
+  let localAlternateSentinel = darkModeDefault ? 'alternate' : 'default';
   // Dark / light mode switch
   window.quartoToggleColorScheme = () => {
     // Read the current dark / light value 
     let toAlternate = !hasAlternateSentinel();
     toggleColorMode(toAlternate);
     setStyleSentinel(toAlternate);
+    toggleGiscusIfUsed(toAlternate, darkModeDefault);
   };
   // Ensure there is a toggle, if there isn't float one in the top right
   if (window.document.querySelector('.quarto-color-scheme-toggle') === null) {
@@ -827,12 +877,15 @@ window.document.addEventListener("DOMContentLoaded", function (event) {
     icon: icon
   };
   anchorJS.add('.anchored');
-  const clipboard = new window.ClipboardJS('.code-copy-button', {
-    target: function(trigger) {
-      return trigger.previousElementSibling;
+  const isCodeAnnotation = (el) => {
+    for (const clz of el.classList) {
+      if (clz.startsWith('code-annotation-')) {                     
+        return true;
+      }
     }
-  });
-  clipboard.on('success', function(e) {
+    return false;
+  }
+  const onCopySuccess = function(e) {
     // button target
     const button = e.trigger;
     // don't keep focus
@@ -864,11 +917,48 @@ window.document.addEventListener("DOMContentLoaded", function (event) {
     }, 1000);
     // clear code selection
     e.clearSelection();
+  }
+  const getTextToCopy = function(trigger) {
+      const codeEl = trigger.previousElementSibling.cloneNode(true);
+      for (const childEl of codeEl.children) {
+        if (isCodeAnnotation(childEl)) {
+          childEl.remove();
+        }
+      }
+      return codeEl.innerText;
+  }
+  const clipboard = new window.ClipboardJS('.code-copy-button:not([data-in-quarto-modal])', {
+    text: getTextToCopy
   });
-  function tippyHover(el, contentFn) {
+  clipboard.on('success', onCopySuccess);
+  if (window.document.getElementById('quarto-embedded-source-code-modal')) {
+    const clipboardModal = new window.ClipboardJS('.code-copy-button[data-in-quarto-modal]', {
+      text: getTextToCopy,
+      container: window.document.getElementById('quarto-embedded-source-code-modal')
+    });
+    clipboardModal.on('success', onCopySuccess);
+  }
+    var localhostRegex = new RegExp(/^(?:http|https):\/\/localhost\:?[0-9]*\//);
+    var mailtoRegex = new RegExp(/^mailto:/);
+      var filterRegex = new RegExp("https:\/\/greglandrum\.github\.io\/rdkit-blog\/");
+    var isInternal = (href) => {
+        return filterRegex.test(href) || localhostRegex.test(href) || mailtoRegex.test(href);
+    }
+    // Inspect non-navigation links and adorn them if external
+ 	var links = window.document.querySelectorAll('a[href]:not(.nav-link):not(.navbar-brand):not(.toc-action):not(.sidebar-link):not(.sidebar-item-toggle):not(.pagination-link):not(.no-external):not([aria-hidden]):not(.dropdown-item):not(.quarto-navigation-tool):not(.about-link)');
+    for (var i=0; i<links.length; i++) {
+      const link = links[i];
+      if (!isInternal(link.href)) {
+        // undo the damage that might have been done by quarto-nav.js in the case of
+        // links that we want to consider external
+        if (link.dataset.originalHref !== undefined) {
+          link.href = link.dataset.originalHref;
+        }
+      }
+    }
+  function tippyHover(el, contentFn, onTriggerFn, onUntriggerFn) {
     const config = {
       allowHTML: true,
-      content: contentFn,
       maxWidth: 500,
       delay: 100,
       arrow: false,
@@ -878,8 +968,17 @@ window.document.addEventListener("DOMContentLoaded", function (event) {
       interactive: true,
       interactiveBorder: 10,
       theme: 'quarto',
-      placement: 'bottom-start'
+      placement: 'bottom-start',
     };
+    if (contentFn) {
+      config.content = contentFn;
+    }
+    if (onTriggerFn) {
+      config.onTrigger = onTriggerFn;
+    }
+    if (onUntriggerFn) {
+      config.onUntrigger = onUntriggerFn;
+    }
     window.tippy(el, config); 
   }
   const noterefs = window.document.querySelectorAll('a[role="doc-noteref"]');
@@ -891,9 +990,244 @@ window.document.addEventListener("DOMContentLoaded", function (event) {
       try { href = new URL(href).hash; } catch {}
       const id = href.replace(/^#\/?/, "");
       const note = window.document.getElementById(id);
-      return note.innerHTML;
+      if (note) {
+        return note.innerHTML;
+      } else {
+        return "";
+      }
     });
   }
+  const xrefs = window.document.querySelectorAll('a.quarto-xref');
+  const processXRef = (id, note) => {
+    // Strip column container classes
+    const stripColumnClz = (el) => {
+      el.classList.remove("page-full", "page-columns");
+      if (el.children) {
+        for (const child of el.children) {
+          stripColumnClz(child);
+        }
+      }
+    }
+    stripColumnClz(note)
+    if (id === null || id.startsWith('sec-')) {
+      // Special case sections, only their first couple elements
+      const container = document.createElement("div");
+      if (note.children && note.children.length > 2) {
+        container.appendChild(note.children[0].cloneNode(true));
+        for (let i = 1; i < note.children.length; i++) {
+          const child = note.children[i];
+          if (child.tagName === "P" && child.innerText === "") {
+            continue;
+          } else {
+            container.appendChild(child.cloneNode(true));
+            break;
+          }
+        }
+        if (window.Quarto?.typesetMath) {
+          window.Quarto.typesetMath(container);
+        }
+        return container.innerHTML
+      } else {
+        if (window.Quarto?.typesetMath) {
+          window.Quarto.typesetMath(note);
+        }
+        return note.innerHTML;
+      }
+    } else {
+      // Remove any anchor links if they are present
+      const anchorLink = note.querySelector('a.anchorjs-link');
+      if (anchorLink) {
+        anchorLink.remove();
+      }
+      if (window.Quarto?.typesetMath) {
+        window.Quarto.typesetMath(note);
+      }
+      if (note.classList.contains("callout")) {
+        return note.outerHTML;
+      } else {
+        return note.innerHTML;
+      }
+    }
+  }
+  for (var i=0; i<xrefs.length; i++) {
+    const xref = xrefs[i];
+    tippyHover(xref, undefined, function(instance) {
+      instance.disable();
+      let url = xref.getAttribute('href');
+      let hash = undefined; 
+      if (url.startsWith('#')) {
+        hash = url;
+      } else {
+        try { hash = new URL(url).hash; } catch {}
+      }
+      if (hash) {
+        const id = hash.replace(/^#\/?/, "");
+        const note = window.document.getElementById(id);
+        if (note !== null) {
+          try {
+            const html = processXRef(id, note.cloneNode(true));
+            instance.setContent(html);
+          } finally {
+            instance.enable();
+            instance.show();
+          }
+        } else {
+          // See if we can fetch this
+          fetch(url.split('#')[0])
+          .then(res => res.text())
+          .then(html => {
+            const parser = new DOMParser();
+            const htmlDoc = parser.parseFromString(html, "text/html");
+            const note = htmlDoc.getElementById(id);
+            if (note !== null) {
+              const html = processXRef(id, note);
+              instance.setContent(html);
+            } 
+          }).finally(() => {
+            instance.enable();
+            instance.show();
+          });
+        }
+      } else {
+        // See if we can fetch a full url (with no hash to target)
+        // This is a special case and we should probably do some content thinning / targeting
+        fetch(url)
+        .then(res => res.text())
+        .then(html => {
+          const parser = new DOMParser();
+          const htmlDoc = parser.parseFromString(html, "text/html");
+          const note = htmlDoc.querySelector('main.content');
+          if (note !== null) {
+            // This should only happen for chapter cross references
+            // (since there is no id in the URL)
+            // remove the first header
+            if (note.children.length > 0 && note.children[0].tagName === "HEADER") {
+              note.children[0].remove();
+            }
+            const html = processXRef(null, note);
+            instance.setContent(html);
+          } 
+        }).finally(() => {
+          instance.enable();
+          instance.show();
+        });
+      }
+    }, function(instance) {
+    });
+  }
+      let selectedAnnoteEl;
+      const selectorForAnnotation = ( cell, annotation) => {
+        let cellAttr = 'data-code-cell="' + cell + '"';
+        let lineAttr = 'data-code-annotation="' +  annotation + '"';
+        const selector = 'span[' + cellAttr + '][' + lineAttr + ']';
+        return selector;
+      }
+      const selectCodeLines = (annoteEl) => {
+        const doc = window.document;
+        const targetCell = annoteEl.getAttribute("data-target-cell");
+        const targetAnnotation = annoteEl.getAttribute("data-target-annotation");
+        const annoteSpan = window.document.querySelector(selectorForAnnotation(targetCell, targetAnnotation));
+        const lines = annoteSpan.getAttribute("data-code-lines").split(",");
+        const lineIds = lines.map((line) => {
+          return targetCell + "-" + line;
+        })
+        let top = null;
+        let height = null;
+        let parent = null;
+        if (lineIds.length > 0) {
+            //compute the position of the single el (top and bottom and make a div)
+            const el = window.document.getElementById(lineIds[0]);
+            top = el.offsetTop;
+            height = el.offsetHeight;
+            parent = el.parentElement.parentElement;
+          if (lineIds.length > 1) {
+            const lastEl = window.document.getElementById(lineIds[lineIds.length - 1]);
+            const bottom = lastEl.offsetTop + lastEl.offsetHeight;
+            height = bottom - top;
+          }
+          if (top !== null && height !== null && parent !== null) {
+            // cook up a div (if necessary) and position it 
+            let div = window.document.getElementById("code-annotation-line-highlight");
+            if (div === null) {
+              div = window.document.createElement("div");
+              div.setAttribute("id", "code-annotation-line-highlight");
+              div.style.position = 'absolute';
+              parent.appendChild(div);
+            }
+            div.style.top = top - 2 + "px";
+            div.style.height = height + 4 + "px";
+            div.style.left = 0;
+            let gutterDiv = window.document.getElementById("code-annotation-line-highlight-gutter");
+            if (gutterDiv === null) {
+              gutterDiv = window.document.createElement("div");
+              gutterDiv.setAttribute("id", "code-annotation-line-highlight-gutter");
+              gutterDiv.style.position = 'absolute';
+              const codeCell = window.document.getElementById(targetCell);
+              const gutter = codeCell.querySelector('.code-annotation-gutter');
+              gutter.appendChild(gutterDiv);
+            }
+            gutterDiv.style.top = top - 2 + "px";
+            gutterDiv.style.height = height + 4 + "px";
+          }
+          selectedAnnoteEl = annoteEl;
+        }
+      };
+      const unselectCodeLines = () => {
+        const elementsIds = ["code-annotation-line-highlight", "code-annotation-line-highlight-gutter"];
+        elementsIds.forEach((elId) => {
+          const div = window.document.getElementById(elId);
+          if (div) {
+            div.remove();
+          }
+        });
+        selectedAnnoteEl = undefined;
+      };
+        // Handle positioning of the toggle
+    window.addEventListener(
+      "resize",
+      throttle(() => {
+        elRect = undefined;
+        if (selectedAnnoteEl) {
+          selectCodeLines(selectedAnnoteEl);
+        }
+      }, 10)
+    );
+    function throttle(fn, ms) {
+    let throttle = false;
+    let timer;
+      return (...args) => {
+        if(!throttle) { // first call gets through
+            fn.apply(this, args);
+            throttle = true;
+        } else { // all the others get throttled
+            if(timer) clearTimeout(timer); // cancel #2
+            timer = setTimeout(() => {
+              fn.apply(this, args);
+              timer = throttle = false;
+            }, ms);
+        }
+      };
+    }
+      // Attach click handler to the DT
+      const annoteDls = window.document.querySelectorAll('dt[data-target-cell]');
+      for (const annoteDlNode of annoteDls) {
+        annoteDlNode.addEventListener('click', (event) => {
+          const clickedEl = event.target;
+          if (clickedEl !== selectedAnnoteEl) {
+            unselectCodeLines();
+            const activeEl = window.document.querySelector('dt[data-target-cell].code-annotation-active');
+            if (activeEl) {
+              activeEl.classList.remove('code-annotation-active');
+            }
+            selectCodeLines(clickedEl);
+            clickedEl.classList.add('code-annotation-active');
+          } else {
+            // Unselect the line
+            unselectCodeLines();
+            clickedEl.classList.remove('code-annotation-active');
+          }
+        });
+      }
   const findCites = (el) => {
     const parentEl = el.parentElement;
     if (parentEl) {
@@ -938,10 +1272,18 @@ window.document.addEventListener("DOMContentLoaded", function (event) {
 </div> <!-- /content -->
 <footer class="footer">
   <div class="nav-footer">
-    <div class="nav-footer-left">Copyright (C) 2024 Greg Landrum</div>   
-    <div class="nav-footer-right"><a href="https://www.rdkit.org"><img src="https://www.rdkit.org/logo.small.png" class="img-fluid" alt="RDKit" width="64"></a></div>
+    <div class="nav-footer-left">
+<p>Copyright (C) 2024 Greg Landrum</p>
+</div>   
+    <div class="nav-footer-center">
+      &nbsp;
+    </div>
+    <div class="nav-footer-right">
+<p><a href="https://www.rdkit.org"><img src="https://www.rdkit.org/logo.small.png" class="img-fluid" alt="RDKit" width="64"></a></p>
+</div>
   </div>
 </footer>
+
 
 
 
