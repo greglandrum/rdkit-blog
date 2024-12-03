@@ -10,7 +10,1043 @@
 <atom:link href="https://greglandrum.github.io/rdkit-blog/index.xml" rel="self" type="application/rss+xml"/>
 <description>RDKit experiments, tips, and tutorials</description>
 <generator>quarto-1.6.39</generator>
-<lastBuildDate>Wed, 30 Oct 2024 23:00:00 GMT</lastBuildDate>
+<lastBuildDate>Mon, 02 Dec 2024 23:00:00 GMT</lastBuildDate>
+<item>
+  <title>Introducing Synthon Searching</title>
+  <link>https://greglandrum.github.io/rdkit-blog/posts/2024-12-03-introducing-synthon-search.html</link>
+  <description><![CDATA[ 
+
+
+
+
+<section id="rapid-searching-of-synthon-spaces" class="level1">
+<h1>Rapid Searching of Synthon Spaces</h1>
+<p><strong>Note</strong> this is a guest post written by Dave Cosgrove (GitHub: <span class="citation" data-cites="DavidACosgrove">@DavidACosgrove</span>).</p>
+<p>There are a number of combinatorial libraries now available offering compounds made to order from a vast array of possibilities, such as <a href="https://enamine.net/compound-collections/real-compounds/real-database">Enamine’s REAL</a> or <a href="https://chem-space.com/compounds/freedom-space">ChemSpace’s FreedomSpace</a>. The enumerated versions of these databases run to billions of compounds making them expensive and difficult to manage and search. Several groups have proposed algorithms for the rapid search of these libraries in synthon rather than enumerated form (e.g.&nbsp;<a href="https://doi.org/10.1021/acs.jcim.0c00850">Spacelight</a> and <a href="https://doi.org/10.1021/acs.jcim.3c00290">Liphardt and Sander</a>). This blogpost describes the implementation of substructure and similarity search methods based on the ideas in the latter.</p>
+<p>The examples use the FreedomSpace 2023 library of some 9 billion compounds. The new module, available starting in the 2024.09.3 release, is rdSynthonSpaceSearch. Timings are from my Mac mini M4 Pro (very nice, you should get one!).</p>
+<blockquote class="blockquote">
+<p>Obligatory new functionality disclaimer: this is completely new RDKit functionality and is still a bit experimental. The API and results may change over the next couple of releases as we do more testing and get more feedback from the community</p>
+</blockquote>
+<div id="9e1b6c1c-3bf8-411d-aa34-c760d9c79e5e" class="cell">
+<div class="sourceCode cell-code" id="cb1" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb1-1"><span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">from</span> rdkit <span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">import</span> Chem</span>
+<span id="cb1-2"><span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">from</span> rdkit.Chem <span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">import</span> rdSynthonSpaceSearch, rdFingerprintGenerator</span>
+<span id="cb1-3"><span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">from</span> rdkit.Chem <span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">import</span> Draw</span>
+<span id="cb1-4"><span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">from</span> rdkit.Chem.Draw <span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">import</span> rdMolDraw2D, rdDepictor</span>
+<span id="cb1-5"><span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">from</span> rdkit.Chem.Draw <span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">import</span> IPythonConsole</span>
+<span id="cb1-6"><span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">from</span> IPython.display <span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">import</span> SVG</span>
+<span id="cb1-7"><span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">from</span> rdkit <span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">import</span> rdBase</span>
+<span id="cb1-8"><span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">import</span> time</span>
+<span id="cb1-9"></span>
+<span id="cb1-10">rdDepictor.SetPreferCoordGen(<span class="va" style="color: #111111;
+background-color: null;
+font-style: inherit;">True</span>)</span>
+<span id="cb1-11"><span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">print</span>(rdBase.rdkitVersion)</span></code></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>2024.09.3</code></pre>
+</div>
+</div>
+<p>Load the library and print some information about it.</p>
+<div id="8c96075c-e9a9-4313-a2b3-5fc45501cdf4" class="cell" data-execution_count="2">
+<div class="sourceCode cell-code" id="cb3" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb3-1">start <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> time.perf_counter()</span>
+<span id="cb3-2">synthonspace <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> rdSynthonSpaceSearch.SynthonSpace()</span>
+<span id="cb3-3">synthonspace.ReadTextFile(<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"/Users/david/Projects/FreedomSpace/2023-05_Freedom_synthons.txt"</span>)</span>
+<span id="cb3-4"><span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">print</span>(<span class="ss" style="color: #20794D;
+background-color: null;
+font-style: inherit;">f"Number of reactions : </span><span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">{</span>synthonspace<span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">.</span>GetNumReactions()<span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">}</span><span class="ss" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"</span>)</span>
+<span id="cb3-5"><span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">print</span>(<span class="ss" style="color: #20794D;
+background-color: null;
+font-style: inherit;">f"Number of products : </span><span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">{</span>synthonspace<span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">.</span>GetNumProducts()<span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">}</span><span class="ss" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"</span>)</span>
+<span id="cb3-6"><span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">print</span>(<span class="ss" style="color: #20794D;
+background-color: null;
+font-style: inherit;">f"Time to load : </span><span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">{</span>time<span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">.</span>perf_counter() <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">-</span> start<span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">:4.2f}</span><span class="ss" style="color: #20794D;
+background-color: null;
+font-style: inherit;"> seconds."</span>)</span></code></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>Number of reactions : 10
+Number of products : 9360696185
+Time to load : 26.47 seconds.</code></pre>
+</div>
+</div>
+<p>There’s a binary format that loads much more quickly.</p>
+<div id="903b5221-0dc6-410d-8986-26ef60b6ae0f" class="cell" data-execution_count="3">
+<div class="sourceCode cell-code" id="cb5" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb5-1">synthonspace.WriteDBFile(<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"/Users/david/Projects/FreedomSpace/2023-05_Freedom_synthons.spc"</span>)</span>
+<span id="cb5-2">start <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> time.perf_counter()</span>
+<span id="cb5-3">synthonspace.ReadDBFile(<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"/Users/david/Projects/FreedomSpace/2023-05_Freedom_synthons.spc"</span>)</span>
+<span id="cb5-4"><span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">print</span>(<span class="ss" style="color: #20794D;
+background-color: null;
+font-style: inherit;">f"Time to load : </span><span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">{</span>time<span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">.</span>perf_counter() <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">-</span> start<span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">:4.2f}</span><span class="ss" style="color: #20794D;
+background-color: null;
+font-style: inherit;"> seconds."</span>)</span></code></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>Time to load : 4.47 seconds.</code></pre>
+</div>
+</div>
+<p>If you want more information about the library:</p>
+<div id="b1f00c62-a0ce-457c-97f0-a244408629f2" class="cell" data-execution_count="4">
+<div class="sourceCode cell-code" id="cb7" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb7-1">synthonspace.Summarise()</span></code></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>Read from file /Users/david/Projects/FreedomSpace/2023-05_Freedom_synthons.spc
+Number of reactions : 10
+Reaction name a1
+  Synthon set 0 has 18662 synthons
+  Synthon set 1 has 16838 synthons
+Reaction name a2
+  Synthon set 0 has 18540 synthons
+  Synthon set 1 has 1503 synthons
+Reaction name a3
+  Synthon set 0 has 492 synthons
+  Synthon set 1 has 4700 synthons
+Reaction name a4
+  Synthon set 0 has 17547 synthons
+  Synthon set 1 has 4539 synthons
+Reaction name a5
+  Synthon set 0 has 6420 synthons
+  Synthon set 1 has 810 synthons
+Reaction name a6
+  Synthon set 0 has 5126 synthons
+  Synthon set 1 has 11636 synthons
+Reaction name a7
+  Synthon set 0 has 320 synthons
+  Synthon set 1 has 1148 synthons
+  Synthon set 2 has 9608 synthons
+Reaction name a77
+  Synthon set 0 has 80 synthons
+  Synthon set 1 has 5890 synthons
+  Synthon set 2 has 8366 synthons
+Reaction name a8
+  Synthon set 0 has 10060 synthons
+  Synthon set 1 has 34 synthons
+Reaction name a80
+  Synthon set 0 has 20 synthons
+  Synthon set 1 has 8366 synthons
+  Synthon set 2 has 8366 synthons
+Approximate number of molecules in SynthonSpace : 9360696185</code></pre>
+</div>
+</div>
+<p>##&nbsp;Substructure Searching</p>
+<div id="4feda823-f48c-4832-b2f7-3b72b5b0e30a" class="cell" data-execution_count="5">
+<div class="sourceCode cell-code" id="cb9" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb9-1">qmol <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> Chem.MolFromSmarts(<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"c12ccc(C)cc1[nH]nc2C(=O)NCc1cncs1"</span>)</span>
+<span id="cb9-2">qmol</span></code></pre></div>
+<div class="cell-output cell-output-display" data-execution_count="5">
+<div>
+<figure class="figure">
+<p><img src="https://greglandrum.github.io/rdkit-blog/posts/2024-12-03-introducing-synthon-search_files/figure-html/cell-6-output-1.png" class="img-fluid figure-img"></p>
+</figure>
+</div>
+</div>
+</div>
+<div id="b7bc6431-d9c5-408f-9838-6c55c1c96119" class="cell" data-execution_count="6">
+<div class="sourceCode cell-code" id="cb10" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb10-1">start <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> time.perf_counter()</span>
+<span id="cb10-2">results <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> synthonspace.SubstructureSearch(qmol)</span>
+<span id="cb10-3">hits <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> results.GetHitMolecules()</span>
+<span id="cb10-4">hit_names <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> [m.GetProp(<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"_Name"</span>) <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">for</span> m <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">in</span> hits]</span>
+<span id="cb10-5"><span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">print</span>(<span class="ss" style="color: #20794D;
+background-color: null;
+font-style: inherit;">f"Time to search : </span><span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">{</span>time<span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">.</span>perf_counter() <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">-</span> start<span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">:4.2f}</span><span class="ss" style="color: #20794D;
+background-color: null;
+font-style: inherit;"> seconds."</span>)</span>
+<span id="cb10-6"><span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">print</span>(<span class="ss" style="color: #20794D;
+background-color: null;
+font-style: inherit;">f"Number of hits : </span><span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">{</span><span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">len</span>(hits)<span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">}</span><span class="ss" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"</span>)</span></code></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>Time to search : 0.33 seconds.
+Number of hits : 108</code></pre>
+</div>
+</div>
+<div id="804b28b3-ba17-42f5-af20-3df82a081dd3" class="cell" data-execution_count="7">
+<div class="sourceCode cell-code" id="cb12" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb12-1"><span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">if</span> hits:</span>
+<span id="cb12-2">    img <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> Draw.MolsToGridImage(hits[:<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">12</span>], legends<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span>hit_names[:<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">12</span>], molsPerRow<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span><span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">4</span>)</span>
+<span id="cb12-3"><span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">else</span>:</span>
+<span id="cb12-4">    img <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"No Hits"</span></span>
+<span id="cb12-5">img</span></code></pre></div>
+<div class="cell-output cell-output-display" data-execution_count="7">
+<div>
+<figure class="figure">
+<p><img src="https://greglandrum.github.io/rdkit-blog/posts/2024-12-03-introducing-synthon-search_files/figure-html/cell-8-output-1.png" class="img-fluid figure-img"></p>
+</figure>
+</div>
+</div>
+</div>
+<p>The molecule names are made up of the reaction name and the synthons for that reaction. So the first hit above is made from synthons 2700 and 25231 and reaction a1.</p>
+<p>Complex SMARTS queries are supported, though can take a little longer to run. The maximum number of hits to be returned is capped at 1000 by default. You can obtain an upper bound on the maximum number of hits possible; there may be fewer hits than this in practice, as duplicate matches are counted but not returned and for other more subtle reasons.</p>
+<div id="7f79cbb5-dff1-4b7e-a5e7-af28d77f85a8" class="cell" data-execution_count="8">
+<div class="sourceCode cell-code" id="cb13" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb13-1">qmol <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> Chem.MolFromSmarts(<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"c1c[n,s,o][n,s,o,c]c1C(=O)[$(N1CCCCC1),$(N1CCCC1)]"</span>)</span>
+<span id="cb13-2">qmol</span></code></pre></div>
+<div class="cell-output cell-output-display" data-execution_count="8">
+<div>
+<figure class="figure">
+<p><img src="https://greglandrum.github.io/rdkit-blog/posts/2024-12-03-introducing-synthon-search_files/figure-html/cell-9-output-1.png" class="img-fluid figure-img"></p>
+</figure>
+</div>
+</div>
+</div>
+<div id="5d145188-7547-4bd1-a7d8-292beb253cc7" class="cell" data-execution_count="9">
+<div class="sourceCode cell-code" id="cb14" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb14-1">start <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> time.perf_counter()</span>
+<span id="cb14-2">results <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> synthonspace.SubstructureSearch(qmol)</span>
+<span id="cb14-3">hits <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> results.GetHitMolecules()</span>
+<span id="cb14-4">hit_names <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> [m.GetProp(<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"_Name"</span>) <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">for</span> m <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">in</span> hits]</span>
+<span id="cb14-5"><span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">print</span>(<span class="ss" style="color: #20794D;
+background-color: null;
+font-style: inherit;">f"Time to search : </span><span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">{</span>time<span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">.</span>perf_counter() <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">-</span> start<span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">:4.2f}</span><span class="ss" style="color: #20794D;
+background-color: null;
+font-style: inherit;"> seconds."</span>)</span>
+<span id="cb14-6"><span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">print</span>(<span class="ss" style="color: #20794D;
+background-color: null;
+font-style: inherit;">f"Number of hits : </span><span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">{</span><span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">len</span>(hits)<span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">}</span><span class="ss" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"</span>)</span>
+<span id="cb14-7"><span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">print</span>(<span class="ss" style="color: #20794D;
+background-color: null;
+font-style: inherit;">f"Maximum number of hits possible : </span><span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">{</span>results<span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">.</span>GetMaxNumResults<span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">}</span><span class="ss" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"</span>)</span></code></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>Time to search : 0.19 seconds.
+Number of hits : 1000
+Maximum number of hits possible : 2358187</code></pre>
+</div>
+</div>
+<p>You can control the number of hits returned, and also get a random sample of the hits, rather than the first N in the list:</p>
+<div id="d6da6906-bd2c-4678-8a92-5677bdb8d050" class="cell" data-execution_count="10">
+<div class="sourceCode cell-code" id="cb16" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb16-1">params <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> rdSynthonSpaceSearch.SynthonSpaceSearchParams()</span>
+<span id="cb16-2">params.maxHits <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> <span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">12</span></span>
+<span id="cb16-3">params.randomSample <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> <span class="va" style="color: #111111;
+background-color: null;
+font-style: inherit;">True</span></span>
+<span id="cb16-4">start <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> time.perf_counter()</span>
+<span id="cb16-5">results <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> synthonspace.SubstructureSearch(qmol, params)</span>
+<span id="cb16-6">hits <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> results.GetHitMolecules()</span>
+<span id="cb16-7">hit_names <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> [m.GetProp(<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"_Name"</span>) <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">for</span> m <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">in</span> hits]</span>
+<span id="cb16-8"><span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">print</span>(<span class="ss" style="color: #20794D;
+background-color: null;
+font-style: inherit;">f"Time to search : </span><span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">{</span>time<span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">.</span>perf_counter() <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">-</span> start<span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">:4.2f}</span><span class="ss" style="color: #20794D;
+background-color: null;
+font-style: inherit;"> seconds."</span>)</span>
+<span id="cb16-9"><span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">print</span>(<span class="ss" style="color: #20794D;
+background-color: null;
+font-style: inherit;">f"Number of hits : </span><span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">{</span><span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">len</span>(hits)<span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">}</span><span class="ss" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"</span>)</span>
+<span id="cb16-10"><span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">print</span>(<span class="ss" style="color: #20794D;
+background-color: null;
+font-style: inherit;">f"Maximum number of hits possible : </span><span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">{</span>results<span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">.</span>GetMaxNumResults<span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">}</span><span class="ss" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"</span>)</span>
+<span id="cb16-11">Draw.MolsToGridImage(hits[:<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">12</span>], legends<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span>hit_names[:<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">12</span>], molsPerRow<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span><span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">4</span>)</span></code></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>Time to search : 0.13 seconds.
+Number of hits : 12
+Maximum number of hits possible : 2358187</code></pre>
+</div>
+<div class="cell-output cell-output-display" data-execution_count="10">
+<div>
+<figure class="figure">
+<p><img src="https://greglandrum.github.io/rdkit-blog/posts/2024-12-03-introducing-synthon-search_files/figure-html/cell-11-output-2.png" class="img-fluid figure-img"></p>
+</figure>
+</div>
+</div>
+</div>
+<p>Having looked at the first 1000 hits, you might want to get the next set in the list. Here we get the 1000 starting at 2000.</p>
+<div id="aac848ef-ff4d-4750-8658-1b84de535f3d" class="cell" data-execution_count="11">
+<div class="sourceCode cell-code" id="cb18" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb18-1">params <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> rdSynthonSpaceSearch.SynthonSpaceSearchParams()</span>
+<span id="cb18-2">params.maxHits <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> <span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">1000</span></span>
+<span id="cb18-3">params.hitStart <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> <span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">2000</span></span>
+<span id="cb18-4">start <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> time.perf_counter()</span>
+<span id="cb18-5">results <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> synthonspace.SubstructureSearch(qmol, params)</span>
+<span id="cb18-6">hits <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> results.GetHitMolecules()</span>
+<span id="cb18-7">hit_names <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> [m.GetProp(<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"_Name"</span>) <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">for</span> m <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">in</span> hits]</span>
+<span id="cb18-8"><span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">print</span>(<span class="ss" style="color: #20794D;
+background-color: null;
+font-style: inherit;">f"Time to search : </span><span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">{</span>time<span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">.</span>perf_counter() <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">-</span> start<span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">:4.2f}</span><span class="ss" style="color: #20794D;
+background-color: null;
+font-style: inherit;"> seconds."</span>)</span>
+<span id="cb18-9"><span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">print</span>(<span class="ss" style="color: #20794D;
+background-color: null;
+font-style: inherit;">f"Number of hits : </span><span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">{</span><span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">len</span>(hits)<span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">}</span><span class="ss" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"</span>)</span>
+<span id="cb18-10">Draw.MolsToGridImage(hits[:<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">12</span>], legends<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span>hit_names[:<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">12</span>], molsPerRow<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span><span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">4</span>)</span></code></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>Time to search : 0.19 seconds.
+Number of hits : 1000</code></pre>
+</div>
+<div class="cell-output cell-output-display" data-execution_count="11">
+<div>
+<figure class="figure">
+<p><img src="https://greglandrum.github.io/rdkit-blog/posts/2024-12-03-introducing-synthon-search_files/figure-html/cell-12-output-2.png" class="img-fluid figure-img"></p>
+</figure>
+</div>
+</div>
+</div>
+<p>It is possible to check the upper bound on the number of hits without building them, just to get an idea of whether you need to refine the search or not.</p>
+<div id="423e46c2-5b53-44f4-9fd8-721abbbedb62" class="cell" data-execution_count="12">
+<div class="sourceCode cell-code" id="cb20" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb20-1">qmol <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> Chem.MolFromSmarts(<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"c12ccc(C)cc1[nH]nc2C(=O)NCc1cncs1"</span>)</span>
+<span id="cb20-2">params <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> rdSynthonSpaceSearch.SynthonSpaceSearchParams()</span>
+<span id="cb20-3">params.buildHits <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> <span class="va" style="color: #111111;
+background-color: null;
+font-style: inherit;">False</span></span>
+<span id="cb20-4">results <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> synthonspace.SubstructureSearch(qmol, params)</span>
+<span id="cb20-5">hits <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> results.GetHitMolecules()</span>
+<span id="cb20-6"><span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">print</span>(<span class="ss" style="color: #20794D;
+background-color: null;
+font-style: inherit;">f"Number of hits : </span><span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">{</span><span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">len</span>(hits)<span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">}</span><span class="ss" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"</span>)</span>
+<span id="cb20-7"><span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">print</span>(<span class="ss" style="color: #20794D;
+background-color: null;
+font-style: inherit;">f"Maximum number of hits possible : </span><span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">{</span>results<span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">.</span>GetMaxNumResults<span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">}</span><span class="ss" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"</span>)</span></code></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>Number of hits : 0
+Maximum number of hits possible : 108</code></pre>
+</div>
+</div>
+<p>##&nbsp;Similarity Searching Any of the RDKit fingerprint generators can be used, although the similarity metric is hard-coded as Tanimoto on a hashed fingerprint. The search structure is <a href="https://en.wikipedia.org/wiki/Osimertinib">Osimertinib</a> which is paying my pension so deserves acknowledgement. Similarity values are returned in the property “Similarity” on each molecule. If the binary file doesn’t contain fingerprints, they will need to be generated. This can be done ahead of time or it will be done as part of the first search.</p>
+<div id="f5878504-c918-4896-9878-87c4ade063ee" class="cell" data-execution_count="13">
+<div class="sourceCode cell-code" id="cb22" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb22-1">fpgen <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> rdFingerprintGenerator.GetRDKitFPGenerator(fpSize<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span><span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">2048</span>)</span>
+<span id="cb22-2">synthonspace.BuildSynthonFingerprints(fpgen)</span>
+<span id="cb22-3">qmol <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> Chem.MolFromSmiles(<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"C=CC(=O)Nc1cc(Nc2nccc(-c3cn(C)c4ccccc34)n2)c(OC)cc1N(C)CCN(C)C"</span>)</span>
+<span id="cb22-4">qmol</span></code></pre></div>
+<div class="cell-output cell-output-stderr">
+<pre><code>[11:01:56] Building the fingerprints may take some time.</code></pre>
+</div>
+<div class="cell-output cell-output-display" data-execution_count="13">
+<div>
+<figure class="figure">
+<p><img src="https://greglandrum.github.io/rdkit-blog/posts/2024-12-03-introducing-synthon-search_files/figure-html/cell-14-output-2.png" class="img-fluid figure-img"></p>
+</figure>
+</div>
+</div>
+</div>
+<div id="a3907cdc-c9b4-4afe-99f7-b0e4c2bf009e" class="cell" data-execution_count="14">
+<div class="sourceCode cell-code" id="cb24" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb24-1">start <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> time.perf_counter()</span>
+<span id="cb24-2">results <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> synthonspace.FingerprintSearch(qmol, fpgen)</span>
+<span id="cb24-3">hits <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> results.GetHitMolecules()</span>
+<span id="cb24-4">hit_names <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> [<span class="ss" style="color: #20794D;
+background-color: null;
+font-style: inherit;">f'</span><span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">{</span>m<span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">.</span>GetProp(<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"_Name"</span>)<span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">}</span><span class="ss" style="color: #20794D;
+background-color: null;
+font-style: inherit;"> : </span><span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">{</span><span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">float</span>(m.GetProp(<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"Similarity"</span>))<span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">:4.2f}</span><span class="ss" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'</span> <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">for</span> m <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">in</span> hits]</span>
+<span id="cb24-5"><span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">print</span>(<span class="ss" style="color: #20794D;
+background-color: null;
+font-style: inherit;">f"Time to search : </span><span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">{</span>time<span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">.</span>perf_counter() <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">-</span> start<span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">:4.2f}</span><span class="ss" style="color: #20794D;
+background-color: null;
+font-style: inherit;"> seconds."</span>)</span>
+<span id="cb24-6"><span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">print</span>(<span class="ss" style="color: #20794D;
+background-color: null;
+font-style: inherit;">f"Number of hits : </span><span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">{</span><span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">len</span>(hits)<span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">}</span><span class="ss" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"</span>)</span>
+<span id="cb24-7"><span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">print</span>(<span class="ss" style="color: #20794D;
+background-color: null;
+font-style: inherit;">f"Maximum number of hits possible : </span><span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">{</span>results<span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">.</span>GetMaxNumResults<span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">}</span><span class="ss" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"</span>)</span>
+<span id="cb24-8">Draw.MolsToGridImage(hits[:<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">12</span>], legends<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span>hit_names[:<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">12</span>], molsPerRow<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span><span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">4</span>)</span></code></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>Time to search : 20.29 seconds.
+Number of hits : 1000
+Maximum number of hits possible : 35911098</code></pre>
+</div>
+<div class="cell-output cell-output-display" data-execution_count="14">
+<div>
+<figure class="figure">
+<p><img src="https://greglandrum.github.io/rdkit-blog/posts/2024-12-03-introducing-synthon-search_files/figure-html/cell-15-output-2.png" class="img-fluid figure-img"></p>
+</figure>
+</div>
+</div>
+</div>
+<p>The extra runtime is due to 2 factors. The first is that osimertinib is a largish molecule, so many fragments are generated that all need to be compared with the synthons. The second is that the screenout by fingerprint is less efficient, as you can see from the fact that 35911098 hits were possible having passed the initial fragment screening, although many of those won’t make the similarity cutoff when the potential hit molecule is built and checked.</p>
+<p>The similarity cutoff can be raised from the default 0.5 however this can result in large search times if there are few hits that meet the threshold - it may have to check all 35911098 potential hits. Note that in the search below we take a random sample of the results, so the hits are not the same as above.</p>
+<div id="780d92fc-45e0-4546-8eb5-f419a6c26221" class="cell" data-execution_count="15">
+<div class="sourceCode cell-code" id="cb26" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb26-1">params <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> rdSynthonSpaceSearch.SynthonSpaceSearchParams()</span>
+<span id="cb26-2">params.maxHits <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> <span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">12</span></span>
+<span id="cb26-3">params.randomSample <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> <span class="va" style="color: #111111;
+background-color: null;
+font-style: inherit;">True</span></span>
+<span id="cb26-4">params.similarityCutoff <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> <span class="fl" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">0.55</span></span>
+<span id="cb26-5">start <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> time.perf_counter()</span>
+<span id="cb26-6">results <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> synthonspace.FingerprintSearch(qmol, fpgen, params)</span>
+<span id="cb26-7">hits <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> results.GetHitMolecules()</span>
+<span id="cb26-8">hit_names <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> [<span class="ss" style="color: #20794D;
+background-color: null;
+font-style: inherit;">f'</span><span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">{</span>m<span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">.</span>GetProp(<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"_Name"</span>)<span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">}</span><span class="ss" style="color: #20794D;
+background-color: null;
+font-style: inherit;"> : </span><span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">{</span><span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">float</span>(m.GetProp(<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"Similarity"</span>))<span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">:4.2f}</span><span class="ss" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'</span> <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">for</span> m <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">in</span> hits]</span>
+<span id="cb26-9"><span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">print</span>(<span class="ss" style="color: #20794D;
+background-color: null;
+font-style: inherit;">f"Time to search : </span><span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">{</span>time<span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">.</span>perf_counter() <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">-</span> start<span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">:4.2f}</span><span class="ss" style="color: #20794D;
+background-color: null;
+font-style: inherit;"> seconds."</span>)</span>
+<span id="cb26-10"><span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">print</span>(<span class="ss" style="color: #20794D;
+background-color: null;
+font-style: inherit;">f"Number of hits : </span><span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">{</span><span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">len</span>(hits)<span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">}</span><span class="ss" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"</span>)</span>
+<span id="cb26-11"><span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">print</span>(<span class="ss" style="color: #20794D;
+background-color: null;
+font-style: inherit;">f"Maximum number of hits possible : </span><span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">{</span>results<span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">.</span>GetMaxNumResults<span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">}</span><span class="ss" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"</span>)</span>
+<span id="cb26-12">Draw.MolsToGridImage(hits[:<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">12</span>], legends<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span>hit_names[:<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">12</span>], molsPerRow<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span><span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">4</span>)</span></code></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>Time to search : 15.84 seconds.
+Number of hits : 12
+Maximum number of hits possible : 3925204</code></pre>
+</div>
+<div class="cell-output cell-output-display" data-execution_count="15">
+<div>
+<figure class="figure">
+<p><img src="https://greglandrum.github.io/rdkit-blog/posts/2024-12-03-introducing-synthon-search_files/figure-html/cell-16-output-2.png" class="img-fluid figure-img"></p>
+</figure>
+</div>
+</div>
+</div>
+<p>Tanimoto similarities between small molecules with sparsely populated fingerprints are known to be be lower and more granular than similiarties for larger entities. This is relevant because the search starts by comparing fragments from the query molecule with synthons in the database. Only synthons that match the fragment within the cutoff are considered as a basis for a hit. There is a parameter that lowers the similarity cutoff for the fragment comparison compared to the global cutoff, which defaults to 0.1. Thus, if your similarityCutoff is set to 0.5, synthons are considered a match to a fragment if their Tanimoto similarities are above 0.4. If you want a faster search and don’t mind possibly missing some hits, you can lower that difference.</p>
+<div id="d537a3a3-5c0f-420e-b231-9a6a13109db2" class="cell" data-execution_count="16">
+<div class="sourceCode cell-code" id="cb28" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb28-1">params <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> rdSynthonSpaceSearch.SynthonSpaceSearchParams()</span>
+<span id="cb28-2">params.maxHits <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> <span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">12</span></span>
+<span id="cb28-3">params.randomSample <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> <span class="va" style="color: #111111;
+background-color: null;
+font-style: inherit;">True</span></span>
+<span id="cb28-4">params.similarityCutoff <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> <span class="fl" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">0.5</span></span>
+<span id="cb28-5">params.fragSimilarityAdjuster <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> <span class="fl" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">0.0</span></span>
+<span id="cb28-6">start <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> time.perf_counter()</span>
+<span id="cb28-7">results <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> synthonspace.FingerprintSearch(qmol, fpgen, params)</span>
+<span id="cb28-8">hits <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> results.GetHitMolecules()</span>
+<span id="cb28-9">hit_names <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> [<span class="ss" style="color: #20794D;
+background-color: null;
+font-style: inherit;">f'</span><span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">{</span>m<span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">.</span>GetProp(<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"_Name"</span>)<span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">}</span><span class="ss" style="color: #20794D;
+background-color: null;
+font-style: inherit;"> : </span><span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">{</span><span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">float</span>(m.GetProp(<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"Similarity"</span>))<span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">:4.2f}</span><span class="ss" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'</span> <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">for</span> m <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">in</span> hits]</span>
+<span id="cb28-10"><span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">print</span>(<span class="ss" style="color: #20794D;
+background-color: null;
+font-style: inherit;">f"Time to search : </span><span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">{</span>time<span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">.</span>perf_counter() <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">-</span> start<span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">:4.2f}</span><span class="ss" style="color: #20794D;
+background-color: null;
+font-style: inherit;"> seconds."</span>)</span>
+<span id="cb28-11"><span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">print</span>(<span class="ss" style="color: #20794D;
+background-color: null;
+font-style: inherit;">f"Number of hits : </span><span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">{</span><span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">len</span>(hits)<span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">}</span><span class="ss" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"</span>)</span>
+<span id="cb28-12"><span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">print</span>(<span class="ss" style="color: #20794D;
+background-color: null;
+font-style: inherit;">f"Maximum number of hits possible : </span><span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">{</span>results<span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">.</span>GetMaxNumResults<span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">}</span><span class="ss" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"</span>)</span>
+<span id="cb28-13">Draw.MolsToGridImage(hits[:<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">12</span>], legends<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span>hit_names[:<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">12</span>], molsPerRow<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span><span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">4</span>)</span></code></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>Time to search : 15.74 seconds.
+Number of hits : 12
+Maximum number of hits possible : 690134</code></pre>
+</div>
+<div class="cell-output cell-output-display" data-execution_count="16">
+<div>
+<figure class="figure">
+<p><img src="https://greglandrum.github.io/rdkit-blog/posts/2024-12-03-introducing-synthon-search_files/figure-html/cell-17-output-2.png" class="img-fluid figure-img"></p>
+</figure>
+</div>
+</div>
+</div>
+<p>As you can see, the potential number of hits it had to check went down to 690134.</p>
+<section id="working-with-synthon-spaces-yourself" class="level2">
+<h2 class="anchored" data-anchor-id="working-with-synthon-spaces-yourself">Working with synthon spaces yourself</h2>
+<p>In order to use this functionality, you obviously need access to a synthon description of the space you want to search. Due to the size of the files, we don’t include a space description with the RDKit itself, so you need to get the data elsewhere.</p>
+<p>ChemSpace’s FreedomSpace 3.0 and Enamine’s REAL are available on request via the links above. If you just want to experiment then there are small test spaces <a href="https://github.com/rdkit/rdkit/tree/master/Code/GraphMol/SynthonSpaceSearch/data">here</a>. The <a href="https://github.com/rdkit/rdkit/blob/master/Code/GraphMol/SynthonSpaceSearch/data/Syntons_5567.csv">Syntons_5567.csv</a> file is a substantial random extract from the FreedomSpace 2023 library.</p>
+<p>We don’t currently know of any others, but we will update this post as if/when we learn about more. Please leave a comment or get in touch some other way if you have a space you want to share. If you work with a provider of make-on-demand libraries or DELs, ask them if they can provide their libraries in synthon form, and we will add the link above. I (Dave) can work with providers on getting the data in the appropriate format.</p>
+</section>
+<section id="acknowledgements" class="level2">
+<h2 class="anchored" data-anchor-id="acknowledgements">Acknowledgements</h2>
+<p>Thanks to Greg for pointing me (Dave) at the problem and providing valuable insight and discussions.<br>
+Thanks are also due to Olga Tarkhanova and colleagues at ChemSpace for providing the FreedomSpace 2023 library in synthon and enumerated forms for me to use during development and testing, and also to Yurii Moroz at Enamine for help and discussions.</p>
+
+
+</section>
+</section>
+
+ ]]></description>
+  <category>release</category>
+  <category>tutorial</category>
+  <guid>https://greglandrum.github.io/rdkit-blog/posts/2024-12-03-introducing-synthon-search.html</guid>
+  <pubDate>Mon, 02 Dec 2024 23:00:00 GMT</pubDate>
+</item>
 <item>
   <title>Using lwreg with the RDKit cartridge</title>
   <link>https://greglandrum.github.io/rdkit-blog/posts/2024-10-31-lwreg-and-the-cartridge.html</link>
@@ -17473,601 +18509,6 @@ font-style: inherit;">=</span>dopts)</span></code></pre></div>
   <guid>https://greglandrum.github.io/rdkit-blog/posts/2023-10-25-molsmatrixtogridimage.html</guid>
   <pubDate>Tue, 24 Oct 2023 22:00:00 GMT</pubDate>
   <media:content url="https://greglandrum.github.io/rdkit-blog/posts/images/blog/molsmatrixtogridimage-1.png" medium="image" type="image/png" height="144" width="144"/>
-</item>
-<item>
-  <title>Templates for ring systems</title>
-  <link>https://greglandrum.github.io/rdkit-blog/posts/2023-10-21-2d-molecular-templates.html</link>
-  <description><![CDATA[ 
-
-
-
-
-<p>This guest post by Rachel Walker (github: <span class="citation" data-cites="rachelnwalker">@rachelnwalker</span>) is the second of a few posts covering some of the new or improved features in the 2023.09.1 RDKit release.</p>
-<div id="cell-2" class="cell" data-executetime="{&quot;end_time&quot;:&quot;2023-10-17T02:33:54.774684Z&quot;,&quot;start_time&quot;:&quot;2023-10-17T02:33:54.391745Z&quot;}" data-execution_count="1">
-<div class="sourceCode cell-code" id="cb1" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb1-1"><span class="im" style="color: #00769E;
-background-color: null;
-font-style: inherit;">from</span> rdkit <span class="im" style="color: #00769E;
-background-color: null;
-font-style: inherit;">import</span> Chem</span>
-<span id="cb1-2"><span class="im" style="color: #00769E;
-background-color: null;
-font-style: inherit;">from</span> rdkit.Chem <span class="im" style="color: #00769E;
-background-color: null;
-font-style: inherit;">import</span> rdDepictor</span>
-<span id="cb1-3"><span class="im" style="color: #00769E;
-background-color: null;
-font-style: inherit;">from</span> rdkit.Chem <span class="im" style="color: #00769E;
-background-color: null;
-font-style: inherit;">import</span> Draw</span>
-<span id="cb1-4"><span class="im" style="color: #00769E;
-background-color: null;
-font-style: inherit;">from</span> rdkit.Chem.Draw <span class="im" style="color: #00769E;
-background-color: null;
-font-style: inherit;">import</span> IPythonConsole</span>
-<span id="cb1-5"></span>
-<span id="cb1-6">IPythonConsole.ipython_useSVG<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span><span class="va" style="color: #111111;
-background-color: null;
-font-style: inherit;">True</span></span>
-<span id="cb1-7"><span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">%</span>pylab inline</span>
-<span id="cb1-8"><span class="im" style="color: #00769E;
-background-color: null;
-font-style: inherit;">import</span> rdkit</span>
-<span id="cb1-9"><span class="bu" style="color: null;
-background-color: null;
-font-style: inherit;">print</span>(rdkit.__version__)</span></code></pre></div>
-<div class="cell-output cell-output-stdout">
-<pre><code>%pylab is deprecated, use %matplotlib inline and import the required libraries.
-Populating the interactive namespace from numpy and matplotlib
-2023.09.1</code></pre>
-</div>
-</div>
-<section id="using-ring-system-templates-in-2d-coordinate-generation" class="level1">
-<h1>Using ring system templates in 2D Coordinate Generation</h1>
-<p>Beginning in the 2023.03.1 release, it is possible to use ring system templates when generating 2D coordinates to improve the depiction of some complicated ring systems and macrocycles. There are currently around 70 pre-existing templates, but you are also able to define and use custom templates. The current templates are sourced from <a href="https://github.com/schrodinger/coordgenlibs">coordgenlibs</a>.</p>
-<p>You can use the default ring system templates by setting <code>useRingTemplates</code> to <code>True</code> in <code>rdDepictor.Compute2DCoords</code></p>
-<div id="cell-4" class="cell" data-executetime="{&quot;end_time&quot;:&quot;2023-10-17T02:33:56.446616Z&quot;,&quot;start_time&quot;:&quot;2023-10-17T02:33:56.347896Z&quot;}" data-execution_count="2">
-<div class="sourceCode cell-code" id="cb3" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb3-1">mol <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> Chem.MolFromSmiles(<span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">"NC(CCC1CCC2C(C1)C1CCN2NN1)CC(=O)CCC1=CCCC2CCCCC2CCCCC2CCCC(CCCCCCC1)C2"</span>)</span>
-<span id="cb3-2">mol_with_templates <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> Chem.Mol(mol)</span>
-<span id="cb3-3"></span>
-<span id="cb3-4"><span class="co" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;"># use rdkit native coordinate generation</span></span>
-<span id="cb3-5">rdDepictor.SetPreferCoordGen(<span class="va" style="color: #111111;
-background-color: null;
-font-style: inherit;">False</span>)</span>
-<span id="cb3-6">rdDepictor.Compute2DCoords(mol)</span>
-<span id="cb3-7"></span>
-<span id="cb3-8"><span class="co" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;"># the first time you call this, </span></span>
-<span id="cb3-9">rdDepictor.Compute2DCoords(mol_with_templates, useRingTemplates<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span><span class="va" style="color: #111111;
-background-color: null;
-font-style: inherit;">True</span>)</span>
-<span id="cb3-10"></span>
-<span id="cb3-11">Draw.MolsToGridImage([mol, mol_with_templates], subImgSize<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span>(<span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">400</span>,<span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">400</span>))</span></code></pre></div>
-<div class="cell-output cell-output-display" data-execution_count="2">
-<div>
-<figure class="figure">
-<p><img src="https://greglandrum.github.io/rdkit-blog/posts/2023-10-21-2d-molecular-templates_files/figure-html/cell-3-output-1.svg" class="img-fluid figure-img"></p>
-</figure>
-</div>
-</div>
-</div>
-<section id="example-uses-of-default-templates" class="level2">
-<h2 class="anchored" data-anchor-id="example-uses-of-default-templates">Example uses of default templates</h2>
-<p>Templates can be used for common, complex ring systems that the standard 2D coordinate generation algorithm distorts. They are also useful if you want certain ring systems to be laid out in a specific way (for example, cubane).</p>
-<section id="templates-by-themselves" class="level3">
-<h3 class="anchored" data-anchor-id="templates-by-themselves">Templates by themselves</h3>
-<div id="cell-6" class="cell" data-executetime="{&quot;end_time&quot;:&quot;2023-10-17T02:33:58.115424Z&quot;,&quot;start_time&quot;:&quot;2023-10-17T02:33:57.993984Z&quot;}" data-execution_count="3">
-<div class="sourceCode cell-code" id="cb4" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb4-1">mols <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> [Chem.MolFromSmiles(<span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">"C1=C2CN3CCC45CCN6CCC(OC1)C(C2CC34)C65"</span>),</span>
-<span id="cb4-2">        Chem.MolFromSmiles(<span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">"C1CCC2C(C1)C1CCN2NN1"</span>),</span>
-<span id="cb4-3">        Chem.MolFromSmiles(<span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">"c1cc2nnc1CCNCCNCCCCO2"</span>),</span>
-<span id="cb4-4">        Chem.MolFromSmiles(<span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">"C12C3C4C1C1C2C3C41"</span>)]</span>
-<span id="cb4-5">mols_with_templates <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> [Chem.Mol(m) <span class="cf" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">for</span> m <span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">in</span> mols]</span>
-<span id="cb4-6"></span>
-<span id="cb4-7">legends <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> []</span>
-<span id="cb4-8">allmols <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> []</span>
-<span id="cb4-9"><span class="cf" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">for</span> m, m_with_t <span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">in</span> <span class="bu" style="color: null;
-background-color: null;
-font-style: inherit;">zip</span>(mols, mols_with_templates):</span>
-<span id="cb4-10">    rdDepictor.Compute2DCoords(m, useRingTemplates<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span><span class="va" style="color: #111111;
-background-color: null;
-font-style: inherit;">False</span>)</span>
-<span id="cb4-11">    rdDepictor.Compute2DCoords(m_with_t, useRingTemplates<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span><span class="va" style="color: #111111;
-background-color: null;
-font-style: inherit;">True</span>)</span>
-<span id="cb4-12">    allmols.append(m)</span>
-<span id="cb4-13">    allmols.append(m_with_t)</span>
-<span id="cb4-14">    legends.append(<span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">"Without templating"</span>)</span>
-<span id="cb4-15">    legends.append(<span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">"With templating"</span>)</span>
-<span id="cb4-16">    </span>
-<span id="cb4-17">Draw.MolsToGridImage(allmols, legends<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span>legends, molsPerRow<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span><span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">2</span>, subImgSize<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span>(<span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">400</span>,<span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">400</span>))</span></code></pre></div>
-<div class="cell-output cell-output-display" data-execution_count="3">
-<div>
-<figure class="figure">
-<p><img src="https://greglandrum.github.io/rdkit-blog/posts/2023-10-21-2d-molecular-templates_files/figure-html/cell-4-output-1.svg" class="img-fluid figure-img"></p>
-</figure>
-</div>
-</div>
-</div>
-</section>
-<section id="template-matches-within-a-larger-structure" class="level3">
-<h3 class="anchored" data-anchor-id="template-matches-within-a-larger-structure">Template matches within a larger structure</h3>
-<div id="cell-8" class="cell" data-executetime="{&quot;end_time&quot;:&quot;2023-10-17T02:33:59.961076Z&quot;,&quot;start_time&quot;:&quot;2023-10-17T02:33:59.790758Z&quot;}" data-execution_count="4">
-<div class="sourceCode cell-code" id="cb5" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb5-1">mols <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> [Chem.MolFromSmiles(<span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">"CCC1CN2CC(CC3=CC=CC=C3)C34CCN5CC6=CCOC1C(C23)C6CC45"</span>),</span>
-<span id="cb5-2">        Chem.MolFromSmiles(<span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">"C1CC2C3CCN(NN3)C2CC1C1=CC2=C(C=CC=C2)C=C1"</span>),</span>
-<span id="cb5-3">        Chem.MolFromSmiles(<span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">"CCc1cc2CCNCC(CC3CCCCC3)NCCCCOc1nn2"</span>)]</span>
-<span id="cb5-4">mols_with_templates <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> [Chem.Mol(m) <span class="cf" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">for</span> m <span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">in</span> mols]</span>
-<span id="cb5-5"></span>
-<span id="cb5-6">legends <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> []</span>
-<span id="cb5-7">allmols <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> []</span>
-<span id="cb5-8"><span class="cf" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">for</span> m, m_with_t <span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">in</span> <span class="bu" style="color: null;
-background-color: null;
-font-style: inherit;">zip</span>(mols, mols_with_templates):</span>
-<span id="cb5-9">    rdDepictor.Compute2DCoords(m, useRingTemplates<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span><span class="va" style="color: #111111;
-background-color: null;
-font-style: inherit;">False</span>)</span>
-<span id="cb5-10">    rdDepictor.Compute2DCoords(m_with_t, useRingTemplates<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span><span class="va" style="color: #111111;
-background-color: null;
-font-style: inherit;">True</span>)</span>
-<span id="cb5-11">    allmols.append(m)</span>
-<span id="cb5-12">    legends.append(<span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">"Without templating"</span>)</span>
-<span id="cb5-13">    allmols.append(m_with_t)</span>
-<span id="cb5-14">    legends.append(<span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">"With templating"</span>)</span>
-<span id="cb5-15">    </span>
-<span id="cb5-16">Draw.MolsToGridImage(allmols, legends<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span>legends, molsPerRow<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span><span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">2</span>, subImgSize<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span>(<span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">400</span>,<span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">400</span>))</span></code></pre></div>
-<div class="cell-output cell-output-display" data-execution_count="4">
-<div>
-<figure class="figure">
-<p><img src="https://greglandrum.github.io/rdkit-blog/posts/2023-10-21-2d-molecular-templates_files/figure-html/cell-5-output-1.svg" class="img-fluid figure-img"></p>
-</figure>
-</div>
-</div>
-</div>
-</section>
-<section id="multiple-template-matches-in-a-single-structure" class="level3">
-<h3 class="anchored" data-anchor-id="multiple-template-matches-in-a-single-structure">Multiple template matches in a single structure</h3>
-<div id="cell-10" class="cell" data-executetime="{&quot;end_time&quot;:&quot;2023-10-17T02:34:01.199074Z&quot;,&quot;start_time&quot;:&quot;2023-10-17T02:34:01.139036Z&quot;}" data-execution_count="5">
-<div class="sourceCode cell-code" id="cb6" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb6-1">m1 <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> Chem.MolFromSmiles(<span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">"NC(CCC1CCC2C(C1)C1CCN2NN1)CC(=O)CCC1=CCCC2CCCCC2CCCCC2CCCC(CCCCCCC1)C2"</span>)</span>
-<span id="cb6-2">m2 <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> Chem.MolFromSmiles(<span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">"NC(CCC1CCC2C(C1)C1CC(CCC(=O)CC(N)CCC3C4CC5CC3CC5C4)N2NN1)CC(=O)CCC1=CCCC2CCCCC2CCCCC2CCCC(CCCCCCC1)C2"</span>)</span>
-<span id="cb6-3">m1_templates <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> Chem.Mol(m1)</span>
-<span id="cb6-4">m2_templates <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> Chem.Mol(m2)</span>
-<span id="cb6-5"></span>
-<span id="cb6-6">rdDepictor.Compute2DCoords(m1, useRingTemplates<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span><span class="va" style="color: #111111;
-background-color: null;
-font-style: inherit;">False</span>)</span>
-<span id="cb6-7">rdDepictor.Compute2DCoords(m2, useRingTemplates<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span><span class="va" style="color: #111111;
-background-color: null;
-font-style: inherit;">False</span>)</span>
-<span id="cb6-8">rdDepictor.Compute2DCoords(m1_templates, useRingTemplates<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span><span class="va" style="color: #111111;
-background-color: null;
-font-style: inherit;">True</span>)</span>
-<span id="cb6-9">rdDepictor.Compute2DCoords(m2_templates, useRingTemplates<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span><span class="va" style="color: #111111;
-background-color: null;
-font-style: inherit;">True</span>)</span>
-<span id="cb6-10"></span>
-<span id="cb6-11">Draw.MolsToGridImage([m1, m1_templates, m2, m2_templates], legends<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span>[<span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">'Without templating'</span>, <span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">'With templating'</span>, <span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">'Without templating'</span>, <span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">'With templating'</span>], molsPerRow<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span><span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">2</span>, subImgSize<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span>(<span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">400</span>,<span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">400</span>))</span></code></pre></div>
-<div class="cell-output cell-output-display" data-execution_count="5">
-<div>
-<figure class="figure">
-<p><img src="https://greglandrum.github.io/rdkit-blog/posts/2023-10-21-2d-molecular-templates_files/figure-html/cell-6-output-1.svg" class="img-fluid figure-img"></p>
-</figure>
-</div>
-</div>
-</div>
-</section>
-</section>
-<section id="setting-custom-templates" class="level2">
-<h2 class="anchored" data-anchor-id="setting-custom-templates">Setting custom templates</h2>
-<p>You can set your own templates using <code>rdDepictor.SetRingSystemTemplates</code>. This will replace all of the default templates, while <code>rdDepictor.AddRingSystemTemplates</code> will add to any templates that are already present (the most recently added templates will be given preference).</p>
-<p>Custom templates should be defined in a .smi file, with each line representing a single template using CXSMILES. Templates must be a connected graph (no fragments) and have 2D coordinates defined, and they need to consist of a single ring or fused ring system (spiros are OK).</p>
-<p>Example: I made <code>my_templates.smi</code> with a single template:</p>
-<p>C1CC2CCOC3OC4CCC(C1)C23OO4 |(-0.5537,-3.1595,;-1.6057,-2.003,;-1.4262,-0.4072,;-2.9804,0.0271,;-3.5191,1.502,;-2.2028,2.3562,;-0.6818,1.8511,;1.0592,1.4391,;2.6123,1.8366,;3.5191,0.5341,;2.6067,-0.7521,;1.0061,-0.773,;0.7888,-2.3546,;-0.0405,0.5251,;0.4049,2.3,;1.7604,3.1594,)|</p>
-<div id="cell-12" class="cell" data-executetime="{&quot;end_time&quot;:&quot;2023-10-17T02:34:26.653081Z&quot;,&quot;start_time&quot;:&quot;2023-10-17T02:34:26.639893Z&quot;}" data-execution_count="7">
-<div class="sourceCode cell-code" id="cb7" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb7-1">m <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> Chem.MolFromSmiles(<span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">"C1CC2CCOC3OC4CCC(C1)C23OO4"</span>)</span>
-<span id="cb7-2">m_default_templates <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> Chem.Mol(m)</span>
-<span id="cb7-3">m_custom_templates <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> Chem.Mol(m)</span>
-<span id="cb7-4"></span>
-<span id="cb7-5">rdDepictor.Compute2DCoords(m, useRingTemplates<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span><span class="va" style="color: #111111;
-background-color: null;
-font-style: inherit;">False</span>)</span>
-<span id="cb7-6">rdDepictor.Compute2DCoords(m_default_templates, useRingTemplates<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span><span class="va" style="color: #111111;
-background-color: null;
-font-style: inherit;">True</span>)</span>
-<span id="cb7-7"></span>
-<span id="cb7-8"><span class="co" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;"># Set ring system templates</span></span>
-<span id="cb7-9">rdDepictor.SetRingSystemTemplates(<span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">"../data/my_templates.smi"</span>)</span>
-<span id="cb7-10">rdDepictor.Compute2DCoords(m_custom_templates, useRingTemplates<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span><span class="va" style="color: #111111;
-background-color: null;
-font-style: inherit;">True</span>)</span>
-<span id="cb7-11"></span>
-<span id="cb7-12">Draw.MolsToGridImage([m, m_default_templates, m_custom_templates], legends<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span>[<span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">'No templates'</span>, <span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">'Default templates'</span>, <span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">'Custom templates'</span>], molsPerRow<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span><span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">3</span>, subImgSize<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span>(<span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">300</span>,<span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">300</span>))</span></code></pre></div>
-<div class="cell-output cell-output-display" data-execution_count="7">
-<div>
-<figure class="figure">
-<p><img src="https://greglandrum.github.io/rdkit-blog/posts/2023-10-21-2d-molecular-templates_files/figure-html/cell-7-output-1.svg" class="img-fluid figure-img"></p>
-</figure>
-</div>
-</div>
-</div>
-<p>You can set the templates back to the original ones by calling <code>LoadDefaultRingSystemTemplates</code></p>
-<div id="cell-14" class="cell" data-executetime="{&quot;end_time&quot;:&quot;2023-10-17T02:34:28.965628Z&quot;,&quot;start_time&quot;:&quot;2023-10-17T02:34:28.940421Z&quot;}" data-execution_count="8">
-<div class="sourceCode cell-code" id="cb8" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb8-1">rdDepictor.LoadDefaultRingSystemTemplates()</span>
-<span id="cb8-2">rdDepictor.Compute2DCoords(m, useRingTemplates<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span><span class="va" style="color: #111111;
-background-color: null;
-font-style: inherit;">True</span>)</span>
-<span id="cb8-3">m</span></code></pre></div>
-<div class="cell-output cell-output-display" data-execution_count="8">
-<!--?xml version='1.0' encoding='iso-8859-1'?-->
-<svg version="1.1" baseprofile="full" xmlns="http://www.w3.org/2000/svg" xmlns:rdkit="http://www.rdkit.org/xml" xlink="http://www.w3.org/1999/xlink" space="preserve" width="450px" height="150px" viewbox="0 0 450 150">
-<!-- END OF HEADER -->
-<rect style="opacity:1.0;fill:#FFFFFF;stroke:none" width="450.0" height="150.0" x="0.0" y="0.0"> </rect>
-<path class="bond-0 atom-0 atom-1" d="M 270.4,142.5 L 291.0,112.2" style="fill:none;fill-rule:evenodd;stroke:#000000;stroke-width:2.0px;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1"></path>
-<path class="bond-1 atom-1 atom-2" d="M 291.0,112.2 L 275.0,79.1" style="fill:none;fill-rule:evenodd;stroke:#000000;stroke-width:2.0px;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1"></path>
-<path class="bond-2 atom-2 atom-3" d="M 275.0,79.1 L 295.8,48.6" style="fill:none;fill-rule:evenodd;stroke:#000000;stroke-width:2.0px;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1"></path>
-<path class="bond-3 atom-3 atom-4" d="M 295.8,48.6 L 279.8,15.5" style="fill:none;fill-rule:evenodd;stroke:#000000;stroke-width:2.0px;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1"></path>
-<path class="bond-4 atom-4 atom-5" d="M 279.8,15.5 L 264.4,14.3" style="fill:none;fill-rule:evenodd;stroke:#000000;stroke-width:2.0px;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1"></path>
-<path class="bond-4 atom-4 atom-5" d="M 264.4,14.3 L 249.1,13.1" style="fill:none;fill-rule:evenodd;stroke:#FF0000;stroke-width:2.0px;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1"></path>
-<path class="bond-5 atom-5 atom-6" d="M 238.7,19.2 L 230.5,31.2" style="fill:none;fill-rule:evenodd;stroke:#FF0000;stroke-width:2.0px;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1"></path>
-<path class="bond-5 atom-5 atom-6" d="M 230.5,31.2 L 222.4,43.2" style="fill:none;fill-rule:evenodd;stroke:#000000;stroke-width:2.0px;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1"></path>
-<path class="bond-6 atom-6 atom-7" d="M 222.4,43.2 L 207.9,38.3" style="fill:none;fill-rule:evenodd;stroke:#000000;stroke-width:2.0px;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1"></path>
-<path class="bond-6 atom-6 atom-7" d="M 207.9,38.3 L 193.4,33.4" style="fill:none;fill-rule:evenodd;stroke:#FF0000;stroke-width:2.0px;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1"></path>
-<path class="bond-7 atom-7 atom-8" d="M 181.6,35.4 L 169.3,43.6" style="fill:none;fill-rule:evenodd;stroke:#FF0000;stroke-width:2.0px;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1"></path>
-<path class="bond-7 atom-7 atom-8" d="M 169.3,43.6 L 156.9,51.8" style="fill:none;fill-rule:evenodd;stroke:#000000;stroke-width:2.0px;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1"></path>
-<path class="bond-8 atom-8 atom-9" d="M 156.9,51.8 L 154.2,88.5" style="fill:none;fill-rule:evenodd;stroke:#000000;stroke-width:2.0px;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1"></path>
-<path class="bond-9 atom-9 atom-10" d="M 154.2,88.5 L 181.4,113.2" style="fill:none;fill-rule:evenodd;stroke:#000000;stroke-width:2.0px;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1"></path>
-<path class="bond-10 atom-10 atom-11" d="M 181.4,113.2 L 217.7,106.6" style="fill:none;fill-rule:evenodd;stroke:#000000;stroke-width:2.0px;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1"></path>
-<path class="bond-11 atom-11 atom-12" d="M 217.7,106.6 L 233.6,139.9" style="fill:none;fill-rule:evenodd;stroke:#000000;stroke-width:2.0px;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1"></path>
-<path class="bond-12 atom-11 atom-13" d="M 217.7,106.6 L 238.4,76.3" style="fill:none;fill-rule:evenodd;stroke:#000000;stroke-width:2.0px;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1"></path>
-<path class="bond-13 atom-13 atom-14" d="M 238.4,76.3 L 226.0,81.2" style="fill:none;fill-rule:evenodd;stroke:#000000;stroke-width:2.0px;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1"></path>
-<path class="bond-13 atom-13 atom-14" d="M 226.0,81.2 L 213.6,86.1" style="fill:none;fill-rule:evenodd;stroke:#FF0000;stroke-width:2.0px;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1"></path>
-<path class="bond-14 atom-14 atom-15" d="M 201.8,86.6 L 181.7,80.7" style="fill:none;fill-rule:evenodd;stroke:#FF0000;stroke-width:2.0px;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1"></path>
-<path class="bond-15 atom-12 atom-0" d="M 233.6,139.9 L 270.4,142.5" style="fill:none;fill-rule:evenodd;stroke:#000000;stroke-width:2.0px;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1"></path>
-<path class="bond-16 atom-13 atom-2" d="M 238.4,76.3 L 275.0,79.1" style="fill:none;fill-rule:evenodd;stroke:#000000;stroke-width:2.0px;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1"></path>
-<path class="bond-17 atom-13 atom-6" d="M 238.4,76.3 L 222.4,43.2" style="fill:none;fill-rule:evenodd;stroke:#000000;stroke-width:2.0px;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1"></path>
-<path class="bond-18 atom-15 atom-8" d="M 171.4,72.6 L 164.2,62.2" style="fill:none;fill-rule:evenodd;stroke:#FF0000;stroke-width:2.0px;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1"></path>
-<path class="bond-18 atom-15 atom-8" d="M 164.2,62.2 L 156.9,51.8" style="fill:none;fill-rule:evenodd;stroke:#000000;stroke-width:2.0px;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1"></path>
-<path d="M 271.4,141.0 L 270.4,142.5 L 268.6,142.4" style="fill:none;stroke:#000000;stroke-width:2.0px;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1;"></path>
-<path d="M 290.0,113.7 L 291.0,112.2 L 290.2,110.5" style="fill:none;stroke:#000000;stroke-width:2.0px;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1;"></path>
-<path d="M 294.8,50.1 L 295.8,48.6 L 295.0,46.9" style="fill:none;stroke:#000000;stroke-width:2.0px;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1;"></path>
-<path d="M 280.6,17.1 L 279.8,15.5 L 279.1,15.4" style="fill:none;stroke:#000000;stroke-width:2.0px;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1;"></path>
-<path d="M 154.3,86.6 L 154.2,88.5 L 155.5,89.7" style="fill:none;stroke:#000000;stroke-width:2.0px;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1;"></path>
-<path d="M 180.1,111.9 L 181.4,113.2 L 183.3,112.8" style="fill:none;stroke:#000000;stroke-width:2.0px;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1;"></path>
-<path d="M 232.8,138.3 L 233.6,139.9 L 235.4,140.1" style="fill:none;stroke:#000000;stroke-width:2.0px;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1;"></path>
-<path class="atom-5" d="M 238.5 12.7
-Q 238.5 10.3, 239.7 8.9
-Q 240.9 7.5, 243.2 7.5
-Q 245.4 7.5, 246.6 8.9
-Q 247.9 10.3, 247.9 12.7
-Q 247.9 15.2, 246.6 16.6
-Q 245.4 18.0, 243.2 18.0
-Q 240.9 18.0, 239.7 16.6
-Q 238.5 15.2, 238.5 12.7
-M 243.2 16.9
-Q 244.7 16.9, 245.6 15.8
-Q 246.4 14.8, 246.4 12.7
-Q 246.4 10.7, 245.6 9.7
-Q 244.7 8.7, 243.2 8.7
-Q 241.6 8.7, 240.7 9.7
-Q 239.9 10.7, 239.9 12.7
-Q 239.9 14.8, 240.7 15.8
-Q 241.6 16.9, 243.2 16.9
-" fill="#FF0000"></path>
-<path class="atom-7" d="M 182.8 31.4
-Q 182.8 29.0, 184.0 27.6
-Q 185.2 26.2, 187.5 26.2
-Q 189.7 26.2, 191.0 27.6
-Q 192.2 29.0, 192.2 31.4
-Q 192.2 33.9, 190.9 35.4
-Q 189.7 36.8, 187.5 36.8
-Q 185.2 36.8, 184.0 35.4
-Q 182.8 34.0, 182.8 31.4
-M 187.5 35.6
-Q 189.0 35.6, 189.9 34.6
-Q 190.7 33.5, 190.7 31.4
-Q 190.7 29.4, 189.9 28.4
-Q 189.0 27.4, 187.5 27.4
-Q 185.9 27.4, 185.1 28.4
-Q 184.2 29.4, 184.2 31.4
-Q 184.2 33.5, 185.1 34.6
-Q 185.9 35.6, 187.5 35.6
-" fill="#FF0000"></path>
-<path class="atom-14" d="M 203.0 88.4
-Q 203.0 86.0, 204.2 84.6
-Q 205.4 83.2, 207.7 83.2
-Q 209.9 83.2, 211.2 84.6
-Q 212.4 86.0, 212.4 88.4
-Q 212.4 90.9, 211.1 92.3
-Q 209.9 93.7, 207.7 93.7
-Q 205.4 93.7, 204.2 92.3
-Q 203.0 90.9, 203.0 88.4
-M 207.7 92.6
-Q 209.2 92.6, 210.1 91.5
-Q 210.9 90.5, 210.9 88.4
-Q 210.9 86.4, 210.1 85.4
-Q 209.2 84.4, 207.7 84.4
-Q 206.1 84.4, 205.2 85.4
-Q 204.4 86.4, 204.4 88.4
-Q 204.4 90.5, 205.2 91.5
-Q 206.1 92.6, 207.7 92.6
-" fill="#FF0000"></path>
-<path class="atom-15" d="M 171.1 79.0
-Q 171.1 76.5, 172.3 75.2
-Q 173.5 73.8, 175.8 73.8
-Q 178.1 73.8, 179.3 75.2
-Q 180.5 76.5, 180.5 79.0
-Q 180.5 81.5, 179.3 82.9
-Q 178.1 84.3, 175.8 84.3
-Q 173.6 84.3, 172.3 82.9
-Q 171.1 81.5, 171.1 79.0
-M 175.8 83.2
-Q 177.4 83.2, 178.2 82.1
-Q 179.1 81.1, 179.1 79.0
-Q 179.1 77.0, 178.2 76.0
-Q 177.4 74.9, 175.8 74.9
-Q 174.3 74.9, 173.4 76.0
-Q 172.6 77.0, 172.6 79.0
-Q 172.6 81.1, 173.4 82.1
-Q 174.3 83.2, 175.8 83.2
-" fill="#FF0000"></path>
-</svg>
-</div>
-</div>
-</section>
-<section id="limitations" class="level2">
-<h2 class="anchored" data-anchor-id="limitations">Limitations</h2>
-<p>As of this release, there are several limitations to the templating that we plan on addressing in the future:</p>
-<ol type="1">
-<li>Only ring system templates are supported, it would be nice to be able to template some complicated stereochemistry</li>
-<li>Template matching only considers the first substructure match, even when other matches would result in better depictions</li>
-<li>Quality and quantity of templates could be vastly improved, we still don’t have a wide variety of macrocycles and the existing templates are specific bond order and atom type</li>
-</ol>
-<p>Example where #2 would be helpful:</p>
-<div id="cell-16" class="cell" data-executetime="{&quot;end_time&quot;:&quot;2023-10-17T02:34:32.271579Z&quot;,&quot;start_time&quot;:&quot;2023-10-17T02:34:32.250684Z&quot;}" data-execution_count="9">
-<div class="sourceCode cell-code" id="cb9" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb9-1">cubane <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> Chem.MolFromSmiles(<span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">"C12C3C4C1C1C2C3C41"</span>)</span>
-<span id="cb9-2">cubane_with_path <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> Chem.MolFromSmiles(<span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">"CCCC12C3C4C5C3C1C5C24"</span>)</span>
-<span id="cb9-3"></span>
-<span id="cb9-4">rdDepictor.Compute2DCoords(cubane, useRingTemplates<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span><span class="va" style="color: #111111;
-background-color: null;
-font-style: inherit;">True</span>)</span>
-<span id="cb9-5">rdDepictor.Compute2DCoords(cubane_with_path, useRingTemplates<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span><span class="va" style="color: #111111;
-background-color: null;
-font-style: inherit;">True</span>)</span>
-<span id="cb9-6"></span>
-<span id="cb9-7">Draw.MolsToGridImage([cubane, cubane_with_path], subImgSize<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span>(<span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">400</span>,<span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">400</span>))</span></code></pre></div>
-<div class="cell-output cell-output-display" data-execution_count="9">
-<div>
-<figure class="figure">
-<p><img src="https://greglandrum.github.io/rdkit-blog/posts/2023-10-21-2d-molecular-templates_files/figure-html/cell-9-output-1.svg" class="img-fluid figure-img"></p>
-</figure>
-</div>
-</div>
-</div>
-</section>
-</section>
-<section id="how-to-contribute-templates-using-the-molecular_templates-repo" class="level1">
-<h1>How to contribute templates using the molecular_templates repo!</h1>
-<p>There is a new repository on github that we will use to collect and store templates here https://github.com/rdkit/molecular_templates. You can contribute ring system template(s) by opening a PR and adding your templates in CXSMILES format to the <code>templates.smi</code> file. More details can be found in the README file on Github. Additions or changes to the templates in this repository will automatically be incorporated into the next RDKit release.</p>
-<p>You can view all of the current templates (which are sourced from coordgenlibs, Schrödinger’s 2D coordinate generation software) in the gallery: https://github.com/rdkit/molecular_templates/blob/main/gallery.md</p>
-<p>Ricardo (github: <span class="citation" data-cites="ricrogz">@ricrogz</span>) set up some awesome Github actions so that we can visualize the template you suggest in your pull request! Here is an example: https://github.com/rdkit/molecular_templates/pull/7</p>
-
-
-</section>
-
- ]]></description>
-  <category>release</category>
-  <category>tutorial</category>
-  <guid>https://greglandrum.github.io/rdkit-blog/posts/2023-10-21-2d-molecular-templates.html</guid>
-  <pubDate>Fri, 20 Oct 2023 22:00:00 GMT</pubDate>
-  <media:content url="https://greglandrum.github.io/rdkit-blog/posts/images/blog/2d-templates-1.png" medium="image" type="image/png" height="80" width="144"/>
 </item>
 </channel>
 </rss>
