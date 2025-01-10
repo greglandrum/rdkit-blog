@@ -10,7 +10,237 @@
 <atom:link href="https://greglandrum.github.io/rdkit-blog/index.xml" rel="self" type="application/rss+xml"/>
 <description>RDKit experiments, tips, and tutorials</description>
 <generator>quarto-1.6.39</generator>
-<lastBuildDate>Mon, 02 Dec 2024 23:00:00 GMT</lastBuildDate>
+<lastBuildDate>Thu, 09 Jan 2025 23:00:00 GMT</lastBuildDate>
+<item>
+  <title>Using custom atom and bond invariants with fingerprint generators</title>
+  <link>https://greglandrum.github.io/rdkit-blog/posts/2025-01-10-fp-generators-and-invariants.html</link>
+  <description><![CDATA[ 
+
+
+
+
+<p>When using the RDKit fingerprint generators - there is a <a href="https://greglandrum.github.io/rdkit-blog/posts/2023-01-18-fingerprint-generator-tutorial.html">tutorial on using these</a> - it’s possible to change the invariants that are used to describe the atoms and/or bonds. This post provides a short intro to how to do that.</p>
+<div id="3f29d538" class="cell" data-execution_count="2">
+<div class="sourceCode cell-code" id="cb1" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb1-1"><span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">from</span> rdkit <span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">import</span> Chem</span>
+<span id="cb1-2"><span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">from</span> rdkit.Chem <span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">import</span> rdFingerprintGenerator</span>
+<span id="cb1-3"><span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">from</span> rdkit.Chem <span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">import</span> Draw</span>
+<span id="cb1-4"><span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">from</span> rdkit.Chem.Draw <span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">import</span> IPythonConsole</span>
+<span id="cb1-5"><span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">from</span> rdkit <span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">import</span> DataStructs</span>
+<span id="cb1-6"><span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">import</span> rdkit</span>
+<span id="cb1-7"><span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">print</span>(rdkit.__version__)</span></code></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>2024.09.4</code></pre>
+</div>
+</div>
+<p>For this blog post I’m going to use the Morgan fingerprint generator, but this approach works for any fingerprint generator.</p>
+<div id="d9e41629" class="cell" data-execution_count="5">
+<div class="sourceCode cell-code" id="cb3" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb3-1">fpg <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> rdFingerprintGenerator.GetMorganGenerator()</span></code></pre></div>
+</div>
+<p>We’ll start by looking at atom invariants, so construct two molecules that differ in a single atom:</p>
+<div id="ca2d381c" class="cell" data-execution_count="3">
+<div class="sourceCode cell-code" id="cb4" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb4-1">m1 <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> Chem.MolFromSmiles(<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'c1ccccc1'</span>)</span>
+<span id="cb4-2">m2 <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> Chem.MolFromSmiles(<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'c1ccccn1'</span>)</span></code></pre></div>
+</div>
+<p>Generate fingerprints for those and calculate the similarity between them:</p>
+<div id="5b5d32f1" class="cell" data-execution_count="4">
+<div class="sourceCode cell-code" id="cb5" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb5-1">fps <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> [fpg.GetFingerprint(m) <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">for</span> m <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">in</span> (m1,m2)]</span>
+<span id="cb5-2"><span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">print</span>(DataStructs.TanimotoSimilarity(fps[<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">0</span>],fps[<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">1</span>]))</span></code></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>0.2727272727272727</code></pre>
+</div>
+</div>
+<p>The <code>GetFingerprint()</code> function takes an optional argument, <code>customAtomInvariants</code>, that allows you to provide the atom invariants that are used.</p>
+<p>Here’s how that works. We’ll use a simple function that just uses the explicit degree (number of explicit bonds) of the atom as its invariant:</p>
+<div id="8ab1262d" class="cell" data-execution_count="8">
+<div class="sourceCode cell-code" id="cb7" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb7-1">atomGen <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">lambda</span> atom: atom.GetDegree()<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">*</span><span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">1000</span></span>
+<span id="cb7-2"></span>
+<span id="cb7-3"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># generate fingerprints using the custom invariants:</span></span>
+<span id="cb7-4">fps_ats <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> [fpg.GetFingerprint(m,customAtomInvariants<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span>[atomGen(at) <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">for</span> at <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">in</span> m.GetAtoms()]) <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">for</span> m <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">in</span> (m1,m2)]</span>
+<span id="cb7-5"></span>
+<span id="cb7-6"><span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">print</span>(DataStructs.TanimotoSimilarity(fps_ats[<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">0</span>],fps_ats[<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">1</span>]))</span></code></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>1.0</code></pre>
+</div>
+</div>
+<p>Now the fingerprints are identical</p>
+<p>We can do the same thing for bond invariants.</p>
+<p>To simplify the demonstration, I will just kekulize the first molecule so that it has alternating single and double bonds instead of aromatic bonds:</p>
+<div id="e91a8753" class="cell" data-execution_count="16">
+<div class="sourceCode cell-code" id="cb9" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb9-1">m3 <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> Chem.Mol(m1)</span>
+<span id="cb9-2">Chem.Kekulize(m3,clearAromaticFlags<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span><span class="va" style="color: #111111;
+background-color: null;
+font-style: inherit;">True</span>)</span></code></pre></div>
+</div>
+<p>By default, the similarity between these is quite low:</p>
+<div id="f5037cef" class="cell" data-execution_count="17">
+<div class="sourceCode cell-code" id="cb10" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb10-1">fps <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> [fpg.GetFingerprint(m) <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">for</span> m <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">in</span> (m1,m3)]</span>
+<span id="cb10-2"></span>
+<span id="cb10-3"><span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">print</span>(DataStructs.TanimotoSimilarity(fps[<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">0</span>],fps[<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">1</span>]))</span></code></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>0.14285714285714285</code></pre>
+</div>
+</div>
+<p>However, if we define a bond invariant which treats all conjugated bonds the same, the molecules are identical:</p>
+<div id="c3a4936b" class="cell" data-execution_count="19">
+<div class="sourceCode cell-code" id="cb12" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb12-1">bondGen <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">lambda</span> bond: <span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">10</span> <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">if</span> bond.GetIsConjugated() <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">else</span> <span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">int</span>(<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">2</span><span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">*</span>bond.GetBondTypeAsDouble())</span>
+<span id="cb12-2"></span>
+<span id="cb12-3">fps_bnds <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> [fpg.GetFingerprint(m,customBondInvariants<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span>[bondGen(b) <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">for</span> b <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">in</span> m.GetBonds()]) <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">for</span> m <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">in</span> (m1,m3)]</span>
+<span id="cb12-4"></span>
+<span id="cb12-5"><span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">print</span>(DataStructs.TanimotoSimilarity(fps_bnds[<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">0</span>],fps_bnds[<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">1</span>]))</span></code></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>1.0</code></pre>
+</div>
+</div>
+<p>That’s it for this one, I hope this brief intro was useful!</p>
+
+
+
+ ]]></description>
+  <category>fingerprints</category>
+  <category>tutorial</category>
+  <guid>https://greglandrum.github.io/rdkit-blog/posts/2025-01-10-fp-generators-and-invariants.html</guid>
+  <pubDate>Thu, 09 Jan 2025 23:00:00 GMT</pubDate>
+</item>
 <item>
   <title>Introducing Synthon Searching</title>
   <link>https://greglandrum.github.io/rdkit-blog/posts/2024-12-03-introducing-synthon-search.html</link>
@@ -17417,1098 +17647,6 @@ font-style: inherit;">in</span> mols])</span></code></pre></div>
   <guid>https://greglandrum.github.io/rdkit-blog/posts/2023-10-27-mcswhatsnew.html</guid>
   <pubDate>Thu, 26 Oct 2023 22:00:00 GMT</pubDate>
   <media:content url="https://greglandrum.github.io/rdkit-blog/posts/images/blog/mcswhatsnew-1.png" medium="image" type="image/png" height="96" width="144"/>
-</item>
-<item>
-  <title>Plotting rows and columns of molecules with MolsMatrixToGridImage</title>
-  <link>https://greglandrum.github.io/rdkit-blog/posts/2023-10-25-molsmatrixtogridimage.html</link>
-  <description><![CDATA[ 
-
-
-
-
-<p>This guest post by Jeremy Monat (GitHub: <a href="https://github.com/bertiewooster/"><span class="citation" data-cites="bertiewooster">@bertiewooster</span></a>), who contributed <code>MolsMatrixToGridImage</code> to the RDKit, is the third of a few posts covering some of the new or improved features in the 2023.09.1 RDKit release.</p>
-<p><a href="https://www.rdkit.org/docs/source/rdkit.Chem.Draw.html#rdkit.Chem.Draw.MolsMatrixToGridImage"><code>MolsMatrixToGridImage</code></a>, new in RDKit 2023.09.1, is designed to easily plot a rectangular grid of molecules, that is, rows and columns of molecules.</p>
-<section id="comparing-molsmatrixtogridimage-to-molstogridimage" class="level2">
-<h2 class="anchored" data-anchor-id="comparing-molsmatrixtogridimage-to-molstogridimage">Comparing MolsMatrixToGridImage to MolsToGridImage</h2>
-<p><code>MolsMatrixToGridImage</code> builds on <a href="https://www.rdkit.org/docs/source/rdkit.Chem.Draw.html#rdkit.Chem.Draw.MolsToGridImage"><code>MolsToGridImage</code></a>. In fact, <code>MolsMatrixToGridImage</code> internally calls <code>MolsToGridImage</code>, so they can output the same images and formats.</p>
-<p>The difference is that <code>MolsMatrixToGridImage</code> creates a rectangular row-and-column format by using nested input data structures. Each data substructure represents a row of molecules. <code>MolsMatrixToGridImage</code> automatically pads rows as needed so all rows are the length of the longest row, making it easy to plot molecules in a matrix without having to think about the length of each row.</p>
-<p>As a minimal example, if we want to plot a single interhalogen molecule at various cells in a grid, for example to represent a spatial arrangement:</p>
-<div id="cell-4" class="cell" data-execution_count="92">
-<div class="sourceCode cell-code" id="cb1" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb1-1"><span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">%%</span>capture</span>
-<span id="cb1-2"><span class="im" style="color: #00769E;
-background-color: null;
-font-style: inherit;">from</span> rdkit.Chem.Draw <span class="im" style="color: #00769E;
-background-color: null;
-font-style: inherit;">import</span> IPythonConsole</span>
-<span id="cb1-3"><span class="im" style="color: #00769E;
-background-color: null;
-font-style: inherit;">from</span> rdkit.Chem <span class="im" style="color: #00769E;
-background-color: null;
-font-style: inherit;">import</span> AllChem <span class="im" style="color: #00769E;
-background-color: null;
-font-style: inherit;">as</span> Chem</span>
-<span id="cb1-4"><span class="im" style="color: #00769E;
-background-color: null;
-font-style: inherit;">from</span> rdkit.Chem.Draw <span class="im" style="color: #00769E;
-background-color: null;
-font-style: inherit;">import</span> MolsToGridImage, rdMolDraw2D, MolsMatrixToGridImage</span>
-<span id="cb1-5"><span class="im" style="color: #00769E;
-background-color: null;
-font-style: inherit;">import</span> copy</span></code></pre></div>
-</div>
-<div id="cell-5" class="cell" data-execution_count="93">
-<div class="sourceCode cell-code" id="cb2" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb2-1">mol <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> Chem.MolFromSmiles(<span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">"FCl"</span>)</span></code></pre></div>
-</div>
-<p>both of the following produce the same grid image:</p>
-<div id="cell-7" class="cell" data-execution_count="94">
-<div class="sourceCode cell-code" id="cb3" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb3-1"><span class="co" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;"># MolsMatrixToGridImage usage</span></span>
-<span id="cb3-2">molsMatrix <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> [[mol, mol], [mol, <span class="va" style="color: #111111;
-background-color: null;
-font-style: inherit;">None</span>, mol]]</span>
-<span id="cb3-3">MolsMatrixToGridImage(molsMatrix<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span>molsMatrix)</span></code></pre></div>
-<div class="cell-output cell-output-display" data-execution_count="94">
-<div>
-<figure class="figure">
-<p><img src="https://greglandrum.github.io/rdkit-blog/posts/2023-10-25-molsmatrixtogridimage_files/figure-html/cell-4-output-1.png" class="img-fluid figure-img"></p>
-</figure>
-</div>
-</div>
-</div>
-<div id="cell-8" class="cell" data-execution_count="95">
-<div class="sourceCode cell-code" id="cb4" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb4-1"><span class="co" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;"># MolsToGridImage usage</span></span>
-<span id="cb4-2">mols <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> [mol, mol, <span class="va" style="color: #111111;
-background-color: null;
-font-style: inherit;">None</span>, mol, <span class="va" style="color: #111111;
-background-color: null;
-font-style: inherit;">None</span>, mol]</span>
-<span id="cb4-3">MolsToGridImage(mols<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span>mols, molsPerRow<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span><span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">3</span>)</span></code></pre></div>
-<div class="cell-output cell-output-display" data-execution_count="95">
-<div>
-<figure class="figure">
-<p><img src="https://greglandrum.github.io/rdkit-blog/posts/2023-10-25-molsmatrixtogridimage_files/figure-html/cell-5-output-1.png" class="img-fluid figure-img"></p>
-</figure>
-</div>
-</div>
-</div>
-<p>where we had to add the first <code>None</code> (null molecule) item for <code>MolsToGridImage</code> to produce the empty cell at the end of the first row.</p>
-<p>The advantage of <code>MolsMatrixToGridImage</code> is that you need not manually pad shorter (narrower) rows, and you can provide molecules in a nested format that explicitly identifies each row.</p>
-<p>While the nested data structure above for <code>MolsMatrixToGridImage</code> is a list of lists, you can use other pairs of iterables: a tuple of tuples, or a list of tuples, etc.</p>
-<section id="choosing-a-grid-image-function" class="level3">
-<h3 class="anchored" data-anchor-id="choosing-a-grid-image-function">Choosing a grid image function</h3>
-<p>Use <code>MolsToGridImage</code> if you want to plot a series of molecules in the least amount of space, where the row that each molecule is on is not important.</p>
-<p>Use <code>MolsMatrixToGridImage</code> if you want each row of molecules to represent something meaningful, and especially if the number of molecules per row can vary. The <em>columns</em> may or may not have meaning: You could plot an uninterrupted series of molecules in a row in no particular order, or you could assign molecules to columns based on some property—for example, a column may represent a spatial location. Or the columns may be used to space out molecules; for example in the retrosynthetic analysis tree below, the columns allow horizontal space for each subtree to avoid visually-confusing overlapping with adjacent subtrees.</p>
-<p>A borderline situation is if each row will have the same number of molecules <code>n</code> (<code>n</code> = 2 below): you can create the same grid using either</p>
-<ul>
-<li><code>MolsToGridImage(molsPerRow=n)</code>, for example <code>MolsToGridImage([mol1a, mol1b, mol2a, mol2b, mol3a, mol3b], molsPerRow=2)</code>.</li>
-<li><code>MolsMatrixToGridImage</code> with <code>n</code> molecules in each row, for example <code>MolsMatrixToGridImage([[mol1a, mol1b], [mol2a, mol2b], [mol3a, mol3b]])</code>. You may find this format easier to use because each row is in its own sub-list. Also, you need not explicitly declare the number of molecules per row, so if you later change that number <code>n</code>, or have a different number of molecules on a given row, the grid will automatically adjust accordingly.</li>
-</ul>
-<p>Both <code>MolsMatrixToGridImage</code> and <code>MolsToGridImage</code> are Python functions; they are not available in C++.</p>
-</section>
-</section>
-<section id="use-cases" class="level2">
-<h2 class="anchored" data-anchor-id="use-cases">Use cases</h2>
-<p>Here are three example use cases. Each comes from an external blog post by the author, which is linked to in the use case’s heading, and which explains more about the chemistry background and how the parameters given below are generated. In each case, we show the <code>MolsMatrixToGridImage</code> usage and then the same output using <code>MolsToGridImage</code>.</p>
-<section id="synthetic-accessibility" class="level3">
-<h3 class="anchored" data-anchor-id="synthetic-accessibility"><a href="https://bertiewooster.github.io/2023/02/07/Are-the-Starting-Materials-for-Synthesizing-Your-Target-Molecules-Commercially-Available.html">Synthetic accessibility</a></h3>
-<p>Given molecules you want to synthesize, and the reaction to create each, this utility determines the starting materials, checks whether they are commercially available per PubChem, and tells you whether each target is accessible—whether all its starting materials are commercially available.</p>
-<p>Here, <code>MolsMatrixToGridImage</code> is useful because</p>
-<ul>
-<li>each row represents a synthetic target</li>
-<li>each target might have a different number of starting materials, and thus a different number of cells (columns). The first column represents the target. Subsequent columns represent the reactants, and are in no particular order.</li>
-</ul>
-<div id="cell-16" class="cell" data-execution_count="96">
-<div class="sourceCode cell-code" id="cb5" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb5-1"><span class="co" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;"># MolsMatrixToGridImage usage</span></span>
-<span id="cb5-2">synSmilesMatrix <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> [[<span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">'OCN1C2CC(C=C2)C1CC1NCCc2ccccc12'</span>, <span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">'NCCc1ccccc1'</span>, <span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">'O=CCC1C2C=CC(C2)N1CO'</span>], [<span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">'c1ccc(NCC2NCCc3ccccc32)cc1'</span>, <span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">'NCCc1ccccc1'</span>, <span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">'O=CCNc1ccccc1'</span>], [<span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">'[O-][N+](=O)C1=CC=C(C2NCCc3ccccc23)C2=C1C=CC=C2'</span>, <span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">'Nc1ccc(C2NCCc3ccccc32)c2ccccc12'</span>]]</span>
-<span id="cb5-3">synMolsMatrix <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> [[Chem.MolFromSmiles(smile) <span class="cf" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">for</span> smile <span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">in</span> row] <span class="cf" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">for</span> row <span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">in</span> synSmilesMatrix]</span>
-<span id="cb5-4">synLegendsMatrix <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> [[<span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">'Pictet-Spengler target accessible: No'</span>, <span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">'Reactant available: Yes'</span>, <span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">'Reactant available: No'</span>], [<span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">'Pictet-Spengler target accesible: Yes'</span>, <span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">'Reactant available: Yes'</span>, <span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">'Reactant available: Yes'</span>], [<span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">'Amine oxidation target accessible: No'</span>, <span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">'Reactant available: No'</span>]]</span>
-<span id="cb5-5">MolsMatrixToGridImage(molsMatrix<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span>synMolsMatrix, legendsMatrix<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span>synLegendsMatrix)</span></code></pre></div>
-<div class="cell-output cell-output-display" data-execution_count="96">
-<div>
-<figure class="figure">
-<p><img src="https://greglandrum.github.io/rdkit-blog/posts/2023-10-25-molsmatrixtogridimage_files/figure-html/cell-6-output-1.png" class="img-fluid figure-img"></p>
-</figure>
-</div>
-</div>
-</div>
-<div id="cell-17" class="cell" data-execution_count="97">
-<div class="sourceCode cell-code" id="cb6" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb6-1"><span class="co" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;"># MolsToGridImage usage</span></span>
-<span id="cb6-2">synSmiles <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> [<span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">'OCN1C2CC(C=C2)C1CC1NCCc2ccccc12'</span>, <span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">'NCCc1ccccc1'</span>, <span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">'O=CCC1C2C=CC(C2)N1CO'</span>, <span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">'c1ccc(NCC2NCCc3ccccc32)cc1'</span>, <span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">'NCCc1ccccc1'</span>, <span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">'O=CCNc1ccccc1'</span>, <span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">'[O-][N+](=O)C1=CC=C(C2NCCc3ccccc23)C2=C1C=CC=C2'</span>, <span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">'Nc1ccc(C2NCCc3ccccc32)c2ccccc12'</span>, <span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">''</span>]</span>
-<span id="cb6-3">synMols <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> [Chem.MolFromSmiles(smile) <span class="cf" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">for</span> smile <span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">in</span> synSmiles]</span>
-<span id="cb6-4">synLegends <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> [<span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">'Pictet-Spengler target accessible: No'</span>, <span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">'Reactant available: Yes'</span>, <span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">'Reactant available: No'</span>, <span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">'Pictet-Spengler target accesible: Yes'</span>, <span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">'Reactant available: Yes'</span>, <span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">'Reactant available: Yes'</span>, <span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">'Amine oxidation target accessible: No'</span>, <span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">'Reactant available: No'</span>, <span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">''</span>]</span>
-<span id="cb6-5">MolsToGridImage(mols<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span>synMols, legends<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span>synLegends, molsPerRow<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span><span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">3</span>)</span></code></pre></div>
-<div class="cell-output cell-output-display" data-execution_count="97">
-<div>
-<figure class="figure">
-<p><img src="https://greglandrum.github.io/rdkit-blog/posts/2023-10-25-molsmatrixtogridimage_files/figure-html/cell-7-output-1.png" class="img-fluid figure-img"></p>
-</figure>
-</div>
-</div>
-</div>
-</section>
-<section id="find-the-maximum-common-substructure-and-groups-off-it" class="level3">
-<h3 class="anchored" data-anchor-id="find-the-maximum-common-substructure-and-groups-off-it"><a href="https://bertiewooster.github.io/2022/12/25/RDKit-Find-Groups-Off-Common-Core.html">Find the maximum common substructure and groups off it</a></h3>
-<p>In drug discovery, the lead optimization step often involves creating analogues of a hit (a promising compound which produces a desired result in an assay) to optimize selectivity and minimize toxicity. Because it has historically been easier to chemically modify the periphery of the molecule (for example the functional groups) than the scaffold, it is helpful to compare the groups off of the common scaffold. A utility function uses the RDKit to find the maximum common substructure (MCS) between a set of molecules, then show the groups off of that core scaffold.</p>
-<p>Here, <code>MolsMatrixToGridImage</code> is useful because</p>
-<ul>
-<li>each row represents a molecule in the set</li>
-<li>each of those molecules might have a different number of groups off the core scaffold. The first column represents the molecule. Subsequent columns represent the groups off the core scaffold for that molecule, and are in no particular order.</li>
-</ul>
-<p>The following example is for a set of two pyridinols.</p>
-<div id="cell-19" class="cell" data-execution_count="98">
-<div class="sourceCode cell-code" id="cb7" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb7-1"><span class="co" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;"># MolsMatrixToGridImage usage</span></span>
-<span id="cb7-2">mcsStringsMatrix <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> [[<span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">'[#6]1:[#6](-[#8]):[#6]:[#7]:[#6](:[#6]:1)-[#7]'</span>, <span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">'NC1:C:C:C(O):C:N:1'</span>], [<span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">'c1c(O)cnc(N)c(NC(=O)(C))1'</span>, <span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">'[2*]NC(C)=O'</span>], [<span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">'c1c(O)cnc(N(CCC))c1(C)'</span>, <span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">'[0*]CCC'</span>, <span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">'[2*]C'</span>]]</span>
-<span id="cb7-3">mcsMolsMatrix <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> [[Chem.MolFromSmiles(smile) <span class="cf" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">for</span> smile <span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">in</span> row] <span class="cf" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">for</span> row <span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">in</span> mcsStringsMatrix]</span>
-<span id="cb7-4"></span>
-<span id="cb7-5">mcsLegends <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> [[<span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">'Max. substructure match'</span>, <span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">'Core'</span>], [<span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">'aldehyde off aromatic carbon'</span>, <span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">'[2*]NC(C)=O'</span>], [<span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">'alkyl off amine'</span>, <span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">'[0*]CCC'</span>, <span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">'[2*]C'</span>]]</span>
-<span id="cb7-6">mcsHighlightAtomLists <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> [[(), ()], [(<span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">0</span>, <span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">1</span>, <span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">2</span>, <span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">3</span>, <span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">4</span>, <span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">5</span>, <span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">7</span>, <span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">6</span>), ()], [(<span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">0</span>, <span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">1</span>, <span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">2</span>, <span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">3</span>, <span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">4</span>, <span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">5</span>, <span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">10</span>, <span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">6</span>), (), ()]]</span>
-<span id="cb7-7"></span>
-<span id="cb7-8">mcsMolForMatrix <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> Chem.MolFromSmarts(mcsStringsMatrix[<span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">0</span>][<span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">0</span>])</span>
-<span id="cb7-9"></span>
-<span id="cb7-10"><span class="co" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;"># Align cores--optional, for easier visual comparison of molecules</span></span>
-<span id="cb7-11">subms <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> [mcsMolsMatrix[<span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">0</span>][<span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">1</span>]]</span>
-<span id="cb7-12"><span class="cf" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">for</span> row <span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">in</span> mcsMolsMatrix[<span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">1</span>:]:</span>
-<span id="cb7-13">    subms <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">+=</span> [row[<span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">0</span>]]</span>
-<span id="cb7-14">Chem.Compute2DCoords(mcsMolForMatrix)</span>
-<span id="cb7-15"></span>
-<span id="cb7-16"><span class="cf" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">for</span> m <span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">in</span> subms:</span>
-<span id="cb7-17">    _ <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> Chem.GenerateDepictionMatching2DStructure(m, mcsMolForMatrix)</span>
-<span id="cb7-18"></span>
-<span id="cb7-19">MolsMatrixToGridImage(molsMatrix<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span>mcsMolsMatrix, highlightAtomListsMatrix<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span>mcsHighlightAtomLists, legendsMatrix<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span>mcsLegends, useSVG<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span><span class="va" style="color: #111111;
-background-color: null;
-font-style: inherit;">True</span>)</span></code></pre></div>
-<div class="cell-output cell-output-display" data-execution_count="98">
-<div>
-<figure class="figure">
-<p><img src="https://greglandrum.github.io/rdkit-blog/posts/2023-10-25-molsmatrixtogridimage_files/figure-html/cell-8-output-1.png" class="img-fluid figure-img"></p>
-</figure>
-</div>
-</div>
-</div>
-<div id="cell-20" class="cell" data-execution_count="99">
-<div class="sourceCode cell-code" id="cb8" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb8-1"><span class="co" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;"># MolsToGridImage usage</span></span>
-<span id="cb8-2">mcsStrings <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> [<span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">'[#6]1:[#6](-[#8]):[#6]:[#7]:[#6](:[#6]:1)-[#7]'</span>, <span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">'NC1:C:C:C(O):C:N:1'</span>, <span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">''</span>, <span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">'c1c(O)cnc(N)c(NC(=O)(C))1'</span>, <span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">'[2*]NC(C)=O'</span>, <span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">''</span>, <span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">'c1c(O)cnc(N(CCC))c1(C)'</span>, <span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">'[0*]CCC'</span>, <span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">'[2*]C'</span>]</span>
-<span id="cb8-3">molsPerRow <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> <span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">3</span></span>
-<span id="cb8-4">mcsMols <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> [Chem.MolFromSmiles(smile) <span class="cf" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">for</span> smile <span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">in</span> mcsStrings]</span>
-<span id="cb8-5">mcsLegends <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> [<span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">'Max. substructure match'</span>, <span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">'Core'</span>, <span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">''</span>, <span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">'aldehyde off aromatic carbon'</span>, <span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">'[2*]NC(C)=O'</span>, <span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">''</span>, <span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">'alkyl off amine'</span>, <span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">'[0*]CCC'</span>, <span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">'[2*]C'</span>]</span>
-<span id="cb8-6">mcsHighlightAtomLists <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> [(), (), (), (<span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">0</span>, <span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">1</span>, <span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">2</span>, <span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">3</span>, <span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">4</span>, <span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">5</span>, <span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">7</span>, <span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">6</span>), (), (), (<span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">0</span>, <span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">1</span>, <span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">2</span>, <span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">3</span>, <span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">4</span>, <span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">5</span>, <span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">10</span>, <span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">6</span>), (), ()]</span>
-<span id="cb8-7"></span>
-<span id="cb8-8">mcsMol <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> Chem.MolFromSmarts(mcsStrings[<span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">0</span>])</span>
-<span id="cb8-9"></span>
-<span id="cb8-10"><span class="co" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;"># Align cores--optional, just for easier visual comparison of molecules</span></span>
-<span id="cb8-11">subms <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> [mcsMols[<span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">1</span>]]</span>
-<span id="cb8-12"><span class="cf" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">for</span> mol <span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">in</span> mcsMols[molsPerRow::molsPerRow]:</span>
-<span id="cb8-13">    subms <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">+=</span> [mol]</span>
-<span id="cb8-14">Chem.Compute2DCoords(mcsMol)</span>
-<span id="cb8-15"><span class="cf" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">for</span> m <span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">in</span> subms:</span>
-<span id="cb8-16">    _ <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> Chem.GenerateDepictionMatching2DStructure(m, mcsMol)</span>
-<span id="cb8-17"></span>
-<span id="cb8-18">MolsToGridImage(mcsMols, highlightAtomLists<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span>mcsHighlightAtomLists, legends<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span>mcsLegends, molsPerRow<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span>molsPerRow, useSVG<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span><span class="va" style="color: #111111;
-background-color: null;
-font-style: inherit;">True</span>)</span></code></pre></div>
-<div class="cell-output cell-output-display" data-execution_count="99">
-<div>
-<figure class="figure">
-<p><img src="https://greglandrum.github.io/rdkit-blog/posts/2023-10-25-molsmatrixtogridimage_files/figure-html/cell-9-output-1.svg" class="img-fluid figure-img"></p>
-</figure>
-</div>
-</div>
-</div>
-</section>
-<section id="retrosynthetic-analysis" class="level3">
-<h3 class="anchored" data-anchor-id="retrosynthetic-analysis"><a href="https://bertiewooster.github.io/2022/11/11/RDKit-Recap-decomposition-tree.html">Retrosynthetic analysis</a></h3>
-<p>Retrosynthetic analysis involves decomposing a target molecule into a set of fragments that could be combined to make the parent molecule using common reactions. The <a href="https://www.semanticscholar.org/paper/RECAP-%E2%80%94-Retrosynthetic-Combinatorial-Analysis-A-New-Lewell-Judd/fbfb10d1f63aa803f6d47df6587aa0e41109f5ee">Recap algorithm</a> by X. Lewell et al.&nbsp;accomplishes that. <a href="https://www.rdkit.org/docs/GettingStartedInPython.html#recap-implementation">Recap is implemented in the RDKit</a>.</p>
-<p>Here, <code>MolsMatrixToGridImage</code> is useful because</p>
-<ul>
-<li>each row represents a level of fragmentation, with the parent molecule at the top and increasing fragmentation towards the bottom</li>
-<li>we want to arrange the fragments hierarchically and allow horizontal space for each subtree to avoid visually-confusing overlapping with adjacent subtrees. The columns have no inherent meaning, except that the parent molecule is in the first column, and fragments (of the parent molecule and its fragments) are arrayed to the right.</li>
-</ul>
-<p>Here is an example retrosynthetic analysis of [6-(hydroxymethoxy)pyridin-2-yl]oxymethanol.</p>
-<div id="cell-22" class="cell" data-execution_count="100">
-<div class="sourceCode cell-code" id="cb9" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb9-1"><span class="co" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;"># MolsMatrixToGridImage usage</span></span>
-<span id="cb9-2">retrosynSmilesMatrix <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> [[<span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">'OCOc1cccc(OCO)n1'</span>, <span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">''</span>, <span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">''</span>],</span>
-<span id="cb9-3"> [<span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">'*CO'</span>, <span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">'*c1cccc(OCO)n1'</span>, <span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">''</span>],</span>
-<span id="cb9-4"> [<span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">''</span>, <span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">'*CO'</span>, <span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">'*c1cccc(*)n1'</span>]]</span>
-<span id="cb9-5">retrosynMolsMatrix <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> [[Chem.MolFromSmiles(smile) <span class="cf" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">for</span> smile <span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">in</span> row] <span class="cf" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">for</span> row <span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">in</span> retrosynSmilesMatrix]</span>
-<span id="cb9-6">retrosynLegendsMatrix <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> copy.deepcopy(retrosynSmilesMatrix)</span>
-<span id="cb9-7">retrosynLegendsMatrix[<span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">0</span>][<span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">0</span>] <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> <span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">"Parent molecule"</span></span>
-<span id="cb9-8">MolsMatrixToGridImage(retrosynMolsMatrix, legendsMatrix<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span>retrosynLegendsMatrix)</span></code></pre></div>
-<div class="cell-output cell-output-display" data-execution_count="100">
-<div>
-<figure class="figure">
-<p><img src="https://greglandrum.github.io/rdkit-blog/posts/2023-10-25-molsmatrixtogridimage_files/figure-html/cell-10-output-1.png" class="img-fluid figure-img"></p>
-</figure>
-</div>
-</div>
-</div>
-<div id="cell-23" class="cell" data-execution_count="101">
-<div class="sourceCode cell-code" id="cb10" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb10-1"><span class="co" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;"># MolsToGridImage usage</span></span>
-<span id="cb10-2">retrosynSmiles <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> [<span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">'OCOc1cccc(OCO)n1'</span>, <span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">''</span>, <span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">''</span>, <span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">'*CO'</span>, <span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">'*c1cccc(OCO)n1'</span>, <span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">''</span>, <span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">''</span>, <span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">'*CO'</span>, <span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">'*c1cccc(*)n1'</span>]</span>
-<span id="cb10-3">retrosynMols <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> [Chem.MolFromSmiles(smile) <span class="cf" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">for</span> smile <span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">in</span> retrosynSmiles]</span>
-<span id="cb10-4">retrosynLegends <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> [<span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">'Parent molecule'</span>, <span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">''</span>, <span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">''</span>, <span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">'*CO'</span>, <span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">'*c1cccc(OCO)n1'</span>, <span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">''</span>, <span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">''</span>, <span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">'*CO'</span>, <span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">'*c1cccc(*)n1'</span>]</span>
-<span id="cb10-5">MolsToGridImage(mols<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span>retrosynMols, legends<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span>retrosynLegends, molsPerRow<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span><span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">3</span>)</span></code></pre></div>
-<div class="cell-output cell-output-display" data-execution_count="101">
-<div>
-<figure class="figure">
-<p><img src="https://greglandrum.github.io/rdkit-blog/posts/2023-10-25-molsmatrixtogridimage_files/figure-html/cell-11-output-1.png" class="img-fluid figure-img"></p>
-</figure>
-</div>
-</div>
-</div>
-</section>
-</section>
-<section id="molsmatrixtogridimage-parameters" class="level2">
-<h2 class="anchored" data-anchor-id="molsmatrixtogridimage-parameters">MolsMatrixToGridImage parameters</h2>
-<p>The only required parameter to <code>MolsMatrixToGridImage</code> is <code>molsMatrix</code>.</p>
-<p><code>MolsMatrixToGridImage</code> nests data structures one additional level beyond the analogous parameter in <code>MolsToGridImage</code>. The following table compares those parameters for the two functions, where the example parameters would produce the same output for their respective functions.</p>
-<table class="caption-top">
-<colgroup>
-<col style="width: 100%">
-</colgroup>
-<thead>
-<tr class="header">
-<th>Key to table lines within a cell:<br><code>MolsToGridImage</code><em><br><code>MolsMatrixToGridImage</code><br></em></th>
-</tr>
-</thead>
-<tbody>
-</tbody>
-</table>
-<table class="caption-top table">
-<colgroup>
-<col style="width: 13%">
-<col style="width: 8%">
-<col style="width: 12%">
-<col style="width: 16%">
-<col style="width: 49%">
-</colgroup>
-<thead>
-<tr class="header">
-<th></th>
-<th>Elements mean</th>
-<th>Parameter name</th>
-<th>Data structure</th>
-<th>Example</th>
-</tr>
-</thead>
-<tbody>
-<tr class="odd">
-<td>Molecules</td>
-<td>RDKit molecule</td>
-<td>mols<br><em>molsMatrix</em></td>
-<td>Iterable[mol]<br><em>Iterable[<wbr>Iterable[mol]]</em></td>
-<td>[FCl, FCl, None, FCl, None, FCl]<br><em>[[FCl, FCl], [FCl, None, FCl]]</em></td>
-</tr>
-<tr class="even">
-<td>Legends</td>
-<td>Legend text</td>
-<td>legends<br><em>legendsMatrix</em></td>
-<td>Iterable[str]<br><em>Iterable[<wbr>Iterable[<wbr>str]]</em></td>
-<td>[“no highlighting”, “bond highlighted”, ““,”F highlighted”, ““,”Cl and bond highlighted”]<br><em>[[“no highlighting”, “bond highlighted”], [“F highlighted”, ““,”Cl and bond highlighted”]]</em></td>
-</tr>
-<tr class="odd">
-<td>Highlight atoms</td>
-<td>Indices of atoms to highlight</td>
-<td>highlightAtomLists<br><em>highlightAtomListsMatrix</em></td>
-<td>Iterable[Iterable[int]]<br><em>Iterable[<wbr>Iterable[<wbr>Iterable[<wbr>Int]]</em></td>
-<td>[[], [], None, [0], None, [1]]<br><em>[[[], []], [[0], None, [1]]]</em></td>
-</tr>
-<tr class="even">
-<td>Highlight bonds</td>
-<td>Indices of bonds to highlight</td>
-<td>highlightBondLists<br><em>highlightBondListsMatrix</em></td>
-<td>Iterable[Iterable[int]]<br><em>Iterable[<wbr>Iterable[<wbr>Iterable[<wbr>Int]]</em></td>
-<td>[[], [0], None, [], None, [0]]<br><em>[[[], [0]], [[], None, [0]]]</em></td>
-</tr>
-</tbody>
-</table>
-<p>In the optional highlighting parameters (<code>highlightAtomLists</code>, <code>highlightAtomListsMatrix</code>, <code>highlightBondLists</code>, and <code>highlightBondListsMatrix</code>), to highlight nothing for a given molecule, you can use either <code>None</code> or an empty iterable such as <code>[]</code>.</p>
-<p>If you provide the parameter names in the function call, for example <code>MolsMatrixToGridImage(molsMatrix=molsMatrix, legendsMatrix=legendsMatrix)</code>, be careful to include the suffix “Matrix” in those last three parameter names: if you use the parameter name from <code>MolsToGridImage</code>, such as <code>legends</code>, it will be passed to <code>MolsToGridImage</code> as a keyword argument and you will get an error like:</p>
-<p><code>TypeError: rdkit.Chem.Draw.IPythonConsole.ShowMols() got multiple values for keyword argument 'legends'</code></p>
-<p>Unlike <code>MolsToGridImage</code>, <code>MolsMatrixToGridImage</code> does not take a <code>molsPerRow</code> parameter because <code>MolsMatrixToGridImage</code> automatically sets the number of molecules per row to the length of the longest row in <code>molsMatrix</code>. Other than that, and the per-molecule parameters having a more nested structure, <code>MolsMatrixToGridImage</code> can accept all the same parameters as <code>MolsToGridImage</code>: <code>useSVG</code>, <code>returnPNG</code>, and <code>**kwargs</code> such as <code>drawOptions</code>. Indeed, <code>MolsMatrixToGridImage</code> passes those three parameters to <code>MolsToGridImage</code>.</p>
-<section id="requirements-for-agreement-of-dimensions-of-per-molecule-parameters" class="level3">
-<h3 class="anchored" data-anchor-id="requirements-for-agreement-of-dimensions-of-per-molecule-parameters">Requirements for agreement of dimensions of per-molecule parameters</h3>
-<p><code>molsMatrix</code> sets the dimensions, and any other supplied Matrix (per-molecule) parameters must match those dimensions. In the example in the table above, <code>molsMatrix</code> has two rows (sub-lists), so <code>legendsMatrix</code>, <code>highlightAtomListsMatrix</code>, and <code>highlightBondListsMatrix</code> (if supplied) must also have two rows. Also, because the first row (sub-list) of <code>molsMatrix</code> has two columns (elements), that must true for those three other parameters. And because the second row (sub-list) of <code>molsMatrix</code> has three columns (elements), that must true for those three other parameters.</p>
-</section>
-<section id="inserting-blank-cells" class="level3">
-<h3 class="anchored" data-anchor-id="inserting-blank-cells">Inserting blank cells</h3>
-<p>For blank cells at the end of a row, <code>MolsMatrixToGridImage</code> will automatically create them so that all rows have the same number of cells.</p>
-<p>For blank cells in the middle of a row (when there is a molecule after the blank cell), you need to have a blank entry in the iterable. For molecules, this blank entry can either be <code>None</code> or a molecule with no atoms, for example using <code>Chem.MolFromSmiles("")</code>. For legends, a blank cell can be <code>""</code> (an empty string) but not <code>None</code>, which will give a type error. If you create molecules using <code>Chem.MolFromSmiles("")</code>, or use those SMILES strings to create legends, entering an empty string will prevent type errors in both situations. For example, this works:</p>
-<div id="cell-32" class="cell" data-execution_count="102">
-<div class="sourceCode cell-code" id="cb11" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb11-1">smilesMatrixEmptyString <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> [[<span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">"FCl"</span>, <span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">"FCl"</span>], [<span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">"FCl"</span>, <span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">""</span>, <span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">"FCl"</span>]]</span>
-<span id="cb11-2">molsMatrixEmptyString <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> [[Chem.MolFromSmiles(smiles) <span class="cf" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">for</span> smiles <span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">in</span> row] <span class="cf" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">for</span> row <span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">in</span> smilesMatrixEmptyString]</span>
-<span id="cb11-3">MolsMatrixToGridImage(molsMatrix<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span>molsMatrixEmptyString, legendsMatrix<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span>smilesMatrixEmptyString)</span></code></pre></div>
-<div class="cell-output cell-output-display" data-execution_count="102">
-<div>
-<figure class="figure">
-<p><img src="https://greglandrum.github.io/rdkit-blog/posts/2023-10-25-molsmatrixtogridimage_files/figure-html/cell-12-output-1.png" class="img-fluid figure-img"></p>
-</figure>
-</div>
-</div>
-</div>
-<p>Whereas this gives a type error because <code>Chem.MolFromSmiles()</code> needs a string as input:</p>
-<div id="cell-34" class="cell" data-execution_count="103">
-<div class="sourceCode cell-code" id="cb12" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb12-1">smilesMatrixNone <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> [[<span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">"FCl"</span>, <span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">"FCl"</span>], [<span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">"FCl"</span>, <span class="va" style="color: #111111;
-background-color: null;
-font-style: inherit;">None</span>, <span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">"FCl"</span>]]</span>
-<span id="cb12-2"><span class="cf" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">try</span>:</span>
-<span id="cb12-3">    molsMatrixNone <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> [[Chem.MolFromSmiles(smiles) <span class="cf" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">for</span> smiles <span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">in</span> row] <span class="cf" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">for</span> row <span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">in</span> smilesMatrixNone]</span>
-<span id="cb12-4"><span class="cf" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">except</span> <span class="pp" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">TypeError</span> <span class="im" style="color: #00769E;
-background-color: null;
-font-style: inherit;">as</span> e:</span>
-<span id="cb12-5">    <span class="bu" style="color: null;
-background-color: null;
-font-style: inherit;">print</span>(e)</span></code></pre></div>
-<div class="cell-output cell-output-stdout">
-<pre><code>No registered converter was able to produce a C++ rvalue of type std::__1::basic_string&lt;wchar_t, std::__1::char_traits&lt;wchar_t&gt;, std::__1::allocator&lt;wchar_t&gt;&gt; from this Python object of type NoneType</code></pre>
-</div>
-</div>
-<p>as does this because of the <code>None</code> element in <code>legendsMatrix</code>:</p>
-<div id="cell-36" class="cell" data-execution_count="104">
-<div class="sourceCode cell-code" id="cb14" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb14-1"><span class="cf" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">try</span>:</span>
-<span id="cb14-2">    MolsMatrixToGridImage(molsMatrix<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span>molsMatrixEmptyString, legendsMatrix<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span>smilesMatrixNone)</span>
-<span id="cb14-3"><span class="cf" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">except</span> <span class="pp" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">TypeError</span> <span class="im" style="color: #00769E;
-background-color: null;
-font-style: inherit;">as</span> e:</span>
-<span id="cb14-4">    <span class="bu" style="color: null;
-background-color: null;
-font-style: inherit;">print</span>(e)</span></code></pre></div>
-<div class="cell-output cell-output-stdout">
-<pre><code>No registered converter was able to produce a C++ rvalue of type std::__1::basic_string&lt;char, std::__1::char_traits&lt;char&gt;, std::__1::allocator&lt;char&gt;&gt; from this Python object of type NoneType</code></pre>
-</div>
-</div>
-</section>
-<section id="example-with-all-parameters" class="level3">
-<h3 class="anchored" data-anchor-id="example-with-all-parameters">Example with all parameters</h3>
-<p>Here is an example of supplying all parameters to <code>MolsMatrixToGridImage</code>.</p>
-<div id="cell-38" class="cell" data-execution_count="105">
-<div class="sourceCode cell-code" id="cb16" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb16-1">legendsMatrix <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> [[<span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">"no highlighting"</span>, <span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">"bond highlighted"</span>], [<span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">"F highlighted"</span>, <span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">""</span>, <span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">"Cl and bond highlighted"</span>]]</span>
-<span id="cb16-2">highlightAtomListsMatrix <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> [[[],[]], [[<span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">0</span>], <span class="va" style="color: #111111;
-background-color: null;
-font-style: inherit;">None</span>, [<span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">1</span>]]]</span>
-<span id="cb16-3">highlightBondListsMatrix <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> [[[],[<span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">0</span>]], [[], <span class="va" style="color: #111111;
-background-color: null;
-font-style: inherit;">None</span>, [<span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">0</span>]]]</span>
-<span id="cb16-4"></span>
-<span id="cb16-5"><span class="co" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;"># Add atom indices to drawing</span></span>
-<span id="cb16-6">dopts <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> rdMolDraw2D.MolDrawOptions()</span>
-<span id="cb16-7">dopts.addAtomIndices <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> <span class="va" style="color: #111111;
-background-color: null;
-font-style: inherit;">True</span></span>
-<span id="cb16-8"></span>
-<span id="cb16-9">MolsMatrixToGridImage(molsMatrix<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span>molsMatrix, subImgSize<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span>(<span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">200</span>, <span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">150</span>), legendsMatrix<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span>legendsMatrix, highlightAtomListsMatrix<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span>highlightAtomListsMatrix, highlightBondListsMatrix<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span>highlightBondListsMatrix, useSVG<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span><span class="va" style="color: #111111;
-background-color: null;
-font-style: inherit;">False</span>, returnPNG<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span><span class="va" style="color: #111111;
-background-color: null;
-font-style: inherit;">False</span>, drawOptions<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span>dopts)</span></code></pre></div>
-<div class="cell-output cell-output-display" data-execution_count="105">
-<div>
-<figure class="figure">
-<p><img src="https://greglandrum.github.io/rdkit-blog/posts/2023-10-25-molsmatrixtogridimage_files/figure-html/cell-15-output-1.png" class="img-fluid figure-img"></p>
-</figure>
-</div>
-</div>
-</div>
-<p>Here is the same image created using <code>MolsToGridImage</code>:</p>
-<div id="cell-40" class="cell" data-execution_count="106">
-<div class="sourceCode cell-code" id="cb17" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb17-1">legends <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> [<span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">"no highlighting"</span>, <span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">"bond highlighted"</span>, <span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">""</span>, <span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">"F highlighted"</span>, <span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">""</span>, <span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">"Cl and bond highlighted"</span>]</span>
-<span id="cb17-2">highlightAtomLists <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> [[],[], <span class="va" style="color: #111111;
-background-color: null;
-font-style: inherit;">None</span>, [<span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">0</span>], <span class="va" style="color: #111111;
-background-color: null;
-font-style: inherit;">None</span>, [<span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">1</span>]]</span>
-<span id="cb17-3">highlightBondLists <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> [<span class="va" style="color: #111111;
-background-color: null;
-font-style: inherit;">None</span>,[<span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">0</span>], [], [], <span class="va" style="color: #111111;
-background-color: null;
-font-style: inherit;">None</span>, [<span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">0</span>]]</span>
-<span id="cb17-4"></span>
-<span id="cb17-5">MolsToGridImage(mols, molsPerRow<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span><span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">3</span>, subImgSize<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span>(<span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">200</span>, <span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">150</span>), legends<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span>legends, highlightAtomLists<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span>highlightAtomLists, highlightBondLists<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span>highlightBondLists, useSVG<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span><span class="va" style="color: #111111;
-background-color: null;
-font-style: inherit;">False</span>, returnPNG<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span><span class="va" style="color: #111111;
-background-color: null;
-font-style: inherit;">False</span>, drawOptions<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span>dopts)</span></code></pre></div>
-<div class="cell-output cell-output-display" data-execution_count="106">
-<div>
-<figure class="figure">
-<p><img src="https://greglandrum.github.io/rdkit-blog/posts/2023-10-25-molsmatrixtogridimage_files/figure-html/cell-16-output-1.png" class="img-fluid figure-img"></p>
-</figure>
-</div>
-</div>
-</div>
-</section>
-</section>
-<section id="share-your-examples" class="level2">
-<h2 class="anchored" data-anchor-id="share-your-examples">Share your examples</h2>
-<p>If you use <code>MolsMatrixToGridImage</code> in a public project, please post a link in the comments below.</p>
-
-
-</section>
-
- ]]></description>
-  <category>release</category>
-  <category>tutorial</category>
-  <guid>https://greglandrum.github.io/rdkit-blog/posts/2023-10-25-molsmatrixtogridimage.html</guid>
-  <pubDate>Tue, 24 Oct 2023 22:00:00 GMT</pubDate>
-  <media:content url="https://greglandrum.github.io/rdkit-blog/posts/images/blog/molsmatrixtogridimage-1.png" medium="image" type="image/png" height="144" width="144"/>
 </item>
 </channel>
 </rss>
