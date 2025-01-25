@@ -106,72 +106,72 @@ from the database.
 With that explained, here's the full results table:
 <table>
 <tr><th></th> <th></th> <th colspan="2">0.95 of related compounds</th> <th colspan="2">0.9 of related compounds</th> <th colspan="2">0.8 of related compounds</th> <th colspan="2">0.5 of related compounds</th></tr>
-<tr><th>Fingerprint</th> <th>0.95 noise level</th> <th>threshold</th> <th>db fraction / count per million</th> <th>threshold</th> <th>db fraction / count per million</th> <th>threshold</th> <th>db fraction / count per million</th> <th>threshold</th> <th>db fraction / count per million</th></tr>
-<tr>
+<tr style="border-bottom: 1px solid black"><th>Fingerprint</th> <th>0.95 noise level</th> <th>threshold</th> <th>db fraction / count per million</th> <th>threshold</th> <th>db fraction / count per million</th> <th>threshold</th> <th>db fraction / count per million</th> <th>threshold</th> <th>db fraction / count per million</th></tr>
+<tr  style="border-bottom: 1px solid black">
 <td><b>MACCS</b></td> <td>0.57</td> <td>0.65</td> <td>0.016 / 15820</td> <td>0.65</td> <td>0.016 / 15820</td> <td>0.7</td> <td>0.0019 / 1880</td> <td>0.8</td> <td>8e-05 / 80</td> </tr>
-<tr>
+<tr  style="border-bottom: 1px solid black">
 <td><b>Morgan0 (counts)</b></td> <td>0.57</td> <td>0.6</td> <td>0.017 / 16990</td> <td>0.6</td> <td>0.017 / 16990</td> <td>0.65</td> <td>0.009 / 9040</td> <td>0.75</td> <td>0.00057 / 565</td> </tr>
-<tr>
+<tr  style="border-bottom: 1px solid black">
 <td><b>Morgan1 (counts)</b></td> <td>0.36</td> <td>0.5</td> <td>0.0003 / 300</td> <td>0.5</td> <td>0.0003 / 300</td> <td>0.55</td> <td>0.00017 / 170</td> <td>0.65</td> <td>2.5e-05 / 25</td> </tr>
-<tr>
+<tr  style="border-bottom: 1px solid black">
 <td><b>Morgan2 (counts)</b></td> <td>0.25</td> <td>0.4</td> <td>0.00014 / 140</td> <td>0.4</td> <td>0.00014 / 140</td> <td>0.45</td> <td>8.5e-05 / 84</td> <td>0.55</td> <td>2e-05 / 20</td> </tr>
-<tr>
+<tr  style="border-bottom: 1px solid black">
 <td><b>Morgan3 (counts)</b></td> <td>0.20</td> <td>0.3</td> <td>0.00026 / 260</td> <td>0.35</td> <td>0.00015 / 154</td> <td>0.35</td> <td>0.00015 / 154</td> <td>0.45</td> <td>3.5e-05 / 35</td> </tr>
-<tr>
+<tr  style="border-bottom: 1px solid black">
 <td><b>Morgan0 (bits)</b></td> <td>0.57</td> <td>0.6</td> <td>0.019 / 18550</td> <td>0.6</td> <td>0.019 / 18550</td> <td>0.65</td> <td>0.0099 / 9880</td> <td>0.75</td> <td>0.00063 / 629</td> </tr>
-<tr>
+<tr  style="border-bottom: 1px solid black">
 <td><b>Morgan1 (bits)</b></td> <td>0.37</td> <td>0.5</td> <td>0.00036 / 360</td> <td>0.5</td> <td>0.00036 / 360</td> <td>0.55</td> <td>0.0002 / 200</td> <td>0.65</td> <td>2.5e-05 / 25</td> </tr>
-<tr>
+<tr  style="border-bottom: 1px solid black">
 <td><b>Morgan2 (bits)</b></td> <td>0.27</td> <td>0.4</td> <td>0.00019 / 190</td> <td>0.4</td> <td>0.00019 / 190</td> <td>0.45</td> <td>0.00012 / 115</td> <td>0.55</td> <td>2.5e-05 / 25</td> </tr>
-<tr>
+<tr  style="border-bottom: 1px solid black">
 <td><b>Morgan3 (bits)</b></td> <td>0.22</td> <td>0.3</td> <td>0.00057 / 570</td> <td>0.35</td> <td>0.00031 / 309</td> <td>0.4</td> <td>5e-05 / 50</td> <td>0.5</td> <td>2e-05 / 20</td> </tr>
-<tr>
+<tr  style="border-bottom: 1px solid black">
 <td><b>FeatMorgan0 (counts)</b></td> <td>0.74</td> <td>0.65</td> <td>0.17 / 165672</td> <td>0.7</td> <td>0.073 / 72975</td> <td>0.7</td> <td>0.073 / 72975</td> <td>0.8</td> <td>0.0086 / 8620</td> </tr>
-<tr>
+<tr  style="border-bottom: 1px solid black">
 <td><b>FeatMorgan1 (counts)</b></td> <td>0.51</td> <td>0.55</td> <td>0.021 / 21000</td> <td>0.6</td> <td>0.0024 / 2360</td> <td>0.65</td> <td>0.0012 / 1235</td> <td>0.7</td> <td>0.00011 / 110</td> </tr>
-<tr>
+<tr  style="border-bottom: 1px solid black">
 <td><b>FeatMorgan2 (counts)</b></td> <td>0.36</td> <td>0.45</td> <td>0.0038 / 3782</td> <td>0.5</td> <td>0.00023 / 230</td> <td>0.55</td> <td>0.00014 / 135</td> <td>0.65</td> <td>2.5e-05 / 25</td> </tr>
-<tr>
+<tr  style="border-bottom: 1px solid black">
 <td><b>FeatMorgan3 (counts)</b></td> <td>0.28</td> <td>0.4</td> <td>0.00022 / 220</td> <td>0.4</td> <td>0.00022 / 220</td> <td>0.45</td> <td>0.00013 / 130</td> <td>0.55</td> <td>3e-05 / 30</td> </tr>
-<tr>
+<tr  style="border-bottom: 1px solid black">
 <td><b>FeatMorgan0 (bits)</b></td> <td>0.74</td> <td>0.65</td> <td>0.17 / 165672</td> <td>0.7</td> <td>0.073 / 72975</td> <td>0.7</td> <td>0.073 / 72975</td> <td>0.8</td> <td>0.0086 / 8620</td> </tr>
-<tr>
+<tr  style="border-bottom: 1px solid black">
 <td><b>FeatMorgan1 (bits)</b></td> <td>0.51</td> <td>0.55</td> <td>0.023 / 22962</td> <td>0.6</td> <td>0.0027 / 2660</td> <td>0.65</td> <td>0.0014 / 1390</td> <td>0.7</td> <td>0.00012 / 120</td> </tr>
-<tr>
+<tr  style="border-bottom: 1px solid black">
 <td><b>FeatMorgan2 (bits)</b></td> <td>0.38</td> <td>0.45</td> <td>0.006 / 6007</td> <td>0.5</td> <td>0.00031 / 310</td> <td>0.55</td> <td>0.00018 / 175</td> <td>0.65</td> <td>2.5e-05 / 25</td> </tr>
-<tr>
+<tr  style="border-bottom: 1px solid black">
 <td><b>FeatMorgan3 (bits)</b></td> <td>0.30</td> <td>0.4</td> <td>0.00037 / 370</td> <td>0.45</td> <td>0.00021 / 210</td> <td>0.45</td> <td>0.00021 / 210</td> <td>0.55</td> <td>3.5e-05 / 35</td> </tr>
-<tr>
+<tr  style="border-bottom: 1px solid black">
 <td><b>RDKit 4 (bits)</b></td> <td>0.33</td> <td>0.5</td> <td>0.00069 / 690</td> <td>0.55</td> <td>0.0004 / 400</td> <td>0.6</td> <td>0.00011 / 110</td> <td>0.7</td> <td>4e-05 / 40</td> </tr>
-<tr>
+<tr  style="border-bottom: 1px solid black">
 <td><b>RDKit 5 (bits)</b></td> <td>0.29</td> <td>0.5</td> <td>0.00025 / 250</td> <td>0.55</td> <td>0.00016 / 155</td> <td>0.6</td> <td>6e-05 / 60</td> <td>0.7</td> <td>3e-05 / 30</td> </tr>
-<tr>
+<tr  style="border-bottom: 1px solid black">
 <td><b>RDKit 6 (bits)</b></td> <td>0.31</td> <td>0.5</td> <td>0.00021 / 210</td> <td>0.55</td> <td>0.00014 / 135</td> <td>0.6</td> <td>6e-05 / 60</td> <td>0.7</td> <td>3e-05 / 30</td> </tr>
-<tr>
+<tr  style="border-bottom: 1px solid black">
 <td><b>RDKit 7 (bits)</b></td> <td>0.43</td> <td>0.55</td> <td>0.00051 / 510</td> <td>0.6</td> <td>8e-05 / 80</td> <td>0.6</td> <td>8e-05 / 80</td> <td>0.7</td> <td>3e-05 / 30</td> </tr>
-<tr>
+<tr  style="border-bottom: 1px solid black">
 <td><b>linear RDKit 4 (bits)</b></td> <td>0.35</td> <td>0.5</td> <td>0.0015 / 1470</td> <td>0.55</td> <td>0.00083 / 830</td> <td>0.6</td> <td>0.00019 / 190</td> <td>0.7</td> <td>5e-05 / 50</td> </tr>
-<tr>
+<tr  style="border-bottom: 1px solid black">
 <td><b>linear RDKit 5 (bits)</b></td> <td>0.31</td> <td>0.5</td> <td>0.00046 / 455</td> <td>0.55</td> <td>0.00027 / 272</td> <td>0.6</td> <td>9e-05 / 90</td> <td>0.7</td> <td>3e-05 / 30</td> </tr>
-<tr>
+<tr  style="border-bottom: 1px solid black">
 <td><b>linear RDKit 6 (bits)</b></td> <td>0.28</td> <td>0.5</td> <td>0.00022 / 220</td> <td>0.5</td> <td>0.00022 / 220</td> <td>0.55</td> <td>0.00014 / 140</td> <td>0.7</td> <td>3e-05 / 30</td> </tr>
-<tr>
+<tr  style="border-bottom: 1px solid black">
 <td><b>linear RDKit 7 (bits)</b></td> <td>0.26</td> <td>0.45</td> <td>0.00053 / 535</td> <td>0.5</td> <td>0.00013 / 130</td> <td>0.55</td> <td>9e-05 / 90</td> <td>0.65</td> <td>3.5e-05 / 35</td> </tr>
-<tr>
+<tr  style="border-bottom: 1px solid black">
 <td><b>Atom Pairs (counts)</b></td> <td>0.27</td> <td>0.35</td> <td>0.0037 / 3724</td> <td>0.35</td> <td>0.0037 / 3724</td> <td>0.4</td> <td>0.00016 / 160</td> <td>0.5</td> <td>3e-05 / 30</td> </tr>
-<tr>
+<tr  style="border-bottom: 1px solid black">
 <td><b>Topological Torsions (counts)</b></td> <td>0.19</td> <td>0.35</td> <td>0.00049 / 489</td> <td>0.4</td> <td>0.00011 / 110</td> <td>0.45</td> <td>7.5e-05 / 75</td> <td>0.55</td> <td>2.5e-05 / 25</td> </tr>
-<tr>
+<tr  style="border-bottom: 1px solid black">
 <td><b>Atom Pairs (bits)</b></td> <td>0.36</td> <td>0.4</td> <td>0.01 / 10380</td> <td>0.45</td> <td>0.0053 / 5250</td> <td>0.5</td> <td>0.00012 / 120</td> <td>0.55</td> <td>7e-05 / 70</td> </tr>
-<tr>
+<tr  style="border-bottom: 1px solid black">
 <td><b>Topological Torsions (bits)</b></td> <td>0.22</td> <td>0.4</td> <td>0.00016 / 160</td> <td>0.4</td> <td>0.00016 / 160</td> <td>0.45</td> <td>0.00011 / 105</td> <td>0.55</td> <td>3.5e-05 / 35</td> </tr>
-<tr>
+<tr  style="border-bottom: 1px solid black">
 <td><b>Avalon 512 (bits)</b></td> <td>0.51</td> <td>0.65</td> <td>0.0004 / 400</td> <td>0.65</td> <td>0.0004 / 400</td> <td>0.7</td> <td>8e-05 / 80</td> <td>0.8</td> <td>2e-05 / 20</td> </tr>
-<tr>
+<tr  style="border-bottom: 1px solid black">
 <td><b>Avalon 1024 (bits)</b></td> <td>0.37</td> <td>0.55</td> <td>0.00075 / 750</td> <td>0.6</td> <td>0.00014 / 140</td> <td>0.65</td> <td>9e-05 / 90</td> <td>0.75</td> <td>2.5e-05 / 25</td> </tr>
-<tr>
+<tr  style="border-bottom: 1px solid black">
 <td><b>Avalon 512 (counts)</b></td> <td>0.42</td> <td>0.55</td> <td>0.0028 / 2785</td> <td>0.6</td> <td>0.00028 / 280</td> <td>0.65</td> <td>0.00016 / 160</td> <td>0.75</td> <td>2.5e-05 / 25</td> </tr>
-<tr>
+<tr  style="border-bottom: 1px solid black">
 <td><b>Avalon 1024 (counts)</b></td> <td>0.38</td> <td>0.55</td> <td>0.0012 / 1192</td> <td>0.6</td> <td>0.00017 / 170</td> <td>0.6</td> <td>0.00017 / 170</td> <td>0.7</td> <td>4e-05 / 40</td> </tr>
 </table>
 
