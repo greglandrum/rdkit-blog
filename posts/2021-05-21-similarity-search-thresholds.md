@@ -252,7 +252,7 @@ statistics based on those results.
 Here's an example of a graphical summary of the results presented in the final
 notebook listed below:
 
-![]({{ site.baseurl }}/images/blog/similarity-search-threshold1-img1.png)
+![](images/blog/similarity-search-threshold1-img1.png)
 
 The violin plots show the distribution of similarity values required to match
 50% of the related compound pairs for each of the fingerprints. The dark gray
