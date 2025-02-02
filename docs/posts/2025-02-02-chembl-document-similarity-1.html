@@ -1,0 +1,1454 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en"><head>
+
+<meta charset="utf-8">
+<meta name="generator" content="quarto-1.6.39">
+
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+
+<meta name="dcterms.date" content="2025-02-02">
+<meta name="description" content="Using compound similarity to define document similarity">
+
+<title>ChEMBL Document Similarity – RDKit blog</title>
+<style>
+code{white-space: pre-wrap;}
+span.smallcaps{font-variant: small-caps;}
+div.columns{display: flex; gap: min(4vw, 1.5em);}
+div.column{flex: auto; overflow-x: auto;}
+div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+ul.task-list{list-style: none;}
+ul.task-list li input[type="checkbox"] {
+  width: 0.8em;
+  margin: 0 0.8em 0.2em -1em; /* quarto-specific, see https://github.com/quarto-dev/quarto-cli/issues/4556 */ 
+  vertical-align: middle;
+}
+/* CSS for syntax highlighting */
+pre > code.sourceCode { white-space: pre; position: relative; }
+pre > code.sourceCode > span { line-height: 1.25; }
+pre > code.sourceCode > span:empty { height: 1.2em; }
+.sourceCode { overflow: visible; }
+code.sourceCode > span { color: inherit; text-decoration: inherit; }
+div.sourceCode { margin: 1em 0; }
+pre.sourceCode { margin: 0; }
+@media screen {
+div.sourceCode { overflow: auto; }
+}
+@media print {
+pre > code.sourceCode { white-space: pre-wrap; }
+pre > code.sourceCode > span { display: inline-block; text-indent: -5em; padding-left: 5em; }
+}
+pre.numberSource code
+  { counter-reset: source-line 0; }
+pre.numberSource code > span
+  { position: relative; left: -4em; counter-increment: source-line; }
+pre.numberSource code > span > a:first-child::before
+  { content: counter(source-line);
+    position: relative; left: -1em; text-align: right; vertical-align: baseline;
+    border: none; display: inline-block;
+    -webkit-touch-callout: none; -webkit-user-select: none;
+    -khtml-user-select: none; -moz-user-select: none;
+    -ms-user-select: none; user-select: none;
+    padding: 0 4px; width: 4em;
+  }
+pre.numberSource { margin-left: 3em;  padding-left: 4px; }
+div.sourceCode
+  {   }
+@media screen {
+pre > code.sourceCode > span > a:first-child::before { text-decoration: underline; }
+}
+</style>
+
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.5.1/jquery.min.js" integrity="sha512-bLT0Qm9VnAYZDflyKcBaQ2gg0hSYNQrJ8RilYldYQ1FxQYoCLtUjuuRuZo+fjqhx/qtq/1itJ0C2ejDxltZVFg==" crossorigin="anonymous"></script><script src="../site_libs/quarto-nav/quarto-nav.js"></script>
+<script src="../site_libs/quarto-nav/headroom.min.js"></script>
+<script src="../site_libs/clipboard/clipboard.min.js"></script>
+<script src="../site_libs/quarto-search/autocomplete.umd.js"></script>
+<script src="../site_libs/quarto-search/fuse.min.js"></script>
+<script src="../site_libs/quarto-search/quarto-search.js"></script>
+<meta name="quarto:offset" content="../">
+<link href="../posts/icons/favicon.ico" rel="icon">
+<script src="../site_libs/quarto-html/quarto.js"></script>
+<script src="../site_libs/quarto-html/popper.min.js"></script>
+<script src="../site_libs/quarto-html/tippy.umd.min.js"></script>
+<script src="../site_libs/quarto-html/anchor.min.js"></script>
+<link href="../site_libs/quarto-html/tippy.css" rel="stylesheet">
+<link href="../site_libs/quarto-html/quarto-syntax-highlighting-e26003cea8cd680ca0c55a263523d882.css" rel="stylesheet" class="quarto-color-scheme" id="quarto-text-highlighting-styles">
+<link href="../site_libs/quarto-html/quarto-syntax-highlighting-dark-d166b450ba5a8e9f7a0ab969bf6592c1.css" rel="prefetch" class="quarto-color-scheme quarto-color-alternate" id="quarto-text-highlighting-styles">
+<script src="../site_libs/bootstrap/bootstrap.min.js"></script>
+<link href="../site_libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
+<link href="../site_libs/bootstrap/bootstrap-a1fb93aa6af6e5138998f4139e0aef3d.min.css" rel="stylesheet" append-hash="true" class="quarto-color-scheme" id="quarto-bootstrap" data-mode="light">
+<link href="../site_libs/bootstrap/bootstrap-dark-98e8d043add42333c0993713f12a6dca.min.css" rel="prefetch" append-hash="true" class="quarto-color-scheme quarto-color-alternate" id="quarto-bootstrap" data-mode="dark">
+<script id="quarto-search-options" type="application/json">{
+  "location": "navbar",
+  "copy-button": false,
+  "collapse-after": 3,
+  "panel-placement": "end",
+  "type": "overlay",
+  "limit": 50,
+  "keyboard-shortcut": [
+    "f",
+    "/",
+    "s"
+  ],
+  "show-item-context": false,
+  "language": {
+    "search-no-results-text": "No results",
+    "search-matching-documents-text": "matching documents",
+    "search-copy-link-title": "Copy link to search",
+    "search-hide-matches-text": "Hide additional matches",
+    "search-more-match-text": "more match in this document",
+    "search-more-matches-text": "more matches in this document",
+    "search-clear-button-title": "Clear",
+    "search-text-placeholder": "",
+    "search-detached-cancel-button-title": "Cancel",
+    "search-submit-button-title": "Submit",
+    "search-label": "Search"
+  }
+}</script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.6/require.min.js" integrity="sha512-c3Nl8+7g4LMSTdrm621y7kf9v3SDPnhxLNhcjFJbKECVnmZHTdo+IRO05sNLTH/D3vA6u1X32ehoLC7WFVdheg==" crossorigin="anonymous"></script>
+
+<script type="application/javascript">define('jquery', [],function() {return window.jQuery;})</script>
+
+
+<link rel="stylesheet" href="../styles.css">
+</head>
+
+<body class="nav-fixed">
+
+<div id="quarto-search-results"></div>
+  <header id="quarto-header" class="headroom fixed-top">
+    <nav class="navbar navbar-expand-lg " data-bs-theme="dark">
+      <div class="navbar-container container-fluid">
+      <div class="navbar-brand-container mx-auto">
+    <a class="navbar-brand" href="../index.html">
+    <span class="navbar-title">RDKit blog</span>
+    </a>
+  </div>
+            <div id="quarto-search" class="" title="Search"></div>
+          <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarCollapse" aria-controls="navbarCollapse" role="menu" aria-expanded="false" aria-label="Toggle navigation" onclick="if (window.quartoToggleHeadroom) { window.quartoToggleHeadroom(); }">
+  <span class="navbar-toggler-icon"></span>
+</button>
+          <div class="collapse navbar-collapse" id="navbarCollapse">
+            <ul class="navbar-nav navbar-nav-scroll ms-auto">
+  <li class="nav-item">
+    <a class="nav-link" href="../about.html"> 
+<span class="menu-text">RDKit experiments, tips, and tutorials</span></a>
+  </li>  
+  <li class="nav-item compact">
+    <a class="nav-link" href="https://github.com/rdkit/rdkit"> <i class="bi bi-github" role="img">
+</i> 
+<span class="menu-text"></span></a>
+  </li>  
+  <li class="nav-item compact">
+    <a class="nav-link" href="https://bsky.app/profile/rdkit.bsky.social"> <i class="bi bi-twitter" role="img">
+</i> 
+<span class="menu-text"></span></a>
+  </li>  
+  <li class="nav-item compact">
+    <a class="nav-link" href="https://www.linkedin.com/groups/8192558/"> <i class="bi bi-linkedin" role="img">
+</i> 
+<span class="menu-text"></span></a>
+  </li>  
+  <li class="nav-item compact">
+    <a class="nav-link" href="../index.xml"> <i class="bi bi-rss" role="img">
+</i> 
+<span class="menu-text"></span></a>
+  </li>  
+</ul>
+          </div> <!-- /navcollapse -->
+            <div class="quarto-navbar-tools">
+  <a href="" class="quarto-color-scheme-toggle quarto-navigation-tool  px-1" onclick="window.quartoToggleColorScheme(); return false;" title="Toggle dark mode"><i class="bi"></i></a>
+</div>
+      </div> <!-- /container-fluid -->
+    </nav>
+</header>
+<!-- content -->
+<div id="quarto-content" class="quarto-container page-columns page-rows-contents page-layout-article page-navbar">
+<!-- sidebar -->
+<!-- margin-sidebar -->
+    <div id="quarto-margin-sidebar" class="sidebar margin-sidebar">
+        <nav id="TOC" role="doc-toc" class="toc-active">
+    <h2 id="toc-title">On this page</h2>
+   
+  <ul>
+  <li><a href="#data-collection" id="toc-data-collection" class="nav-link active" data-scroll-target="#data-collection">Data collection</a></li>
+  <li><a href="#intra--and-inter-paper-similarity-distributions" id="toc-intra--and-inter-paper-similarity-distributions" class="nav-link" data-scroll-target="#intra--and-inter-paper-similarity-distributions">Intra- and inter-paper similarity distributions</a></li>
+  <li><a href="#finding-related-documents" id="toc-finding-related-documents" class="nav-link" data-scroll-target="#finding-related-documents">Finding related documents</a></li>
+  </ul>
+</nav>
+    </div>
+<!-- main -->
+<main class="content" id="quarto-document-content">
+
+<header id="title-block-header" class="quarto-title-block default">
+<div class="quarto-title">
+<h1 class="title">ChEMBL Document Similarity</h1>
+  <div class="quarto-categories">
+    <div class="quarto-category">exploration</div>
+    <div class="quarto-category">similarity</div>
+  </div>
+  </div>
+
+<div>
+  <div class="description">
+    Using compound similarity to define document similarity
+  </div>
+</div>
+
+
+<div class="quarto-title-meta">
+
+    
+    <div>
+    <div class="quarto-title-meta-heading">Published</div>
+    <div class="quarto-title-meta-contents">
+      <p class="date">February 2, 2025</p>
+    </div>
+  </div>
+  
+    
+  </div>
+  
+
+
+</header>
+
+
+<p>For a couple of other ideas I want to explore, I need some “clumpy” sets of compounds: a group of compounds with a number of separate clusters of different sizes and cohesiveness (I’m not sure what the right word here is, I mean how tightly packed the cluster is). As I almost always do, I’m going to do this using data from ChEMBL and I will use groups of compounds from individual med chem papers as my clumps. Since I want clumpiness at different similarity ranges, I want to be able to find groups of “related” papers: papers with similar compounds. This post is a first step towards finding those related papers.</p>
+<p>There’s an <a href="https://chembl.blogspot.com/2013/09/document-similarity-in-chembl.html">old ChEMBL blog post</a> about document similarity. Not too long after that, I did a <a href="https://rdkit.blogspot.com/2013/12/finding-related-documents-in-chembl.html">blog post</a> with a related approach. This time instead of looking at the number of highly similar compounds between papers, I’m going to look at the median similarity between the compounds the papers..</p>
+<p>I start by comparing at the distribution of similarities between compounds in med chem papers to those between papers in order to demonstrate that there is a significant difference there. To do this I pick a random sample of 20000 documents with between 20 and 100 compounds and use the usual Morgan fingerprint with radius 2 (there are plots below for radius 3 as well).</p>
+<p>Here are the distributions of the median compound similarities within the papers and the median similarities between 500K random pairs of papers:</p>
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="2025-02-02-chembl-document-similarity-1_files/figure-html/dc5d46f9-2-image.png" class="img-fluid figure-img"></p>
+<figcaption>image.png</figcaption>
+</figure>
+</div>
+<p>The plot also contains lines showing the threshold values for similarity between random compounds and related compounds taken from <a href="https://greglandrum.github.io/rdkit-blog/posts/2021-05-21-similarity-search-thresholds.html">this blog post</a>. Unsurprisingly, the intra-paper similarity values tend to be significantly higher than the inter-paper similarity values. The intra-paper similarity values tend to be above the “related” threshold value while the inter-paper values are below the “random” threshold value.</p>
+<p>Moving on to finding related documents. One simple measure for document similarity is to count how many exact matches they have in common. This isn’t particularly interesting for my purposes, so I chose to focus on pairs of documents that have high ratios of compounds that have similarities above the “related” threshold. Here’s the overall distribution for fraction of exact matches, and fraction of pairs above the “random” and “related” thresholds for a set of 20 million random document pairs:</p>
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="2025-02-02-chembl-document-similarity-1_files/figure-html/dc5d46f9-1-image-2.png" class="img-fluid figure-img"></p>
+<figcaption>image-2.png</figcaption>
+</figure>
+</div>
+<p>Looking through the papers with the highest “related” fraction shows that they contain peptides or other large molecules. This is less useful for me, so I’m going to come back to this in a follow-up post where I either limit the size of the compounds considered or use a count-based fingerprint to calculate similarity so that larger molecules don’t automatically have higher similarity scores.|</p>
+<div id="b46a1e68" class="cell" data-execution_count="1">
+<div class="sourceCode cell-code" id="cb1"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> rdkit <span class="im">import</span> Chem</span>
+<span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> rdkit.Chem <span class="im">import</span> rdFingerprintGenerator</span>
+<span id="cb1-3"><a href="#cb1-3" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> rdkit.Chem.Draw <span class="im">import</span> IPythonConsole</span>
+<span id="cb1-4"><a href="#cb1-4" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> rdkit.Chem <span class="im">import</span> Draw</span>
+<span id="cb1-5"><a href="#cb1-5" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> rdkit.Chem <span class="im">import</span> rdDepictor</span>
+<span id="cb1-6"><a href="#cb1-6" aria-hidden="true" tabindex="-1"></a>rdDepictor.SetPreferCoordGen(<span class="va">True</span>)</span>
+<span id="cb1-7"><a href="#cb1-7" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-8"><a href="#cb1-8" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> rdkit <span class="im">import</span> DataStructs</span>
+<span id="cb1-9"><a href="#cb1-9" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-10"><a href="#cb1-10" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> numpy <span class="im">as</span> np</span>
+<span id="cb1-11"><a href="#cb1-11" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-12"><a href="#cb1-12" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> matplotlib <span class="im">import</span> pyplot <span class="im">as</span> plt</span>
+<span id="cb1-13"><a href="#cb1-13" aria-hidden="true" tabindex="-1"></a>plt.style.use(<span class="st">'tableau-colorblind10'</span>)</span>
+<span id="cb1-14"><a href="#cb1-14" aria-hidden="true" tabindex="-1"></a><span class="op">%</span>matplotlib inline</span>
+<span id="cb1-15"><a href="#cb1-15" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> psycopg2</span>
+<span id="cb1-16"><a href="#cb1-16" aria-hidden="true" tabindex="-1"></a><span class="op">%</span>load_ext sql</span>
+<span id="cb1-17"><a href="#cb1-17" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-18"><a href="#cb1-18" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> rdkit</span>
+<span id="cb1-19"><a href="#cb1-19" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(rdkit.__version__)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>2024.09.4</code></pre>
+</div>
+</div>
+<div id="5233a402" class="cell" data-execution_count="2">
+<div class="sourceCode cell-code" id="cb3"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a><span class="op">%</span>config SqlMagic.feedback <span class="op">=</span> <span class="va">False</span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+<section id="data-collection" class="level1">
+<h1>Data collection</h1>
+<p>Start by getting a collection of documents with between 20 and 100 compounds; this is my normal heuristic for trying to get med chem papers.</p>
+<div id="8759dc15" class="cell" data-execution_count="3">
+<div class="sourceCode cell-code" id="cb4"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a><span class="op">%</span>sql postgresql:<span class="op">//</span>localhost<span class="op">/</span>chembl_35 <span class="op">\</span></span>
+<span id="cb4-2"><a href="#cb4-2" aria-hidden="true" tabindex="-1"></a>    select doc_id,count(distinct molregno) cnt into temporary table doc_compound_counts <span class="op">\</span></span>
+<span id="cb4-3"><a href="#cb4-3" aria-hidden="true" tabindex="-1"></a>      <span class="im">from</span> docs join compound_records using (doc_id) join compound_structures using (molregno) <span class="op">\</span></span>
+<span id="cb4-4"><a href="#cb4-4" aria-hidden="true" tabindex="-1"></a>      group by (doc_id)<span class="op">;</span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-display" data-execution_count="3">
+<pre><code>[]</code></pre>
+</div>
+</div>
+<div id="9e90d2b5" class="cell" data-execution_count="4">
+<div class="sourceCode cell-code" id="cb6"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb6-1"><a href="#cb6-1" aria-hidden="true" tabindex="-1"></a><span class="op">%</span>sql <span class="op">\</span></span>
+<span id="cb6-2"><a href="#cb6-2" aria-hidden="true" tabindex="-1"></a>    select count(<span class="op">*</span>) <span class="im">from</span> doc_compound_counts where cnt<span class="op">&gt;=</span><span class="dv">20</span> <span class="kw">and</span> cnt<span class="op">&lt;=</span><span class="dv">100</span><span class="op">;</span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code> * postgresql://localhost/chembl_35</code></pre>
+</div>
+<div class="cell-output cell-output-display" data-execution_count="4">
+<table class="caption-top table table-sm table-striped small" data-quarto-postprocess="true">
+<thead>
+<tr class="header">
+<th data-quarto-table-cell-role="th">count</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>34821</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+<div id="f1877fd0" class="cell" data-execution_count="5">
+<div class="sourceCode cell-code" id="cb8"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb8-1"><a href="#cb8-1" aria-hidden="true" tabindex="-1"></a>docs <span class="op">=</span> <span class="op">%</span>sql <span class="op">\</span></span>
+<span id="cb8-2"><a href="#cb8-2" aria-hidden="true" tabindex="-1"></a>   select doc_id <span class="im">from</span> doc_compound_counts tablesample bernoulli(<span class="dv">80</span>) repeatable (<span class="dv">8723346</span>) <span class="op">\</span></span>
+<span id="cb8-3"><a href="#cb8-3" aria-hidden="true" tabindex="-1"></a>    where cnt<span class="op">&gt;=</span><span class="dv">20</span> <span class="kw">and</span> cnt<span class="op">&lt;=</span><span class="dv">100</span> limit <span class="dv">20000</span><span class="op">;</span></span>
+<span id="cb8-4"><a href="#cb8-4" aria-hidden="true" tabindex="-1"></a><span class="bu">len</span>(docs)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code> * postgresql://localhost/chembl_35</code></pre>
+</div>
+<div class="cell-output cell-output-display" data-execution_count="5">
+<pre><code>20000</code></pre>
+</div>
+</div>
+<p>Generate fingerprints for the compounds from the papers</p>
+<div id="2e49fbf1" class="cell" data-execution_count="6">
+<div class="sourceCode cell-code" id="cb11"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb11-1"><a href="#cb11-1" aria-hidden="true" tabindex="-1"></a>fpg2 <span class="op">=</span> rdFingerprintGenerator.GetMorganGenerator(radius<span class="op">=</span><span class="dv">2</span>)</span>
+<span id="cb11-2"><a href="#cb11-2" aria-hidden="true" tabindex="-1"></a>fpg3 <span class="op">=</span> rdFingerprintGenerator.GetMorganGenerator(radius<span class="op">=</span><span class="dv">3</span>)</span>
+<span id="cb11-3"><a href="#cb11-3" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb11-4"><a href="#cb11-4" aria-hidden="true" tabindex="-1"></a>fps2 <span class="op">=</span> {}</span>
+<span id="cb11-5"><a href="#cb11-5" aria-hidden="true" tabindex="-1"></a>fps3 <span class="op">=</span> {}</span>
+<span id="cb11-6"><a href="#cb11-6" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> doc_id <span class="kw">in</span> docs:</span>
+<span id="cb11-7"><a href="#cb11-7" aria-hidden="true" tabindex="-1"></a>    doc_id <span class="op">=</span> doc_id[<span class="dv">0</span>]</span>
+<span id="cb11-8"><a href="#cb11-8" aria-hidden="true" tabindex="-1"></a>    pkls <span class="op">=</span> <span class="op">%</span>sql postgresql:<span class="op">//</span>localhost<span class="op">/</span>chembl_35 <span class="op">\</span></span>
+<span id="cb11-9"><a href="#cb11-9" aria-hidden="true" tabindex="-1"></a>        select molregno,mol_to_pkl(m) <span class="im">from</span> rdk.mols join compound_records using (molregno) <span class="op">\</span></span>
+<span id="cb11-10"><a href="#cb11-10" aria-hidden="true" tabindex="-1"></a>        where doc_id<span class="op">=</span>:doc_id</span>
+<span id="cb11-11"><a href="#cb11-11" aria-hidden="true" tabindex="-1"></a>    ms <span class="op">=</span> [Chem.Mol(x[<span class="dv">1</span>].tobytes()) <span class="cf">for</span> x <span class="kw">in</span> pkls]</span>
+<span id="cb11-12"><a href="#cb11-12" aria-hidden="true" tabindex="-1"></a>    fps2[doc_id] <span class="op">=</span> fpg2.GetFingerprints(ms)</span>
+<span id="cb11-13"><a href="#cb11-13" aria-hidden="true" tabindex="-1"></a>    fps3[doc_id] <span class="op">=</span> fpg3.GetFingerprints(ms)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+</section>
+<section id="intra--and-inter-paper-similarity-distributions" class="level1">
+<h1>Intra- and inter-paper similarity distributions</h1>
+<p>Calculate intra-paper similarity distributions</p>
+<div id="81949f6b" class="cell" data-execution_count="7">
+<div class="sourceCode cell-code" id="cb12"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb12-1"><a href="#cb12-1" aria-hidden="true" tabindex="-1"></a>sims2 <span class="op">=</span> {}</span>
+<span id="cb12-2"><a href="#cb12-2" aria-hidden="true" tabindex="-1"></a>sims3 <span class="op">=</span> {}</span>
+<span id="cb12-3"><a href="#cb12-3" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> idx,doc_id <span class="kw">in</span> <span class="bu">enumerate</span>(docs):</span>
+<span id="cb12-4"><a href="#cb12-4" aria-hidden="true" tabindex="-1"></a>    <span class="cf">if</span> <span class="kw">not</span> idx<span class="op">%</span><span class="dv">1000</span>:</span>
+<span id="cb12-5"><a href="#cb12-5" aria-hidden="true" tabindex="-1"></a>        <span class="bu">print</span>(<span class="ss">f'Done </span><span class="sc">{</span>idx<span class="sc">}</span><span class="ss">'</span>)</span>
+<span id="cb12-6"><a href="#cb12-6" aria-hidden="true" tabindex="-1"></a>    doc_id <span class="op">=</span> doc_id[<span class="dv">0</span>]</span>
+<span id="cb12-7"><a href="#cb12-7" aria-hidden="true" tabindex="-1"></a>    a <span class="op">=</span> []</span>
+<span id="cb12-8"><a href="#cb12-8" aria-hidden="true" tabindex="-1"></a>    fps <span class="op">=</span> fps2[doc_id]</span>
+<span id="cb12-9"><a href="#cb12-9" aria-hidden="true" tabindex="-1"></a>    <span class="cf">for</span> i <span class="kw">in</span> <span class="bu">range</span>(<span class="dv">1</span>,<span class="bu">len</span>(fps)):</span>
+<span id="cb12-10"><a href="#cb12-10" aria-hidden="true" tabindex="-1"></a>        a.extend(DataStructs.BulkTanimotoSimilarity(fps[i],fps[<span class="dv">0</span>:i]))</span>
+<span id="cb12-11"><a href="#cb12-11" aria-hidden="true" tabindex="-1"></a>    sims2[doc_id] <span class="op">=</span> np.quantile(a,[<span class="fl">0.5</span>,<span class="fl">0.9</span>,<span class="fl">0.95</span>,<span class="fl">0.99</span>])</span>
+<span id="cb12-12"><a href="#cb12-12" aria-hidden="true" tabindex="-1"></a>    a <span class="op">=</span> []</span>
+<span id="cb12-13"><a href="#cb12-13" aria-hidden="true" tabindex="-1"></a>    fps <span class="op">=</span> fps3[doc_id]</span>
+<span id="cb12-14"><a href="#cb12-14" aria-hidden="true" tabindex="-1"></a>    <span class="cf">for</span> i <span class="kw">in</span> <span class="bu">range</span>(<span class="dv">1</span>,<span class="bu">len</span>(fps)):</span>
+<span id="cb12-15"><a href="#cb12-15" aria-hidden="true" tabindex="-1"></a>        a.extend(DataStructs.BulkTanimotoSimilarity(fps[i],fps[<span class="dv">0</span>:i]))</span>
+<span id="cb12-16"><a href="#cb12-16" aria-hidden="true" tabindex="-1"></a>    sims3[doc_id] <span class="op">=</span> np.quantile(a,[<span class="fl">0.5</span>,<span class="fl">0.9</span>,<span class="fl">0.95</span>,<span class="fl">0.99</span>])</span>
+<span id="cb12-17"><a href="#cb12-17" aria-hidden="true" tabindex="-1"></a>    </span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>Done 0
+Done 1000
+Done 2000
+Done 3000
+Done 4000
+Done 5000
+Done 6000
+Done 7000
+Done 8000
+Done 9000
+Done 10000
+Done 11000
+Done 12000
+Done 13000
+Done 14000
+Done 15000
+Done 16000
+Done 17000
+Done 18000
+Done 19000</code></pre>
+</div>
+</div>
+<div id="3db19079" class="cell" data-execution_count="8">
+<div class="sourceCode cell-code" id="cb14"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb14-1"><a href="#cb14-1" aria-hidden="true" tabindex="-1"></a>plt.figure(figsize<span class="op">=</span>(<span class="dv">8</span>,<span class="dv">8</span>))</span>
+<span id="cb14-2"><a href="#cb14-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb14-3"><a href="#cb14-3" aria-hidden="true" tabindex="-1"></a>plt.subplot(<span class="dv">2</span>,<span class="dv">1</span>,<span class="dv">1</span>)</span>
+<span id="cb14-4"><a href="#cb14-4" aria-hidden="true" tabindex="-1"></a>plt.hist([[x[<span class="dv">0</span>] <span class="cf">for</span> x <span class="kw">in</span> sims2.values()],[x[<span class="dv">0</span>] <span class="cf">for</span> x <span class="kw">in</span> sims3.values()]],bins<span class="op">=</span><span class="dv">20</span>,label<span class="op">=</span>([<span class="st">'mfp2'</span>,<span class="st">'mfp3'</span>]))<span class="op">;</span></span>
+<span id="cb14-5"><a href="#cb14-5" aria-hidden="true" tabindex="-1"></a>plt.xlabel(<span class="st">'median intra-doc similarity'</span>)<span class="op">;</span></span>
+<span id="cb14-6"><a href="#cb14-6" aria-hidden="true" tabindex="-1"></a>plt.legend()<span class="op">;</span></span>
+<span id="cb14-7"><a href="#cb14-7" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb14-8"><a href="#cb14-8" aria-hidden="true" tabindex="-1"></a>plt.subplot(<span class="dv">2</span>,<span class="dv">1</span>,<span class="dv">2</span>)</span>
+<span id="cb14-9"><a href="#cb14-9" aria-hidden="true" tabindex="-1"></a>plt.hist([[x[<span class="dv">2</span>] <span class="cf">for</span> x <span class="kw">in</span> sims2.values()],[x[<span class="dv">2</span>] <span class="cf">for</span> x <span class="kw">in</span> sims3.values()]],bins<span class="op">=</span><span class="dv">20</span>,label<span class="op">=</span>([<span class="st">'mfp2'</span>,<span class="st">'mfp3'</span>]))<span class="op">;</span></span>
+<span id="cb14-10"><a href="#cb14-10" aria-hidden="true" tabindex="-1"></a>plt.xlabel(<span class="st">'95</span><span class="sc">% i</span><span class="st">ntra-doc similarity'</span>)<span class="op">;</span></span>
+<span id="cb14-11"><a href="#cb14-11" aria-hidden="true" tabindex="-1"></a>plt.legend()<span class="op">;</span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="2025-02-02-chembl-document-similarity-1_files/figure-html/cell-9-output-1.png" class="img-fluid figure-img"></p>
+</figure>
+</div>
+</div>
+</div>
+<p>Now calculate the inter-paper similarity distributions; I’ll choose 500,000 random pairs for this:</p>
+<div id="25ee9cdf" class="cell" data-execution_count="9">
+<div class="sourceCode cell-code" id="cb15"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb15-1"><a href="#cb15-1" aria-hidden="true" tabindex="-1"></a>target <span class="op">=</span> <span class="dv">500000</span></span>
+<span id="cb15-2"><a href="#cb15-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb15-3"><a href="#cb15-3" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> random</span>
+<span id="cb15-4"><a href="#cb15-4" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> math</span>
+<span id="cb15-5"><a href="#cb15-5" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> time</span>
+<span id="cb15-6"><a href="#cb15-6" aria-hidden="true" tabindex="-1"></a><span class="co"># from: https://stackoverflow.com/a/55245866</span></span>
+<span id="cb15-7"><a href="#cb15-7" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> decode(i):</span>
+<span id="cb15-8"><a href="#cb15-8" aria-hidden="true" tabindex="-1"></a>    k <span class="op">=</span> math.floor((<span class="dv">1</span><span class="op">+</span>math.sqrt(<span class="dv">1</span><span class="op">+</span><span class="dv">8</span><span class="op">*</span>i))<span class="op">/</span><span class="dv">2</span>)</span>
+<span id="cb15-9"><a href="#cb15-9" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> k,i<span class="op">-</span>k<span class="op">*</span>(k<span class="op">-</span><span class="dv">1</span>)<span class="op">//</span><span class="dv">2</span></span>
+<span id="cb15-10"><a href="#cb15-10" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb15-11"><a href="#cb15-11" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> rand_pairs(n,m):</span>
+<span id="cb15-12"><a href="#cb15-12" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> [decode(i) <span class="cf">for</span> i <span class="kw">in</span> random.sample(<span class="bu">range</span>(n<span class="op">*</span>(n<span class="op">-</span><span class="dv">1</span>)<span class="op">//</span><span class="dv">2</span>),m)]</span>
+<span id="cb15-13"><a href="#cb15-13" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb15-14"><a href="#cb15-14" aria-hidden="true" tabindex="-1"></a>pairs <span class="op">=</span> rand_pairs(<span class="bu">len</span>(docs),target)</span>
+<span id="cb15-15"><a href="#cb15-15" aria-hidden="true" tabindex="-1"></a>pairs <span class="op">=</span> [(docs[i][<span class="dv">0</span>],docs[j][<span class="dv">0</span>]) <span class="cf">for</span> i,j <span class="kw">in</span> pairs]</span>
+<span id="cb15-16"><a href="#cb15-16" aria-hidden="true" tabindex="-1"></a>       </span>
+<span id="cb15-17"><a href="#cb15-17" aria-hidden="true" tabindex="-1"></a>        </span>
+<span id="cb15-18"><a href="#cb15-18" aria-hidden="true" tabindex="-1"></a>inter_sims2 <span class="op">=</span> {}</span>
+<span id="cb15-19"><a href="#cb15-19" aria-hidden="true" tabindex="-1"></a>related_sims2 <span class="op">=</span> {}</span>
+<span id="cb15-20"><a href="#cb15-20" aria-hidden="true" tabindex="-1"></a>inter_sims3 <span class="op">=</span> {}</span>
+<span id="cb15-21"><a href="#cb15-21" aria-hidden="true" tabindex="-1"></a>related_sims3 <span class="op">=</span> {}</span>
+<span id="cb15-22"><a href="#cb15-22" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> idx <span class="kw">in</span> <span class="bu">range</span>(target):</span>
+<span id="cb15-23"><a href="#cb15-23" aria-hidden="true" tabindex="-1"></a>    <span class="cf">if</span> <span class="kw">not</span> idx<span class="op">%</span>(target<span class="op">//</span><span class="dv">20</span>):</span>
+<span id="cb15-24"><a href="#cb15-24" aria-hidden="true" tabindex="-1"></a>        <span class="bu">print</span>(<span class="ss">f'Done </span><span class="sc">{</span>idx<span class="sc">}</span><span class="ss">'</span>)</span>
+<span id="cb15-25"><a href="#cb15-25" aria-hidden="true" tabindex="-1"></a>    di,dj <span class="op">=</span> pairs[idx]</span>
+<span id="cb15-26"><a href="#cb15-26" aria-hidden="true" tabindex="-1"></a>   </span>
+<span id="cb15-27"><a href="#cb15-27" aria-hidden="true" tabindex="-1"></a>    a <span class="op">=</span> []</span>
+<span id="cb15-28"><a href="#cb15-28" aria-hidden="true" tabindex="-1"></a>    fpsi <span class="op">=</span> fps2[di]</span>
+<span id="cb15-29"><a href="#cb15-29" aria-hidden="true" tabindex="-1"></a>    fpsj <span class="op">=</span> fps2[dj]</span>
+<span id="cb15-30"><a href="#cb15-30" aria-hidden="true" tabindex="-1"></a>    <span class="cf">for</span> i <span class="kw">in</span> <span class="bu">range</span>(<span class="bu">len</span>(fpsi)):</span>
+<span id="cb15-31"><a href="#cb15-31" aria-hidden="true" tabindex="-1"></a>        a.extend(DataStructs.BulkTanimotoSimilarity(fpsi[i],fpsj))</span>
+<span id="cb15-32"><a href="#cb15-32" aria-hidden="true" tabindex="-1"></a>    inter_sims2[(di,dj)] <span class="op">=</span> np.quantile(a,[<span class="fl">0.5</span>,<span class="fl">0.9</span>,<span class="fl">0.95</span>,<span class="fl">0.99</span>])</span>
+<span id="cb15-33"><a href="#cb15-33" aria-hidden="true" tabindex="-1"></a>    related_sims2[(di,dj)] <span class="op">=</span> (<span class="bu">len</span>([<span class="dv">1</span> <span class="cf">for</span> x <span class="kw">in</span> a <span class="cf">if</span> x<span class="op">&gt;</span><span class="fl">0.27</span>]),<span class="bu">len</span>([<span class="dv">1</span> <span class="cf">for</span> x <span class="kw">in</span> a <span class="cf">if</span> x<span class="op">&gt;</span><span class="fl">0.4</span>]),<span class="bu">len</span>(fpsi),<span class="bu">len</span>(fpsj))</span>
+<span id="cb15-34"><a href="#cb15-34" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb15-35"><a href="#cb15-35" aria-hidden="true" tabindex="-1"></a>    a <span class="op">=</span> []</span>
+<span id="cb15-36"><a href="#cb15-36" aria-hidden="true" tabindex="-1"></a>    fpsi <span class="op">=</span> fps3[di]</span>
+<span id="cb15-37"><a href="#cb15-37" aria-hidden="true" tabindex="-1"></a>    fpsj <span class="op">=</span> fps3[dj]</span>
+<span id="cb15-38"><a href="#cb15-38" aria-hidden="true" tabindex="-1"></a>    <span class="cf">for</span> i <span class="kw">in</span> <span class="bu">range</span>(<span class="bu">len</span>(fpsi)):</span>
+<span id="cb15-39"><a href="#cb15-39" aria-hidden="true" tabindex="-1"></a>        a.extend(DataStructs.BulkTanimotoSimilarity(fpsi[i],fpsj))</span>
+<span id="cb15-40"><a href="#cb15-40" aria-hidden="true" tabindex="-1"></a>    inter_sims3[(di,dj)] <span class="op">=</span> np.quantile(a,[<span class="fl">0.5</span>,<span class="fl">0.9</span>,<span class="fl">0.95</span>,<span class="fl">0.99</span>])</span>
+<span id="cb15-41"><a href="#cb15-41" aria-hidden="true" tabindex="-1"></a>    related_sims3[(di,dj)] <span class="op">=</span> (<span class="bu">len</span>([<span class="dv">1</span> <span class="cf">for</span> x <span class="kw">in</span> a <span class="cf">if</span> x<span class="op">&gt;</span><span class="fl">0.22</span>]),<span class="bu">len</span>([<span class="dv">1</span> <span class="cf">for</span> x <span class="kw">in</span> a <span class="cf">if</span> x<span class="op">&gt;</span><span class="fl">0.3</span>]),<span class="bu">len</span>(fpsi),<span class="bu">len</span>(fpsj) )</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>Done 0
+Done 25000
+Done 50000
+Done 75000
+Done 100000
+Done 125000
+Done 150000
+Done 175000
+Done 200000
+Done 225000
+Done 250000
+Done 275000
+Done 300000
+Done 325000
+Done 350000
+Done 375000
+Done 400000
+Done 425000
+Done 450000
+Done 475000</code></pre>
+</div>
+</div>
+<p>Compare the intra- and inter-paper distributions.</p>
+<p>The line labeled noise in the plot below is the “noise level” for the fingerprint - the 95% threshold for similarity between random compound. The dashed line labeled “related” is the threshold level for compounds which are related to each other. You can find more information about these definitions in <a href="https://greglandrum.github.io/rdkit-blog/posts/2021-05-21-similarity-search-thresholds.html">this blog post</a></p>
+<div id="818eccc8" class="cell" data-execution_count="63">
+<div class="sourceCode cell-code" id="cb17"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb17-1"><a href="#cb17-1" aria-hidden="true" tabindex="-1"></a>plt.figure(figsize<span class="op">=</span>(<span class="dv">8</span>,<span class="dv">8</span>))</span>
+<span id="cb17-2"><a href="#cb17-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb17-3"><a href="#cb17-3" aria-hidden="true" tabindex="-1"></a>plt.subplot(<span class="dv">2</span>,<span class="dv">1</span>,<span class="dv">1</span>)</span>
+<span id="cb17-4"><a href="#cb17-4" aria-hidden="true" tabindex="-1"></a>plt.hist([[x[<span class="dv">0</span>] <span class="cf">for</span> x <span class="kw">in</span> sims2.values()],[x[<span class="dv">0</span>] <span class="cf">for</span> x <span class="kw">in</span> inter_sims2.values()]],bins<span class="op">=</span><span class="dv">20</span>,</span>
+<span id="cb17-5"><a href="#cb17-5" aria-hidden="true" tabindex="-1"></a>         label<span class="op">=</span>([<span class="st">'intra-document'</span>,<span class="st">'inter-document'</span>]),density<span class="op">=</span><span class="va">True</span>)<span class="op">;</span></span>
+<span id="cb17-6"><a href="#cb17-6" aria-hidden="true" tabindex="-1"></a>ymax <span class="op">=</span> plt.ylim()[<span class="dv">1</span>]</span>
+<span id="cb17-7"><a href="#cb17-7" aria-hidden="true" tabindex="-1"></a>plt.plot([<span class="fl">0.27</span>,<span class="fl">0.27</span>],[<span class="dv">0</span>,ymax],<span class="st">'k-'</span>,label<span class="op">=</span><span class="st">'noise'</span>)</span>
+<span id="cb17-8"><a href="#cb17-8" aria-hidden="true" tabindex="-1"></a>plt.plot([<span class="fl">0.4</span>,<span class="fl">0.4</span>],[<span class="dv">0</span>,ymax],<span class="st">'k--'</span>,label<span class="op">=</span><span class="st">'related'</span>)</span>
+<span id="cb17-9"><a href="#cb17-9" aria-hidden="true" tabindex="-1"></a>plt.xlabel(<span class="st">'median mfp2 similarity'</span>)<span class="op">;</span></span>
+<span id="cb17-10"><a href="#cb17-10" aria-hidden="true" tabindex="-1"></a>plt.legend()<span class="op">;</span></span>
+<span id="cb17-11"><a href="#cb17-11" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb17-12"><a href="#cb17-12" aria-hidden="true" tabindex="-1"></a>plt.subplot(<span class="dv">2</span>,<span class="dv">1</span>,<span class="dv">2</span>)</span>
+<span id="cb17-13"><a href="#cb17-13" aria-hidden="true" tabindex="-1"></a>plt.hist([[x[<span class="dv">2</span>] <span class="cf">for</span> x <span class="kw">in</span> sims2.values()],[x[<span class="dv">2</span>] <span class="cf">for</span> x <span class="kw">in</span> inter_sims2.values()]],bins<span class="op">=</span><span class="dv">20</span>,</span>
+<span id="cb17-14"><a href="#cb17-14" aria-hidden="true" tabindex="-1"></a>         label<span class="op">=</span>([<span class="st">'intra-document'</span>,<span class="st">'inter-document'</span>]),density<span class="op">=</span><span class="va">True</span>)<span class="op">;</span></span>
+<span id="cb17-15"><a href="#cb17-15" aria-hidden="true" tabindex="-1"></a>ymax <span class="op">=</span> plt.ylim()[<span class="dv">1</span>]</span>
+<span id="cb17-16"><a href="#cb17-16" aria-hidden="true" tabindex="-1"></a>plt.plot([<span class="fl">0.22</span>,<span class="fl">0.22</span>],[<span class="dv">0</span>,ymax],<span class="st">'k-'</span>,label<span class="op">=</span><span class="st">'noise'</span>)</span>
+<span id="cb17-17"><a href="#cb17-17" aria-hidden="true" tabindex="-1"></a>plt.plot([<span class="fl">0.35</span>,<span class="fl">0.35</span>],[<span class="dv">0</span>,ymax],<span class="st">'k--'</span>,label<span class="op">=</span><span class="st">'related'</span>)</span>
+<span id="cb17-18"><a href="#cb17-18" aria-hidden="true" tabindex="-1"></a>plt.xlabel(<span class="st">'95% mfp2 similarity'</span>)<span class="op">;</span></span>
+<span id="cb17-19"><a href="#cb17-19" aria-hidden="true" tabindex="-1"></a>plt.legend()<span class="op">;</span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="2025-02-02-chembl-document-similarity-1_files/figure-html/cell-11-output-1.png" class="img-fluid figure-img"></p>
+</figure>
+</div>
+</div>
+</div>
+<p>Get just the first of those plots, because that’s what we’ll use in the summary above:</p>
+<div id="339896ff" class="cell" data-execution_count="64">
+<div class="sourceCode cell-code" id="cb18"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb18-1"><a href="#cb18-1" aria-hidden="true" tabindex="-1"></a>plt.figure(figsize<span class="op">=</span>(<span class="dv">8</span>,<span class="dv">4</span>))</span>
+<span id="cb18-2"><a href="#cb18-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb18-3"><a href="#cb18-3" aria-hidden="true" tabindex="-1"></a>plt.hist([[x[<span class="dv">0</span>] <span class="cf">for</span> x <span class="kw">in</span> sims2.values()],[x[<span class="dv">0</span>] <span class="cf">for</span> x <span class="kw">in</span> inter_sims2.values()]],bins<span class="op">=</span><span class="dv">20</span>,</span>
+<span id="cb18-4"><a href="#cb18-4" aria-hidden="true" tabindex="-1"></a>         label<span class="op">=</span>([<span class="st">'intra-document'</span>,<span class="st">'inter-document'</span>]),density<span class="op">=</span><span class="va">True</span>)<span class="op">;</span></span>
+<span id="cb18-5"><a href="#cb18-5" aria-hidden="true" tabindex="-1"></a>ymax <span class="op">=</span> plt.ylim()[<span class="dv">1</span>]</span>
+<span id="cb18-6"><a href="#cb18-6" aria-hidden="true" tabindex="-1"></a>plt.plot([<span class="fl">0.27</span>,<span class="fl">0.27</span>],[<span class="dv">0</span>,ymax],<span class="st">'k-'</span>,label<span class="op">=</span><span class="st">'noise'</span>)</span>
+<span id="cb18-7"><a href="#cb18-7" aria-hidden="true" tabindex="-1"></a>plt.plot([<span class="fl">0.4</span>,<span class="fl">0.4</span>],[<span class="dv">0</span>,ymax],<span class="st">'k--'</span>,label<span class="op">=</span><span class="st">'related'</span>)</span>
+<span id="cb18-8"><a href="#cb18-8" aria-hidden="true" tabindex="-1"></a>plt.xlabel(<span class="st">'median mfp2 similarity'</span>)<span class="op">;</span></span>
+<span id="cb18-9"><a href="#cb18-9" aria-hidden="true" tabindex="-1"></a>plt.legend()<span class="op">;</span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="2025-02-02-chembl-document-similarity-1_files/figure-html/cell-12-output-1.png" class="img-fluid figure-img"></p>
+</figure>
+</div>
+</div>
+</div>
+<div id="399ccbcf" class="cell" data-execution_count="68">
+<div class="sourceCode cell-code" id="cb19"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb19-1"><a href="#cb19-1" aria-hidden="true" tabindex="-1"></a>np.quantile([x[<span class="dv">0</span>] <span class="cf">for</span> x <span class="kw">in</span> sims2.values()],[<span class="fl">0.5</span>,<span class="fl">0.9</span>,<span class="fl">0.95</span>,<span class="fl">0.99</span>])</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-display" data-execution_count="68">
+<pre><code>array([0.48979592, 0.65753425, 0.7       , 0.78703901])</code></pre>
+</div>
+</div>
+<div id="f1306f06" class="cell" data-execution_count="70">
+<div class="sourceCode cell-code" id="cb21"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb21-1"><a href="#cb21-1" aria-hidden="true" tabindex="-1"></a>np.quantile([x[<span class="dv">0</span>] <span class="cf">for</span> x <span class="kw">in</span> inter_sims2.values()],[<span class="fl">0.5</span>,<span class="fl">0.9</span>,<span class="fl">0.95</span>,<span class="fl">0.99</span>])</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-display" data-execution_count="70">
+<pre><code>array([0.10227273, 0.14      , 0.15306122, 0.18390805])</code></pre>
+</div>
+</div>
+</section>
+<section id="finding-related-documents" class="level1">
+<h1>Finding related documents</h1>
+<p>Get the molregnos for the compounds in all the papers. We will use these to identify overlapping compounds and to retrieve the compounds themselves</p>
+<div id="9af2b3b6" class="cell" data-execution_count="13">
+<div class="sourceCode cell-code" id="cb23"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb23-1"><a href="#cb23-1" aria-hidden="true" tabindex="-1"></a>mrns <span class="op">=</span> {}</span>
+<span id="cb23-2"><a href="#cb23-2" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> doc_id <span class="kw">in</span> docs:</span>
+<span id="cb23-3"><a href="#cb23-3" aria-hidden="true" tabindex="-1"></a>    doc_id <span class="op">=</span> doc_id[<span class="dv">0</span>]</span>
+<span id="cb23-4"><a href="#cb23-4" aria-hidden="true" tabindex="-1"></a>    pkls <span class="op">=</span> <span class="op">%</span>sql postgresql:<span class="op">//</span>localhost<span class="op">/</span>chembl_35 <span class="op">\</span></span>
+<span id="cb23-5"><a href="#cb23-5" aria-hidden="true" tabindex="-1"></a>        select molregno <span class="im">from</span> rdk.mols join compound_records using (molregno) <span class="op">\</span></span>
+<span id="cb23-6"><a href="#cb23-6" aria-hidden="true" tabindex="-1"></a>        where doc_id<span class="op">=</span>:doc_id</span>
+<span id="cb23-7"><a href="#cb23-7" aria-hidden="true" tabindex="-1"></a>    mrns[doc_id] <span class="op">=</span> [x[<span class="dv">0</span>] <span class="cf">for</span> x <span class="kw">in</span> pkls]</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+<div id="6f97ab56" class="cell" data-execution_count="14">
+<div class="sourceCode cell-code" id="cb24"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb24-1"><a href="#cb24-1" aria-hidden="true" tabindex="-1"></a>(<span class="bu">len</span>(docs)<span class="op">*</span>(<span class="bu">len</span>(docs)<span class="op">-</span><span class="dv">1</span>))<span class="op">//</span><span class="dv">2</span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-display" data-execution_count="14">
+<pre><code>199990000</code></pre>
+</div>
+</div>
+<p>I’ll look at 10,000,000 random pairs of documents:</p>
+<div id="c3fe1474" class="cell" data-execution_count="15">
+<div class="sourceCode cell-code" id="cb26"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb26-1"><a href="#cb26-1" aria-hidden="true" tabindex="-1"></a>pairs2 <span class="op">=</span> rand_pairs(<span class="bu">len</span>(docs),<span class="dv">10000000</span>)</span>
+<span id="cb26-2"><a href="#cb26-2" aria-hidden="true" tabindex="-1"></a>pairs2 <span class="op">=</span> [(docs[i][<span class="dv">0</span>],docs[j][<span class="dv">0</span>]) <span class="cf">for</span> i,j <span class="kw">in</span> pairs2]</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+<p>For each pair calculate the number of compounds in common and the fractions of compound pairs with similarity values above the random and related thresholds.</p>
+<div id="855088d9" class="cell" data-execution_count="31">
+<div class="sourceCode cell-code" id="cb27"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb27-1"><a href="#cb27-1" aria-hidden="true" tabindex="-1"></a>mrn_overlaps <span class="op">=</span> []</span>
+<span id="cb27-2"><a href="#cb27-2" aria-hidden="true" tabindex="-1"></a>noise_sim_overlaps <span class="op">=</span> []</span>
+<span id="cb27-3"><a href="#cb27-3" aria-hidden="true" tabindex="-1"></a>related_sim_overlaps <span class="op">=</span> []</span>
+<span id="cb27-4"><a href="#cb27-4" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb27-5"><a href="#cb27-5" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> idx <span class="kw">in</span> <span class="bu">range</span>(<span class="bu">len</span>(pairs2)):</span>
+<span id="cb27-6"><a href="#cb27-6" aria-hidden="true" tabindex="-1"></a>    <span class="cf">if</span> <span class="kw">not</span> idx<span class="op">%</span>(<span class="bu">len</span>(pairs2)<span class="op">//</span><span class="dv">20</span>):</span>
+<span id="cb27-7"><a href="#cb27-7" aria-hidden="true" tabindex="-1"></a>        <span class="bu">print</span>(<span class="ss">f'Done </span><span class="sc">{</span>idx<span class="sc">}</span><span class="ss">'</span>)</span>
+<span id="cb27-8"><a href="#cb27-8" aria-hidden="true" tabindex="-1"></a>    di,dj <span class="op">=</span> pairs2[idx]</span>
+<span id="cb27-9"><a href="#cb27-9" aria-hidden="true" tabindex="-1"></a>   </span>
+<span id="cb27-10"><a href="#cb27-10" aria-hidden="true" tabindex="-1"></a>    mrnsi <span class="op">=</span> <span class="bu">set</span>(mrns[di])</span>
+<span id="cb27-11"><a href="#cb27-11" aria-hidden="true" tabindex="-1"></a>    mrnsj <span class="op">=</span> <span class="bu">set</span>(mrns[dj])</span>
+<span id="cb27-12"><a href="#cb27-12" aria-hidden="true" tabindex="-1"></a>    mrn_overlaps.append(<span class="bu">len</span>(mrnsi.intersection(mrnsj))<span class="op">/</span>(<span class="bu">len</span>(mrnsi)<span class="op">+</span><span class="bu">len</span>(mrnsj)<span class="op">-</span><span class="bu">len</span>(mrnsi.intersection(mrnsj))))</span>
+<span id="cb27-13"><a href="#cb27-13" aria-hidden="true" tabindex="-1"></a>    </span>
+<span id="cb27-14"><a href="#cb27-14" aria-hidden="true" tabindex="-1"></a>    <span class="cf">if</span> (di,dj) <span class="kw">not</span> <span class="kw">in</span> related_sims2:</span>
+<span id="cb27-15"><a href="#cb27-15" aria-hidden="true" tabindex="-1"></a>        a <span class="op">=</span> []</span>
+<span id="cb27-16"><a href="#cb27-16" aria-hidden="true" tabindex="-1"></a>        fpsi <span class="op">=</span> fps2[di]</span>
+<span id="cb27-17"><a href="#cb27-17" aria-hidden="true" tabindex="-1"></a>        fpsj <span class="op">=</span> fps2[dj]</span>
+<span id="cb27-18"><a href="#cb27-18" aria-hidden="true" tabindex="-1"></a>        <span class="cf">for</span> i <span class="kw">in</span> <span class="bu">range</span>(<span class="bu">len</span>(fpsi)):</span>
+<span id="cb27-19"><a href="#cb27-19" aria-hidden="true" tabindex="-1"></a>            a.extend(DataStructs.BulkTanimotoSimilarity(fpsi[i],fpsj))</span>
+<span id="cb27-20"><a href="#cb27-20" aria-hidden="true" tabindex="-1"></a>        inter_sims2[(di,dj)] <span class="op">=</span> np.quantile(a,[<span class="fl">0.5</span>,<span class="fl">0.9</span>,<span class="fl">0.95</span>,<span class="fl">0.99</span>])</span>
+<span id="cb27-21"><a href="#cb27-21" aria-hidden="true" tabindex="-1"></a>        related_sims2[(di,dj)] <span class="op">=</span> (<span class="bu">len</span>([<span class="dv">1</span> <span class="cf">for</span> x <span class="kw">in</span> a <span class="cf">if</span> x<span class="op">&gt;</span><span class="fl">0.27</span>]),<span class="bu">len</span>([<span class="dv">1</span> <span class="cf">for</span> x <span class="kw">in</span> a <span class="cf">if</span> x<span class="op">&gt;</span><span class="fl">0.4</span>]),<span class="bu">len</span>(fpsi),<span class="bu">len</span>(fpsj))   </span>
+<span id="cb27-22"><a href="#cb27-22" aria-hidden="true" tabindex="-1"></a>    </span>
+<span id="cb27-23"><a href="#cb27-23" aria-hidden="true" tabindex="-1"></a>    noise,related,ni,nj <span class="op">=</span> related_sims2[(di,dj)]</span>
+<span id="cb27-24"><a href="#cb27-24" aria-hidden="true" tabindex="-1"></a>    denom <span class="op">=</span> ni<span class="op">*</span>nj</span>
+<span id="cb27-25"><a href="#cb27-25" aria-hidden="true" tabindex="-1"></a>    noise_sim_overlaps.append(noise<span class="op">/</span>denom)</span>
+<span id="cb27-26"><a href="#cb27-26" aria-hidden="true" tabindex="-1"></a>    related_sim_overlaps.append(related<span class="op">/</span>denom)</span>
+<span id="cb27-27"><a href="#cb27-27" aria-hidden="true" tabindex="-1"></a>    </span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>Done 0
+Done 500000
+Done 1000000
+Done 1500000
+Done 2000000
+Done 2500000
+Done 3000000
+Done 3500000
+Done 4000000
+Done 4500000
+Done 5000000
+Done 5500000
+Done 6000000
+Done 6500000
+Done 7000000
+Done 7500000
+Done 8000000
+Done 8500000
+Done 9000000
+Done 9500000</code></pre>
+</div>
+</div>
+<div id="bcfb3652" class="cell" data-execution_count="71">
+<div class="sourceCode cell-code" id="cb29"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb29-1"><a href="#cb29-1" aria-hidden="true" tabindex="-1"></a><span class="bu">len</span>(inter_sims2),<span class="bu">len</span>([<span class="dv">1</span> <span class="cf">for</span> v <span class="kw">in</span> inter_sims2.values() <span class="cf">if</span> v[<span class="dv">0</span>]<span class="op">&gt;</span><span class="fl">0.27</span>]),<span class="bu">len</span>([<span class="dv">1</span> <span class="cf">for</span> v <span class="kw">in</span> inter_sims2.values() <span class="cf">if</span> v[<span class="dv">0</span>]<span class="op">&gt;</span><span class="fl">0.4</span>])</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-display" data-execution_count="71">
+<pre><code>(10474902, 6329, 707)</code></pre>
+</div>
+</div>
+<p>Look at the fraction of exact matches, the fraction of pairs of compounds with similarity above the random threshold, and the fraction of pairs of compounds with similarity above the related threshold:</p>
+<div id="91d8e0ef" class="cell" data-execution_count="32">
+<div class="sourceCode cell-code" id="cb31"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb31-1"><a href="#cb31-1" aria-hidden="true" tabindex="-1"></a>plt.figure(figsize<span class="op">=</span>(<span class="dv">8</span>,<span class="dv">4</span>))</span>
+<span id="cb31-2"><a href="#cb31-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb31-3"><a href="#cb31-3" aria-hidden="true" tabindex="-1"></a>plt.hist([mrn_overlaps,noise_sim_overlaps,related_sim_overlaps],bins<span class="op">=</span><span class="dv">20</span>,log<span class="op">=</span><span class="va">True</span>,</span>
+<span id="cb31-4"><a href="#cb31-4" aria-hidden="true" tabindex="-1"></a>        label<span class="op">=</span>(<span class="st">'mrns'</span>,<span class="st">'mfp2-nonrandom'</span>,<span class="st">'mfp2-related'</span>))</span>
+<span id="cb31-5"><a href="#cb31-5" aria-hidden="true" tabindex="-1"></a>plt.xlabel(<span class="st">'compound overlap'</span>)<span class="op">;</span></span>
+<span id="cb31-6"><a href="#cb31-6" aria-hidden="true" tabindex="-1"></a>plt.legend()<span class="op">;</span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="2025-02-02-chembl-document-similarity-1_files/figure-html/cell-21-output-1.png" class="img-fluid figure-img"></p>
+</figure>
+</div>
+</div>
+</div>
+<p>Let’s look at an example with a high fraction of compounds above the noise level but a low fraction above the related level:</p>
+<div id="69de3474" class="cell" data-execution_count="33">
+<div class="sourceCode cell-code" id="cb32"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb32-1"><a href="#cb32-1" aria-hidden="true" tabindex="-1"></a>[(i,ovl,related_sim_overlaps[i]) <span class="cf">for</span> i,ovl <span class="kw">in</span> <span class="bu">enumerate</span>(noise_sim_overlaps) <span class="cf">if</span> ovl<span class="op">&gt;</span><span class="fl">0.5</span>][:<span class="dv">2</span>]</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-display" data-execution_count="33">
+<pre><code>[(1606, 0.5188034188034188, 0.09487179487179487),
+ (5770, 0.5236270753512133, 0.14431673052362706)]</code></pre>
+</div>
+</div>
+<div id="32b04401" class="cell" data-execution_count="39">
+<div class="sourceCode cell-code" id="cb34"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb34-1"><a href="#cb34-1" aria-hidden="true" tabindex="-1"></a>pairs2[<span class="dv">1606</span>]</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-display" data-execution_count="39">
+<pre><code>(66679, 21372)</code></pre>
+</div>
+</div>
+<div id="1af8926f" class="cell" data-execution_count="72">
+<div class="sourceCode cell-code" id="cb36"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb36-1"><a href="#cb36-1" aria-hidden="true" tabindex="-1"></a>didi,didj <span class="op">=</span> pairs2[<span class="dv">1606</span>]</span>
+<span id="cb36-2"><a href="#cb36-2" aria-hidden="true" tabindex="-1"></a>pklsi <span class="op">=</span> <span class="op">%</span>sql postgresql:<span class="op">//</span>localhost<span class="op">/</span>chembl_35 <span class="op">\</span></span>
+<span id="cb36-3"><a href="#cb36-3" aria-hidden="true" tabindex="-1"></a>   select chembl_id,mol_to_pkl(m) <span class="im">from</span> rdk.mols join compound_records using (molregno) <span class="op">\</span></span>
+<span id="cb36-4"><a href="#cb36-4" aria-hidden="true" tabindex="-1"></a>    join chembl_id_lookup on (molregno<span class="op">=</span>entity_id <span class="kw">and</span> entity_type<span class="op">=</span><span class="st">'COMPOUND'</span>) <span class="op">\</span></span>
+<span id="cb36-5"><a href="#cb36-5" aria-hidden="true" tabindex="-1"></a>    where doc_id<span class="op">=</span>:didi</span>
+<span id="cb36-6"><a href="#cb36-6" aria-hidden="true" tabindex="-1"></a>molsi <span class="op">=</span> [(x,Chem.Mol(y.tobytes())) <span class="cf">for</span> x,y <span class="kw">in</span> pklsi]</span>
+<span id="cb36-7"><a href="#cb36-7" aria-hidden="true" tabindex="-1"></a>pklsj <span class="op">=</span> <span class="op">%</span>sql postgresql:<span class="op">//</span>localhost<span class="op">/</span>chembl_35 <span class="op">\</span></span>
+<span id="cb36-8"><a href="#cb36-8" aria-hidden="true" tabindex="-1"></a>   select chembl_id,mol_to_pkl(m) <span class="im">from</span> rdk.mols join compound_records using (molregno) <span class="op">\</span></span>
+<span id="cb36-9"><a href="#cb36-9" aria-hidden="true" tabindex="-1"></a>    join chembl_id_lookup on (molregno<span class="op">=</span>entity_id <span class="kw">and</span> entity_type<span class="op">=</span><span class="st">'COMPOUND'</span>) <span class="op">\</span></span>
+<span id="cb36-10"><a href="#cb36-10" aria-hidden="true" tabindex="-1"></a>    where doc_id<span class="op">=</span>:didj</span>
+<span id="cb36-11"><a href="#cb36-11" aria-hidden="true" tabindex="-1"></a>molsj <span class="op">=</span> [(x,Chem.Mol(y.tobytes())) <span class="cf">for</span> x,y <span class="kw">in</span> pklsj]</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+<div id="abfcf92c" class="cell" data-execution_count="73">
+<div class="sourceCode cell-code" id="cb37"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb37-1"><a href="#cb37-1" aria-hidden="true" tabindex="-1"></a><span class="bu">len</span>(molsi),<span class="bu">len</span>(molsj)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-display" data-execution_count="73">
+<pre><code>(45, 26)</code></pre>
+</div>
+</div>
+<div id="26874ab1" class="cell" data-execution_count="74">
+<div class="sourceCode cell-code" id="cb39"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb39-1"><a href="#cb39-1" aria-hidden="true" tabindex="-1"></a>Draw.MolsToGridImage([y <span class="cf">for</span> x,y <span class="kw">in</span> molsi][:<span class="dv">12</span>],legends<span class="op">=</span>[x <span class="cf">for</span> x,y <span class="kw">in</span> molsi],molsPerRow<span class="op">=</span><span class="dv">4</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-display" data-execution_count="74">
+<div>
+<figure class="figure">
+<p><img src="2025-02-02-chembl-document-similarity-1_files/figure-html/cell-26-output-1.png" class="img-fluid figure-img"></p>
+</figure>
+</div>
+</div>
+</div>
+<div id="84e2527a" class="cell" data-execution_count="75">
+<div class="sourceCode cell-code" id="cb40"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb40-1"><a href="#cb40-1" aria-hidden="true" tabindex="-1"></a>Draw.MolsToGridImage([y <span class="cf">for</span> x,y <span class="kw">in</span> molsj][:<span class="dv">12</span>],legends<span class="op">=</span>[x <span class="cf">for</span> x,y <span class="kw">in</span> molsj],molsPerRow<span class="op">=</span><span class="dv">4</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-display" data-execution_count="75">
+<div>
+<figure class="figure">
+<p><img src="2025-02-02-chembl-document-similarity-1_files/figure-html/cell-27-output-1.png" class="img-fluid figure-img"></p>
+</figure>
+</div>
+</div>
+</div>
+<p>Anb bibliographic info on those:</p>
+<div id="7c5a4df0" class="cell" data-execution_count="76">
+<div class="sourceCode cell-code" id="cb41"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb41-1"><a href="#cb41-1" aria-hidden="true" tabindex="-1"></a><span class="op">%</span>sql postgresql:<span class="op">//</span>localhost<span class="op">/</span>chembl_35 <span class="op">\</span></span>
+<span id="cb41-2"><a href="#cb41-2" aria-hidden="true" tabindex="-1"></a>    select doc_id,title,authors <span class="im">from</span> docs where doc_id <span class="kw">in</span> (:didi,:didj)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-display" data-execution_count="76">
+<table class="caption-top table table-sm table-striped small" data-quarto-postprocess="true">
+<thead>
+<tr class="header">
+<th data-quarto-table-cell-role="th">doc_id</th>
+<th data-quarto-table-cell-role="th">title</th>
+<th data-quarto-table-cell-role="th">authors</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>9752</td>
+<td>Synthesis and hypolipidemic activity of 2-substituted isobutyric acid derivatives.</td>
+<td>Morishita S, Saito T, Hirai Y, Shoji M, Mishima Y, Kawakami M.</td>
+</tr>
+<tr class="even">
+<td>15546</td>
+<td>Synthesis and immunosuppressive activity of 2-substituted 2-aminopropane-1,3-diols and 2-aminoethanols.</td>
+<td>Kiuchi M, Adachi K, Kohara T, Minoguchi M, Hanano T, Aoki Y, Mishina T, Arita M, Nakao N, Ohtsuki M, Hoshino Y, Teshima K, Chiba K, Sasaki S, Fujita T.</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+<p>Look about a pair with a high fraction of “related” structures but a small number of exact matches:</p>
+<div id="46239c91" class="cell" data-execution_count="46">
+<div class="sourceCode cell-code" id="cb42"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb42-1"><a href="#cb42-1" aria-hidden="true" tabindex="-1"></a>[(i,ovl,noise_sim_overlaps[i],mrn_overlaps[i]) <span class="cf">for</span> i,ovl <span class="kw">in</span> <span class="bu">enumerate</span>(related_sim_overlaps) <span class="cf">if</span> ovl<span class="op">&gt;</span><span class="fl">0.5</span>][:<span class="dv">2</span>]</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-display" data-execution_count="46">
+<pre><code>[(6704, 0.7841269841269841, 0.9206349206349206, 0.0),
+ (34215, 0.5823095823095823, 0.8341523341523341, 0.03508771929824561)]</code></pre>
+</div>
+</div>
+<div id="de53f47d" class="cell" data-execution_count="77">
+<div class="sourceCode cell-code" id="cb44"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb44-1"><a href="#cb44-1" aria-hidden="true" tabindex="-1"></a>didi,didj <span class="op">=</span> pairs2[<span class="dv">6704</span>]</span>
+<span id="cb44-2"><a href="#cb44-2" aria-hidden="true" tabindex="-1"></a>pklsi <span class="op">=</span> <span class="op">%</span>sql postgresql:<span class="op">//</span>localhost<span class="op">/</span>chembl_35 <span class="op">\</span></span>
+<span id="cb44-3"><a href="#cb44-3" aria-hidden="true" tabindex="-1"></a>   select chembl_id,mol_to_pkl(m) <span class="im">from</span> rdk.mols join compound_records using (molregno) <span class="op">\</span></span>
+<span id="cb44-4"><a href="#cb44-4" aria-hidden="true" tabindex="-1"></a>    join chembl_id_lookup on (molregno<span class="op">=</span>entity_id <span class="kw">and</span> entity_type<span class="op">=</span><span class="st">'COMPOUND'</span>) <span class="op">\</span></span>
+<span id="cb44-5"><a href="#cb44-5" aria-hidden="true" tabindex="-1"></a>    where doc_id<span class="op">=</span>:didi</span>
+<span id="cb44-6"><a href="#cb44-6" aria-hidden="true" tabindex="-1"></a>molsi <span class="op">=</span> [(x,Chem.Mol(y.tobytes())) <span class="cf">for</span> x,y <span class="kw">in</span> pklsi]</span>
+<span id="cb44-7"><a href="#cb44-7" aria-hidden="true" tabindex="-1"></a>pklsj <span class="op">=</span> <span class="op">%</span>sql postgresql:<span class="op">//</span>localhost<span class="op">/</span>chembl_35 <span class="op">\</span></span>
+<span id="cb44-8"><a href="#cb44-8" aria-hidden="true" tabindex="-1"></a>   select chembl_id,mol_to_pkl(m) <span class="im">from</span> rdk.mols join compound_records using (molregno) <span class="op">\</span></span>
+<span id="cb44-9"><a href="#cb44-9" aria-hidden="true" tabindex="-1"></a>    join chembl_id_lookup on (molregno<span class="op">=</span>entity_id <span class="kw">and</span> entity_type<span class="op">=</span><span class="st">'COMPOUND'</span>) <span class="op">\</span></span>
+<span id="cb44-10"><a href="#cb44-10" aria-hidden="true" tabindex="-1"></a>    where doc_id<span class="op">=</span>:didj</span>
+<span id="cb44-11"><a href="#cb44-11" aria-hidden="true" tabindex="-1"></a>molsj <span class="op">=</span> [(x,Chem.Mol(y.tobytes())) <span class="cf">for</span> x,y <span class="kw">in</span> pklsj]</span>
+<span id="cb44-12"><a href="#cb44-12" aria-hidden="true" tabindex="-1"></a><span class="bu">len</span>(molsi),<span class="bu">len</span>(molsj)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-display" data-execution_count="77">
+<pre><code>(21, 30)</code></pre>
+</div>
+</div>
+<div id="b696debe" class="cell" data-execution_count="82">
+<div class="sourceCode cell-code" id="cb46"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb46-1"><a href="#cb46-1" aria-hidden="true" tabindex="-1"></a>Draw.MolsToGridImage([y <span class="cf">for</span> x,y <span class="kw">in</span> molsi][<span class="dv">1</span>:<span class="dv">10</span>],legends<span class="op">=</span>[x <span class="cf">for</span> x,y <span class="kw">in</span> molsi[<span class="dv">1</span>:]],molsPerRow<span class="op">=</span><span class="dv">3</span>,subImgSize<span class="op">=</span>(<span class="dv">250</span>,<span class="dv">200</span>))</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-display" data-execution_count="82">
+<div>
+<figure class="figure">
+<p><img src="2025-02-02-chembl-document-similarity-1_files/figure-html/cell-31-output-1.png" class="img-fluid figure-img"></p>
+</figure>
+</div>
+</div>
+</div>
+<div id="1430fc5c" class="cell" data-execution_count="79">
+<div class="sourceCode cell-code" id="cb47"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb47-1"><a href="#cb47-1" aria-hidden="true" tabindex="-1"></a>Draw.MolsToGridImage([y <span class="cf">for</span> x,y <span class="kw">in</span> molsj][<span class="dv">1</span>:<span class="dv">10</span>],legends<span class="op">=</span>[x <span class="cf">for</span> x,y <span class="kw">in</span> molsj[<span class="dv">1</span>:]],molsPerRow<span class="op">=</span><span class="dv">3</span>,subImgSize<span class="op">=</span>(<span class="dv">250</span>,<span class="dv">200</span>))</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-display" data-execution_count="79">
+<div>
+<figure class="figure">
+<p><img src="2025-02-02-chembl-document-similarity-1_files/figure-html/cell-32-output-1.png" class="img-fluid figure-img"></p>
+</figure>
+</div>
+</div>
+</div>
+<div id="9800075d" class="cell" data-execution_count="80">
+<div class="sourceCode cell-code" id="cb48"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb48-1"><a href="#cb48-1" aria-hidden="true" tabindex="-1"></a><span class="op">%</span>sql postgresql:<span class="op">//</span>localhost<span class="op">/</span>chembl_35 <span class="op">\</span></span>
+<span id="cb48-2"><a href="#cb48-2" aria-hidden="true" tabindex="-1"></a>    select doc_id,title,authors <span class="im">from</span> docs where doc_id <span class="kw">in</span> (:didi,:didj)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-display" data-execution_count="80">
+<table class="caption-top table table-sm table-striped small" data-quarto-postprocess="true">
+<thead>
+<tr class="header">
+<th data-quarto-table-cell-role="th">doc_id</th>
+<th data-quarto-table-cell-role="th">title</th>
+<th data-quarto-table-cell-role="th">authors</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>5559</td>
+<td>Synthesis, stereochemical assignment and biological activity of a novel series of C-4" modified aza-macrolides.</td>
+<td>Bronk BS, Letavic MA, Bertsche CD, George DM, Hayashi SF, Kamicker BJ, Kolosko NL, Norcia LJ, Rushing MA, Santoro SL, Yang BV.</td>
+</tr>
+<tr class="even">
+<td>62283</td>
+<td>Design, synthesis, and in vitro activity of novel 2'-O-substituted 15-membered azalides.</td>
+<td>Pešić D, Starčević K, Toplak A, Herreros E, Vidal J, Almela MJ, Jelić D, Alihodžić S, Spaventi R, Perić M.</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+<p>Order the document pairs by the median inter-document similarity.</p>
+<div id="830cab89" class="cell" data-execution_count="87">
+<div class="sourceCode cell-code" id="cb49"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb49-1"><a href="#cb49-1" aria-hidden="true" tabindex="-1"></a>ordered <span class="op">=</span> <span class="bu">sorted</span>((v[<span class="dv">0</span>],k) <span class="cf">for</span> k,v <span class="kw">in</span> inter_sims2.items())</span>
+<span id="cb49-2"><a href="#cb49-2" aria-hidden="true" tabindex="-1"></a>ordered.reverse()</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+<div id="2d74865f" class="cell" data-execution_count="90">
+<div class="sourceCode cell-code" id="cb50"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb50-1"><a href="#cb50-1" aria-hidden="true" tabindex="-1"></a>[(k,inter_sims2[k],related_sims2[k]) <span class="cf">for</span> _,k <span class="kw">in</span> ordered[:<span class="dv">10</span>]]</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-display" data-execution_count="90">
+<pre><code>[((12331, 7482),
+  array([0.83809524, 0.91428571, 0.96      , 1.        ]),
+  (594, 594, 27, 22)),
+ ((93472, 15907),
+  array([0.76190476, 0.82279986, 0.85034014, 0.88860906]),
+  (1656, 1656, 46, 36)),
+ ((14825, 9122),
+  array([0.73387097, 0.9380531 , 0.9826087 , 1.        ]),
+  (1817, 1817, 79, 23)),
+ ((31412, 6280),
+  array([0.71590909, 0.77286602, 0.81410256, 0.87204231]),
+  (651, 651, 31, 22)),
+ ((42121, 13617),
+  array([0.71551724, 0.8411215 , 0.86538462, 0.91116191]),
+  (1711, 1711, 59, 30)),
+ ((2880, 923),
+  array([0.71028037, 0.7979798 , 0.82501752, 0.89473684]),
+  (2470, 2470, 26, 95)),
+ ((65011, 5969),
+  array([0.70748299, 0.78516762, 0.82269504, 0.86639801]),
+  (1081, 1081, 24, 47)),
+ ((46543, 4410),
+  array([0.703125  , 0.83928571, 0.85714286, 1.        ]),
+  (575, 575, 23, 25)),
+ ((98553, 55691),
+  array([0.7029703 , 0.84946237, 0.88172043, 0.92391304]),
+  (716, 716, 36, 30)),
+ ((10959, 923),
+  array([0.69194824, 0.83333333, 0.88282071, 1.        ]),
+  (4370, 4368, 46, 95))]</code></pre>
+</div>
+</div>
+<div id="0ea01f50" class="cell" data-execution_count="109">
+<div class="sourceCode cell-code" id="cb52"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb52-1"><a href="#cb52-1" aria-hidden="true" tabindex="-1"></a>didi,didj <span class="op">=</span> ordered[<span class="dv">0</span>][<span class="dv">1</span>]</span>
+<span id="cb52-2"><a href="#cb52-2" aria-hidden="true" tabindex="-1"></a>pklsi <span class="op">=</span> <span class="op">%</span>sql postgresql:<span class="op">//</span>localhost<span class="op">/</span>chembl_35 <span class="op">\</span></span>
+<span id="cb52-3"><a href="#cb52-3" aria-hidden="true" tabindex="-1"></a>   select chembl_id,mol_to_pkl(m) <span class="im">from</span> rdk.mols join compound_records using (molregno) <span class="op">\</span></span>
+<span id="cb52-4"><a href="#cb52-4" aria-hidden="true" tabindex="-1"></a>    join chembl_id_lookup on (molregno<span class="op">=</span>entity_id <span class="kw">and</span> entity_type<span class="op">=</span><span class="st">'COMPOUND'</span>) <span class="op">\</span></span>
+<span id="cb52-5"><a href="#cb52-5" aria-hidden="true" tabindex="-1"></a>    where doc_id<span class="op">=</span>:didi</span>
+<span id="cb52-6"><a href="#cb52-6" aria-hidden="true" tabindex="-1"></a>molsi <span class="op">=</span> [(x,Chem.Mol(y.tobytes())) <span class="cf">for</span> x,y <span class="kw">in</span> pklsi]</span>
+<span id="cb52-7"><a href="#cb52-7" aria-hidden="true" tabindex="-1"></a>pklsj <span class="op">=</span> <span class="op">%</span>sql postgresql:<span class="op">//</span>localhost<span class="op">/</span>chembl_35 <span class="op">\</span></span>
+<span id="cb52-8"><a href="#cb52-8" aria-hidden="true" tabindex="-1"></a>   select chembl_id,mol_to_pkl(m) <span class="im">from</span> rdk.mols join compound_records using (molregno) <span class="op">\</span></span>
+<span id="cb52-9"><a href="#cb52-9" aria-hidden="true" tabindex="-1"></a>    join chembl_id_lookup on (molregno<span class="op">=</span>entity_id <span class="kw">and</span> entity_type<span class="op">=</span><span class="st">'COMPOUND'</span>) <span class="op">\</span></span>
+<span id="cb52-10"><a href="#cb52-10" aria-hidden="true" tabindex="-1"></a>    where doc_id<span class="op">=</span>:didj</span>
+<span id="cb52-11"><a href="#cb52-11" aria-hidden="true" tabindex="-1"></a>molsj <span class="op">=</span> [(x,Chem.Mol(y.tobytes())) <span class="cf">for</span> x,y <span class="kw">in</span> pklsj]</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+<div id="cafe1852" class="cell" data-execution_count="110">
+<div class="sourceCode cell-code" id="cb53"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb53-1"><a href="#cb53-1" aria-hidden="true" tabindex="-1"></a>Draw.MolsToGridImage([y <span class="cf">for</span> x,y <span class="kw">in</span> molsi][<span class="dv">1</span>:<span class="dv">10</span>],legends<span class="op">=</span>[x <span class="cf">for</span> x,y <span class="kw">in</span> molsi[<span class="dv">1</span>:]],molsPerRow<span class="op">=</span><span class="dv">3</span>,subImgSize<span class="op">=</span>(<span class="dv">250</span>,<span class="dv">200</span>))</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-display" data-execution_count="110">
+<div>
+<figure class="figure">
+<p><img src="2025-02-02-chembl-document-similarity-1_files/figure-html/cell-37-output-1.png" class="img-fluid figure-img"></p>
+</figure>
+</div>
+</div>
+</div>
+<div id="8c90f488" class="cell" data-execution_count="111">
+<div class="sourceCode cell-code" id="cb54"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb54-1"><a href="#cb54-1" aria-hidden="true" tabindex="-1"></a>Draw.MolsToGridImage([y <span class="cf">for</span> x,y <span class="kw">in</span> molsj][<span class="dv">1</span>:<span class="dv">10</span>],legends<span class="op">=</span>[x <span class="cf">for</span> x,y <span class="kw">in</span> molsj[<span class="dv">1</span>:]],molsPerRow<span class="op">=</span><span class="dv">3</span>,subImgSize<span class="op">=</span>(<span class="dv">250</span>,<span class="dv">200</span>))</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-display" data-execution_count="111">
+<div>
+<figure class="figure">
+<p><img src="2025-02-02-chembl-document-similarity-1_files/figure-html/cell-38-output-1.png" class="img-fluid figure-img"></p>
+</figure>
+</div>
+</div>
+</div>
+<div id="a9a7adc6" class="cell" data-execution_count="112">
+<div class="sourceCode cell-code" id="cb55"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb55-1"><a href="#cb55-1" aria-hidden="true" tabindex="-1"></a><span class="op">%</span>sql postgresql:<span class="op">//</span>localhost<span class="op">/</span>chembl_35 <span class="op">\</span></span>
+<span id="cb55-2"><a href="#cb55-2" aria-hidden="true" tabindex="-1"></a>    select doc_id,title,authors <span class="im">from</span> docs where doc_id <span class="kw">in</span> (:didi,:didj)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-display" data-execution_count="112">
+<table class="caption-top table table-sm table-striped small" data-quarto-postprocess="true">
+<thead>
+<tr class="header">
+<th data-quarto-table-cell-role="th">doc_id</th>
+<th data-quarto-table-cell-role="th">title</th>
+<th data-quarto-table-cell-role="th">authors</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>7482</td>
+<td>Synthesis of peptides by the solid-phase method. 7. Substance P and analogues.</td>
+<td>Fournier A, Couture R, Regoli D, Gendreau M, St-Pierre S.</td>
+</tr>
+<tr class="even">
+<td>12331</td>
+<td>Design and synthesis of side-chain conformationally restricted phenylalanines and their use for structure-activity studies on tachykinin NK-1 receptor.</td>
+<td>Josien H, Lavielle S, Brunissen A, Saffroy M, Torrens Y, Beaujouan JC, Glowinski J, Chassaing G.</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+<p>I looked at a number of different highly ranked document pairs here and they all contain peptides or other fairly large molecules. This makes sense given that I am using a bit vector fingerprint for similarity, but isn’t ideal for what I am trying to do. In a followup post I will explore a bit deeper into the list of highly ranked documents and/or try using count-based fingerprints.</p>
+
+
+</section>
+
+</main> <!-- /main -->
+<script id="quarto-html-after-body" type="application/javascript">
+window.document.addEventListener("DOMContentLoaded", function (event) {
+  const toggleBodyColorMode = (bsSheetEl) => {
+    const mode = bsSheetEl.getAttribute("data-mode");
+    const bodyEl = window.document.querySelector("body");
+    if (mode === "dark") {
+      bodyEl.classList.add("quarto-dark");
+      bodyEl.classList.remove("quarto-light");
+    } else {
+      bodyEl.classList.add("quarto-light");
+      bodyEl.classList.remove("quarto-dark");
+    }
+  }
+  const toggleBodyColorPrimary = () => {
+    const bsSheetEl = window.document.querySelector("link#quarto-bootstrap");
+    if (bsSheetEl) {
+      toggleBodyColorMode(bsSheetEl);
+    }
+  }
+  toggleBodyColorPrimary();  
+  const disableStylesheet = (stylesheets) => {
+    for (let i=0; i < stylesheets.length; i++) {
+      const stylesheet = stylesheets[i];
+      stylesheet.rel = 'prefetch';
+    }
+  }
+  const enableStylesheet = (stylesheets) => {
+    for (let i=0; i < stylesheets.length; i++) {
+      const stylesheet = stylesheets[i];
+      stylesheet.rel = 'stylesheet';
+    }
+  }
+  const manageTransitions = (selector, allowTransitions) => {
+    const els = window.document.querySelectorAll(selector);
+    for (let i=0; i < els.length; i++) {
+      const el = els[i];
+      if (allowTransitions) {
+        el.classList.remove('notransition');
+      } else {
+        el.classList.add('notransition');
+      }
+    }
+  }
+  const toggleGiscusIfUsed = (isAlternate, darkModeDefault) => {
+    const baseTheme = document.querySelector('#giscus-base-theme')?.value ?? 'light';
+    const alternateTheme = document.querySelector('#giscus-alt-theme')?.value ?? 'dark';
+    let newTheme = '';
+    if(darkModeDefault) {
+      newTheme = isAlternate ? baseTheme : alternateTheme;
+    } else {
+      newTheme = isAlternate ? alternateTheme : baseTheme;
+    }
+    const changeGiscusTheme = () => {
+      // From: https://github.com/giscus/giscus/issues/336
+      const sendMessage = (message) => {
+        const iframe = document.querySelector('iframe.giscus-frame');
+        if (!iframe) return;
+        iframe.contentWindow.postMessage({ giscus: message }, 'https://giscus.app');
+      }
+      sendMessage({
+        setConfig: {
+          theme: newTheme
+        }
+      });
+    }
+    const isGiscussLoaded = window.document.querySelector('iframe.giscus-frame') !== null;
+    if (isGiscussLoaded) {
+      changeGiscusTheme();
+    }
+  }
+  const toggleColorMode = (alternate) => {
+    // Switch the stylesheets
+    const alternateStylesheets = window.document.querySelectorAll('link.quarto-color-scheme.quarto-color-alternate');
+    manageTransitions('#quarto-margin-sidebar .nav-link', false);
+    if (alternate) {
+      enableStylesheet(alternateStylesheets);
+      for (const sheetNode of alternateStylesheets) {
+        if (sheetNode.id === "quarto-bootstrap") {
+          toggleBodyColorMode(sheetNode);
+        }
+      }
+    } else {
+      disableStylesheet(alternateStylesheets);
+      toggleBodyColorPrimary();
+    }
+    manageTransitions('#quarto-margin-sidebar .nav-link', true);
+    // Switch the toggles
+    const toggles = window.document.querySelectorAll('.quarto-color-scheme-toggle');
+    for (let i=0; i < toggles.length; i++) {
+      const toggle = toggles[i];
+      if (toggle) {
+        if (alternate) {
+          toggle.classList.add("alternate");     
+        } else {
+          toggle.classList.remove("alternate");
+        }
+      }
+    }
+    // Hack to workaround the fact that safari doesn't
+    // properly recolor the scrollbar when toggling (#1455)
+    if (navigator.userAgent.indexOf('Safari') > 0 && navigator.userAgent.indexOf('Chrome') == -1) {
+      manageTransitions("body", false);
+      window.scrollTo(0, 1);
+      setTimeout(() => {
+        window.scrollTo(0, 0);
+        manageTransitions("body", true);
+      }, 40);  
+    }
+  }
+  const isFileUrl = () => { 
+    return window.location.protocol === 'file:';
+  }
+  const hasAlternateSentinel = () => {  
+    let styleSentinel = getColorSchemeSentinel();
+    if (styleSentinel !== null) {
+      return styleSentinel === "alternate";
+    } else {
+      return false;
+    }
+  }
+  const setStyleSentinel = (alternate) => {
+    const value = alternate ? "alternate" : "default";
+    if (!isFileUrl()) {
+      window.localStorage.setItem("quarto-color-scheme", value);
+    } else {
+      localAlternateSentinel = value;
+    }
+  }
+  const getColorSchemeSentinel = () => {
+    if (!isFileUrl()) {
+      const storageValue = window.localStorage.getItem("quarto-color-scheme");
+      return storageValue != null ? storageValue : localAlternateSentinel;
+    } else {
+      return localAlternateSentinel;
+    }
+  }
+  const darkModeDefault = false;
+  let localAlternateSentinel = darkModeDefault ? 'alternate' : 'default';
+  // Dark / light mode switch
+  window.quartoToggleColorScheme = () => {
+    // Read the current dark / light value 
+    let toAlternate = !hasAlternateSentinel();
+    toggleColorMode(toAlternate);
+    setStyleSentinel(toAlternate);
+    toggleGiscusIfUsed(toAlternate, darkModeDefault);
+  };
+  // Ensure there is a toggle, if there isn't float one in the top right
+  if (window.document.querySelector('.quarto-color-scheme-toggle') === null) {
+    const a = window.document.createElement('a');
+    a.classList.add('top-right');
+    a.classList.add('quarto-color-scheme-toggle');
+    a.href = "";
+    a.onclick = function() { try { window.quartoToggleColorScheme(); } catch {} return false; };
+    const i = window.document.createElement("i");
+    i.classList.add('bi');
+    a.appendChild(i);
+    window.document.body.appendChild(a);
+  }
+  // Switch to dark mode if need be
+  if (hasAlternateSentinel()) {
+    toggleColorMode(true);
+  } else {
+    toggleColorMode(false);
+  }
+  const icon = "";
+  const anchorJS = new window.AnchorJS();
+  anchorJS.options = {
+    placement: 'right',
+    icon: icon
+  };
+  anchorJS.add('.anchored');
+  const isCodeAnnotation = (el) => {
+    for (const clz of el.classList) {
+      if (clz.startsWith('code-annotation-')) {                     
+        return true;
+      }
+    }
+    return false;
+  }
+  const onCopySuccess = function(e) {
+    // button target
+    const button = e.trigger;
+    // don't keep focus
+    button.blur();
+    // flash "checked"
+    button.classList.add('code-copy-button-checked');
+    var currentTitle = button.getAttribute("title");
+    button.setAttribute("title", "Copied!");
+    let tooltip;
+    if (window.bootstrap) {
+      button.setAttribute("data-bs-toggle", "tooltip");
+      button.setAttribute("data-bs-placement", "left");
+      button.setAttribute("data-bs-title", "Copied!");
+      tooltip = new bootstrap.Tooltip(button, 
+        { trigger: "manual", 
+          customClass: "code-copy-button-tooltip",
+          offset: [0, -8]});
+      tooltip.show();    
+    }
+    setTimeout(function() {
+      if (tooltip) {
+        tooltip.hide();
+        button.removeAttribute("data-bs-title");
+        button.removeAttribute("data-bs-toggle");
+        button.removeAttribute("data-bs-placement");
+      }
+      button.setAttribute("title", currentTitle);
+      button.classList.remove('code-copy-button-checked');
+    }, 1000);
+    // clear code selection
+    e.clearSelection();
+  }
+  const getTextToCopy = function(trigger) {
+      const codeEl = trigger.previousElementSibling.cloneNode(true);
+      for (const childEl of codeEl.children) {
+        if (isCodeAnnotation(childEl)) {
+          childEl.remove();
+        }
+      }
+      return codeEl.innerText;
+  }
+  const clipboard = new window.ClipboardJS('.code-copy-button:not([data-in-quarto-modal])', {
+    text: getTextToCopy
+  });
+  clipboard.on('success', onCopySuccess);
+  if (window.document.getElementById('quarto-embedded-source-code-modal')) {
+    const clipboardModal = new window.ClipboardJS('.code-copy-button[data-in-quarto-modal]', {
+      text: getTextToCopy,
+      container: window.document.getElementById('quarto-embedded-source-code-modal')
+    });
+    clipboardModal.on('success', onCopySuccess);
+  }
+    var localhostRegex = new RegExp(/^(?:http|https):\/\/localhost\:?[0-9]*\//);
+    var mailtoRegex = new RegExp(/^mailto:/);
+      var filterRegex = new RegExp("https:\/\/greglandrum\.github\.io\/rdkit-blog\/");
+    var isInternal = (href) => {
+        return filterRegex.test(href) || localhostRegex.test(href) || mailtoRegex.test(href);
+    }
+    // Inspect non-navigation links and adorn them if external
+ 	var links = window.document.querySelectorAll('a[href]:not(.nav-link):not(.navbar-brand):not(.toc-action):not(.sidebar-link):not(.sidebar-item-toggle):not(.pagination-link):not(.no-external):not([aria-hidden]):not(.dropdown-item):not(.quarto-navigation-tool):not(.about-link)');
+    for (var i=0; i<links.length; i++) {
+      const link = links[i];
+      if (!isInternal(link.href)) {
+        // undo the damage that might have been done by quarto-nav.js in the case of
+        // links that we want to consider external
+        if (link.dataset.originalHref !== undefined) {
+          link.href = link.dataset.originalHref;
+        }
+      }
+    }
+  function tippyHover(el, contentFn, onTriggerFn, onUntriggerFn) {
+    const config = {
+      allowHTML: true,
+      maxWidth: 500,
+      delay: 100,
+      arrow: false,
+      appendTo: function(el) {
+          return el.parentElement;
+      },
+      interactive: true,
+      interactiveBorder: 10,
+      theme: 'quarto',
+      placement: 'bottom-start',
+    };
+    if (contentFn) {
+      config.content = contentFn;
+    }
+    if (onTriggerFn) {
+      config.onTrigger = onTriggerFn;
+    }
+    if (onUntriggerFn) {
+      config.onUntrigger = onUntriggerFn;
+    }
+    window.tippy(el, config); 
+  }
+  const noterefs = window.document.querySelectorAll('a[role="doc-noteref"]');
+  for (var i=0; i<noterefs.length; i++) {
+    const ref = noterefs[i];
+    tippyHover(ref, function() {
+      // use id or data attribute instead here
+      let href = ref.getAttribute('data-footnote-href') || ref.getAttribute('href');
+      try { href = new URL(href).hash; } catch {}
+      const id = href.replace(/^#\/?/, "");
+      const note = window.document.getElementById(id);
+      if (note) {
+        return note.innerHTML;
+      } else {
+        return "";
+      }
+    });
+  }
+  const xrefs = window.document.querySelectorAll('a.quarto-xref');
+  const processXRef = (id, note) => {
+    // Strip column container classes
+    const stripColumnClz = (el) => {
+      el.classList.remove("page-full", "page-columns");
+      if (el.children) {
+        for (const child of el.children) {
+          stripColumnClz(child);
+        }
+      }
+    }
+    stripColumnClz(note)
+    if (id === null || id.startsWith('sec-')) {
+      // Special case sections, only their first couple elements
+      const container = document.createElement("div");
+      if (note.children && note.children.length > 2) {
+        container.appendChild(note.children[0].cloneNode(true));
+        for (let i = 1; i < note.children.length; i++) {
+          const child = note.children[i];
+          if (child.tagName === "P" && child.innerText === "") {
+            continue;
+          } else {
+            container.appendChild(child.cloneNode(true));
+            break;
+          }
+        }
+        if (window.Quarto?.typesetMath) {
+          window.Quarto.typesetMath(container);
+        }
+        return container.innerHTML
+      } else {
+        if (window.Quarto?.typesetMath) {
+          window.Quarto.typesetMath(note);
+        }
+        return note.innerHTML;
+      }
+    } else {
+      // Remove any anchor links if they are present
+      const anchorLink = note.querySelector('a.anchorjs-link');
+      if (anchorLink) {
+        anchorLink.remove();
+      }
+      if (window.Quarto?.typesetMath) {
+        window.Quarto.typesetMath(note);
+      }
+      if (note.classList.contains("callout")) {
+        return note.outerHTML;
+      } else {
+        return note.innerHTML;
+      }
+    }
+  }
+  for (var i=0; i<xrefs.length; i++) {
+    const xref = xrefs[i];
+    tippyHover(xref, undefined, function(instance) {
+      instance.disable();
+      let url = xref.getAttribute('href');
+      let hash = undefined; 
+      if (url.startsWith('#')) {
+        hash = url;
+      } else {
+        try { hash = new URL(url).hash; } catch {}
+      }
+      if (hash) {
+        const id = hash.replace(/^#\/?/, "");
+        const note = window.document.getElementById(id);
+        if (note !== null) {
+          try {
+            const html = processXRef(id, note.cloneNode(true));
+            instance.setContent(html);
+          } finally {
+            instance.enable();
+            instance.show();
+          }
+        } else {
+          // See if we can fetch this
+          fetch(url.split('#')[0])
+          .then(res => res.text())
+          .then(html => {
+            const parser = new DOMParser();
+            const htmlDoc = parser.parseFromString(html, "text/html");
+            const note = htmlDoc.getElementById(id);
+            if (note !== null) {
+              const html = processXRef(id, note);
+              instance.setContent(html);
+            } 
+          }).finally(() => {
+            instance.enable();
+            instance.show();
+          });
+        }
+      } else {
+        // See if we can fetch a full url (with no hash to target)
+        // This is a special case and we should probably do some content thinning / targeting
+        fetch(url)
+        .then(res => res.text())
+        .then(html => {
+          const parser = new DOMParser();
+          const htmlDoc = parser.parseFromString(html, "text/html");
+          const note = htmlDoc.querySelector('main.content');
+          if (note !== null) {
+            // This should only happen for chapter cross references
+            // (since there is no id in the URL)
+            // remove the first header
+            if (note.children.length > 0 && note.children[0].tagName === "HEADER") {
+              note.children[0].remove();
+            }
+            const html = processXRef(null, note);
+            instance.setContent(html);
+          } 
+        }).finally(() => {
+          instance.enable();
+          instance.show();
+        });
+      }
+    }, function(instance) {
+    });
+  }
+      let selectedAnnoteEl;
+      const selectorForAnnotation = ( cell, annotation) => {
+        let cellAttr = 'data-code-cell="' + cell + '"';
+        let lineAttr = 'data-code-annotation="' +  annotation + '"';
+        const selector = 'span[' + cellAttr + '][' + lineAttr + ']';
+        return selector;
+      }
+      const selectCodeLines = (annoteEl) => {
+        const doc = window.document;
+        const targetCell = annoteEl.getAttribute("data-target-cell");
+        const targetAnnotation = annoteEl.getAttribute("data-target-annotation");
+        const annoteSpan = window.document.querySelector(selectorForAnnotation(targetCell, targetAnnotation));
+        const lines = annoteSpan.getAttribute("data-code-lines").split(",");
+        const lineIds = lines.map((line) => {
+          return targetCell + "-" + line;
+        })
+        let top = null;
+        let height = null;
+        let parent = null;
+        if (lineIds.length > 0) {
+            //compute the position of the single el (top and bottom and make a div)
+            const el = window.document.getElementById(lineIds[0]);
+            top = el.offsetTop;
+            height = el.offsetHeight;
+            parent = el.parentElement.parentElement;
+          if (lineIds.length > 1) {
+            const lastEl = window.document.getElementById(lineIds[lineIds.length - 1]);
+            const bottom = lastEl.offsetTop + lastEl.offsetHeight;
+            height = bottom - top;
+          }
+          if (top !== null && height !== null && parent !== null) {
+            // cook up a div (if necessary) and position it 
+            let div = window.document.getElementById("code-annotation-line-highlight");
+            if (div === null) {
+              div = window.document.createElement("div");
+              div.setAttribute("id", "code-annotation-line-highlight");
+              div.style.position = 'absolute';
+              parent.appendChild(div);
+            }
+            div.style.top = top - 2 + "px";
+            div.style.height = height + 4 + "px";
+            div.style.left = 0;
+            let gutterDiv = window.document.getElementById("code-annotation-line-highlight-gutter");
+            if (gutterDiv === null) {
+              gutterDiv = window.document.createElement("div");
+              gutterDiv.setAttribute("id", "code-annotation-line-highlight-gutter");
+              gutterDiv.style.position = 'absolute';
+              const codeCell = window.document.getElementById(targetCell);
+              const gutter = codeCell.querySelector('.code-annotation-gutter');
+              gutter.appendChild(gutterDiv);
+            }
+            gutterDiv.style.top = top - 2 + "px";
+            gutterDiv.style.height = height + 4 + "px";
+          }
+          selectedAnnoteEl = annoteEl;
+        }
+      };
+      const unselectCodeLines = () => {
+        const elementsIds = ["code-annotation-line-highlight", "code-annotation-line-highlight-gutter"];
+        elementsIds.forEach((elId) => {
+          const div = window.document.getElementById(elId);
+          if (div) {
+            div.remove();
+          }
+        });
+        selectedAnnoteEl = undefined;
+      };
+        // Handle positioning of the toggle
+    window.addEventListener(
+      "resize",
+      throttle(() => {
+        elRect = undefined;
+        if (selectedAnnoteEl) {
+          selectCodeLines(selectedAnnoteEl);
+        }
+      }, 10)
+    );
+    function throttle(fn, ms) {
+    let throttle = false;
+    let timer;
+      return (...args) => {
+        if(!throttle) { // first call gets through
+            fn.apply(this, args);
+            throttle = true;
+        } else { // all the others get throttled
+            if(timer) clearTimeout(timer); // cancel #2
+            timer = setTimeout(() => {
+              fn.apply(this, args);
+              timer = throttle = false;
+            }, ms);
+        }
+      };
+    }
+      // Attach click handler to the DT
+      const annoteDls = window.document.querySelectorAll('dt[data-target-cell]');
+      for (const annoteDlNode of annoteDls) {
+        annoteDlNode.addEventListener('click', (event) => {
+          const clickedEl = event.target;
+          if (clickedEl !== selectedAnnoteEl) {
+            unselectCodeLines();
+            const activeEl = window.document.querySelector('dt[data-target-cell].code-annotation-active');
+            if (activeEl) {
+              activeEl.classList.remove('code-annotation-active');
+            }
+            selectCodeLines(clickedEl);
+            clickedEl.classList.add('code-annotation-active');
+          } else {
+            // Unselect the line
+            unselectCodeLines();
+            clickedEl.classList.remove('code-annotation-active');
+          }
+        });
+      }
+  const findCites = (el) => {
+    const parentEl = el.parentElement;
+    if (parentEl) {
+      const cites = parentEl.dataset.cites;
+      if (cites) {
+        return {
+          el,
+          cites: cites.split(' ')
+        };
+      } else {
+        return findCites(el.parentElement)
+      }
+    } else {
+      return undefined;
+    }
+  };
+  var bibliorefs = window.document.querySelectorAll('a[role="doc-biblioref"]');
+  for (var i=0; i<bibliorefs.length; i++) {
+    const ref = bibliorefs[i];
+    const citeInfo = findCites(ref);
+    if (citeInfo) {
+      tippyHover(citeInfo.el, function() {
+        var popup = window.document.createElement('div');
+        citeInfo.cites.forEach(function(cite) {
+          var citeDiv = window.document.createElement('div');
+          citeDiv.classList.add('hanging-indent');
+          citeDiv.classList.add('csl-entry');
+          var biblioDiv = window.document.getElementById('ref-' + cite);
+          if (biblioDiv) {
+            citeDiv.innerHTML = biblioDiv.innerHTML;
+          }
+          popup.appendChild(citeDiv);
+        });
+        return popup.innerHTML;
+      });
+    }
+  }
+});
+</script>
+<script src="https://utteranc.es/client.js" repo="greglandrum/rdkit-blog" issue-term="pathname" theme="github-light" crossorigin="anonymous" async="">
+</script>
+</div> <!-- /content -->
+<footer class="footer">
+  <div class="nav-footer">
+    <div class="nav-footer-left">
+<p>Copyright (C) 2025 Greg Landrum</p>
+</div>   
+    <div class="nav-footer-center">
+      &nbsp;
+    </div>
+    <div class="nav-footer-right">
+<p><a href="https://www.rdkit.org"><img src="https://www.rdkit.org/logo.small.png" class="img-fluid" alt="RDKit" width="64"></a></p>
+</div>
+  </div>
+</footer>
+
+
+
+
+</body></html>
