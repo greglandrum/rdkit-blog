@@ -10,7 +10,2155 @@
 <atom:link href="https://greglandrum.github.io/rdkit-blog/index.xml" rel="self" type="application/rss+xml"/>
 <description>RDKit experiments, tips, and tutorials</description>
 <generator>quarto-1.6.39</generator>
-<lastBuildDate>Sat, 01 Feb 2025 23:00:00 GMT</lastBuildDate>
+<lastBuildDate>Fri, 07 Feb 2025 23:00:00 GMT</lastBuildDate>
+<item>
+  <title>More on generalized substructure search</title>
+  <link>https://greglandrum.github.io/rdkit-blog/posts/2025-02-08-more-on-generalized-substructure-search.html</link>
+  <description><![CDATA[ 
+
+
+
+
+<p>This post builds on, and updates, <a href="https://greglandrum.github.io/rdkit-blog/posts/2021-08-03-generalized-substructure-search.html">an older blog post</a> as well as some material from the 2024 RDKit UGM <a href="https://github.com/rdkit/UGM_2024/blob/main/Notebooks/Greg_WhatsNew.ipynb">What’s New session</a>. It’s a tutorial on some functionality for making substructure searching considerably more flexible that we call “Generalized Substructure Search”.</p>
+<p>I will show how use to use generalized substructure search with both a <code>SubstructLibrary</code> and the RDKit PostgreSQL cartridge.</p>
+<div id="cell-2" class="cell" data-execution_count="1">
+<div class="sourceCode cell-code" id="cb1" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb1-1"><span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">import</span> copy</span>
+<span id="cb1-2"><span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">import</span> json</span>
+<span id="cb1-3"><span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">from</span> rdkit <span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">import</span> Chem</span>
+<span id="cb1-4"><span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">from</span> rdkit.Chem <span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">import</span> rdGeneralizedSubstruct</span>
+<span id="cb1-5"><span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">from</span> rdkit.Chem <span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">import</span> rdTautomerQuery</span>
+<span id="cb1-6"><span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">from</span> rdkit.Chem <span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">import</span> Draw</span>
+<span id="cb1-7"><span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">from</span> rdkit.Chem.Draw <span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">import</span> IPythonConsole</span>
+<span id="cb1-8">IPythonConsole.drawOptions.minFontSize <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> <span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">10</span></span>
+<span id="cb1-9">Draw.SetComicMode(IPythonConsole.drawOptions)</span>
+<span id="cb1-10"><span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">from</span> rdkit.Chem <span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">import</span> rdDepictor</span>
+<span id="cb1-11">rdDepictor.SetPreferCoordGen(<span class="va" style="color: #111111;
+background-color: null;
+font-style: inherit;">True</span>)</span>
+<span id="cb1-12"><span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">import</span> rdkit</span>
+<span id="cb1-13"><span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">print</span>(rdkit.__version__)</span></code></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>2024.09.5</code></pre>
+</div>
+</div>
+<div id="cell-3" class="cell" data-execution_count="2">
+<div class="sourceCode cell-code" id="cb3" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb3-1"><span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">%</span>load_ext sql</span></code></pre></div>
+</div>
+<p>Load a <code>SubstructLibrary</code> created using ChEMBL 35. I do this using Charles Hoyt’s <a href="https://github.com/cthoyt/chembl-downloader"><code>chembl_downloader</code></a> Python package to handle downloading the ChEMBL SDF data. For reference, on my 2.5 year old linux box, processing the 2.4 million molecules took ~990 seconds.</p>
+<p>The code used to construct this is:</p>
+<div class="sourceCode" id="cb4" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb4-1">chembl_version<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span><span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"35"</span></span>
+<span id="cb4-2"></span>
+<span id="cb4-3"><span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">from</span> rdkit <span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">import</span> RDLogger</span>
+<span id="cb4-4"><span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">from</span> rdkit <span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">import</span> Chem</span>
+<span id="cb4-5"><span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">from</span> rdkit.Chem <span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">import</span> rdSubstructLibrary</span>
+<span id="cb4-6"><span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">import</span> pickle, time</span>
+<span id="cb4-7"><span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">import</span> gzip</span>
+<span id="cb4-8"><span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">import</span> chembl_downloader</span>
+<span id="cb4-9"></span>
+<span id="cb4-10">RDLogger.DisableLog(<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"rdApp.warning"</span>)</span>
+<span id="cb4-11">mols <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> rdSubstructLibrary.CachedTrustedSmilesMolHolder()</span>
+<span id="cb4-12">fps <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> rdSubstructLibrary.TautomerPatternHolder(<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">1024</span>)</span>
+<span id="cb4-13">keys <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> rdSubstructLibrary.KeyFromPropHolder() </span>
+<span id="cb4-14">library <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> rdSubstructLibrary.SubstructLibrary(mols,fps, keys)</span>
+<span id="cb4-15">nats <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> []</span>
+<span id="cb4-16"><span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">with</span> chembl_downloader.supplier(version<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span>chembl_version) <span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">as</span> suppl:</span>
+<span id="cb4-17">    t1<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span>time.time()</span>
+<span id="cb4-18">    <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">for</span> i,mol <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">in</span> <span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">enumerate</span>(suppl):</span>
+<span id="cb4-19">        <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">if</span> <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">not</span> ((i<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">+</span><span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">1</span>)<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">%</span><span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">50000</span>):</span>
+<span id="cb4-20">            <span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">print</span>(<span class="ss" style="color: #20794D;
+background-color: null;
+font-style: inherit;">f"Processed </span><span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">{</span>i<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">+</span><span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">1</span><span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">}</span><span class="ss" style="color: #20794D;
+background-color: null;
+font-style: inherit;"> molecules in </span><span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">{</span>(time.time()<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">-</span>t1)<span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">:.1f}</span><span class="ss" style="color: #20794D;
+background-color: null;
+font-style: inherit;"> seconds"</span>)</span>
+<span id="cb4-21">        <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">if</span> mol <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">is</span> <span class="va" style="color: #111111;
+background-color: null;
+font-style: inherit;">None</span> <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">or</span> mol.GetNumAtoms()<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">&gt;</span><span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">75</span>:</span>
+<span id="cb4-22">            <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">continue</span></span>
+<span id="cb4-23">        library.AddMol(mol)</span>
+<span id="cb4-24">        nats.append(mol.GetNumHeavyAtoms())</span>
+<span id="cb4-25">t2<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span>time.time()</span>
+<span id="cb4-26"><span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">print</span>(<span class="ss" style="color: #20794D;
+background-color: null;
+font-style: inherit;">f"That took </span><span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">{</span>t2<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">-</span>t1<span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">:.2f}</span><span class="ss" style="color: #20794D;
+background-color: null;
+font-style: inherit;"> seconds. The library has </span><span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">{</span><span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">len</span>(library)<span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">}</span><span class="ss" style="color: #20794D;
+background-color: null;
+font-style: inherit;"> molecules."</span>)</span>
+<span id="cb4-27"><span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">with</span> <span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">open</span>(<span class="ss" style="color: #20794D;
+background-color: null;
+font-style: inherit;">f'../data/chembl</span><span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">{</span>chembl_version<span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">}</span><span class="ss" style="color: #20794D;
+background-color: null;
+font-style: inherit;">_ssslib.pkl'</span>,<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'wb+'</span>) <span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">as</span> outf:</span>
+<span id="cb4-28">    pickle.dump(library,outf)</span>
+<span id="cb4-29"></span>
+<span id="cb4-30"></span>
+<span id="cb4-31"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># we want to be able to use the number of heavy atoms as a search order:</span></span>
+<span id="cb4-32">nats <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> <span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">sorted</span>([(x,i) <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">for</span> i,x <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">in</span> <span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">enumerate</span>(nats)])</span>
+<span id="cb4-33">order <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> [y <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">for</span> x,y <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">in</span> nats]</span>
+<span id="cb4-34"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># append that to the pickle file with the substruct lib:</span></span>
+<span id="cb4-35"><span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">with</span> <span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">open</span>(<span class="ss" style="color: #20794D;
+background-color: null;
+font-style: inherit;">f'../data/chembl</span><span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">{</span>chembl_version<span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">}</span><span class="ss" style="color: #20794D;
+background-color: null;
+font-style: inherit;">_ssslib.pkl'</span>,<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'ab'</span>) <span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">as</span> outf:</span>
+<span id="cb4-36">    pickle.dump(order,outf)</span>
+<span id="cb4-37">    </span></code></pre></div>
+<p>Load the pickled <code>SubstructLibrary</code> and the order information:</p>
+<div id="cell-6" class="cell" data-execution_count="3">
+<div class="sourceCode cell-code" id="cb5" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb5-1"><span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">import</span> pickle</span>
+<span id="cb5-2"><span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">with</span> <span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">open</span>(<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'../data/chembl35_ssslib.pkl'</span>,<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'rb'</span>) <span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">as</span> inf:</span>
+<span id="cb5-3">    sslib <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> pickle.load(inf)</span>
+<span id="cb5-4">    order <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> pickle.load(inf)</span>
+<span id="cb5-5"><span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">print</span>(<span class="ss" style="color: #20794D;
+background-color: null;
+font-style: inherit;">f'SubstructLibrary loaded with </span><span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">{</span><span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">len</span>(sslib)<span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">}</span><span class="ss" style="color: #20794D;
+background-color: null;
+font-style: inherit;"> molecules'</span>)</span></code></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>SubstructLibrary loaded with 2430167 molecules</code></pre>
+</div>
+</div>
+<section id="advanced-query-basics" class="level1">
+<h1>Advanced query basics</h1>
+<p>(Yes, I am laughing as I write this)</p>
+<p>Start with a query including a variable attachment point:</p>
+<div id="cell-9" class="cell" data-execution_count="4">
+<div class="sourceCode cell-code" id="cb7" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb7-1">qmb <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'''</span></span>
+<span id="cb7-2"><span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">  Mrv2108 08012107372D          </span></span>
+<span id="cb7-3"></span>
+<span id="cb7-4"><span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">  0  0  0     0  0            999 V3000</span></span>
+<span id="cb7-5"><span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">M  V30 BEGIN CTAB</span></span>
+<span id="cb7-6"><span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">M  V30 COUNTS 11 11 0 0 0</span></span>
+<span id="cb7-7"><span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">M  V30 BEGIN ATOM</span></span>
+<span id="cb7-8"><span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">M  V30 1 C -2.4167 7.8734 0 0</span></span>
+<span id="cb7-9"><span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">M  V30 2 C -3.7503 7.1034 0 0</span></span>
+<span id="cb7-10"><span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">M  V30 3 C -3.7503 5.5633 0 0</span></span>
+<span id="cb7-11"><span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">M  V30 4 N -2.4167 4.7933 0 0</span></span>
+<span id="cb7-12"><span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">M  V30 5 C -1.083 5.5633 0 0</span></span>
+<span id="cb7-13"><span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">M  V30 6 C -1.083 7.1034 0 0</span></span>
+<span id="cb7-14"><span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">M  V30 7 N 0.3973 7.5279 0 0</span></span>
+<span id="cb7-15"><span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">M  V30 8 N 0.3104 5.0377 0 0</span></span>
+<span id="cb7-16"><span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">M  V30 9 C 1.2585 6.2511 0 0</span></span>
+<span id="cb7-17"><span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">M  V30 10 * 0.3539 6.2828 0 0</span></span>
+<span id="cb7-18"><span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">M  V30 11 C 1.5089 8.2833 0 0</span></span>
+<span id="cb7-19"><span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">M  V30 END ATOM</span></span>
+<span id="cb7-20"><span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">M  V30 BEGIN BOND</span></span>
+<span id="cb7-21"><span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">M  V30 1 1 1 2</span></span>
+<span id="cb7-22"><span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">M  V30 2 2 2 3</span></span>
+<span id="cb7-23"><span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">M  V30 3 1 3 4</span></span>
+<span id="cb7-24"><span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">M  V30 4 2 4 5</span></span>
+<span id="cb7-25"><span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">M  V30 5 1 5 6</span></span>
+<span id="cb7-26"><span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">M  V30 6 2 1 6</span></span>
+<span id="cb7-27"><span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">M  V30 7 1 7 6</span></span>
+<span id="cb7-28"><span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">M  V30 8 1 5 8</span></span>
+<span id="cb7-29"><span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">M  V30 9 1 8 9</span></span>
+<span id="cb7-30"><span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">M  V30 10 2 7 9</span></span>
+<span id="cb7-31"><span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">M  V30 11 1 10 11 ENDPTS=(2 8 7) ATTACH=ANY</span></span>
+<span id="cb7-32"><span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">M  V30 END BOND</span></span>
+<span id="cb7-33"><span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">M  V30 END CTAB</span></span>
+<span id="cb7-34"><span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">M  END</span></span>
+<span id="cb7-35"><span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'''</span></span>
+<span id="cb7-36">qry <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> Chem.MolFromMolBlock(qmb)</span>
+<span id="cb7-37">qry</span></code></pre></div>
+<div class="cell-output cell-output-display" data-execution_count="4">
+<div>
+<figure class="figure">
+<p><img src="https://greglandrum.github.io/rdkit-blog/posts/2025-02-08-more-on-generalized-substructure-search_files/figure-html/cell-5-output-1.png" class="img-fluid figure-img"></p>
+</figure>
+</div>
+</div>
+</div>
+<p>If we just use that query with the substruct library we don’t get the expected results:</p>
+<div id="cell-11" class="cell" data-execution_count="5">
+<div class="sourceCode cell-code" id="cb8" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb8-1"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># change the sort order of the substruct library so that</span></span>
+<span id="cb8-2"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># we get the matches in order of increasing number of heavy atoms</span></span>
+<span id="cb8-3">sslib.SetSearchOrder(order)</span>
+<span id="cb8-4">mids <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> sslib.GetMatches(qry)</span>
+<span id="cb8-5"><span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">print</span>(<span class="ss" style="color: #20794D;
+background-color: null;
+font-style: inherit;">f'</span><span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">{</span><span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">len</span>(mids)<span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">}</span><span class="ss" style="color: #20794D;
+background-color: null;
+font-style: inherit;"> results'</span>)</span>
+<span id="cb8-6">ms <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> [sslib.GetMolHolder().GetMol(x) <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">for</span> x <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">in</span> mids[:<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">9</span>]]</span>
+<span id="cb8-7">legends <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> [sslib.GetKeyHolder().GetKey(x) <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">for</span> x <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">in</span> mids[:<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">9</span>]]</span>
+<span id="cb8-8">Draw.MolsToGridImage(ms,legends<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span>legends,subImgSize<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span>(<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">250</span>,<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">200</span>))</span></code></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>1000 results</code></pre>
+</div>
+<div class="cell-output cell-output-display" data-execution_count="5">
+<div>
+<figure class="figure">
+<p><img src="https://greglandrum.github.io/rdkit-blog/posts/2025-02-08-more-on-generalized-substructure-search_files/figure-html/cell-6-output-2.png" class="img-fluid figure-img"></p>
+</figure>
+</div>
+</div>
+</div>
+<p>Repeat that query using the cartridge and my local install of ChEMBL35</p>
+<div id="cell-13" class="cell" data-execution_count="6">
+<div class="sourceCode cell-code" id="cb10" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb10-1">matches <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">%</span>sql postgresql:<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">//</span>localhost<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">/</span>chembl_35 <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">\</span></span>
+<span id="cb10-2">    select chembl_id,mol_send(m) <span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">from</span> rdk.mols <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">\</span></span>
+<span id="cb10-3">        join chembl_id_lookup on (molregno<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span>entity_id <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">and</span> entity_type<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span><span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'COMPOUND'</span>) <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">\</span></span>
+<span id="cb10-4">        join compound_properties using (molregno) <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">\</span></span>
+<span id="cb10-5">        where m<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">@&gt;</span> mol_from_ctab(:qmb) <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">\</span></span>
+<span id="cb10-6">    order by (heavy_atoms,chembl_id) limit <span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">1000</span></span>
+<span id="cb10-7">    </span>
+<span id="cb10-8"><span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">print</span>(<span class="ss" style="color: #20794D;
+background-color: null;
+font-style: inherit;">f'</span><span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">{</span><span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">len</span>(matches)<span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">}</span><span class="ss" style="color: #20794D;
+background-color: null;
+font-style: inherit;"> matches'</span>)</span>
+<span id="cb10-9">    </span>
+<span id="cb10-10">mols <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> [Chem.Mol(y.tobytes()) <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">for</span> x,y <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">in</span> matches][:<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">9</span>]</span>
+<span id="cb10-11">legends <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> [x <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">for</span> x,y <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">in</span> matches]</span>
+<span id="cb10-12">Draw.MolsToGridImage(mols,legends<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span>legends,subImgSize<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span>(<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">250</span>,<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">200</span>))</span></code></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>1000 rows affected.
+1000 matches</code></pre>
+</div>
+<div class="cell-output cell-output-display" data-execution_count="6">
+<div>
+<figure class="figure">
+<p><img src="https://greglandrum.github.io/rdkit-blog/posts/2025-02-08-more-on-generalized-substructure-search_files/figure-html/cell-7-output-2.png" class="img-fluid figure-img"></p>
+</figure>
+</div>
+</div>
+</div>
+<p>The ordering of the results is different, but the same molecules, most of which don’t match what we intended, are there.</p>
+<p>In order to use the advanced query feature (the link node) in the search, we need to construct an extended query mol and then pass that to the substruct library:</p>
+<div id="cell-15" class="cell" data-execution_count="7">
+<div class="sourceCode cell-code" id="cb12" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb12-1">xqry <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> rdGeneralizedSubstruct.CreateExtendedQueryMol(qry)</span>
+<span id="cb12-2">matches <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> sslib.GetMatches(xqry)</span>
+<span id="cb12-3"><span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">print</span>(<span class="ss" style="color: #20794D;
+background-color: null;
+font-style: inherit;">f'</span><span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">{</span><span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">len</span>(matches)<span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">}</span><span class="ss" style="color: #20794D;
+background-color: null;
+font-style: inherit;"> matches'</span>)</span>
+<span id="cb12-4">mols <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> [sslib.GetMol(x) <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">for</span> x <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">in</span> matches][:<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">9</span>]</span>
+<span id="cb12-5">legends <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> [sslib.GetKeyHolder().GetKey(x) <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">for</span> x <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">in</span> matches]</span>
+<span id="cb12-6"></span>
+<span id="cb12-7"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># get the actual matching atoms from each molecule </span></span>
+<span id="cb12-8"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># so we can highlight them:</span></span>
+<span id="cb12-9">highlights <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> []</span>
+<span id="cb12-10"><span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">for</span> mol <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">in</span> mols:</span>
+<span id="cb12-11">    highlights.append(rdGeneralizedSubstruct.MolGetSubstructMatch(mol,xqry))</span>
+<span id="cb12-12">legends <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> [sslib.GetKeyHolder().GetKey(x) <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">for</span> x <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">in</span> matches]</span>
+<span id="cb12-13">dopts <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> Draw.MolDrawOptions()</span>
+<span id="cb12-14">dopts.useBWAtomPalette()</span>
+<span id="cb12-15">Draw.MolsToGridImage(mols,legends<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span>legends,subImgSize<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span>(<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">250</span>,<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">200</span>),</span>
+<span id="cb12-16">                     highlightAtomLists<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span>highlights,drawOptions<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span>dopts)</span></code></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>1000 matches</code></pre>
+</div>
+<div class="cell-output cell-output-display" data-execution_count="7">
+<div>
+<figure class="figure">
+<p><img src="https://greglandrum.github.io/rdkit-blog/posts/2025-02-08-more-on-generalized-substructure-search_files/figure-html/cell-8-output-2.png" class="img-fluid figure-img"></p>
+</figure>
+</div>
+</div>
+</div>
+<p>Repeat that using the cartridge. The key here is the function <code>mol_to_xqmol()</code>:</p>
+<div id="cell-17" class="cell" data-execution_count="8">
+<div class="sourceCode cell-code" id="cb14" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb14-1">matches <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">%</span>sql postgresql:<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">//</span>localhost<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">/</span>chembl_35 <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">\</span></span>
+<span id="cb14-2">    select chembl_id,mol_send(m) <span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">from</span> rdk.mols <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">\</span></span>
+<span id="cb14-3">        join chembl_id_lookup on (molregno<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span>entity_id <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">and</span> entity_type<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span><span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'COMPOUND'</span>) <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">\</span></span>
+<span id="cb14-4">        join compound_properties using (molregno) <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">\</span></span>
+<span id="cb14-5">        where m<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">@&gt;</span> mol_to_xqmol(mol_from_ctab(:qmb)) <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">\</span></span>
+<span id="cb14-6">    order by (heavy_atoms,chembl_id) limit <span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">1000</span></span>
+<span id="cb14-7">    </span>
+<span id="cb14-8"><span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">print</span>(<span class="ss" style="color: #20794D;
+background-color: null;
+font-style: inherit;">f'</span><span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">{</span><span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">len</span>(matches)<span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">}</span><span class="ss" style="color: #20794D;
+background-color: null;
+font-style: inherit;"> matches'</span>)</span>
+<span id="cb14-9">    </span>
+<span id="cb14-10">mols <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> [Chem.Mol(y.tobytes()) <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">for</span> x,y <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">in</span> matches][:<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">9</span>]</span>
+<span id="cb14-11">legends <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> [x <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">for</span> x,y <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">in</span> matches]</span>
+<span id="cb14-12">Draw.MolsToGridImage(mols,legends<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span>legends,subImgSize<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span>(<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">250</span>,<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">200</span>))</span></code></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>1000 rows affected.
+1000 matches</code></pre>
+</div>
+<div class="cell-output cell-output-display" data-execution_count="8">
+<div>
+<figure class="figure">
+<p><img src="https://greglandrum.github.io/rdkit-blog/posts/2025-02-08-more-on-generalized-substructure-search_files/figure-html/cell-9-output-2.png" class="img-fluid figure-img"></p>
+</figure>
+</div>
+</div>
+</div>
+<p>Many of those include sidechains (or even other rings in the case of CHEMBL1990692) attached to the core. We can limit the results to only have substitutions at two the two positions tagged in the query using the <code>adjustQueryProperties</code> flag. You can find more information about this function in an <a href="https://rdkit.blogspot.com/2016/07/tuning-substructure-queries-ii.html">old blog post</a></p>
+<blockquote class="blockquote">
+<p>Memo to myself: update that post!</p>
+</blockquote>
+<div id="cell-19" class="cell" data-execution_count="9">
+<div class="sourceCode cell-code" id="cb16" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb16-1">aqps <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> Chem.AdjustQueryParameters()</span>
+<span id="cb16-2">aqps.adjustHeavyDegree <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> <span class="va" style="color: #111111;
+background-color: null;
+font-style: inherit;">True</span></span>
+<span id="cb16-3">aqps.adjustHeavyDegreeFlags <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> Chem.AdjustQueryWhichFlags.ADJUST_IGNORECHAINS</span>
+<span id="cb16-4">xqry <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> rdGeneralizedSubstruct.CreateExtendedQueryMol(qry,adjustQueryProperties<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span><span class="va" style="color: #111111;
+background-color: null;
+font-style: inherit;">True</span>,</span>
+<span id="cb16-5">                                                     adjustQueryParameters<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span>aqps)</span>
+<span id="cb16-6">matches <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> sslib.GetMatches(xqry)</span>
+<span id="cb16-7"><span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">print</span>(<span class="ss" style="color: #20794D;
+background-color: null;
+font-style: inherit;">f'</span><span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">{</span><span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">len</span>(matches)<span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">}</span><span class="ss" style="color: #20794D;
+background-color: null;
+font-style: inherit;"> matches'</span>)</span>
+<span id="cb16-8">mols <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> [sslib.GetMol(x) <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">for</span> x <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">in</span> matches][:<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">9</span>]</span>
+<span id="cb16-9">legends <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> [sslib.GetKeyHolder().GetKey(x) <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">for</span> x <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">in</span> matches]</span>
+<span id="cb16-10"></span>
+<span id="cb16-11">highlights <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> []</span>
+<span id="cb16-12"><span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">for</span> mol <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">in</span> mols:</span>
+<span id="cb16-13">    highlights.append(rdGeneralizedSubstruct.MolGetSubstructMatch(mol,xqry))</span>
+<span id="cb16-14">legends <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> [sslib.GetKeyHolder().GetKey(x) <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">for</span> x <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">in</span> matches]</span>
+<span id="cb16-15">dopts <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> Draw.MolDrawOptions()</span>
+<span id="cb16-16">dopts.useBWAtomPalette()</span>
+<span id="cb16-17">Draw.MolsToGridImage(mols,legends<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span>legends,subImgSize<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span>(<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">250</span>,<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">200</span>),</span>
+<span id="cb16-18">                     highlightAtomLists<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span>highlights,drawOptions<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span>dopts)</span></code></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>186 matches</code></pre>
+</div>
+<div class="cell-output cell-output-display" data-execution_count="9">
+<div>
+<figure class="figure">
+<p><img src="https://greglandrum.github.io/rdkit-blog/posts/2025-02-08-more-on-generalized-substructure-search_files/figure-html/cell-10-output-2.png" class="img-fluid figure-img"></p>
+</figure>
+</div>
+</div>
+</div>
+<p>Now do the same thing with the cartridge:</p>
+<div id="cell-21" class="cell" data-execution_count="10">
+<div class="sourceCode cell-code" id="cb18" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb18-1">params <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> json.dumps({<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"adjustHeavyDegree"</span>:<span class="va" style="color: #111111;
+background-color: null;
+font-style: inherit;">True</span>,<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"adjustHeavyDegreeFlags"</span>:<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"IGNORECHAINS"</span>})</span>
+<span id="cb18-2">matches <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">%</span>sql postgresql:<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">//</span>localhost<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">/</span>chembl_35 <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">\</span></span>
+<span id="cb18-3">    select chembl_id,mol_send(m) <span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">from</span> rdk.mols <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">\</span></span>
+<span id="cb18-4">        join chembl_id_lookup on (molregno<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span>entity_id <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">and</span> entity_type<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span><span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'COMPOUND'</span>) <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">\</span></span>
+<span id="cb18-5">        join compound_properties using (molregno) <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">\</span></span>
+<span id="cb18-6">        where m<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">@&gt;</span> mol_to_xqmol(mol_from_ctab(:qmb),true,true,true,:params) <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">\</span></span>
+<span id="cb18-7">    order by (heavy_atoms,chembl_id) limit <span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">1000</span></span>
+<span id="cb18-8">    </span>
+<span id="cb18-9"><span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">print</span>(<span class="ss" style="color: #20794D;
+background-color: null;
+font-style: inherit;">f'</span><span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">{</span><span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">len</span>(matches)<span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">}</span><span class="ss" style="color: #20794D;
+background-color: null;
+font-style: inherit;"> matches'</span>)</span>
+<span id="cb18-10">    </span>
+<span id="cb18-11">mols <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> [Chem.Mol(y.tobytes()) <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">for</span> x,y <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">in</span> matches][:<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">9</span>]</span>
+<span id="cb18-12">legends <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> [x <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">for</span> x,y <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">in</span> matches]</span>
+<span id="cb18-13">Draw.MolsToGridImage(mols,legends<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span>legends,subImgSize<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span>(<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">250</span>,<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">200</span>))</span></code></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>190 rows affected.
+190 matches</code></pre>
+</div>
+<div class="cell-output cell-output-display" data-execution_count="10">
+<div>
+<figure class="figure">
+<p><img src="https://greglandrum.github.io/rdkit-blog/posts/2025-02-08-more-on-generalized-substructure-search_files/figure-html/cell-11-output-2.png" class="img-fluid figure-img"></p>
+</figure>
+</div>
+</div>
+</div>
+</section>
+<section id="using-generic-atoms" class="level1">
+<h1>Using generic atoms</h1>
+<p>For the next query we will combine a generic atom along with a link node (a position in the molecule which can have varying numbers of atoms)</p>
+<p>There’s more information, including a list of supported atom types, in the <a href="https://www.rdkit.org/docs/RDKit_Book.html#generic-markush-queries-in-substructure-matching">RDKit book</a></p>
+<div id="cell-23" class="cell" data-execution_count="11">
+<div class="sourceCode cell-code" id="cb20" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb20-1">qmb <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'''</span></span>
+<span id="cb20-2"><span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">  Mrv2401 02062512582D          </span></span>
+<span id="cb20-3"></span>
+<span id="cb20-4"><span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">  0  0  0     0  0            999 V3000</span></span>
+<span id="cb20-5"><span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">M  V30 BEGIN CTAB</span></span>
+<span id="cb20-6"><span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">M  V30 COUNTS 12 13 1 0 0</span></span>
+<span id="cb20-7"><span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">M  V30 BEGIN ATOM</span></span>
+<span id="cb20-8"><span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">M  V30 1 C -2.4167 7.8733 0 0</span></span>
+<span id="cb20-9"><span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">M  V30 2 C -3.7503 7.1033 0 0</span></span>
+<span id="cb20-10"><span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">M  V30 3 C -3.7503 5.5632 0 0</span></span>
+<span id="cb20-11"><span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">M  V30 4 N -2.4167 4.7932 0 0</span></span>
+<span id="cb20-12"><span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">M  V30 5 C -1.083 5.5632 0 0</span></span>
+<span id="cb20-13"><span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">M  V30 6 C -1.083 7.1033 0 0</span></span>
+<span id="cb20-14"><span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">M  V30 7 N 0.3973 7.5278 0 0</span></span>
+<span id="cb20-15"><span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">M  V30 8 N 0.3104 5.0376 0 0</span></span>
+<span id="cb20-16"><span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">M  V30 9 C 1.2585 6.251 0 0</span></span>
+<span id="cb20-17"><span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">M  V30 10 C 2.7975 6.1973 0 0</span></span>
+<span id="cb20-18"><span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">M  V30 11 N 3.6136 7.5032 0 0</span></span>
+<span id="cb20-19"><span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">M  V30 12 * -2.4167 9.4133 0 0</span></span>
+<span id="cb20-20"><span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">M  V30 END ATOM</span></span>
+<span id="cb20-21"><span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">M  V30 BEGIN BOND</span></span>
+<span id="cb20-22"><span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">M  V30 1 1 1 2</span></span>
+<span id="cb20-23"><span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">M  V30 2 2 2 3</span></span>
+<span id="cb20-24"><span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">M  V30 3 1 3 4</span></span>
+<span id="cb20-25"><span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">M  V30 4 2 4 5</span></span>
+<span id="cb20-26"><span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">M  V30 5 1 5 6</span></span>
+<span id="cb20-27"><span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">M  V30 6 2 1 6</span></span>
+<span id="cb20-28"><span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">M  V30 7 1 7 6</span></span>
+<span id="cb20-29"><span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">M  V30 8 1 5 8</span></span>
+<span id="cb20-30"><span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">M  V30 9 1 8 9</span></span>
+<span id="cb20-31"><span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">M  V30 10 2 7 9</span></span>
+<span id="cb20-32"><span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">M  V30 11 1 9 10</span></span>
+<span id="cb20-33"><span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">M  V30 12 1 10 11</span></span>
+<span id="cb20-34"><span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">M  V30 13 1 1 12</span></span>
+<span id="cb20-35"><span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">M  V30 END BOND</span></span>
+<span id="cb20-36"><span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">M  V30 LINKNODE 1 3 2 10 9 10 11</span></span>
+<span id="cb20-37"><span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">M  V30 BEGIN SGROUP</span></span>
+<span id="cb20-38"><span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">M  V30 1 SUP 0 ATOMS=(1 12) SAP=(3 12 1 1) XBONDS=(1 13) LABEL=ARY ESTATE=E</span></span>
+<span id="cb20-39"><span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">M  V30 END SGROUP</span></span>
+<span id="cb20-40"><span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">M  V30 END CTAB</span></span>
+<span id="cb20-41"><span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">M  END</span></span>
+<span id="cb20-42"><span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'''</span></span>
+<span id="cb20-43">qry <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> Chem.MolFromMolBlock(qmb)</span>
+<span id="cb20-44"></span>
+<span id="cb20-45"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># we currently have to do some contortions in order to show labels for the Sgroups:</span></span>
+<span id="cb20-46">lbls <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> []</span>
+<span id="cb20-47"><span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">for</span> sgs <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">in</span> Chem.GetMolSubstanceGroups(qry):</span>
+<span id="cb20-48">    <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">if</span> sgs.GetProp(<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'TYPE'</span>) <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">==</span> <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'SUP'</span>:</span>
+<span id="cb20-49">        lbls.append((sgs.GetAtoms()[<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">0</span>],sgs.GetProp(<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"LABEL"</span>)))</span>
+<span id="cb20-50"></span>
+<span id="cb20-51"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># convert the Sgroups into queries:        </span></span>
+<span id="cb20-52">Chem.SetGenericQueriesFromProperties(qry)</span>
+<span id="cb20-53"></span>
+<span id="cb20-54"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># now apply the labels</span></span>
+<span id="cb20-55"><span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">for</span> idx,lbl <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">in</span> lbls:</span>
+<span id="cb20-56">    qry.GetAtomWithIdx(idx).SetProp(<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'atomLabel'</span>,lbl)</span>
+<span id="cb20-57">                    </span>
+<span id="cb20-58"></span>
+<span id="cb20-59">qry</span></code></pre></div>
+<div class="cell-output cell-output-display" data-execution_count="11">
+<div>
+<figure class="figure">
+<p><img src="https://greglandrum.github.io/rdkit-blog/posts/2025-02-08-more-on-generalized-substructure-search_files/figure-html/cell-12-output-1.png" class="img-fluid figure-img"></p>
+</figure>
+</div>
+</div>
+</div>
+<div id="cell-24" class="cell" data-execution_count="12">
+<div class="sourceCode cell-code" id="cb21" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb21-1">aqps <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> Chem.AdjustQueryParameters()</span>
+<span id="cb21-2">aqps.adjustHeavyDegree <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> <span class="va" style="color: #111111;
+background-color: null;
+font-style: inherit;">True</span></span>
+<span id="cb21-3">aqps.adjustHeavyDegreeFlags <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> Chem.AdjustQueryWhichFlags.ADJUST_IGNORECHAINS</span>
+<span id="cb21-4"></span>
+<span id="cb21-5">xqry <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> rdGeneralizedSubstruct.CreateExtendedQueryMol(qry,adjustQueryProperties<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span><span class="va" style="color: #111111;
+background-color: null;
+font-style: inherit;">True</span>,</span>
+<span id="cb21-6">                                                     adjustQueryParameters<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span>aqps)</span>
+<span id="cb21-7">params <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> Chem.SubstructMatchParameters()</span>
+<span id="cb21-8">params.useGenericMatchers <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> <span class="va" style="color: #111111;
+background-color: null;
+font-style: inherit;">True</span></span>
+<span id="cb21-9">matches <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> sslib.GetMatches(xqry, params)</span>
+<span id="cb21-10"><span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">print</span>(<span class="ss" style="color: #20794D;
+background-color: null;
+font-style: inherit;">f'</span><span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">{</span><span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">len</span>(matches)<span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">}</span><span class="ss" style="color: #20794D;
+background-color: null;
+font-style: inherit;"> matches'</span>)</span>
+<span id="cb21-11"></span>
+<span id="cb21-12">mols <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> [sslib.GetMol(x) <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">for</span> x <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">in</span> matches][:<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">9</span>]</span>
+<span id="cb21-13">legends <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> [sslib.GetKeyHolder().GetKey(x) <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">for</span> x <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">in</span> matches]</span>
+<span id="cb21-14"></span>
+<span id="cb21-15">highlights <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> []</span>
+<span id="cb21-16"><span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">for</span> mol <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">in</span> mols:</span>
+<span id="cb21-17">    highlights.append(rdGeneralizedSubstruct.MolGetSubstructMatch(mol,xqry))</span>
+<span id="cb21-18">legends <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> [sslib.GetKeyHolder().GetKey(x) <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">for</span> x <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">in</span> matches]</span>
+<span id="cb21-19">dopts <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> Draw.MolDrawOptions()</span>
+<span id="cb21-20">dopts.useBWAtomPalette()</span>
+<span id="cb21-21">Draw.MolsToGridImage(mols,legends<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span>legends,subImgSize<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span>(<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">250</span>,<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">200</span>),</span>
+<span id="cb21-22">                     highlightAtomLists<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span>highlights,drawOptions<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span>dopts)</span>
+<span id="cb21-23"></span></code></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>2 matches</code></pre>
+</div>
+<div class="cell-output cell-output-display" data-execution_count="12">
+<div>
+<figure class="figure">
+<p><img src="https://greglandrum.github.io/rdkit-blog/posts/2025-02-08-more-on-generalized-substructure-search_files/figure-html/cell-13-output-2.png" class="img-fluid figure-img"></p>
+</figure>
+</div>
+</div>
+</div>
+<p>We can use generic queries in the cartridge by explicitly calling <code>mol_adjust_query_properties()</code> and including <code>"setGenericQueryFromProperties":true</code> in its arguments (we should clean that up, and make <code>mol_to_xqmol()</code> support the extra work), and by using the <code>@&gt;&gt;</code> operator to search instead of the normal <code>@&gt;</code> substructure search operator.</p>
+<div id="cell-26" class="cell" data-execution_count="13">
+<div class="sourceCode cell-code" id="cb23" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb23-1">params <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> json.dumps({<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"adjustHeavyDegree"</span>:<span class="va" style="color: #111111;
+background-color: null;
+font-style: inherit;">True</span>,</span>
+<span id="cb23-2">                     <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"adjustHeavyDegreeFlags"</span>:<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"IGNORECHAINS"</span>,</span>
+<span id="cb23-3">                     <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"setGenericQueryFromProperties"</span>:<span class="va" style="color: #111111;
+background-color: null;
+font-style: inherit;">True</span>})</span>
+<span id="cb23-4">matches <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">%</span>sql postgresql:<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">//</span>localhost<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">/</span>chembl_35 <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">\</span></span>
+<span id="cb23-5">    select chembl_id,mol_send(m) <span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">from</span> rdk.mols <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">\</span></span>
+<span id="cb23-6">        join chembl_id_lookup on (molregno<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span>entity_id <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">and</span> entity_type<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span><span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'COMPOUND'</span>) <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">\</span></span>
+<span id="cb23-7">        join compound_properties using (molregno) <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">\</span></span>
+<span id="cb23-8">        where m<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">@&gt;&gt;</span> mol_to_xqmol(mol_adjust_query_properties(mol_from_ctab(:qmb),:params)) <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">\</span></span>
+<span id="cb23-9">    order by (heavy_atoms,chembl_id) limit <span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">1000</span></span>
+<span id="cb23-10">    </span>
+<span id="cb23-11"><span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">print</span>(<span class="ss" style="color: #20794D;
+background-color: null;
+font-style: inherit;">f'</span><span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">{</span><span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">len</span>(matches)<span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">}</span><span class="ss" style="color: #20794D;
+background-color: null;
+font-style: inherit;"> matches'</span>)</span>
+<span id="cb23-12">    </span>
+<span id="cb23-13">mols <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> [Chem.Mol(y.tobytes()) <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">for</span> x,y <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">in</span> matches][:<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">9</span>]</span>
+<span id="cb23-14">legends <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> [x <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">for</span> x,y <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">in</span> matches]</span>
+<span id="cb23-15">Draw.MolsToGridImage(mols,legends<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span>legends,subImgSize<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span>(<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">250</span>,<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">200</span>))</span></code></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>2 rows affected.
+2 matches</code></pre>
+</div>
+<div class="cell-output cell-output-display" data-execution_count="13">
+<div>
+<figure class="figure">
+<p><img src="https://greglandrum.github.io/rdkit-blog/posts/2025-02-08-more-on-generalized-substructure-search_files/figure-html/cell-14-output-2.png" class="img-fluid figure-img"></p>
+</figure>
+</div>
+</div>
+</div>
+<p>If we don’t use the generic matchers, we get additional results:</p>
+<div id="cell-28" class="cell" data-execution_count="14">
+<div class="sourceCode cell-code" id="cb25" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb25-1">matches <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> sslib.GetMatches(xqry)</span>
+<span id="cb25-2"><span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">print</span>(<span class="ss" style="color: #20794D;
+background-color: null;
+font-style: inherit;">f'</span><span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">{</span><span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">len</span>(matches)<span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">}</span><span class="ss" style="color: #20794D;
+background-color: null;
+font-style: inherit;"> matches'</span>)</span>
+<span id="cb25-3"></span>
+<span id="cb25-4">mols <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> [sslib.GetMol(x) <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">for</span> x <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">in</span> matches][:<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">9</span>]</span>
+<span id="cb25-5">legends <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> [sslib.GetKeyHolder().GetKey(x) <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">for</span> x <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">in</span> matches]</span>
+<span id="cb25-6"></span>
+<span id="cb25-7">highlights <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> []</span>
+<span id="cb25-8"><span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">for</span> mol <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">in</span> mols:</span>
+<span id="cb25-9">    highlights.append(rdGeneralizedSubstruct.MolGetSubstructMatch(mol,xqry))</span>
+<span id="cb25-10">legends <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> [sslib.GetKeyHolder().GetKey(x) <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">for</span> x <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">in</span> matches]</span>
+<span id="cb25-11">dopts <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> Draw.MolDrawOptions()</span>
+<span id="cb25-12">dopts.useBWAtomPalette()</span>
+<span id="cb25-13">Draw.MolsToGridImage(mols,legends<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span>legends,subImgSize<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span>(<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">250</span>,<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">200</span>),</span>
+<span id="cb25-14">                     highlightAtomLists<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span>highlights,drawOptions<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span>dopts)</span></code></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>4 matches</code></pre>
+</div>
+<div class="cell-output cell-output-display" data-execution_count="14">
+<div>
+<figure class="figure">
+<p><img src="https://greglandrum.github.io/rdkit-blog/posts/2025-02-08-more-on-generalized-substructure-search_files/figure-html/cell-15-output-2.png" class="img-fluid figure-img"></p>
+</figure>
+</div>
+</div>
+</div>
+</section>
+<section id="tautomer-insensitivity" class="level1">
+<h1>Tautomer insensitivity</h1>
+<p>We haven’t seen it in the examples so far, but the results are being done with a tautomer insensitive search - it finds molecules where a tautomer could match the query even if the molecule itself may not directly match.</p>
+<p>Here’s a query incorporating both a variable attachment point and a link node which demonstrates this:</p>
+<div id="cell-31" class="cell" data-execution_count="15">
+<div class="sourceCode cell-code" id="cb27" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb27-1">qmb <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'''qry </span></span>
+<span id="cb27-2"><span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">  Mrv2305 09052314502D          </span></span>
+<span id="cb27-3"></span>
+<span id="cb27-4"><span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">  0  0  0     0  0            999 V3000</span></span>
+<span id="cb27-5"><span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">M  V30 BEGIN CTAB</span></span>
+<span id="cb27-6"><span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">M  V30 COUNTS 13 13 0 0 0</span></span>
+<span id="cb27-7"><span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">M  V30 BEGIN ATOM</span></span>
+<span id="cb27-8"><span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">M  V30 1 N -4.75 1.9567 0 0</span></span>
+<span id="cb27-9"><span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">M  V30 2 C -6.0837 1.1867 0 0</span></span>
+<span id="cb27-10"><span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">M  V30 3 C -6.0837 -0.3534 0 0</span></span>
+<span id="cb27-11"><span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">M  V30 4 C -4.75 -1.1234 0 0</span></span>
+<span id="cb27-12"><span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">M  V30 5 C -3.4163 -0.3534 0 0</span></span>
+<span id="cb27-13"><span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">M  V30 6 C -3.4163 1.1867 0 0</span></span>
+<span id="cb27-14"><span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">M  V30 7 N -1.9692 1.7134 0 0</span></span>
+<span id="cb27-15"><span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">M  V30 8 N -1.8822 -0.7768 0 0</span></span>
+<span id="cb27-16"><span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">M  V30 9 C -1.0211 0.4999 0 0</span></span>
+<span id="cb27-17"><span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">M  V30 10 C 0.5179 0.5536 0 0</span></span>
+<span id="cb27-18"><span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">M  V30 11 N 1.2409 1.9133 0 0</span></span>
+<span id="cb27-19"><span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">M  V30 12 * -5.6391 -0.0967 0 0</span></span>
+<span id="cb27-20"><span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">M  V30 13 C -5.6391 -2.4067 0 0</span></span>
+<span id="cb27-21"><span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">M  V30 END ATOM</span></span>
+<span id="cb27-22"><span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">M  V30 BEGIN BOND</span></span>
+<span id="cb27-23"><span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">M  V30 1 1 1 2</span></span>
+<span id="cb27-24"><span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">M  V30 2 2 2 3</span></span>
+<span id="cb27-25"><span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">M  V30 3 1 3 4</span></span>
+<span id="cb27-26"><span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">M  V30 4 2 4 5</span></span>
+<span id="cb27-27"><span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">M  V30 5 1 5 6</span></span>
+<span id="cb27-28"><span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">M  V30 6 2 1 6</span></span>
+<span id="cb27-29"><span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">M  V30 7 1 8 9</span></span>
+<span id="cb27-30"><span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">M  V30 8 1 7 6</span></span>
+<span id="cb27-31"><span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">M  V30 9 1 5 8</span></span>
+<span id="cb27-32"><span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">M  V30 10 2 7 9</span></span>
+<span id="cb27-33"><span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">M  V30 11 1 9 10</span></span>
+<span id="cb27-34"><span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">M  V30 12 1 10 11</span></span>
+<span id="cb27-35"><span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">M  V30 13 1 12 13 ENDPTS=(3 4 3 2) ATTACH=ANY</span></span>
+<span id="cb27-36"><span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">M  V30 END BOND</span></span>
+<span id="cb27-37"><span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">M  V30 LINKNODE 1 2 2 10 9 10 11</span></span>
+<span id="cb27-38"><span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">M  V30 END CTAB</span></span>
+<span id="cb27-39"><span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">M  END'''</span></span>
+<span id="cb27-40"></span>
+<span id="cb27-41">qry <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> Chem.MolFromMolBlock(qmb)</span>
+<span id="cb27-42"></span>
+<span id="cb27-43">qry</span></code></pre></div>
+<div class="cell-output cell-output-display" data-execution_count="15">
+<div>
+<figure class="figure">
+<p><img src="https://greglandrum.github.io/rdkit-blog/posts/2025-02-08-more-on-generalized-substructure-search_files/figure-html/cell-16-output-1.png" class="img-fluid figure-img"></p>
+</figure>
+</div>
+</div>
+</div>
+<div id="cell-32" class="cell" data-execution_count="16">
+<div class="sourceCode cell-code" id="cb28" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb28-1">aqps <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> Chem.AdjustQueryParameters()</span>
+<span id="cb28-2">aqps.adjustHeavyDegree <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> <span class="va" style="color: #111111;
+background-color: null;
+font-style: inherit;">True</span></span>
+<span id="cb28-3">aqps.adjustHeavyDegreeFlags <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> Chem.AdjustQueryWhichFlags.ADJUST_IGNORECHAINS</span>
+<span id="cb28-4"></span>
+<span id="cb28-5">xqry <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> rdGeneralizedSubstruct.CreateExtendedQueryMol(qry,adjustQueryProperties<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span><span class="va" style="color: #111111;
+background-color: null;
+font-style: inherit;">True</span>,</span>
+<span id="cb28-6">                                                     adjustQueryParameters<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span>aqps)</span>
+<span id="cb28-7">params <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> Chem.SubstructMatchParameters()</span>
+<span id="cb28-8">params.useGenericMatchers <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> <span class="va" style="color: #111111;
+background-color: null;
+font-style: inherit;">True</span></span>
+<span id="cb28-9">matches <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> sslib.GetMatches(xqry, params)</span>
+<span id="cb28-10"><span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">print</span>(<span class="ss" style="color: #20794D;
+background-color: null;
+font-style: inherit;">f'</span><span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">{</span><span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">len</span>(matches)<span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">}</span><span class="ss" style="color: #20794D;
+background-color: null;
+font-style: inherit;"> matches'</span>)</span>
+<span id="cb28-11"></span>
+<span id="cb28-12">mols <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> [sslib.GetMol(x) <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">for</span> x <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">in</span> matches][:<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">9</span>]</span>
+<span id="cb28-13">highlights <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> []</span>
+<span id="cb28-14"><span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">for</span> mol <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">in</span> mols:</span>
+<span id="cb28-15">    highlights.append(rdGeneralizedSubstruct.MolGetSubstructMatch(mol,xqry))</span>
+<span id="cb28-16">legends <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> [sslib.GetKeyHolder().GetKey(x) <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">for</span> x <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">in</span> matches]</span>
+<span id="cb28-17">dopts <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> Draw.MolDrawOptions()</span>
+<span id="cb28-18">dopts.useBWAtomPalette()</span>
+<span id="cb28-19">Draw.MolsToGridImage(mols,legends<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span>legends,subImgSize<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span>(<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">250</span>,<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">200</span>),</span>
+<span id="cb28-20">                     highlightAtomLists<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span>highlights,drawOptions<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span>dopts)</span></code></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>20 matches</code></pre>
+</div>
+<div class="cell-output cell-output-display" data-execution_count="16">
+<div>
+<figure class="figure">
+<p><img src="https://greglandrum.github.io/rdkit-blog/posts/2025-02-08-more-on-generalized-substructure-search_files/figure-html/cell-17-output-2.png" class="img-fluid figure-img"></p>
+</figure>
+</div>
+</div>
+</div>
+<p>Molecules CHEMBL105982 and CHEMBL110180, which are drawn with a different tautomer of the ring system we’re lookin for, would not be found using a standard substructure search:</p>
+<div id="cell-34" class="cell" data-execution_count="18">
+<div class="sourceCode cell-code" id="cb30" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb30-1">Draw.MolsToGridImage(mols[<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">7</span>:<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">9</span>],legends<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span>legends[<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">7</span>:<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">9</span>], subImgSize<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span>(<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">350</span>,<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">300</span>))</span></code></pre></div>
+<div class="cell-output cell-output-display" data-execution_count="18">
+<div>
+<figure class="figure">
+<p><img src="https://greglandrum.github.io/rdkit-blog/posts/2025-02-08-more-on-generalized-substructure-search_files/figure-html/cell-18-output-1.png" class="img-fluid figure-img"></p>
+</figure>
+</div>
+</div>
+</div>
+<div id="cell-35" class="cell" data-execution_count="20">
+<div class="sourceCode cell-code" id="cb31" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb31-1">mols[<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">7</span>].HasSubstructMatch(qry),mols[<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">8</span>].HasSubstructMatch(qry)</span></code></pre></div>
+<div class="cell-output cell-output-display" data-execution_count="20">
+<pre><code>(False, False)</code></pre>
+</div>
+</div>
+</section>
+<section id="supported-query-features" class="level1">
+<h1>Supported query features</h1>
+<p>In addition to the link nodes and variable attachment points demonstrated above, the extended query mol also supports SRUs (repeat units with a specified range of repeats, these are similar to link nodes but can support multiple atoms).</p>
+<p>The list of supported generic queries can be found in the <a href="https://www.rdkit.org/docs/RDKit_Book.html#generic-markush-queries-in-substructure-matching">RDKit Book</a></p>
+</section>
+<section id="creating-advanced-queries" class="level1">
+<h1>Creating advanced queries</h1>
+<section id="sketchers" class="level2">
+<h2 class="anchored" data-anchor-id="sketchers">Sketchers</h2>
+<p>At the time I wrote this post, none of the freely available chemical sketchers I was aware of were able to create either link nodes or variable attachment points. The open sketchers like ketcher are steadily improving, but, at least as far as I can tell, they don’t support these advanced query features. I drew all the queries for the post using ChemAxon’s MarvinSketch, which has been my go-to sketcher for years. It’s cross-platform, not insanely expensive, and generaly quite good. Biovia Draw, as you’d expect, can also deal with all of these features (at least it used to back when I still had a license. I stopped paying for that one a few years ago since I wasn’t using it). I haven’t used any of the other commercial chemical sketchers recently, so I can’t comment on their support.</p>
+</section>
+<section id="by-hand" class="level2">
+<h2 class="anchored" data-anchor-id="by-hand">By hand</h2>
+<p>If you know SMARTS, it’s pretty easy to add either link nodes or variable attachment points to <a href="https://docs.chemaxon.com/display/docs/formats_chemaxon-extended-smiles-and-smarts-cxsmiles-and-cxsmarts.md">CXSMARTS</a>; here’s some documentation on the subset of CXSMARTS that the RDKit <a href="https://www.rdkit.org/docs/RDKit_Book.html#cxsmiles-cxsmarts-extensions">currently supports</a></p>
+<p>Here’s an example for a link node. Here you need to provide the index (all indices in CXSMARTS are zero-based) for the atom that is the link node along with the possible repeat counts:</p>
+<div id="cell-39" class="cell" data-execution_count="21">
+<div class="sourceCode cell-code" id="cb33" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb33-1">m <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> Chem.MolFromSmarts(<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'[#6]-1-[#6]-c2ccccc2-[#7]-1 |LN:1:1.2|'</span>)</span>
+<span id="cb33-2">m</span></code></pre></div>
+<div class="cell-output cell-output-display" data-execution_count="21">
+<div>
+<figure class="figure">
+<p><img src="https://greglandrum.github.io/rdkit-blog/posts/2025-02-08-more-on-generalized-substructure-search_files/figure-html/cell-20-output-1.png" class="img-fluid figure-img"></p>
+</figure>
+</div>
+</div>
+</div>
+<p>For variable attachment points you provide the index of the multi-center attachment point (the atom that will not be actual enumerated molecule) and the indices of the atoms that are bonded to the attachment point’s neighbor:</p>
+<div id="cell-41" class="cell" data-execution_count="22">
+<div class="sourceCode cell-code" id="cb34" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb34-1">m <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> Chem.MolFromSmarts(<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'[#6]-*.c1nc2cccnc2n1 |m:1:3.10|'</span>)</span>
+<span id="cb34-2">m</span></code></pre></div>
+<div class="cell-output cell-output-display" data-execution_count="22">
+<div>
+<figure class="figure">
+<p><img src="https://greglandrum.github.io/rdkit-blog/posts/2025-02-08-more-on-generalized-substructure-search_files/figure-html/cell-21-output-1.png" class="img-fluid figure-img"></p>
+</figure>
+</div>
+</div>
+</div>
+<p>Notice that we currently do a pretty crappy job of generating coordinates for these multi-center attachments. That’s something we need to work on at some point in the future.</p>
+<p>SRUs (repeat units that can include multiple atoms) are a bit trickier to provide by hand, but still doable:</p>
+<div id="cell-44" class="cell" data-execution_count="27">
+<div class="sourceCode cell-code" id="cb35" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb35-1">m <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> Chem.MolFromSmarts(<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'c1ccccc1-[#6]-[#8]-C=O |Sg:n:6,7:2-4:ht:::|'</span>)</span>
+<span id="cb35-2">m</span></code></pre></div>
+<div class="cell-output cell-output-display" data-execution_count="27">
+<div>
+<figure class="figure">
+<p><img src="https://greglandrum.github.io/rdkit-blog/posts/2025-02-08-more-on-generalized-substructure-search_files/figure-html/cell-22-output-1.png" class="img-fluid figure-img"></p>
+</figure>
+</div>
+</div>
+</div>
+<p>Note that the current rendering code does not automagically insert missing brackets (something we should fix), but we can see that the correct substance group type has been added:</p>
+<div id="cell-46" class="cell" data-execution_count="28">
+<div class="sourceCode cell-code" id="cb36" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb36-1">sgs <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> Chem.GetMolSubstanceGroups(m)</span>
+<span id="cb36-2">sg <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> sgs[<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">0</span>]</span>
+<span id="cb36-3">sg.GetPropsAsDict()</span></code></pre></div>
+<div class="cell-output cell-output-display" data-execution_count="28">
+<pre><code>{'TYPE': 'SRU',
+ '_cxsmilesindex': 0,
+ 'LABEL': '2-4',
+ 'CONNECT': 'HT',
+ 'XBHEAD': &lt;rdkit.rdBase._vectj at 0x78dfc975fb40&gt;,
+ 'XBCORR': &lt;rdkit.rdBase._vectj at 0x78dfc975f840&gt;,
+ 'index': 1}</code></pre>
+</div>
+</div>
+<p>Here’s the same query provided as a mol block, so we can see the brackets:</p>
+<div id="cell-48" class="cell" data-execution_count="29">
+<div class="sourceCode cell-code" id="cb38" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb38-1">qmb <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'''</span></span>
+<span id="cb38-2"><span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">  Mrv2401 02082507292D          </span></span>
+<span id="cb38-3"></span>
+<span id="cb38-4"><span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">  0  0  0     0  0            999 V3000</span></span>
+<span id="cb38-5"><span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">M  V30 BEGIN CTAB</span></span>
+<span id="cb38-6"><span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">M  V30 COUNTS 10 10 1 0 0</span></span>
+<span id="cb38-7"><span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">M  V30 BEGIN ATOM</span></span>
+<span id="cb38-8"><span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">M  V30 1 C -9.3703 -7.3117 0 0</span></span>
+<span id="cb38-9"><span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">M  V30 2 C -10.7039 -8.0817 0 0</span></span>
+<span id="cb38-10"><span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">M  V30 3 C -10.7039 -9.6218 0 0</span></span>
+<span id="cb38-11"><span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">M  V30 4 C -9.3703 -10.3918 0 0</span></span>
+<span id="cb38-12"><span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">M  V30 5 C -8.0366 -9.6218 0 0</span></span>
+<span id="cb38-13"><span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">M  V30 6 C -8.0366 -8.0817 0 0</span></span>
+<span id="cb38-14"><span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">M  V30 7 C -6.7029 -7.3117 0 0</span></span>
+<span id="cb38-15"><span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">M  V30 8 O -5.3692 -8.0818 0 0</span></span>
+<span id="cb38-16"><span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">M  V30 9 C -4.0357 -7.3118 0 0</span></span>
+<span id="cb38-17"><span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">M  V30 10 O -4.0357 -5.7718 0 0</span></span>
+<span id="cb38-18"><span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">M  V30 END ATOM</span></span>
+<span id="cb38-19"><span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">M  V30 BEGIN BOND</span></span>
+<span id="cb38-20"><span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">M  V30 1 1 1 2</span></span>
+<span id="cb38-21"><span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">M  V30 2 2 2 3</span></span>
+<span id="cb38-22"><span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">M  V30 3 1 3 4</span></span>
+<span id="cb38-23"><span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">M  V30 4 2 4 5</span></span>
+<span id="cb38-24"><span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">M  V30 5 1 5 6</span></span>
+<span id="cb38-25"><span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">M  V30 6 2 1 6</span></span>
+<span id="cb38-26"><span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">M  V30 7 1 6 7</span></span>
+<span id="cb38-27"><span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">M  V30 8 1 7 8</span></span>
+<span id="cb38-28"><span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">M  V30 9 1 8 9</span></span>
+<span id="cb38-29"><span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">M  V30 10 2 9 10</span></span>
+<span id="cb38-30"><span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">M  V30 END BOND</span></span>
+<span id="cb38-31"><span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">M  V30 BEGIN SGROUP</span></span>
+<span id="cb38-32"><span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">M  V30 1 SRU 0 ATOMS=(2 7 8) XBONDS=(2 7 9) BRKXYZ=(9 -5.2821 -6.9645 0 -</span></span>
+<span id="cb38-33"><span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">M  V30 -4.3581 -8.5649 0 0 0 0) BRKXYZ=(9 -6.7901 -8.429 0 -7.7141 -6.8286 0 -</span></span>
+<span id="cb38-34"><span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">M  V30 0 0 0) CONNECT=HT LABEL="2-4"</span></span>
+<span id="cb38-35"><span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">M  V30 END SGROUP</span></span>
+<span id="cb38-36"><span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">M  V30 END CTAB</span></span>
+<span id="cb38-37"><span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">M  END</span></span>
+<span id="cb38-38"><span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'''</span></span>
+<span id="cb38-39">qry <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> Chem.MolFromMolBlock(qmb)</span>
+<span id="cb38-40">qry</span></code></pre></div>
+<div class="cell-output cell-output-display" data-execution_count="29">
+<div>
+<figure class="figure">
+<p><img src="https://greglandrum.github.io/rdkit-blog/posts/2025-02-08-more-on-generalized-substructure-search_files/figure-html/cell-24-output-1.png" class="img-fluid figure-img"></p>
+</figure>
+</div>
+</div>
+</div>
+<p>And a quick demonstration that it actually works:</p>
+<div id="cell-50" class="cell" data-execution_count="34">
+<div class="sourceCode cell-code" id="cb39" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb39-1">tmols <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> [Chem.MolFromSmiles(smi) <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">for</span> smi <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">in</span> (<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'c1ccccc1COC(=O)O'</span>,<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'c1ccccc1COCOC(=O)O'</span>,</span>
+<span id="cb39-2">                                             <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'c1ccccc1COCOCOC(=O)O'</span>,<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'c1ccccc1COCOCOCOC(=O)O'</span>,</span>
+<span id="cb39-3">                                            <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'c1ccccc1COCOCOCOCOC(=O)O'</span>)]</span>
+<span id="cb39-4">xqry <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> rdGeneralizedSubstruct.CreateExtendedQueryMol(qry)</span>
+<span id="cb39-5"></span>
+<span id="cb39-6">highlights <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> []</span>
+<span id="cb39-7"><span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">for</span> mol <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">in</span> tmols:</span>
+<span id="cb39-8">    highlights.append(rdGeneralizedSubstruct.MolGetSubstructMatch(mol,xqry))</span>
+<span id="cb39-9">dopts <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> Draw.MolDrawOptions()</span>
+<span id="cb39-10">dopts.useBWAtomPalette()</span>
+<span id="cb39-11">legends <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> [<span class="ss" style="color: #20794D;
+background-color: null;
+font-style: inherit;">f'n=</span><span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">{</span>i<span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">}</span><span class="ss" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'</span> <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">for</span> i <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">in</span> <span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">range</span>(<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">1</span>,<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">6</span>)]</span>
+<span id="cb39-12">Draw.MolsToGridImage(tmols,subImgSize<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span>(<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">250</span>,<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">150</span>),legends<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span>legends,</span>
+<span id="cb39-13">                     highlightAtomLists<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span>highlights,drawOptions<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span>dopts)</span></code></pre></div>
+<div class="cell-output cell-output-display" data-execution_count="34">
+<div>
+<figure class="figure">
+<p><img src="https://greglandrum.github.io/rdkit-blog/posts/2025-02-08-more-on-generalized-substructure-search_files/figure-html/cell-25-output-1.png" class="img-fluid figure-img"></p>
+</figure>
+</div>
+</div>
+</div>
+
+
+</section>
+</section>
+
+ ]]></description>
+  <category>tutorial</category>
+  <category>substructure</category>
+  <guid>https://greglandrum.github.io/rdkit-blog/posts/2025-02-08-more-on-generalized-substructure-search.html</guid>
+  <pubDate>Fri, 07 Feb 2025 23:00:00 GMT</pubDate>
+  <media:content url="https://greglandrum.github.io/rdkit-blog/posts/images/blog/more-on-generalized-substructure-search-1.png" medium="image" type="image/png" height="48" width="144"/>
+</item>
 <item>
   <title>ChEMBL Document Similarity</title>
   <link>https://greglandrum.github.io/rdkit-blog/posts/2025-02-02-chembl-document-similarity-1.html</link>
@@ -17944,523 +20092,6 @@ model in</code></pre>
   <category>descriptors</category>
   <guid>https://greglandrum.github.io/rdkit-blog/posts/2023-12-01-using_sascore_and_npscore.html</guid>
   <pubDate>Thu, 30 Nov 2023 23:00:00 GMT</pubDate>
-</item>
-<item>
-  <title>Intro to Stereo Groups and Enhanced Stereochemistry</title>
-  <link>https://greglandrum.github.io/rdkit-blog/posts/2023-11-19-explaining-stereo-groups.html</link>
-  <description><![CDATA[ 
-
-
-
-
-<section id="basics-of-enhanced-stereochemistry" class="level1">
-<h1>Basics of enhanced stereochemistry</h1>
-<div id="7372d384" class="cell" data-executetime="{&quot;end_time&quot;:&quot;2023-11-19T05:43:02.382475Z&quot;,&quot;start_time&quot;:&quot;2023-11-19T05:43:02.243337Z&quot;}" data-execution_count="1">
-<div class="sourceCode cell-code" id="cb1" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb1-1"><span class="im" style="color: #00769E;
-background-color: null;
-font-style: inherit;">from</span> rdkit <span class="im" style="color: #00769E;
-background-color: null;
-font-style: inherit;">import</span> Chem</span>
-<span id="cb1-2"><span class="im" style="color: #00769E;
-background-color: null;
-font-style: inherit;">from</span> rdkit.Chem.Draw <span class="im" style="color: #00769E;
-background-color: null;
-font-style: inherit;">import</span> IPythonConsole</span>
-<span id="cb1-3">IPythonConsole.molSize <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> <span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">350</span>,<span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">300</span></span>
-<span id="cb1-4">IPythonConsole.drawOptions.addStereoAnnotation <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> <span class="va" style="color: #111111;
-background-color: null;
-font-style: inherit;">True</span></span>
-<span id="cb1-5"><span class="im" style="color: #00769E;
-background-color: null;
-font-style: inherit;">from</span> rdkit.Chem <span class="im" style="color: #00769E;
-background-color: null;
-font-style: inherit;">import</span> Draw</span>
-<span id="cb1-6"><span class="im" style="color: #00769E;
-background-color: null;
-font-style: inherit;">import</span> rdkit</span>
-<span id="cb1-7"><span class="bu" style="color: null;
-background-color: null;
-font-style: inherit;">print</span>(rdkit.__version__)</span></code></pre></div>
-<div class="cell-output cell-output-stdout">
-<pre><code>2023.09.2</code></pre>
-</div>
-</div>
-<p>Let’s start with four versions of a molecule with a single chiral center (alanine):</p>
-<div id="b278bf53" class="cell" data-executetime="{&quot;end_time&quot;:&quot;2023-11-19T05:43:02.399036Z&quot;,&quot;start_time&quot;:&quot;2023-11-19T05:43:02.383907Z&quot;}" data-execution_count="2">
-<div class="sourceCode cell-code" id="cb3" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb3-1">m <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> Chem.MolFromSmiles(<span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">'NC(C)C(=O)O'</span>)</span>
-<span id="cb3-2">m_ccw <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> Chem.MolFromSmiles(<span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">'N[C@H](C)C(=O)O'</span>)</span>
-<span id="cb3-3">m_cw <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> Chem.MolFromSmiles(<span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">'N[C@@H](C)C(=O)O'</span>)</span>
-<span id="cb3-4">m_unk <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> Chem.MolFromSmiles(<span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">'N[C@@H](C)C(=O)O |w:1.1|'</span>)</span>
-<span id="cb3-5">Chem.ReapplyMolBlockWedging(m_unk)</span>
-<span id="cb3-6">Draw.MolsToGridImage([m,m_ccw,m_cw,m_unk],legends<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span>[<span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">''</span>,<span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">'R'</span>,<span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">'S'</span>,<span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">'unknown'</span>],molsPerRow<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span><span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">4</span>)</span></code></pre></div>
-<div class="cell-output cell-output-display" data-execution_count="2">
-<div>
-<figure class="figure">
-<p><img src="https://greglandrum.github.io/rdkit-blog/posts/2023-11-19-explaining-stereo-groups_files/figure-html/cell-3-output-1.png" class="img-fluid figure-img"></p>
-</figure>
-</div>
-</div>
-</div>
-<p>Understanding what is meant by the second two SMILES is straightforward: in each case we’re dealing with a single stereoisomer. The last molecule is also reasonably clear: by providing a squiggle (or wavy) bond to one of the neighbors of the chiral center we have been explicit that we don’t know its stereochemistry.</p>
-<blockquote class="blockquote">
-<p><em>Note</em> that being explicit about what we don’t know by providing the squiggle bond requires us to use CXSMILES, an extension to SMILES developed by ChemAxon.</p>
-</blockquote>
-<p>But what does the first SMILES mean? Here no information is provided about stereochemistry, so we have to either guess or assume some convention like “unspecified chiral centers indicate a 50/50 mixture of the two possible local chiralities”. This is fine if we produce all of the SMILES that we need to work with and either never provide SMILES to anyone else or let them know about our conventions, but both of those are pretty strong assumptions/requirements.</p>
-<p>Fortunately we can do better than this by taking advantage of stereo groups, a.k.a. enhanced stereochemistry. This was introduced, I believe (the horrors of link rot and the modern internet makes it hard to be sure), by the team at MDL Information Systems back at the beginning of the ’00s. It’s supported in V3000 Mol/SDF files as well as CXSMILES.</p>
-<blockquote class="blockquote">
-<p><em>Aside</em> While writing this post I ran across a nice <a href="https://www.acdlabs.com/blog/enhanced-stereochemistry-labels-advanced-techniques-for-indicating-stereoconfigurations/">blog post</a> by the team at ACD/Labs which also discusses enhanced stereo and the ways they support it.</p>
-</blockquote>
-<p>We can use stereo groups to label what we know about each stereo center (or group of related stereo centers). There are three types of stereo groups:</p>
-<ol type="1">
-<li>abs: indicates that the absolute stereo of the centers is known</li>
-<li>and: indicates that the molecule represents a 50/50 mixture of the stereoisomer as drawn and its mirror image</li>
-<li>or: indicates that the molecule represents either the stereoisomer as drawn or its mirror image</li>
-</ol>
-<p>Here’s the application of that to alanine:</p>
-<div id="d1190576" class="cell" data-executetime="{&quot;end_time&quot;:&quot;2023-11-19T05:43:02.510492Z&quot;,&quot;start_time&quot;:&quot;2023-11-19T05:43:02.400194Z&quot;}" data-execution_count="3">
-<div class="sourceCode cell-code" id="cb4" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb4-1">m_ccw_abs <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> Chem.MolFromSmiles(<span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">'N[C@H](C)C(=O)O |a:1|'</span>)</span>
-<span id="cb4-2">m_and <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> Chem.MolFromSmiles(<span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">'N[C@H](C)C(=O)O |&amp;1:1|'</span>)</span>
-<span id="cb4-3">m_or <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> Chem.MolFromSmiles(<span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">'N[C@H](C)C(=O)O |o1:1|'</span>)</span>
-<span id="cb4-4">Draw.MolsToGridImage([m_ccw_abs,m_and,m_or],legends<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span>[<span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">'R'</span>, <span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">'R and S'</span>,<span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">'R or S'</span>])</span></code></pre></div>
-<div class="cell-output cell-output-display" data-execution_count="3">
-<div>
-<figure class="figure">
-<p><img src="https://greglandrum.github.io/rdkit-blog/posts/2023-11-19-explaining-stereo-groups_files/figure-html/cell-4-output-1.png" class="img-fluid figure-img"></p>
-</figure>
-</div>
-</div>
-</div>
-<p>Let’s look at the AND example:</p>
-<div id="957109e2" class="cell" data-executetime="{&quot;end_time&quot;:&quot;2023-11-19T05:43:02.661421Z&quot;,&quot;start_time&quot;:&quot;2023-11-19T05:43:02.512400Z&quot;}" data-execution_count="4">
-<div class="sourceCode cell-code" id="cb5" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb5-1">m_and <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> Chem.MolFromSmiles(<span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">'N[C@H](C)C(=O)O |&amp;1:1|'</span>)</span>
-<span id="cb5-2">m_and_1 <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> Chem.MolFromSmiles(<span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">'N[C@H](C)C(=O)O |a:1|'</span>)</span>
-<span id="cb5-3">m_and_2 <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> Chem.MolFromSmiles(<span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">'N[C@@H](C)C(=O)O |a:1|'</span>)</span>
-<span id="cb5-4">Draw.MolsToGridImage([m_and,m_and_1,m_and_2])</span></code></pre></div>
-<div class="cell-output cell-output-display" data-execution_count="4">
-<div>
-<figure class="figure">
-<p><img src="https://greglandrum.github.io/rdkit-blog/posts/2023-11-19-explaining-stereo-groups_files/figure-html/cell-5-output-1.png" class="img-fluid figure-img"></p>
-</figure>
-</div>
-</div>
-</div>
-<p>Here the first entry shows the molecule with stereo group while the second two entries show the two molecules contained in that mixture. If we used an OR stereo group instead of AND we’d be describing a sample with one of the two stereoisomers.</p>
-</section>
-<section id="multiple-stereocenters" class="level1">
-<h1>Multiple stereocenters</h1>
-<p>Stereo groups are even more useful if there are multiple chiral centers since they allow us to express relative stereochemistry.</p>
-<p>We’ll use this molecule with two chiral centers as an example:</p>
-<div id="15dd7ac2" class="cell" data-executetime="{&quot;end_time&quot;:&quot;2023-11-19T05:43:02.791774Z&quot;,&quot;start_time&quot;:&quot;2023-11-19T05:43:02.663033Z&quot;}" data-execution_count="5">
-<div class="sourceCode cell-code" id="cb6" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb6-1">m <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> Chem.MolFromSmiles(<span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">'OC1CCC1N'</span>)</span>
-<span id="cb6-2">m</span></code></pre></div>
-<div class="cell-output cell-output-display" data-execution_count="5">
-<div>
-<figure class="figure">
-<p><img src="https://greglandrum.github.io/rdkit-blog/posts/2023-11-19-explaining-stereo-groups_files/figure-html/cell-6-output-1.png" class="img-fluid figure-img"></p>
-</figure>
-</div>
-</div>
-</div>
-<p>We can obviously have examples of this where one or both chiral centers are fully specified, just as we saw above, but using stereo groups lets us do something new: express that the relative stereochemistry of the two centers is known:</p>
-<div id="c3438296" class="cell" data-executetime="{&quot;end_time&quot;:&quot;2023-11-19T05:43:02.917957Z&quot;,&quot;start_time&quot;:&quot;2023-11-19T05:43:02.797566Z&quot;}" data-execution_count="6">
-<div class="sourceCode cell-code" id="cb7" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb7-1">m2_cis <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> Chem.MolFromSmiles(<span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">'O[C@H]1CC[C@H]1N |&amp;1:1,4|'</span>)</span>
-<span id="cb7-2">m2_cis_1 <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> Chem.MolFromSmiles(<span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">'O[C@H]1CC[C@H]1N |a:1,4|'</span>)</span>
-<span id="cb7-3">m2_cis_2 <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> Chem.MolFromSmiles(<span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">'O[C@@H]1CC[C@@H]1N |a:1,4|'</span>)</span>
-<span id="cb7-4"></span>
-<span id="cb7-5">m2_trans <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> Chem.MolFromSmiles(<span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">'O[C@H]1CC[C@@H]1N |&amp;1:1,4|'</span>)</span>
-<span id="cb7-6">m2_trans_1 <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> Chem.MolFromSmiles(<span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">'O[C@H]1CC[C@@H]1N |a:1,4|'</span>)</span>
-<span id="cb7-7">m2_trans_2 <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> Chem.MolFromSmiles(<span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">'O[C@@H]1CC[C@H]1N |a:1,4|'</span>)</span>
-<span id="cb7-8"></span>
-<span id="cb7-9">Draw.MolsToGridImage([m2_cis,m2_cis_1,m2_cis_2,m2_trans,m2_trans_1,m2_trans_2],legends<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span>[<span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">'"cis"'</span>,<span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">''</span>,<span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">''</span>,<span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">'"trans"'</span>,<span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">''</span>,<span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">''</span>],molsPerRow<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span><span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">3</span>)</span></code></pre></div>
-<div class="cell-output cell-output-display" data-execution_count="6">
-<div>
-<figure class="figure">
-<p><img src="https://greglandrum.github.io/rdkit-blog/posts/2023-11-19-explaining-stereo-groups_files/figure-html/cell-7-output-1.png" class="img-fluid figure-img"></p>
-</figure>
-</div>
-</div>
-</div>
-<p>In each row above the first entry shows the molecule with stereo groups while the second two entries show the two molecules contained in the mixture that representation describes.</p>
-</section>
-<section id="a-slightly-more-complicated-example" class="level1">
-<h1>A slightly more complicated example</h1>
-<p>Here we’ll invent some enhanced stereo information for this molecule from ChEMBL:</p>
-<div id="9667e652" class="cell" data-executetime="{&quot;end_time&quot;:&quot;2023-11-19T05:43:03.011393Z&quot;,&quot;start_time&quot;:&quot;2023-11-19T05:43:02.919442Z&quot;}" data-execution_count="7">
-<div class="sourceCode cell-code" id="cb8" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb8-1">m <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> Chem.MolFromSmiles(<span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">'OC[C@H]1OC=C[C@@H](O)[C@@H]1O'</span>) <span class="co" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;"># CHEMBL2115567</span></span>
-<span id="cb8-2">m</span></code></pre></div>
-<div class="cell-output cell-output-display" data-execution_count="7">
-<div>
-<figure class="figure">
-<p><img src="https://greglandrum.github.io/rdkit-blog/posts/2023-11-19-explaining-stereo-groups_files/figure-html/cell-8-output-1.png" class="img-fluid figure-img"></p>
-</figure>
-</div>
-</div>
-</div>
-<div id="6e856d3f" class="cell" data-executetime="{&quot;end_time&quot;:&quot;2023-11-19T05:43:03.092938Z&quot;,&quot;start_time&quot;:&quot;2023-11-19T05:43:03.013422Z&quot;}" data-execution_count="8">
-<div class="sourceCode cell-code" id="cb9" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb9-1">three_centers <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> Chem.MolFromSmiles(<span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">'OC[C@H]1OC=C[C@@H](O)[C@@H]1O |&amp;1:2,o2:6,8|'</span>) </span>
-<span id="cb9-2">three_centers</span></code></pre></div>
-<div class="cell-output cell-output-display" data-execution_count="8">
-<div>
-<figure class="figure">
-<p><img src="https://greglandrum.github.io/rdkit-blog/posts/2023-11-19-explaining-stereo-groups_files/figure-html/cell-9-output-1.png" class="img-fluid figure-img"></p>
-</figure>
-</div>
-</div>
-</div>
-<p>There are both “and” and “or” groups present, so this represents one of two mixtures.</p>
-<p>We have a mixture which contains either these two molecules:</p>
-<div id="b270ded0" class="cell" data-executetime="{&quot;end_time&quot;:&quot;2023-11-19T05:43:03.201699Z&quot;,&quot;start_time&quot;:&quot;2023-11-19T05:43:03.095369Z&quot;}" data-execution_count="9">
-<div class="sourceCode cell-code" id="cb10" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb10-1">mix1_1 <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> Chem.MolFromSmiles(<span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">'OC[C@H]1OC=C[C@@H](O)[C@@H]1O'</span>) </span>
-<span id="cb10-2">mix1_2 <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> Chem.MolFromSmiles(<span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">'OC[C@@H]1OC=C[C@@H](O)[C@@H]1O'</span>) </span>
-<span id="cb10-3">Draw.MolsToGridImage([mix1_1,mix1_2])</span></code></pre></div>
-<div class="cell-output cell-output-display" data-execution_count="9">
-<div>
-<figure class="figure">
-<p><img src="https://greglandrum.github.io/rdkit-blog/posts/2023-11-19-explaining-stereo-groups_files/figure-html/cell-10-output-1.png" class="img-fluid figure-img"></p>
-</figure>
-</div>
-</div>
-</div>
-<p>or these two molecules:</p>
-<div id="1b56d0ae" class="cell" data-executetime="{&quot;end_time&quot;:&quot;2023-11-19T05:43:03.321363Z&quot;,&quot;start_time&quot;:&quot;2023-11-19T05:43:03.206021Z&quot;}" data-execution_count="10">
-<div class="sourceCode cell-code" id="cb11" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb11-1">mix2_1 <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> Chem.MolFromSmiles(<span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">'OC[C@H]1OC=C[C@H](O)[C@H]1O'</span>) </span>
-<span id="cb11-2">mix2_2 <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> Chem.MolFromSmiles(<span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">'OC[C@@H]1OC=C[C@H](O)[C@H]1O'</span>) </span>
-<span id="cb11-3">Draw.MolsToGridImage([mix2_1,mix2_2])</span></code></pre></div>
-<div class="cell-output cell-output-display" data-execution_count="10">
-<div>
-<figure class="figure">
-<p><img src="https://greglandrum.github.io/rdkit-blog/posts/2023-11-19-explaining-stereo-groups_files/figure-html/cell-11-output-1.png" class="img-fluid figure-img"></p>
-</figure>
-</div>
-</div>
-</div>
-</section>
-<section id="enumerating-stereo-groups" class="level1">
-<h1>Enumerating stereo groups</h1>
-<p>The RDKit’s stereoisomer enumeration code can take stereo groups into account. This is a useful way to see all of the possible molecules encoded in a structure with stereo groups.</p>
-<div id="fcbfeeef" class="cell" data-executetime="{&quot;end_time&quot;:&quot;2023-11-19T05:43:03.471652Z&quot;,&quot;start_time&quot;:&quot;2023-11-19T05:43:03.323864Z&quot;}" data-execution_count="11">
-<div class="sourceCode cell-code" id="cb12" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb12-1"><span class="im" style="color: #00769E;
-background-color: null;
-font-style: inherit;">from</span> rdkit.Chem <span class="im" style="color: #00769E;
-background-color: null;
-font-style: inherit;">import</span> EnumerateStereoisomers</span></code></pre></div>
-</div>
-<div id="fba2b354" class="cell" data-executetime="{&quot;end_time&quot;:&quot;2023-11-19T05:43:03.749923Z&quot;,&quot;start_time&quot;:&quot;2023-11-19T05:43:03.472760Z&quot;}" data-execution_count="12">
-<div class="sourceCode cell-code" id="cb13" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb13-1">opts <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> EnumerateStereoisomers.StereoEnumerationOptions()</span>
-<span id="cb13-2">opts.onlyStereoGroups <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> <span class="va" style="color: #111111;
-background-color: null;
-font-style: inherit;">True</span></span>
-<span id="cb13-3">enumerated <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> EnumerateStereoisomers.EnumerateStereoisomers(three_centers)</span>
-<span id="cb13-4">Draw.MolsToGridImage(<span class="bu" style="color: null;
-background-color: null;
-font-style: inherit;">list</span>(enumerated))</span></code></pre></div>
-<div class="cell-output cell-output-display" data-execution_count="12">
-<div>
-<figure class="figure">
-<p><img src="https://greglandrum.github.io/rdkit-blog/posts/2023-11-19-explaining-stereo-groups_files/figure-html/cell-13-output-1.png" class="img-fluid figure-img"></p>
-</figure>
-</div>
-</div>
-</div>
-<p>Note that <code>EnumerateStereoisomers()</code> currently has no way of indicating AND and OR relationships, so we see all stereoisomers which could be present.</p>
-</section>
-<section id="stereo-groups-and-canonicalization" class="level1">
-<h1>Stereo groups and canonicalization</h1>
-<p>These four representations all describe the same thing:</p>
-<div id="f42884f7" class="cell" data-executetime="{&quot;end_time&quot;:&quot;2023-11-19T05:43:03.858300Z&quot;,&quot;start_time&quot;:&quot;2023-11-19T05:43:03.752107Z&quot;}" data-execution_count="13">
-<div class="sourceCode cell-code" id="cb14" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb14-1">m1 <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> Chem.MolFromSmiles(<span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">'OC[C@H]1OC=C[C@@H](O)[C@@H]1O |&amp;1:2,o2:6,8|'</span>) </span>
-<span id="cb14-2">m2 <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> Chem.MolFromSmiles(<span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">'OC[C@@H]1OC=C[C@@H](O)[C@@H]1O |&amp;1:2,o2:6,8|'</span>) </span>
-<span id="cb14-3">m3 <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> Chem.MolFromSmiles(<span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">'OC[C@H]1OC=C[C@H](O)[C@H]1O |&amp;1:2,o2:6,8|'</span>) </span>
-<span id="cb14-4">m4 <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> Chem.MolFromSmiles(<span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">'OC[C@@H]1OC=C[C@H](O)[C@H]1O |&amp;1:2,o2:6,8|'</span>) </span>
-<span id="cb14-5"></span>
-<span id="cb14-6">Draw.MolsToGridImage([m1,m2,m3,m4],molsPerRow<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span><span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">2</span>,subImgSize<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span>(<span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">250</span>,<span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">250</span>))</span></code></pre></div>
-<div class="cell-output cell-output-display" data-execution_count="13">
-<div>
-<figure class="figure">
-<p><img src="https://greglandrum.github.io/rdkit-blog/posts/2023-11-19-explaining-stereo-groups_files/figure-html/cell-14-output-1.png" class="img-fluid figure-img"></p>
-</figure>
-</div>
-</div>
-</div>
-<p>We see that when we generate canonical CXSMILES for the molecules:</p>
-<div id="35f0ea1f" class="cell" data-executetime="{&quot;end_time&quot;:&quot;2023-11-19T05:43:03.930702Z&quot;,&quot;start_time&quot;:&quot;2023-11-19T05:43:03.859581Z&quot;}" data-execution_count="14">
-<div class="sourceCode cell-code" id="cb15" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb15-1"><span class="cf" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">for</span> m <span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">in</span> (m1,m2,m3,m4):</span>
-<span id="cb15-2">    <span class="bu" style="color: null;
-background-color: null;
-font-style: inherit;">print</span>(Chem.MolToCXSmiles(m))</span></code></pre></div>
-<div class="cell-output cell-output-stdout">
-<pre><code>OC[C@H]1OC=C[C@H](O)[C@H]1O |o1:6,8,&amp;1:2|
-OC[C@H]1OC=C[C@H](O)[C@H]1O |o1:6,8,&amp;1:2|
-OC[C@H]1OC=C[C@H](O)[C@H]1O |o1:6,8,&amp;1:2|
-OC[C@H]1OC=C[C@H](O)[C@H]1O |o1:6,8,&amp;1:2|</code></pre>
-</div>
-</div>
-<p>Note that this <em>not</em> true if we generate standard canonical SMILES for the molecule:</p>
-<div id="dcd4ab2e" class="cell" data-executetime="{&quot;end_time&quot;:&quot;2023-11-19T05:43:04.005151Z&quot;,&quot;start_time&quot;:&quot;2023-11-19T05:43:03.932637Z&quot;}" data-execution_count="15">
-<div class="sourceCode cell-code" id="cb17" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb17-1"><span class="cf" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">for</span> m <span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">in</span> (m1,m2,m3,m4):</span>
-<span id="cb17-2">    <span class="bu" style="color: null;
-background-color: null;
-font-style: inherit;">print</span>(Chem.MolToSmiles(m))</span></code></pre></div>
-<div class="cell-output cell-output-stdout">
-<pre><code>OC[C@H]1OC=C[C@@H](O)[C@@H]1O
-OC[C@@H]1OC=C[C@@H](O)[C@@H]1O
-OC[C@H]1OC=C[C@H](O)[C@H]1O
-OC[C@@H]1OC=C[C@H](O)[C@H]1O</code></pre>
-</div>
-</div>
-<p>This is a bit confusing at first. The reasoning behind the behavior is that the stereo groups should not be used in the canonicalization since no information about them will be included in the output.</p>
-</section>
-<section id="creating-your-own-stereo-groups" class="level1">
-<h1>Creating your own stereo groups</h1>
-<p>You can also add your own stereo groups to molecules:</p>
-<div id="f3d61b01" class="cell" data-executetime="{&quot;end_time&quot;:&quot;2023-11-19T05:43:04.111094Z&quot;,&quot;start_time&quot;:&quot;2023-11-19T05:43:04.010953Z&quot;}" data-execution_count="16">
-<div class="sourceCode cell-code" id="cb19" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb19-1">m <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> Chem.MolFromSmiles(<span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">'OC[C@H]1OC=C[C@@H](O)[C@@H]1O'</span>) <span class="co" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;"># CHEMBL2115567</span></span>
-<span id="cb19-2">IPythonConsole.drawOptions.addAtomIndices <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> <span class="va" style="color: #111111;
-background-color: null;
-font-style: inherit;">True</span></span>
-<span id="cb19-3">m</span></code></pre></div>
-<div class="cell-output cell-output-display" data-execution_count="16">
-<div>
-<figure class="figure">
-<p><img src="https://greglandrum.github.io/rdkit-blog/posts/2023-11-19-explaining-stereo-groups_files/figure-html/cell-17-output-1.png" class="img-fluid figure-img"></p>
-</figure>
-</div>
-</div>
-</div>
-<div id="31abb735" class="cell" data-executetime="{&quot;end_time&quot;:&quot;2023-11-19T05:43:04.181307Z&quot;,&quot;start_time&quot;:&quot;2023-11-19T05:43:04.114584Z&quot;}" data-execution_count="17">
-<div class="sourceCode cell-code" id="cb20" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb20-1">IPythonConsole.drawOptions.addAtomIndices <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> <span class="va" style="color: #111111;
-background-color: null;
-font-style: inherit;">False</span></span></code></pre></div>
-</div>
-<p>The function to do this is <code>CreateStereoGroup()</code>:</p>
-<div id="68d6c43d" class="cell" data-executetime="{&quot;end_time&quot;:&quot;2023-11-19T05:43:04.281239Z&quot;,&quot;start_time&quot;:&quot;2023-11-19T05:43:04.184268Z&quot;}" data-execution_count="18">
-<div class="sourceCode cell-code" id="cb21" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb21-1">sgmol <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> Chem.RWMol(m)</span>
-<span id="cb21-2">sg <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> Chem.CreateStereoGroup(Chem.StereoGroupType.STEREO_AND, sgmol, [<span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">6</span>,<span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">8</span>])</span>
-<span id="cb21-3">sgmol.SetStereoGroups([sg])</span>
-<span id="cb21-4">sgmol</span></code></pre></div>
-<div class="cell-output cell-output-display" data-execution_count="18">
-<div>
-<figure class="figure">
-<p><img src="https://greglandrum.github.io/rdkit-blog/posts/2023-11-19-explaining-stereo-groups_files/figure-html/cell-19-output-1.png" class="img-fluid figure-img"></p>
-</figure>
-</div>
-</div>
-</div>
-
-
-</section>
-
- ]]></description>
-  <category>tutorial</category>
-  <category>stereochemistry</category>
-  <category>documentation</category>
-  <guid>https://greglandrum.github.io/rdkit-blog/posts/2023-11-19-explaining-stereo-groups.html</guid>
-  <pubDate>Sat, 18 Nov 2023 23:00:00 GMT</pubDate>
-  <media:content url="https://greglandrum.github.io/rdkit-blog/posts/images/blog/stereogroups-1.png" medium="image" type="image/png" height="123" width="144"/>
 </item>
 </channel>
 </rss>
