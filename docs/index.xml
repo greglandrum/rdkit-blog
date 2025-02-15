@@ -10,7 +10,506 @@
 <atom:link href="https://greglandrum.github.io/rdkit-blog/index.xml" rel="self" type="application/rss+xml"/>
 <description>RDKit experiments, tips, and tutorials</description>
 <generator>quarto-1.6.39</generator>
-<lastBuildDate>Fri, 07 Feb 2025 23:00:00 GMT</lastBuildDate>
+<lastBuildDate>Fri, 14 Feb 2025 23:00:00 GMT</lastBuildDate>
+<item>
+  <title>Storing molecules in images</title>
+  <link>https://greglandrum.github.io/rdkit-blog/posts/2025-02-15-storing-molecules-in-images.html</link>
+  <description><![CDATA[ 
+
+
+
+
+<p>We added the ability to store metadata about molecules in the PNG and SVG images that the RDKit generates some years ago. This tutorial post shows how to use that information.</p>
+<p>These days you can do some pretty amazing work with using a deep neural network to “understand” the image and translate it into a chemical structure, but it’s a lot easier (and less noisy!) to just save the molecular structure as part of the image file itself.</p>
+<div id="deed336c" class="cell" data-execution_count="1">
+<div class="sourceCode cell-code" id="cb1" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb1-1"><span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">from</span> rdkit <span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">import</span> Chem</span>
+<span id="cb1-2"><span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">from</span> rdkit.Chem <span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">import</span> Draw</span>
+<span id="cb1-3"><span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">from</span> rdkit.Chem <span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">import</span> rdDepictor</span>
+<span id="cb1-4">rdDepictor.SetPreferCoordGen(<span class="va" style="color: #111111;
+background-color: null;
+font-style: inherit;">True</span>)</span>
+<span id="cb1-5"><span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">from</span> rdkit.Chem.Draw <span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">import</span> IPythonConsole</span>
+<span id="cb1-6"></span>
+<span id="cb1-7"><span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">from</span> PIL <span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">import</span> Image</span>
+<span id="cb1-8"></span>
+<span id="cb1-9"><span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">import</span> rdkit</span>
+<span id="cb1-10"><span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">print</span>(rdkit.__version__)</span></code></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>2024.09.5</code></pre>
+</div>
+</div>
+<p>Read in some molecules and generating coordinates for them.</p>
+<div id="baf77f2e" class="cell" data-execution_count="2">
+<div class="sourceCode cell-code" id="cb3" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb3-1"><span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">import</span> pandas <span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">as</span> pd</span>
+<span id="cb3-2">df <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> pd.read_csv(<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'../data/S1P1_data.csv'</span>)</span>
+<span id="cb3-3">ms <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> [Chem.MolFromSmiles(x) <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">for</span> x <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">in</span> df.canonical_smiles][:<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">12</span>]</span>
+<span id="cb3-4"><span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">for</span> m <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">in</span> ms:</span>
+<span id="cb3-5">    rdDepictor.Compute2DCoords(m)</span></code></pre></div>
+</div>
+<div id="68dadcd0" class="cell" data-execution_count="3">
+<div class="sourceCode cell-code" id="cb4" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb4-1">df.columns</span></code></pre></div>
+<div class="cell-output cell-output-display" data-execution_count="3">
+<pre><code>Index(['doc_id', 'molregno', 'standard_relation', 'standard_value',
+       'standard_units', 'standard_flag', 'standard_type', 'pchembl_value',
+       'canonical_smiles', 'compound_chembl_id'],
+      dtype='object')</code></pre>
+</div>
+</div>
+<section id="working-with-pngs" class="level1">
+<h1>Working with PNGs</h1>
+<p>Generate a PNG image of one molecule:</p>
+<div id="817329e0" class="cell" data-execution_count="4">
+<div class="sourceCode cell-code" id="cb6" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb6-1">d2d <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> Draw.MolDraw2DCairo(<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">300</span>,<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">300</span>)</span>
+<span id="cb6-2">d2d.DrawMolecule(ms[<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">0</span>])</span>
+<span id="cb6-3">d2d.FinishDrawing()</span>
+<span id="cb6-4">d2d.WriteDrawingText(<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'img1.png'</span>)</span></code></pre></div>
+</div>
+<p>Read the image in and display it:</p>
+<div id="7d21000f" class="cell" data-execution_count="5">
+<div class="sourceCode cell-code" id="cb7" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb7-1">img <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> Image.<span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">open</span>(<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'img1.png'</span>)</span>
+<span id="cb7-2">img</span></code></pre></div>
+<div class="cell-output cell-output-display" data-execution_count="5">
+<div>
+<figure class="figure">
+<p><img src="https://greglandrum.github.io/rdkit-blog/posts/2025-02-15-storing-molecules-in-images_files/figure-html/cell-6-output-1.png" class="img-fluid figure-img"></p>
+</figure>
+</div>
+</div>
+</div>
+<p>The PNG contains metadata allowing us to reconstruct the molecule; you do that with <code>MolFromPNGFile()</code>:</p>
+<div id="b789ad22" class="cell" data-execution_count="5">
+<div class="sourceCode cell-code" id="cb8" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb8-1">nmol <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> Chem.MolFromPNGFile(<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'img1.png'</span>)</span>
+<span id="cb8-2">nmol</span></code></pre></div>
+<div class="cell-output cell-output-display" data-execution_count="5">
+<div>
+<figure class="figure">
+<p><img src="https://greglandrum.github.io/rdkit-blog/posts/2025-02-15-storing-molecules-in-images_files/figure-html/cell-7-output-1.png" class="img-fluid figure-img"></p>
+</figure>
+</div>
+</div>
+</div>
+<section id="additional-metadata" class="level2">
+<h2 class="anchored" data-anchor-id="additional-metadata">Additional metadata</h2>
+<p>There’s also a function to add additional metadata to the PNG file. Here we’ll just add the information about the molecule that we read in from the input CSV file:</p>
+<div id="ba125ac7" class="cell" data-execution_count="6">
+<div class="sourceCode cell-code" id="cb9" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb9-1">df.iloc[<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">0</span>]</span></code></pre></div>
+<div class="cell-output cell-output-display" data-execution_count="6">
+<pre><code>doc_id                                                             5839
+molregno                                                         189018
+standard_relation                                                     =
+standard_value                                                     82.0
+standard_units                                                       nM
+standard_flag                                                         1
+standard_type                                                      EC50
+pchembl_value                                                      7.09
+canonical_smiles      CCCCCCCCc1ccc(NC(=O)[C@@H](N)COP(=O)(O)O)cc1.O...
+compound_chembl_id                                         CHEMBL332050
+Name: 0, dtype: object</code></pre>
+</div>
+</div>
+<div id="4df427ba" class="cell" data-execution_count="6">
+<div class="sourceCode cell-code" id="cb11" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb11-1"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># get a string with PNG data:</span></span>
+<span id="cb11-2">d2d <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> Draw.MolDraw2DCairo(<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">300</span>,<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">300</span>)</span>
+<span id="cb11-3">d2d.DrawMolecule(ms[<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">0</span>])</span>
+<span id="cb11-4">d2d.FinishDrawing()</span>
+<span id="cb11-5">png <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> d2d.GetDrawingText()</span>
+<span id="cb11-6"></span>
+<span id="cb11-7"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># construct a dictionary with the metadat we want to add:</span></span>
+<span id="cb11-8">metadata <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> {k:<span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">str</span>(v) <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">for</span> k,v <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">in</span> <span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">zip</span>(df.iloc[<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">0</span>].keys(),df.iloc[<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">0</span>])}</span>
+<span id="cb11-9"></span>
+<span id="cb11-10"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># and then add the data to the PNG string:</span></span>
+<span id="cb11-11">png <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> Chem.AddMetadataToPNGString(metadata,png)</span>
+<span id="cb11-12"></span></code></pre></div>
+</div>
+<p>Read the molecule and the metadata from the PNG string:</p>
+<div id="5ae22e5d" class="cell" data-execution_count="7">
+<div class="sourceCode cell-code" id="cb12" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb12-1">nm <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> Chem.MolFromPNGString(png)</span>
+<span id="cb12-2">nprops <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> Chem.MetadataFromPNGString(png)</span>
+<span id="cb12-3">nm</span></code></pre></div>
+<div class="cell-output cell-output-display" data-execution_count="7">
+<div>
+<figure class="figure">
+<p><img src="https://greglandrum.github.io/rdkit-blog/posts/2025-02-15-storing-molecules-in-images_files/figure-html/cell-10-output-1.png" class="img-fluid figure-img"></p>
+</figure>
+</div>
+</div>
+</div>
+<div id="404efdfa" class="cell" data-execution_count="8">
+<div class="sourceCode cell-code" id="cb13" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb13-1">nprops.keys()</span></code></pre></div>
+<div class="cell-output cell-output-display" data-execution_count="8">
+<pre><code>dict_keys(['rdkitPKL rdkit 2024.09.5', 'MOL rdkit 2024.09.5', 'SMILES rdkit 2024.09.5', 'doc_id', 'molregno', 'standard_relation', 'standard_value', 'standard_units', 'standard_flag', 'standard_type', 'pchembl_value', 'canonical_smiles', 'compound_chembl_id'])</code></pre>
+</div>
+</div>
+<p>Here we can see metadata that the RDKit added - pkl data, a Mol block, and SMILES - as well as the properties that we added. The Mol block and the SMILES can be used by other tools, so there’s a bit of interoperability here too.</p>
+<p>The values are all strings:</p>
+<div id="0b72b6a9" class="cell" data-execution_count="9">
+<div class="sourceCode cell-code" id="cb15" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb15-1">nprops[<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'compound_chembl_id'</span>], nprops[<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'pchembl_value'</span>]</span></code></pre></div>
+<div class="cell-output cell-output-display" data-execution_count="9">
+<pre><code>(b'CHEMBL332050', b'7.09')</code></pre>
+</div>
+</div>
+</section>
+</section>
+<section id="working-with-multiple-molecules" class="level1">
+<h1>Working with multiple molecules</h1>
+<p>We can also store/retrieve multiple molecules to/from a PNG:</p>
+<div id="c5a1fbe3" class="cell" data-execution_count="10">
+<div class="sourceCode cell-code" id="cb17" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb17-1">img <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> Draw.MolsToGridImage(ms[:<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">12</span>],molsPerRow<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span><span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">4</span>,subImgSize<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span>(<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">250</span>,<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">200</span>),legends<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span>df.compound_chembl_id.to_list())</span>
+<span id="cb17-2">img</span></code></pre></div>
+<div class="cell-output cell-output-display" data-execution_count="10">
+<div>
+<figure class="figure">
+<p><img src="https://greglandrum.github.io/rdkit-blog/posts/2025-02-15-storing-molecules-in-images_files/figure-html/cell-13-output-1.png" class="img-fluid figure-img"></p>
+</figure>
+</div>
+</div>
+</div>
+<div id="3aad4aa1" class="cell" data-execution_count="11">
+<div class="sourceCode cell-code" id="cb18" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb18-1"><span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">type</span>(img)</span></code></pre></div>
+<div class="cell-output cell-output-display" data-execution_count="11">
+<pre><code>IPython.core.display.Image</code></pre>
+</div>
+</div>
+<p>Write the image to a file and then display it (just as a demo):</p>
+<div id="4ea4ad51" class="cell" data-execution_count="12">
+<div class="sourceCode cell-code" id="cb20" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb20-1"><span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">with</span> <span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">open</span>(<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'img1.png'</span>,<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'wb+'</span>) <span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">as</span> outf:</span>
+<span id="cb20-2">    outf.write(img.data)</span>
+<span id="cb20-3">newImg <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> Image.<span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">open</span>(<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'img1.png'</span>)</span>
+<span id="cb20-4">newImg</span></code></pre></div>
+<div class="cell-output cell-output-display" data-execution_count="12">
+<div>
+<figure class="figure">
+<p><img src="https://greglandrum.github.io/rdkit-blog/posts/2025-02-15-storing-molecules-in-images_files/figure-html/cell-15-output-1.png" class="img-fluid figure-img"></p>
+</figure>
+</div>
+</div>
+</div>
+<p>The call to read multiple molecules from a PNG is <code>MolsFromPNGFile()</code>:</p>
+<div id="b5ddc277" class="cell" data-execution_count="14">
+<div class="sourceCode cell-code" id="cb21" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb21-1">nmols <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> Chem.MolsFromPNGFile(<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'img1.png'</span>)</span>
+<span id="cb21-2"><span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">print</span>(<span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">len</span>(nmols))</span></code></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>12</code></pre>
+</div>
+</div>
+<p>Look at the first molecule:</p>
+<div id="1e0be8d9" class="cell" data-execution_count="15">
+<div class="sourceCode cell-code" id="cb23" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb23-1">nmols[<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">0</span>]</span></code></pre></div>
+<div class="cell-output cell-output-display" data-execution_count="15">
+<div>
+<figure class="figure">
+<p><img src="https://greglandrum.github.io/rdkit-blog/posts/2025-02-15-storing-molecules-in-images_files/figure-html/cell-17-output-1.png" class="img-fluid figure-img"></p>
+</figure>
+</div>
+</div>
+</div>
+<p>In case you’re curious, here’s what the keys for the metadata in the PNG file are:</p>
+<div id="95802f99" class="cell" data-execution_count="16">
+<div class="sourceCode cell-code" id="cb24" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb24-1">nmd <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> Chem.MetadataFromPNGFile(<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'img1.png'</span>)</span>
+<span id="cb24-2">nmd.keys()</span></code></pre></div>
+<div class="cell-output cell-output-display" data-execution_count="16">
+<pre><code>dict_keys(['rdkitPKL rdkit 2024.09.5', 'MOL rdkit 2024.09.5', 'SMILES rdkit 2024.09.5', 'rdkitPKL1 rdkit 2024.09.5', 'MOL1 rdkit 2024.09.5', 'SMILES1 rdkit 2024.09.5', 'rdkitPKL2 rdkit 2024.09.5', 'MOL2 rdkit 2024.09.5', 'SMILES2 rdkit 2024.09.5', 'rdkitPKL3 rdkit 2024.09.5', 'MOL3 rdkit 2024.09.5', 'SMILES3 rdkit 2024.09.5', 'rdkitPKL4 rdkit 2024.09.5', 'MOL4 rdkit 2024.09.5', 'SMILES4 rdkit 2024.09.5', 'rdkitPKL5 rdkit 2024.09.5', 'MOL5 rdkit 2024.09.5', 'SMILES5 rdkit 2024.09.5', 'rdkitPKL6 rdkit 2024.09.5', 'MOL6 rdkit 2024.09.5', 'SMILES6 rdkit 2024.09.5', 'rdkitPKL7 rdkit 2024.09.5', 'MOL7 rdkit 2024.09.5', 'SMILES7 rdkit 2024.09.5', 'rdkitPKL8 rdkit 2024.09.5', 'MOL8 rdkit 2024.09.5', 'SMILES8 rdkit 2024.09.5', 'rdkitPKL9 rdkit 2024.09.5', 'MOL9 rdkit 2024.09.5', 'SMILES9 rdkit 2024.09.5', 'rdkitPKL10 rdkit 2024.09.5', 'MOL10 rdkit 2024.09.5', 'SMILES10 rdkit 2024.09.5', 'rdkitPKL11 rdkit 2024.09.5', 'MOL11 rdkit 2024.09.5', 'SMILES11 rdkit 2024.09.5'])</code></pre>
+</div>
+</div>
+</section>
+<section id="working-with-svg" class="level1">
+<h1>Working with SVG</h1>
+<p>We can do the same thing with SVG. At the moment we only support a single molecule per SVG file and the metadata is not added by default</p>
+<div id="df1518e7" class="cell" data-execution_count="18">
+<div class="sourceCode cell-code" id="cb26" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb26-1"><span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">from</span> IPython.display <span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">import</span> SVG</span>
+<span id="cb26-2"></span>
+<span id="cb26-3">d2d <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> Draw.MolDraw2DSVG(<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">300</span>,<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">300</span>)</span>
+<span id="cb26-4">d2d.DrawMolecule(ms[<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">0</span>])</span>
+<span id="cb26-5"></span>
+<span id="cb26-6"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># add the molecule metadata:</span></span>
+<span id="cb26-7">d2d.AddMoleculeMetadata(ms[<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">0</span>])</span>
+<span id="cb26-8"></span>
+<span id="cb26-9">d2d.FinishDrawing()</span>
+<span id="cb26-10">svg <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> d2d.GetDrawingText()</span>
+<span id="cb26-11"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># look at the first few characters of the string:</span></span>
+<span id="cb26-12"><span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">print</span>(svg[:<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">10</span>])</span>
+<span id="cb26-13"></span>
+<span id="cb26-14"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># display the SVG</span></span>
+<span id="cb26-15">SVG(svg)</span></code></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>&lt;?xml vers</code></pre>
+</div>
+<div class="cell-output cell-output-display" data-execution_count="18">
+<div>
+<figure class="figure">
+<p><img src="https://greglandrum.github.io/rdkit-blog/posts/2025-02-15-storing-molecules-in-images_files/figure-html/cell-19-output-2.svg" class="img-fluid figure-img"></p>
+</figure>
+</div>
+</div>
+</div>
+<p>Write the SVG to a file and read it back in:</p>
+<div id="e2413916" class="cell" data-execution_count="19">
+<div class="sourceCode cell-code" id="cb28" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb28-1"><span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">from</span> IPython.display <span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">import</span> SVG</span>
+<span id="cb28-2"><span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">with</span> <span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">open</span>(<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'img1.svg'</span>,<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'w+'</span>) <span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">as</span> outf:</span>
+<span id="cb28-3">    outf.write(svg)</span>
+<span id="cb28-4"></span>
+<span id="cb28-5"><span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">with</span> <span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">open</span>(<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'img1.svg'</span>,<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'r'</span>) <span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">as</span> inf:</span>
+<span id="cb28-6">    newData <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> inf.read()</span>
+<span id="cb28-7"></span>
+<span id="cb28-8">newSVG <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> SVG(newData)</span>
+<span id="cb28-9">newSVG</span></code></pre></div>
+<div class="cell-output cell-output-display" data-execution_count="19">
+<div>
+<figure class="figure">
+<p><img src="https://greglandrum.github.io/rdkit-blog/posts/2025-02-15-storing-molecules-in-images_files/figure-html/cell-20-output-1.svg" class="img-fluid figure-img"></p>
+</figure>
+</div>
+</div>
+</div>
+<p>Now read the molecule back from the SVG:</p>
+<div id="5118cb7c" class="cell" data-execution_count="20">
+<div class="sourceCode cell-code" id="cb29" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb29-1">nmol <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> Chem.MolFromRDKitSVG(newData)</span>
+<span id="cb29-2">nmol</span></code></pre></div>
+<div class="cell-output cell-output-display" data-execution_count="20">
+<div>
+<figure class="figure">
+<p><img src="https://greglandrum.github.io/rdkit-blog/posts/2025-02-15-storing-molecules-in-images_files/figure-html/cell-21-output-1.png" class="img-fluid figure-img"></p>
+</figure>
+</div>
+</div>
+</div>
+</section>
+<section id="last-notes" class="level1">
+<h1>Last notes</h1>
+<p>I won’t demonstrate it here in this short post, but chemical reactions can also be stored in/retrieved from PNG files (though currently not SVG files). As with molecules, the data is automatically added to the PNG when a reaction is drawn. It can be retrieved with the function <code>rdChemReactions.ReactionFromPNGString()</code> or <code>rdChemReactions.ReactionFromPNGFile()</code>.</p>
+<p>I was going to demo this by grabbing an image from a website that I know uses the RDKit for molecule display, like ChEMBL or the PDBE, but both of those use SVGs for their images and they haven’t made the extra call to add the molecular metadata to those SVGs (this may be intentional, since the metadata does make the SVG files a bit larger).</p>
+<p>One thing we’ve noticed is that if you embed one of these PNGs into a Word or PowerPoint document, the metadata ends up being lost when you copy the image back out of the document. However, if you unzip the .docx or .pptx file and look at the PNG there, the metadata is still present, so not all is lost.</p>
+<p>Anyway, I think it’s pretty cool to be able to save a compound’s structure as part of its image. Hopefully others agree. :-)</p>
+
+
+</section>
+
+ ]]></description>
+  <category>tutorial</category>
+  <category>drawing</category>
+  <guid>https://greglandrum.github.io/rdkit-blog/posts/2025-02-15-storing-molecules-in-images.html</guid>
+  <pubDate>Fri, 14 Feb 2025 23:00:00 GMT</pubDate>
+  <media:content url="https://greglandrum.github.io/rdkit-blog/posts/images/blog/storing-molecules-in-images-1.png" medium="image" type="image/png" height="94" width="144"/>
+</item>
 <item>
   <title>More on generalized substructure search</title>
   <link>https://greglandrum.github.io/rdkit-blog/posts/2025-02-08-more-on-generalized-substructure-search.html</link>
@@ -19948,150 +20447,6 @@ font-style: inherit;">0.8</span>)</span>
   <guid>https://greglandrum.github.io/rdkit-blog/posts/2024-01-11-using-abbreviations.html</guid>
   <pubDate>Wed, 10 Jan 2024 23:00:00 GMT</pubDate>
   <media:content url="https://greglandrum.github.io/rdkit-blog/posts/images/blog/abbreviations-1.png" medium="image" type="image/png" height="115" width="144"/>
-</item>
-<item>
-  <title>Calculating the SA_Score and NP_Score descriptors</title>
-  <link>https://greglandrum.github.io/rdkit-blog/posts/2023-12-01-using_sascore_and_npscore.html</link>
-  <description><![CDATA[ 
-
-
-
-
-<p>The RDKit’s <a href="https://github.com/rdkit/rdkit/tree/master/Contrib">Contrib</a> directory includes implementations of two descriptors, <code>SA_Score</code> and <code>NP_Score</code>, which are not included in the core RDKit because they both use large data files. Still, the descriptors can be useful and questions about how to use them come up every once in a while, so here’s a really short blog post showing how to use them.</p>
-<p>Both descriptors are implemented in Python, so they’re currently only accessible from Python. We’re working on making them available in KNIME too (in fact this blog post was prompted by a question Alice at KNIME asked me as she was working on the node), but that’s going to take a bit longer.</p>
-<p>If you want to learn more about the descriptors themselves, the publications describing for those two descriptors are:</p>
-<ol type="1">
-<li>SA_Score: http://www.jcheminf.com/content/1/1/8 (this one is open access)</li>
-<li>NP_Score: http://pubs.acs.org/doi/abs/10.1021/ci700286x (this one is not open access)</li>
-</ol>
-<div id="3584082d-620d-4d60-9337-ac0b0f574688" class="cell" data-execution_count="1">
-<div class="sourceCode cell-code" id="cb1" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb1-1"><span class="im" style="color: #00769E;
-background-color: null;
-font-style: inherit;">from</span> rdkit <span class="im" style="color: #00769E;
-background-color: null;
-font-style: inherit;">import</span> Chem</span>
-<span id="cb1-2"><span class="im" style="color: #00769E;
-background-color: null;
-font-style: inherit;">from</span> rdkit.Chem.Draw <span class="im" style="color: #00769E;
-background-color: null;
-font-style: inherit;">import</span> IPythonConsole</span>
-<span id="cb1-3"><span class="im" style="color: #00769E;
-background-color: null;
-font-style: inherit;">from</span> rdkit.Chem <span class="im" style="color: #00769E;
-background-color: null;
-font-style: inherit;">import</span> rdDepictor</span>
-<span id="cb1-4">rdDepictor.SetPreferCoordGen(<span class="va" style="color: #111111;
-background-color: null;
-font-style: inherit;">True</span>)</span>
-<span id="cb1-5"><span class="im" style="color: #00769E;
-background-color: null;
-font-style: inherit;">import</span> rdkit</span>
-<span id="cb1-6"><span class="bu" style="color: null;
-background-color: null;
-font-style: inherit;">print</span>(rdkit.__version__)</span></code></pre></div>
-<div class="cell-output cell-output-stdout">
-<pre><code>2023.09.2</code></pre>
-</div>
-</div>
-<p>We’ll use a compound from one of the papers in J. Med. Chem.’s ASAP section as I was writing this post (https://pubs.acs.org/doi/10.1021/acs.jmedchem.3c01626).</p>
-<blockquote class="blockquote">
-<p>Mini rant: it was easy for me to get the structure of this compound since J. Med. Chem. suggests that authors provide SMILES strings for the compounds in their papers and compliance is pretty good. Too bad this isn’t true in computational/cheminformatics journals.</p>
-</blockquote>
-<div id="2b35641b-616e-4801-bd7a-95059df2c6d2" class="cell" data-execution_count="2">
-<div class="sourceCode cell-code" id="cb3" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb3-1">m  <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> Chem.MolFromSmiles(<span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">'FC1=CN=C(NC2=NC=C(C(N3CCN(C(C4CC4)=O)CC3)=O)C=C2)N=C1C5=CC=C6N=C(N(CC)CC)SC6=C5'</span>)</span>
-<span id="cb3-2">m</span></code></pre></div>
-<div class="cell-output cell-output-display" data-execution_count="2">
-<div>
-<figure class="figure">
-<p><img src="https://greglandrum.github.io/rdkit-blog/posts/2023-12-01-using_sascore_and_npscore_files/figure-html/cell-3-output-1.png" class="img-fluid figure-img"></p>
-</figure>
-</div>
-</div>
-</div>
-<section id="using-the-rdkit-installed-from-conda-forge" class="level1">
-<h1>Using the RDKit installed from conda-forge</h1>
-<p>The Contrib directory is installed with the RDKit conda package, you just need to tell python to look in the appropriate place:</p>
-<div id="3f93ea6e-9aef-4b78-b2d3-0facb2922cbc" class="cell" data-execution_count="3">
-<div class="sourceCode cell-code" id="cb4" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb4-1"><span class="im" style="color: #00769E;
-background-color: null;
-font-style: inherit;">import</span> sys</span>
-<span id="cb4-2"><span class="im" style="color: #00769E;
-background-color: null;
-font-style: inherit;">import</span> os</span>
-<span id="cb4-3">sys.path.append(os.path.join(os.environ[<span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">'CONDA_PREFIX'</span>],<span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">'share'</span>,<span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">'RDKit'</span>,<span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">'Contrib'</span>))</span>
-<span id="cb4-4"></span>
-<span id="cb4-5"><span class="im" style="color: #00769E;
-background-color: null;
-font-style: inherit;">from</span> SA_Score <span class="im" style="color: #00769E;
-background-color: null;
-font-style: inherit;">import</span> sascorer</span>
-<span id="cb4-6"><span class="im" style="color: #00769E;
-background-color: null;
-font-style: inherit;">from</span> NP_Score <span class="im" style="color: #00769E;
-background-color: null;
-font-style: inherit;">import</span> npscorer</span></code></pre></div>
-</div>
-</section>
-<section id="using-the-rdkit-installed-from-pypi" class="level1">
-<h1>Using the RDKit installed from pypi</h1>
-<p>When Chris (<span class="citation" data-cites="kuelumbus">@kuelumbus</span> on GitHub) packages the RDKit for pypi, he copies the Contrib directory into the rest of the Python code, so you do:</p>
-<pre><code>from rdkit.Contrib.SA_Score import sascorer
-from rdkit.Contrib.NP_Score import npscorer</code></pre>
-</section>
-<section id="calculating-the-scores" class="level1">
-<h1>Calculating the scores</h1>
-<p>This is the same regardless of how you have the RDKit installed:</p>
-<div id="532d7847-7d51-4458-a009-9abecb9e8fb4" class="cell" data-execution_count="4">
-<div class="sourceCode cell-code" id="cb6" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb6-1">sascorer.calculateScore(m)</span></code></pre></div>
-<div class="cell-output cell-output-display" data-execution_count="4">
-<pre><code>2.8716389090191434</code></pre>
-</div>
-</div>
-<p>The SA_Score ranges from 1 to 10 with 1 being easy to make and 10 being hard to make.</p>
-<div id="3cb1f499-a021-4e0e-9737-be898babc028" class="cell" data-execution_count="5">
-<div class="sourceCode cell-code" id="cb8" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb8-1">fscore <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> npscorer.readNPModel()</span>
-<span id="cb8-2">npscorer.scoreMol(m,fscore)</span></code></pre></div>
-<div class="cell-output cell-output-stderr">
-<pre><code>reading NP model ...
-model in</code></pre>
-</div>
-<div class="cell-output cell-output-display" data-execution_count="5">
-<pre><code>-1.960519718438019</code></pre>
-</div>
-</div>
-<p>The NP score ranges from -5 to 5, so this is pretty low.</p>
-<p>You can also get a confidence value:</p>
-<div id="7f3ea417-47e4-4eab-a41e-9bbe9f2db3ea" class="cell" data-execution_count="6">
-<div class="sourceCode cell-code" id="cb11" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb11-1">npscorer.scoreMolWConfidence(m,fscore)</span></code></pre></div>
-<div class="cell-output cell-output-display" data-execution_count="6">
-<pre><code>NPLikeness(nplikeness=-1.960519718438019, confidence=1.0)</code></pre>
-</div>
-</div>
-<p>That’s it for this post. As I said in the intro, it’s a short one!</p>
-
-
-</section>
-
- ]]></description>
-  <category>tutorial</category>
-  <category>documentation</category>
-  <category>descriptors</category>
-  <guid>https://greglandrum.github.io/rdkit-blog/posts/2023-12-01-using_sascore_and_npscore.html</guid>
-  <pubDate>Thu, 30 Nov 2023 23:00:00 GMT</pubDate>
 </item>
 </channel>
 </rss>
