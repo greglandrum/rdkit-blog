@@ -10,7 +10,983 @@
 <atom:link href="https://greglandrum.github.io/rdkit-blog/index.xml" rel="self" type="application/rss+xml"/>
 <description>RDKit experiments, tips, and tutorials</description>
 <generator>quarto-1.6.39</generator>
-<lastBuildDate>Fri, 14 Feb 2025 23:00:00 GMT</lastBuildDate>
+<lastBuildDate>Thu, 20 Feb 2025 23:00:00 GMT</lastBuildDate>
+<item>
+  <title>Highlight atoms in drawings</title>
+  <link>https://greglandrum.github.io/rdkit-blog/posts/2025-02-21-highlighting-atoms-tutorial.html</link>
+  <description><![CDATA[ 
+
+
+
+
+<p>This is a tutorial blog post demonstrating some of the options the RDKit has for highlighting parts of molecules to show additional information.</p>
+<p>An older blog post shows a more advanced application: using multiple highlights together with R-group decomposition: https://greglandrum.github.io/rdkit-blog/posts/2021-08-07-rgd-and-highlighting.html</p>
+<div id="62bc69d3" class="cell" data-execution_count="1">
+<div class="sourceCode cell-code" id="cb1" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb1-1"><span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">from</span> rdkit <span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">import</span> Chem</span>
+<span id="cb1-2"><span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">from</span> rdkit.Chem <span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">import</span> Draw</span>
+<span id="cb1-3"><span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">from</span> rdkit.Chem.Draw <span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">import</span> SimilarityMaps</span>
+<span id="cb1-4"><span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">from</span> rdkit.Chem.Draw <span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">import</span> IPythonConsole</span>
+<span id="cb1-5"><span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">from</span> rdkit.Chem <span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">import</span> rdDepictor</span>
+<span id="cb1-6">rdDepictor.SetPreferCoordGen(<span class="va" style="color: #111111;
+background-color: null;
+font-style: inherit;">True</span>)</span>
+<span id="cb1-7"></span>
+<span id="cb1-8"><span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">import</span> rdkit</span>
+<span id="cb1-9"><span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">print</span>(rdkit.__version__)</span></code></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>2024.09.5</code></pre>
+</div>
+</div>
+<p>Test molecule:</p>
+<div id="5518f2e2" class="cell" data-scrolled="true" data-execution_count="2">
+<div class="sourceCode cell-code" id="cb3" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb3-1">esomep <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> Chem.MolFromSmiles(<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'COc1ccc2nc([nH]c2c1)[S@](=O)Cc1ncc(C)c(OC)c1C'</span>)</span>
+<span id="cb3-2">rdDepictor.Compute2DCoords(esomep)</span>
+<span id="cb3-3">esomep</span></code></pre></div>
+<div class="cell-output cell-output-display" data-execution_count="2">
+<div>
+<figure class="figure">
+<p><img src="https://greglandrum.github.io/rdkit-blog/posts/2025-02-21-highlighting-atoms-tutorial_files/figure-html/cell-3-output-1.png" class="img-fluid figure-img"></p>
+</figure>
+</div>
+</div>
+</div>
+<div id="dbe1cd7b" class="cell" data-execution_count="3">
+<div class="sourceCode cell-code" id="cb4" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb4-1">esomep_h <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> Chem.AddHs(esomep)</span>
+<span id="cb4-2">rdDepictor.Compute2DCoords(esomep_h)</span>
+<span id="cb4-3">esomep_h</span></code></pre></div>
+<div class="cell-output cell-output-display" data-execution_count="3">
+<div>
+<figure class="figure">
+<p><img src="https://greglandrum.github.io/rdkit-blog/posts/2025-02-21-highlighting-atoms-tutorial_files/figure-html/cell-4-output-1.png" class="img-fluid figure-img"></p>
+</figure>
+</div>
+</div>
+</div>
+<section id="highlight-numerical-data" class="level1">
+<h1>Highlight numerical data</h1>
+<p>As an example of numeric data I’ll use partial charges calculated using the DASH-props tree populated with AM1-BCC charges. Here’s the paper describing the work: https://doi.org/10.1063/5.0218154 and here’s the github repo: https://github.com/rinikerlab/DASH-tree</p>
+<div id="10070156" class="cell" data-execution_count="4">
+<div class="sourceCode cell-code" id="cb5" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb5-1"><span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">from</span> serenityff.charge.tree.dash_tree <span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">import</span> DASHTree, TreeType</span>
+<span id="cb5-2"><span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">from</span> serenityff.charge.data <span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">import</span> dash_props_tree_path</span>
+<span id="cb5-3">tree <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> DASHTree(tree_folder_path<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span>dash_props_tree_path, tree_type<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span>TreeType.FULL)</span></code></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>Loading DASH tree data
+Loaded 122 trees and data</code></pre>
+</div>
+</div>
+<div id="df3d9cbe" class="cell" data-execution_count="5">
+<div class="sourceCode cell-code" id="cb7" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb7-1">charges <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> tree.get_molecules_partial_charges(esomep_h, chg_key<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span><span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"AM1BCC"</span>, </span>
+<span id="cb7-2">                                              chg_std_key<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span><span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"AM1BCC_std"</span>)[<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"charges"</span>]</span>
+<span id="cb7-3"></span>
+<span id="cb7-4">charges[:<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">6</span>]</span></code></pre></div>
+<div class="cell-output cell-output-display" data-execution_count="5">
+<pre><code>[0.10260369084159895,
+ -0.3260823673748836,
+ 0.13600369084159897,
+ -0.17074237544369403,
+ -0.04009630915840103,
+ 0.009303690841598967]</code></pre>
+</div>
+</div>
+<p>Let’s start with the oldest option in the RDKit and the one that is best suited to presenting continuous numerical data, similarity maps:</p>
+<div id="95e954a5" class="cell" data-execution_count="6">
+<div class="sourceCode cell-code" id="cb9" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb9-1"><span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">from</span> IPython.display <span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">import</span> SVG</span>
+<span id="cb9-2"></span>
+<span id="cb9-3">d2d <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> Draw.MolDraw2DSVG(<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">550</span>,<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">350</span>)</span>
+<span id="cb9-4">dopts <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> d2d.drawOptions()</span>
+<span id="cb9-5">dopts.useBWAtomPalette()</span>
+<span id="cb9-6">SimilarityMaps.GetSimilarityMapFromWeights(esomep_h,charges,d2d,colorMap<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span><span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'coolwarm'</span>,alpha<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span><span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">0</span>)</span>
+<span id="cb9-7">d2d.FinishDrawing()</span>
+<span id="cb9-8">SVG(d2d.GetDrawingText())</span></code></pre></div>
+<div class="cell-output cell-output-display" data-execution_count="6">
+<div>
+<figure class="figure">
+<p><img src="https://greglandrum.github.io/rdkit-blog/posts/2025-02-21-highlighting-atoms-tutorial_files/figure-html/cell-7-output-1.svg" class="img-fluid figure-img"></p>
+</figure>
+</div>
+</div>
+</div>
+<p>Notice above that I switched to using a black and white atom palette when doing highlighting. I think this makes everything easier to read and will do it throughout this post.</p>
+<div id="3ed3df4e" class="cell" data-scrolled="true" data-execution_count="7">
+<div class="sourceCode cell-code" id="cb10" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb10-1"><span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">max</span>(charges),<span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">min</span>(charges)</span></code></pre></div>
+<div class="cell-output cell-output-display" data-execution_count="7">
+<pre><code>(0.44457, -0.6342717064338059)</code></pre>
+</div>
+</div>
+<p>An alternate approach: draw the molecule and use distinct atomic highlights (circles/ovals) with a radius proportional to the magnitude of the charge.</p>
+<div id="b4e399a5" class="cell" data-execution_count="8">
+<div class="sourceCode cell-code" id="cb12" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb12-1">maxRad <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> <span class="fl" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">0.5</span></span>
+<span id="cb12-2">chargeRadii <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> {}</span>
+<span id="cb12-3">chargeColors <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> {}</span>
+<span id="cb12-4">highlightAtoms <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> []</span>
+<span id="cb12-5"><span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">for</span> i,chg <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">in</span> <span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">enumerate</span>(charges):</span>
+<span id="cb12-6">    <span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># quantize and scale the charge so that we can use it to scale the highlight radii</span></span>
+<span id="cb12-7">    chg <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> (<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">10</span><span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">*</span>chg<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">//</span><span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">1</span>)<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">/</span><span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">10</span></span>
+<span id="cb12-8">    <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">if</span> <span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">abs</span>(chg)<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">&gt;</span><span class="fl" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">1e-4</span>:</span>
+<span id="cb12-9">        chargeRadii[i] <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> <span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">abs</span>(chg)<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">*</span>maxRad </span>
+<span id="cb12-10">        highlightAtoms.append(i)</span>
+<span id="cb12-11">        <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">if</span> chg<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">&gt;</span><span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">0</span>:</span>
+<span id="cb12-12">            chargeColors[i] <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> (<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">1</span>,<span class="fl" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">.5</span>,<span class="fl" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">.5</span>)</span>
+<span id="cb12-13">        <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">else</span>:</span>
+<span id="cb12-14">            chargeColors[i] <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> (<span class="fl" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">.5</span>,<span class="fl" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">.5</span>,<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">1</span>)</span>
+<span id="cb12-15"></span>
+<span id="cb12-16">d2d <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> Draw.MolDraw2DSVG(<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">550</span>,<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">350</span>)</span>
+<span id="cb12-17">dopts <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> d2d.drawOptions()</span>
+<span id="cb12-18">dopts.useBWAtomPalette()</span>
+<span id="cb12-19"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># we need to set the highlights to be circles or we'll end up with ovals</span></span>
+<span id="cb12-20"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># that fit around the atomic symbol</span></span>
+<span id="cb12-21">dopts.atomHighlightsAreCircles <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> <span class="va" style="color: #111111;
+background-color: null;
+font-style: inherit;">True</span></span>
+<span id="cb12-22"></span>
+<span id="cb12-23"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># we need to provide highlightBonds=[] here to avoid having the bonds between highlighted atoms highlighted:</span></span>
+<span id="cb12-24">d2d.DrawMolecule(esomep_h,highlightAtoms<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span>highlightAtoms,highlightAtomColors<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span>chargeColors,highlightAtomRadii<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span>chargeRadii,</span>
+<span id="cb12-25">                highlightBonds<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span>[])</span>
+<span id="cb12-26">d2d.FinishDrawing()</span>
+<span id="cb12-27">SVG(d2d.GetDrawingText())</span></code></pre></div>
+<div class="cell-output cell-output-display" data-execution_count="8">
+<div>
+<figure class="figure">
+<p><img src="https://greglandrum.github.io/rdkit-blog/posts/2025-02-21-highlighting-atoms-tutorial_files/figure-html/cell-9-output-1.svg" class="img-fluid figure-img"></p>
+</figure>
+</div>
+</div>
+</div>
+<p>We can also add the numeric values for the atoms where we’ve drawn circles by setting the <code>atomNote</code> property on those atoms:</p>
+<div id="ab63f0e5" class="cell" data-execution_count="9">
+<div class="sourceCode cell-code" id="cb13" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb13-1">molcopy <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> Chem.Mol(esomep_h)</span>
+<span id="cb13-2"></span>
+<span id="cb13-3"><span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">for</span> aid <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">in</span> chargeColors:</span>
+<span id="cb13-4">    chg <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> charges[aid]</span>
+<span id="cb13-5">    <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">if</span> <span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">abs</span>(chg)<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">&gt;=</span><span class="fl" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">0.1</span>:</span>
+<span id="cb13-6">        molcopy.GetAtomWithIdx(aid).SetProp(<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'atomNote'</span>,<span class="ss" style="color: #20794D;
+background-color: null;
+font-style: inherit;">f'</span><span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">{</span>charges[aid]<span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">:.2f}</span><span class="ss" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'</span>)</span>
+<span id="cb13-7">d2d <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> Draw.MolDraw2DSVG(<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">550</span>,<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">350</span>)</span>
+<span id="cb13-8">dopts <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> d2d.drawOptions()</span>
+<span id="cb13-9">dopts.useBWAtomPalette()</span>
+<span id="cb13-10">dopts.atomHighlightsAreCircles <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> <span class="va" style="color: #111111;
+background-color: null;
+font-style: inherit;">True</span></span>
+<span id="cb13-11">d2d.DrawMolecule(molcopy,highlightAtoms<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span>highlightAtoms,highlightAtomColors<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span>chargeColors,highlightAtomRadii<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span>chargeRadii,</span>
+<span id="cb13-12">                highlightBonds<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span>[])</span>
+<span id="cb13-13">d2d.FinishDrawing()</span>
+<span id="cb13-14">SVG(d2d.GetDrawingText())</span></code></pre></div>
+<div class="cell-output cell-output-display" data-execution_count="9">
+<div>
+<figure class="figure">
+<p><img src="https://greglandrum.github.io/rdkit-blog/posts/2025-02-21-highlighting-atoms-tutorial_files/figure-html/cell-10-output-1.svg" class="img-fluid figure-img"></p>
+</figure>
+</div>
+</div>
+</div>
+</section>
+<section id="highlighting-regions-of-a-molecule" class="level1">
+<h1>Highlighting regions of a molecule</h1>
+<section id="single-color" class="level2">
+<h2 class="anchored" data-anchor-id="single-color">Single color</h2>
+<p>This time we’re going to highlight regions of the molecule that match a substructure</p>
+<div id="cea18f1c" class="cell" data-execution_count="10">
+<div class="sourceCode cell-code" id="cb14" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb14-1"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># build a list that has all atoms that match the substructure:</span></span>
+<span id="cb14-2">matches1 <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> esomep.GetSubstructMatches(Chem.MolFromSmarts(<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'a1aaaaa1'</span>))</span>
+<span id="cb14-3">highlightAtoms <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> []</span>
+<span id="cb14-4"><span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">for</span> match <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">in</span> matches1:</span>
+<span id="cb14-5">    highlightAtoms.extend(match)</span>
+<span id="cb14-6"></span>
+<span id="cb14-7"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># and now draw with highlights on those atoms:    </span></span>
+<span id="cb14-8">d2d <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> Draw.MolDraw2DSVG(<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">350</span>,<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">200</span>)</span>
+<span id="cb14-9">dopts <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> d2d.drawOptions()</span>
+<span id="cb14-10">dopts.useBWAtomPalette()</span>
+<span id="cb14-11">d2d.DrawMolecule(esomep,highlightAtoms<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span>highlightAtoms)</span>
+<span id="cb14-12">d2d.FinishDrawing()</span>
+<span id="cb14-13">SVG(d2d.GetDrawingText())</span></code></pre></div>
+<div class="cell-output cell-output-display" data-execution_count="10">
+<div>
+<figure class="figure">
+<p><img src="https://greglandrum.github.io/rdkit-blog/posts/2025-02-21-highlighting-atoms-tutorial_files/figure-html/cell-11-output-1.svg" class="img-fluid figure-img"></p>
+</figure>
+</div>
+</div>
+</div>
+</section>
+<section id="multiple-colors" class="level2">
+<h2 class="anchored" data-anchor-id="multiple-colors">Multiple colors</h2>
+<p>We can also have multiple different highlighting colors.</p>
+<div id="54560d2d" class="cell" data-execution_count="11">
+<div class="sourceCode cell-code" id="cb15" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb15-1"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># rather than trying to guess discernible colors, I will just use </span></span>
+<span id="cb15-2"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># matplotlib's color scheme</span></span>
+<span id="cb15-3"><span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">import</span> matplotlib.pyplot <span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">as</span> plt</span>
+<span id="cb15-4">plt.style.use(<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'tableau-colorblind10'</span>)</span>
+<span id="cb15-5"><span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">from</span> matplotlib <span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">import</span> colors</span></code></pre></div>
+</div>
+<div id="cf787d77" class="cell" data-execution_count="12">
+<div class="sourceCode cell-code" id="cb16" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb16-1"><span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">from</span> collections <span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">import</span> defaultdict</span>
+<span id="cb16-2"></span>
+<span id="cb16-3">matches1 <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> esomep.GetSubstructMatches(Chem.MolFromSmarts(<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'a1aaaaa1'</span>))</span>
+<span id="cb16-4">color1 <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> colors.to_rgb(<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'C0'</span>)</span>
+<span id="cb16-5">matches2 <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> esomep.GetSubstructMatches(Chem.MolFromSmarts(<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'a1aaaa1'</span>))</span>
+<span id="cb16-6">color2 <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> colors.to_rgb(<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'C1'</span>)</span>
+<span id="cb16-7"></span>
+<span id="cb16-8">rad <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> <span class="fl" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">0.4</span></span>
+<span id="cb16-9">atomHighlights <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> defaultdict(<span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">list</span>)</span>
+<span id="cb16-10">atomRads <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> {}</span>
+<span id="cb16-11"><span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">for</span> (matches,color) <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">in</span> <span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">zip</span>((matches1,matches2),(color1,color2)):</span>
+<span id="cb16-12">    <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">for</span> match <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">in</span> matches:</span>
+<span id="cb16-13">        <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">for</span> aid <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">in</span> match:</span>
+<span id="cb16-14">            atomHighlights[aid].append(color)</span>
+<span id="cb16-15">            atomRads[aid] <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> rad</span>
+<span id="cb16-16">        </span>
+<span id="cb16-17">d2d <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> Draw.MolDraw2DSVG(<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">350</span>,<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">200</span>)</span>
+<span id="cb16-18">dopts <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> d2d.drawOptions()</span>
+<span id="cb16-19">dopts.useBWAtomPalette()</span>
+<span id="cb16-20">d2d.DrawMoleculeWithHighlights(esomep,<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">""</span>,<span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">dict</span>(atomHighlights),{},atomRads,{})</span>
+<span id="cb16-21">d2d.FinishDrawing()</span>
+<span id="cb16-22">SVG(d2d.GetDrawingText())</span></code></pre></div>
+<div class="cell-output cell-output-display" data-execution_count="12">
+<div>
+<figure class="figure">
+<p><img src="https://greglandrum.github.io/rdkit-blog/posts/2025-02-21-highlighting-atoms-tutorial_files/figure-html/cell-13-output-1.svg" class="img-fluid figure-img"></p>
+</figure>
+</div>
+</div>
+</div>
+<p>We can also just draw the outlines of the highlighted atoms:</p>
+<div id="bc0670bf" class="cell" data-execution_count="13">
+<div class="sourceCode cell-code" id="cb17" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb17-1">d2d <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> Draw.MolDraw2DSVG(<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">350</span>,<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">200</span>)</span>
+<span id="cb17-2">dopts <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> d2d.drawOptions()</span>
+<span id="cb17-3">dopts.useBWAtomPalette()</span>
+<span id="cb17-4">dopts.fillHighlights <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> <span class="va" style="color: #111111;
+background-color: null;
+font-style: inherit;">False</span></span>
+<span id="cb17-5">d2d.DrawMoleculeWithHighlights(esomep,<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">""</span>,<span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">dict</span>(atomHighlights),{},atomRads,{})</span>
+<span id="cb17-6">d2d.FinishDrawing()</span>
+<span id="cb17-7">SVG(d2d.GetDrawingText())</span></code></pre></div>
+<div class="cell-output cell-output-display" data-execution_count="13">
+<div>
+<figure class="figure">
+<p><img src="https://greglandrum.github.io/rdkit-blog/posts/2025-02-21-highlighting-atoms-tutorial_files/figure-html/cell-14-output-1.svg" class="img-fluid figure-img"></p>
+</figure>
+</div>
+</div>
+</div>
+<p>Repeat that, but include the bonds as well.</p>
+<div id="d8a2aa2a" class="cell" data-execution_count="14">
+<div class="sourceCode cell-code" id="cb18" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb18-1">rad <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> <span class="fl" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">0.3</span></span>
+<span id="cb18-2">atomHighlights <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> defaultdict(<span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">list</span>)</span>
+<span id="cb18-3">bondHighlights <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> defaultdict(<span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">list</span>)</span>
+<span id="cb18-4">atomRads <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> {}</span>
+<span id="cb18-5"></span>
+<span id="cb18-6"><span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">for</span> (matches,color) <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">in</span> <span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">zip</span>((matches1,matches2),(color1,color2)):</span>
+<span id="cb18-7">    <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">for</span> match <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">in</span> matches:</span>
+<span id="cb18-8">        <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">for</span> i,aid <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">in</span> <span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">enumerate</span>(match):</span>
+<span id="cb18-9">            atomHighlights[aid].append(color1)</span>
+<span id="cb18-10">            atomRads[aid] <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> rad</span>
+<span id="cb18-11">            bnd <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> esomep.GetBondBetweenAtoms(aid,match[(i<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">+</span><span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">1</span>)<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">%</span><span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">len</span>(match)])</span>
+<span id="cb18-12">            bondHighlights[bnd.GetIdx()].append(color)</span>
+<span id="cb18-13">        </span>
+<span id="cb18-14">d2d <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> Draw.MolDraw2DSVG(<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">350</span>,<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">200</span>)</span>
+<span id="cb18-15">dopts <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> d2d.drawOptions()</span>
+<span id="cb18-16">dopts.useBWAtomPalette()</span>
+<span id="cb18-17"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># I think this looks better if we ensure that the atom highlights are always circles:</span></span>
+<span id="cb18-18">dopts.atomHighlightsAreCircles <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> <span class="va" style="color: #111111;
+background-color: null;
+font-style: inherit;">True</span></span>
+<span id="cb18-19">d2d.DrawMoleculeWithHighlights(esomep,<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">""</span>,<span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">dict</span>(atomHighlights),<span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">dict</span>(bondHighlights),atomRads,{})</span>
+<span id="cb18-20">d2d.FinishDrawing()</span>
+<span id="cb18-21">SVG(d2d.GetDrawingText())</span></code></pre></div>
+<div class="cell-output cell-output-display" data-execution_count="14">
+<div>
+<figure class="figure">
+<p><img src="https://greglandrum.github.io/rdkit-blog/posts/2025-02-21-highlighting-atoms-tutorial_files/figure-html/cell-15-output-1.svg" class="img-fluid figure-img"></p>
+</figure>
+</div>
+</div>
+</div>
+<p>We can also do that in a more “subway map” style. I will add a third highlight to make it more dramatic.</p>
+<div id="a9a5a63f" class="cell" data-execution_count="15">
+<div class="sourceCode cell-code" id="cb19" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb19-1"><span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">from</span> collections <span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">import</span> defaultdict</span>
+<span id="cb19-2"></span>
+<span id="cb19-3">matches1 <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> esomep.GetSubstructMatches(Chem.MolFromSmarts(<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'a1aaaaa1'</span>))</span>
+<span id="cb19-4">color1 <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> colors.to_rgb(<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'C0'</span>)</span>
+<span id="cb19-5">matches2 <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> esomep.GetSubstructMatches(Chem.MolFromSmarts(<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'a1aaaa1'</span>))</span>
+<span id="cb19-6">color2 <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> colors.to_rgb(<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'C1'</span>)</span>
+<span id="cb19-7">matches3 <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> esomep.GetSubstructMatches(Chem.MolFromSmarts(<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'Occc[nH]c'</span>))</span>
+<span id="cb19-8">color3 <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> colors.to_rgb(<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'C2'</span>)</span>
+<span id="cb19-9"></span>
+<span id="cb19-10">rad <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> <span class="fl" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">0.2</span></span>
+<span id="cb19-11">atomHighlights <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> defaultdict(<span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">list</span>)</span>
+<span id="cb19-12">bondHighlights <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> defaultdict(<span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">list</span>)</span>
+<span id="cb19-13">atomRads <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> {}</span>
+<span id="cb19-14"><span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">for</span> matches,color <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">in</span> <span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">zip</span>((matches1,matches2,matches3),(color1,color2,color3)):</span>
+<span id="cb19-15">    <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">for</span> match <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">in</span> matches:</span>
+<span id="cb19-16">        <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">for</span> i,aid <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">in</span> <span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">enumerate</span>(match):</span>
+<span id="cb19-17">            atomHighlights[aid].append(color)</span>
+<span id="cb19-18">            atomRads[aid] <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> rad</span>
+<span id="cb19-19">            bnd <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> esomep.GetBondBetweenAtoms(aid,match[(i<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">+</span><span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">1</span>)<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">%</span><span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">len</span>(match)])</span>
+<span id="cb19-20">            <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">if</span> bnd <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">is</span> <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">not</span> <span class="va" style="color: #111111;
+background-color: null;
+font-style: inherit;">None</span>:</span>
+<span id="cb19-21">                bondHighlights[bnd.GetIdx()].append(color)</span>
+<span id="cb19-22">        </span>
+<span id="cb19-23">d2d <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> Draw.MolDraw2DSVG(<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">450</span>,<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">300</span>)</span>
+<span id="cb19-24">dopts <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> d2d.drawOptions()</span>
+<span id="cb19-25">dopts.useBWAtomPalette()</span>
+<span id="cb19-26"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># turn off the highlight fill and ensure circular atom highlights:</span></span>
+<span id="cb19-27">dopts.fillHighlights <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> <span class="va" style="color: #111111;
+background-color: null;
+font-style: inherit;">False</span></span>
+<span id="cb19-28">dopts.atomHighlightsAreCircles <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> <span class="va" style="color: #111111;
+background-color: null;
+font-style: inherit;">True</span></span>
+<span id="cb19-29">d2d.DrawMoleculeWithHighlights(esomep,<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">""</span>,<span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">dict</span>(atomHighlights),<span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">dict</span>(bondHighlights),atomRads,{})</span>
+<span id="cb19-30">d2d.FinishDrawing()</span>
+<span id="cb19-31">SVG(d2d.GetDrawingText())</span></code></pre></div>
+<div class="cell-output cell-output-display" data-execution_count="15">
+<div>
+<figure class="figure">
+<p><img src="https://greglandrum.github.io/rdkit-blog/posts/2025-02-21-highlighting-atoms-tutorial_files/figure-html/cell-16-output-1.svg" class="img-fluid figure-img"></p>
+</figure>
+</div>
+</div>
+</div>
+</section>
+</section>
+<section id="highlighting-rings" class="level1">
+<h1>Highlighting rings</h1>
+<p>This is something I first figured out how to do for the <a href="https://greglandrum.github.io/rdkit-blog/posts/2021-08-07-rgd-and-highlighting.html">R-group decomposition blog post</a> mentioned above.</p>
+<p>Here we have to draw the molecule twice: The first time finalizes the scaling of the drawing canvas, then we clear the canvas, draw the polygons that fill the rings, and then draw the molecule a second time on top of the polygons.</p>
+<div id="322eabd8" class="cell" data-execution_count="16">
+<div class="sourceCode cell-code" id="cb20" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb20-1"><span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">from</span> rdkit <span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">import</span> Geometry</span>
+<span id="cb20-2"></span>
+<span id="cb20-3"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># setup the same way we did before:</span></span>
+<span id="cb20-4">matches1 <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> esomep.GetSubstructMatches(Chem.MolFromSmarts(<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'a1aaaaa1'</span>))</span>
+<span id="cb20-5"></span>
+<span id="cb20-6">color1 <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> colors.to_rgb(<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'C1'</span>)</span>
+<span id="cb20-7"></span>
+<span id="cb20-8"></span>
+<span id="cb20-9">highlightAtoms <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> []</span>
+<span id="cb20-10"><span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">for</span> match <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">in</span> matches1:</span>
+<span id="cb20-11">    highlightAtoms.extend(match)</span>
+<span id="cb20-12"></span>
+<span id="cb20-13">d2d <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> Draw.MolDraw2DSVG(<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">350</span>,<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">200</span>)</span>
+<span id="cb20-14">dopts <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> d2d.drawOptions()</span>
+<span id="cb20-15">dopts.useBWAtomPalette()</span>
+<span id="cb20-16">dopts.setHighlightColour(color1)</span>
+<span id="cb20-17"></span>
+<span id="cb20-18"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># draw the molecule to get the atom drawing positions and set the canvas scale:</span></span>
+<span id="cb20-19">d2d.DrawMolecule(esomep,highlightAtoms<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span>highlightAtoms)</span>
+<span id="cb20-20">d2d.ClearDrawing()</span>
+<span id="cb20-21"></span>
+<span id="cb20-22"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># draw the filled rings:</span></span>
+<span id="cb20-23">conf <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> esomep.GetConformer()</span>
+<span id="cb20-24"><span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">for</span> ring <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">in</span> matches1:</span>
+<span id="cb20-25">    ps <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> [Geometry.Point2D(conf.GetAtomPosition(aidx)) <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">for</span> aidx <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">in</span> ring]</span>
+<span id="cb20-26">    d2d.SetFillPolys(<span class="va" style="color: #111111;
+background-color: null;
+font-style: inherit;">True</span>)</span>
+<span id="cb20-27">    d2d.SetColour(color1)</span>
+<span id="cb20-28">    d2d.DrawPolygon(ps)</span>
+<span id="cb20-29">dopts.clearBackground <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> <span class="va" style="color: #111111;
+background-color: null;
+font-style: inherit;">False</span></span>
+<span id="cb20-30"></span>
+<span id="cb20-31"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># now redraw the molecule on top of those ring highlights:</span></span>
+<span id="cb20-32">d2d.DrawMolecule(esomep,highlightAtoms<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span>highlightAtoms)</span>
+<span id="cb20-33">d2d.FinishDrawing()</span>
+<span id="cb20-34">SVG(d2d.GetDrawingText())</span></code></pre></div>
+<div class="cell-output cell-output-display" data-execution_count="16">
+<div>
+<figure class="figure">
+<p><img src="https://greglandrum.github.io/rdkit-blog/posts/2025-02-21-highlighting-atoms-tutorial_files/figure-html/cell-17-output-1.svg" class="img-fluid figure-img"></p>
+</figure>
+</div>
+</div>
+</div>
+<p>As usual, I hope this was useful. Please leave questions, comments, or suggestions in the widget below.</p>
+
+
+</section>
+
+ ]]></description>
+  <category>tutorial</category>
+  <category>drawing</category>
+  <guid>https://greglandrum.github.io/rdkit-blog/posts/2025-02-21-highlighting-atoms-tutorial.html</guid>
+  <pubDate>Thu, 20 Feb 2025 23:00:00 GMT</pubDate>
+  <media:content url="https://greglandrum.github.io/rdkit-blog/posts/images/blog/atom-highlighting-tutorial-1.png" medium="image" type="image/png" height="78" width="144"/>
+</item>
 <item>
   <title>Storing molecules in images</title>
   <link>https://greglandrum.github.io/rdkit-blog/posts/2025-02-15-storing-molecules-in-images.html</link>
@@ -19159,1297 +20135,6 @@ font-style: inherit;">;</span></span></code></pre></div>
   <guid>https://greglandrum.github.io/rdkit-blog/posts/2024-01-18-molecules-on-plots.html</guid>
   <pubDate>Wed, 17 Jan 2024 23:00:00 GMT</pubDate>
   <media:content url="https://greglandrum.github.io/rdkit-blog/posts/images/blog/molecules-on-plots-1.png" medium="image" type="image/png" height="108" width="144"/>
-</item>
-<item>
-  <title>Using abbreviations in the RDKit</title>
-  <link>https://greglandrum.github.io/rdkit-blog/posts/2024-01-11-using-abbreviations.html</link>
-  <description><![CDATA[ 
-
-
-
-
-<p>This is another one of those “reminder about lesser known RDKit features” posts.</p>
-<p>The RDKit has had the ability to condense common functional groups to short-hand abbreviations for a few years. This is primarily intended as a way to simplify the drawings of molecules. This can be quite useful, particularly when preparing figures for publication.</p>
-<p>Here’s a simple illustration. The molecule:</p>
-<div class="quarto-figure quarto-figure-center">
-<figure class="figure">
-<p><img src="https://greglandrum.github.io/rdkit-blog/posts/2024-01-11-using-abbreviations_files/figure-html/e9a7fdff-2-image.png" class="img-fluid figure-img"></p>
-<figcaption>image.png</figcaption>
-</figure>
-</div>
-<p>can be drawn with abbreviations as: dsas <img src="https://greglandrum.github.io/rdkit-blog/posts/2024-01-11-using-abbreviations_files/figure-html/e9a7fdff-1-image-2.png" class="img-fluid" alt="image-2.png"></p>
-<p>In this post I’ll provide a short overview of the functionality. There’s also a <a href="https://www.rdkit.org/docs/Cookbook.html#with-abbreviations">cookbook entry</a> on the topic.</p>
-<div id="d80dc886" class="cell" data-executetime="{&quot;end_time&quot;:&quot;2024-01-11T05:39:17.361299Z&quot;,&quot;start_time&quot;:&quot;2024-01-11T05:39:17.243076Z&quot;}" data-execution_count="1">
-<div class="sourceCode cell-code" id="cb1" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb1-1"><span class="im" style="color: #00769E;
-background-color: null;
-font-style: inherit;">from</span> rdkit <span class="im" style="color: #00769E;
-background-color: null;
-font-style: inherit;">import</span> Chem</span>
-<span id="cb1-2"><span class="im" style="color: #00769E;
-background-color: null;
-font-style: inherit;">from</span> rdkit.Chem <span class="im" style="color: #00769E;
-background-color: null;
-font-style: inherit;">import</span> rdDepictor</span>
-<span id="cb1-3"><span class="im" style="color: #00769E;
-background-color: null;
-font-style: inherit;">from</span> rdkit.Chem <span class="im" style="color: #00769E;
-background-color: null;
-font-style: inherit;">import</span> Draw</span>
-<span id="cb1-4"><span class="im" style="color: #00769E;
-background-color: null;
-font-style: inherit;">from</span> rdkit.Chem.Draw <span class="im" style="color: #00769E;
-background-color: null;
-font-style: inherit;">import</span> IPythonConsole</span>
-<span id="cb1-5">IPythonConsole.molSize <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> <span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">250</span>,<span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">200</span></span>
-<span id="cb1-6"><span class="im" style="color: #00769E;
-background-color: null;
-font-style: inherit;">from</span> rdkit.Chem <span class="im" style="color: #00769E;
-background-color: null;
-font-style: inherit;">import</span> rdAbbreviations</span>
-<span id="cb1-7"></span>
-<span id="cb1-8"><span class="im" style="color: #00769E;
-background-color: null;
-font-style: inherit;">import</span> rdkit</span>
-<span id="cb1-9">rdkit.__version__</span></code></pre></div>
-<div class="cell-output cell-output-display" data-execution_count="1">
-<pre><code>'2023.09.4'</code></pre>
-</div>
-</div>
-<section id="abbreviation-basics" class="level1">
-<h1>Abbreviation basics</h1>
-<p>Let’s start with the example used in the introduction to this post:</p>
-<div id="78082ee9" class="cell" data-executetime="{&quot;end_time&quot;:&quot;2024-01-11T05:39:18.890211Z&quot;,&quot;start_time&quot;:&quot;2024-01-11T05:39:18.884032Z&quot;}" data-execution_count="2">
-<div class="sourceCode cell-code" id="cb3" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb3-1">m <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> Chem.MolFromSmiles(<span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">'FC(F)(F)c1cc(C(=O)O)cc2ccc(C(C)(C)C)cc21'</span>)</span>
-<span id="cb3-2">m</span></code></pre></div>
-<div class="cell-output cell-output-display" data-execution_count="2">
-<div>
-<figure class="figure">
-<p><img src="https://greglandrum.github.io/rdkit-blog/posts/2024-01-11-using-abbreviations_files/figure-html/cell-3-output-1.png" class="img-fluid figure-img"></p>
-</figure>
-</div>
-</div>
-</div>
-<p>We can get a new molecule which uses abbreviations with the function <code>rdAbbreviations.CondenseMolAbbreviations()</code>:</p>
-<div id="32e60fa1" class="cell" data-executetime="{&quot;end_time&quot;:&quot;2024-01-11T05:39:19.722284Z&quot;,&quot;start_time&quot;:&quot;2024-01-11T05:39:19.715885Z&quot;}" data-execution_count="3">
-<div class="sourceCode cell-code" id="cb4" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb4-1"><span class="co" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;"># CondenseMolAbbreviations requires a set of abbreviations to be used. Here we pick the defaults:</span></span>
-<span id="cb4-2">abbrevs <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> rdAbbreviations.GetDefaultAbbreviations()</span>
-<span id="cb4-3"></span>
-<span id="cb4-4"><span class="co" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;"># Now use them:</span></span>
-<span id="cb4-5">amol <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> rdAbbreviations.CondenseMolAbbreviations(m,abbrevs)</span>
-<span id="cb4-6">amol</span></code></pre></div>
-<div class="cell-output cell-output-display" data-execution_count="3">
-<div>
-<figure class="figure">
-<p><img src="https://greglandrum.github.io/rdkit-blog/posts/2024-01-11-using-abbreviations_files/figure-html/cell-4-output-1.png" class="img-fluid figure-img"></p>
-</figure>
-</div>
-</div>
-</div>
-<p>This isn’t a cosmetic transformation, the output molecule has less atoms:</p>
-<div id="b8145ae0" class="cell" data-executetime="{&quot;end_time&quot;:&quot;2024-01-11T05:39:20.483348Z&quot;,&quot;start_time&quot;:&quot;2024-01-11T05:39:20.479596Z&quot;}" data-execution_count="4">
-<div class="sourceCode cell-code" id="cb5" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb5-1">m.GetNumAtoms(),amol.GetNumAtoms()</span></code></pre></div>
-<div class="cell-output cell-output-display" data-execution_count="4">
-<pre><code>(21, 13)</code></pre>
-</div>
-</div>
-<p>The result molecule has dummy atoms where the abbreviations are drawn:</p>
-<div id="81ef0dd7" class="cell" data-executetime="{&quot;end_time&quot;:&quot;2024-01-11T05:39:21.290023Z&quot;,&quot;start_time&quot;:&quot;2024-01-11T05:39:21.286924Z&quot;}" data-execution_count="5">
-<div class="sourceCode cell-code" id="cb7" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb7-1">Chem.MolToSmiles(amol)</span></code></pre></div>
-<div class="cell-output cell-output-display" data-execution_count="5">
-<pre><code>'*c1cc(*)c2cc(*)ccc2c1'</code></pre>
-</div>
-</div>
-<p>And the abbreviations themselves can be preserved with CXSMILES:</p>
-<div id="f39ea338" class="cell" data-executetime="{&quot;end_time&quot;:&quot;2024-01-11T05:39:21.982773Z&quot;,&quot;start_time&quot;:&quot;2024-01-11T05:39:21.979829Z&quot;}" data-execution_count="6">
-<div class="sourceCode cell-code" id="cb9" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb9-1">Chem.MolToCXSmiles(amol)</span></code></pre></div>
-<div class="cell-output cell-output-display" data-execution_count="6">
-<pre><code>'*c1cc(*)c2cc(*)ccc2c1 |$CO2H;;;;CF3;;;;tBu;;;;$|'</code></pre>
-</div>
-</div>
-<p>This allows us to round-trip abbreviations through CXSMILES:</p>
-<div id="f25fed9a" class="cell" data-executetime="{&quot;end_time&quot;:&quot;2024-01-11T05:39:22.729105Z&quot;,&quot;start_time&quot;:&quot;2024-01-11T05:39:22.723885Z&quot;}" data-execution_count="7">
-<div class="sourceCode cell-code" id="cb11" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb11-1">Chem.MolFromSmiles(<span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">'*c1cc(*)c2cc(*)ccc2c1 |$CO2H;;;;CF3;;;;tBu;;;;$|'</span>)</span></code></pre></div>
-<div class="cell-output cell-output-display" data-execution_count="7">
-<div>
-<figure class="figure">
-<p><img src="https://greglandrum.github.io/rdkit-blog/posts/2024-01-11-using-abbreviations_files/figure-html/cell-8-output-1.png" class="img-fluid figure-img"></p>
-</figure>
-</div>
-</div>
-</div>
-<p>There is a threshold on the maximum percentage of atoms in the molecule which can be replaced by abbreviations. The default value for this is 0.4, so the CF3 group here is not replaced:</p>
-<div id="d56456aa" class="cell" data-executetime="{&quot;end_time&quot;:&quot;2024-01-11T05:39:23.656631Z&quot;,&quot;start_time&quot;:&quot;2024-01-11T05:39:23.651758Z&quot;}" data-execution_count="8">
-<div class="sourceCode cell-code" id="cb12" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb12-1">m <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> Chem.MolFromSmiles(<span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">'FC(F)(F)CC(=O)O'</span>)</span>
-<span id="cb12-2">amol <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> rdAbbreviations.CondenseMolAbbreviations(m,abbrevs)</span>
-<span id="cb12-3">amol</span></code></pre></div>
-<div class="cell-output cell-output-display" data-execution_count="8">
-<div>
-<figure class="figure">
-<p><img src="https://greglandrum.github.io/rdkit-blog/posts/2024-01-11-using-abbreviations_files/figure-html/cell-9-output-1.png" class="img-fluid figure-img"></p>
-</figure>
-</div>
-</div>
-</div>
-<p>But we can change that threshold with the <code>maxCoverage</code> argument:</p>
-<div id="0b9035c6" class="cell" data-executetime="{&quot;end_time&quot;:&quot;2024-01-11T05:39:24.520615Z&quot;,&quot;start_time&quot;:&quot;2024-01-11T05:39:24.515849Z&quot;}" data-execution_count="9">
-<div class="sourceCode cell-code" id="cb13" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb13-1">amol <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> rdAbbreviations.CondenseMolAbbreviations(m,abbrevs,maxCoverage<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span><span class="fl" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">0.8</span>)</span>
-<span id="cb13-2">amol</span></code></pre></div>
-<div class="cell-output cell-output-display" data-execution_count="9">
-<div>
-<figure class="figure">
-<p><img src="https://greglandrum.github.io/rdkit-blog/posts/2024-01-11-using-abbreviations_files/figure-html/cell-10-output-1.png" class="img-fluid figure-img"></p>
-</figure>
-</div>
-</div>
-</div>
-<p>The code will never abbreviate groups which are bonded directly to each other, no matter how high <code>maxCoverage</code> is set:</p>
-<div id="26f8b9e1" class="cell" data-executetime="{&quot;end_time&quot;:&quot;2024-01-11T05:39:26.609220Z&quot;,&quot;start_time&quot;:&quot;2024-01-11T05:39:26.604029Z&quot;}" data-execution_count="10">
-<div class="sourceCode cell-code" id="cb14" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb14-1">m <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> Chem.MolFromSmiles(<span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">'FC(F)(F)C(=O)O'</span>)</span>
-<span id="cb14-2">amol <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> rdAbbreviations.CondenseMolAbbreviations(m,abbrevs,maxCoverage<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span><span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">1</span>)</span>
-<span id="cb14-3">amol</span></code></pre></div>
-<div class="cell-output cell-output-display" data-execution_count="10">
-<div>
-<figure class="figure">
-<p><img src="https://greglandrum.github.io/rdkit-blog/posts/2024-01-11-using-abbreviations_files/figure-html/cell-11-output-1.png" class="img-fluid figure-img"></p>
-</figure>
-</div>
-</div>
-</div>
-<p>Here’s the default list of abbreviations</p>
-<div id="31eb9bd7" class="cell" data-executetime="{&quot;end_time&quot;:&quot;2024-01-11T05:39:28.295379Z&quot;,&quot;start_time&quot;:&quot;2024-01-11T05:39:28.291791Z&quot;}" data-execution_count="11">
-<div class="sourceCode cell-code" id="cb15" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb15-1"><span class="cf" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">for</span> abbrev <span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">in</span> abbrevs:</span>
-<span id="cb15-2">    <span class="bu" style="color: null;
-background-color: null;
-font-style: inherit;">print</span>(abbrev.label,Chem.MolToSmiles(abbrev.mol))</span></code></pre></div>
-<div class="cell-output cell-output-stdout">
-<pre><code>CO2Et *C(=O)OCC
-COOEt *C(=O)OCC
-OiBu *OCC(C)C
-nDec *CCCCCCCCCC
-nNon *CCCCCCCCC
-nOct *CCCCCCCC
-nHept *CCCCCCC
-nHex *CCCCCC
-nPent *CCCCC
-iPent *C(C)CCC
-tBu *C(C)(C)C
-iBu *C(C)CC
-nBu *CCCC
-iPr *C(C)C
-nPr *CCC
-Et *CC
-NCF3 *NC(F)(F)F
-CF3 *C(F)(F)F
-CCl3 *C(Cl)(Cl)Cl
-CN *C#N
-NC *[N+]#[C-]
-N(OH)CH3 *N(C)[OH]
-NO2 *[N+](=O)[O-]
-NO *N=O
-SO3H *S(=O)(=O)[OH]
-CO2H *C(=O)[OH]
-COOH *C(=O)[OH]
-OEt *OCC
-OAc *OC(C)=O
-NHAc *NC(C)=O
-Ac *C(C)=O
-CHO *C=O
-NMe *NC
-SMe *SC
-OMe *OC
-CO2- *C(=O)[O-]
-COO- *C(=O)[O-]</code></pre>
-</div>
-</div>
-</section>
-<section id="adding-your-own-abbreviations" class="level1">
-<h1>Adding your own abbreviations</h1>
-<p>You can extend the list of default abbreviations with your own additions:</p>
-<div id="300563db" class="cell" data-executetime="{&quot;end_time&quot;:&quot;2024-01-11T05:39:29.230387Z&quot;,&quot;start_time&quot;:&quot;2024-01-11T05:39:29.227843Z&quot;}" data-execution_count="12">
-<div class="sourceCode cell-code" id="cb17" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb17-1">abbrevs <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> rdAbbreviations.GetDefaultAbbreviations()</span>
-<span id="cb17-2">nabbrevs <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> rdAbbreviations.ParseAbbreviations(<span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">'''Ph3C C(c1ccccc1)(c1ccccc1)c1ccccc1 CPh3</span></span>
-<span id="cb17-3"><span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">TosO OS(=O)(=O)c1ccc(C)cc1 OTos'''</span>)</span>
-<span id="cb17-4"><span class="co" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;"># make sure our new abbreviations are at the front of the list so that they </span></span>
-<span id="cb17-5"><span class="co" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;"># match before anything else. We could also put them at the end so that </span></span>
-<span id="cb17-6"><span class="co" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;"># the default abbreviations have priority</span></span>
-<span id="cb17-7"><span class="cf" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">for</span> abbrev <span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">in</span> abbrevs:</span>
-<span id="cb17-8">     nabbrevs.append(abbrev)</span>
-<span id="cb17-9">abbrevs <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> nabbrevs</span></code></pre></div>
-</div>
-<div id="15eb0962" class="cell" data-executetime="{&quot;end_time&quot;:&quot;2024-01-11T05:39:29.855288Z&quot;,&quot;start_time&quot;:&quot;2024-01-11T05:39:29.847207Z&quot;}" data-execution_count="13">
-<div class="sourceCode cell-code" id="cb18" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb18-1">rdAbbreviations.CondenseMolAbbreviations(Chem.MolFromSmiles(<span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">'OCC(c1ccccc1)(c1ccccc1)c1ccccc1'</span>),abbrevs,maxCoverage<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span><span class="fl" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">1.0</span>)</span></code></pre></div>
-<div class="cell-output cell-output-display" data-execution_count="13">
-<div>
-<figure class="figure">
-<p><img src="https://greglandrum.github.io/rdkit-blog/posts/2024-01-11-using-abbreviations_files/figure-html/cell-14-output-1.png" class="img-fluid figure-img"></p>
-</figure>
-</div>
-</div>
-</div>
-<div id="ff20d325" class="cell" data-executetime="{&quot;end_time&quot;:&quot;2024-01-11T05:39:30.367019Z&quot;,&quot;start_time&quot;:&quot;2024-01-11T05:39:30.359504Z&quot;}" data-scrolled="true" data-execution_count="14">
-<div class="sourceCode cell-code" id="cb19" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb19-1">rdAbbreviations.CondenseMolAbbreviations(Chem.MolFromSmiles(<span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">'OCCOS(=O)(=O)c1ccc(C)cc1'</span>),abbrevs,maxCoverage<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span><span class="fl" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">1.0</span>)</span></code></pre></div>
-<div class="cell-output cell-output-display" data-execution_count="14">
-<div>
-<figure class="figure">
-<p><img src="https://greglandrum.github.io/rdkit-blog/posts/2024-01-11-using-abbreviations_files/figure-html/cell-15-output-1.png" class="img-fluid figure-img"></p>
-</figure>
-</div>
-</div>
-</div>
-</section>
-<section id="replacing-the-abbreviations" class="level1">
-<h1>Replacing the abbreviations</h1>
-<p>We can also completely replace the list of abbreviations with our own definitions.</p>
-<p>Here’s a github discussion on the topic: https://github.com/rdkit/rdkit/discussions/3677</p>
-<div id="3ce537e1" class="cell" data-executetime="{&quot;end_time&quot;:&quot;2024-01-11T05:39:32.974803Z&quot;,&quot;start_time&quot;:&quot;2024-01-11T05:39:32.967873Z&quot;}" data-execution_count="15">
-<div class="sourceCode cell-code" id="cb20" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb20-1"><span class="im" style="color: #00769E;
-background-color: null;
-font-style: inherit;">import</span> re</span>
-<span id="cb20-2"></span>
-<span id="cb20-3"><span class="co" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;"># data from: https://github.com/metamolecular/osra/blob/master/dict/superatom.txt</span></span>
-<span id="cb20-4">abbrev_defns<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span><span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">'''# Translations of superatom labels to SMILES.</span></span>
-<span id="cb20-5"><span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;"># First atom of SMILES string should be the one connected to the rest of</span></span>
-<span id="cb20-6"><span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;"># the molecule.</span></span>
-<span id="cb20-7"><span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;"># Empty lines and lines starting with # are ignored.</span></span>
-<span id="cb20-8"><span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;"># Also check spelling.txt to see that the superatom label</span></span>
-<span id="cb20-9"><span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;"># is correctly spelled.</span></span>
-<span id="cb20-10"></span>
-<span id="cb20-11"><span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">Me   C</span></span>
-<span id="cb20-12"><span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">MeO      OC</span></span>
-<span id="cb20-13"><span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">MeS      SC</span></span>
-<span id="cb20-14"><span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">MeN      NC</span></span>
-<span id="cb20-15"><span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">CF       CF</span></span>
-<span id="cb20-16"><span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">CF3      C(F)(F)F</span></span>
-<span id="cb20-17"><span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">CN       C#N</span></span>
-<span id="cb20-18"><span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">F3CN     NC(F)(F)F</span></span>
-<span id="cb20-19"><span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">Ph       c1ccccc1</span></span>
-<span id="cb20-20"><span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">NO       N=O</span></span>
-<span id="cb20-21"><span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">NO2      N(=O)=O</span></span>
-<span id="cb20-22"><span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">N(OH)CH3 N(O)C</span></span>
-<span id="cb20-23"><span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">SO3H     S(=O)(=O)O</span></span>
-<span id="cb20-24"><span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">COOH     C(=O)O</span></span>
-<span id="cb20-25"><span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">nBu      CCCC</span></span>
-<span id="cb20-26"><span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">EtO      OCC</span></span>
-<span id="cb20-27"><span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">OiBu     OCC(C)C</span></span>
-<span id="cb20-28"><span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">iPr      CCC</span></span>
-<span id="cb20-29"><span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">tBu      C(C)(C)C</span></span>
-<span id="cb20-30"><span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">Ac       C(=O)C</span></span>
-<span id="cb20-31"><span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">AcO      OC(=O)C</span></span>
-<span id="cb20-32"><span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">NHAc     NC(=O)C</span></span>
-<span id="cb20-33"><span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">OR       O*</span></span>
-<span id="cb20-34"><span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">#BzO      OCc1ccccc1</span></span>
-<span id="cb20-35"><span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">BzO OC(=O)C1=CC=CC=C1</span></span>
-<span id="cb20-36"><span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">THPO     O[C@@H]1OCCCC1</span></span>
-<span id="cb20-37"></span>
-<span id="cb20-38"><span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">CHO    C=O</span></span>
-<span id="cb20-39"><span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">NOH    NO </span></span>
-<span id="cb20-40"></span>
-<span id="cb20-41"><span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;"># Added  release 1.3.0</span></span>
-<span id="cb20-42"><span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">CO2Et C(=O)OCC</span></span>
-<span id="cb20-43"><span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">CO2Me C(=O)OC</span></span>
-<span id="cb20-44"><span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">MeO2S S(=O)(=O)C</span></span>
-<span id="cb20-45"><span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">NMe2  N(C)C</span></span>
-<span id="cb20-46"><span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">CO2R  C(=O)O*</span></span>
-<span id="cb20-47"><span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">ZNH   NC(=O)OCC1=CC=CC=C1</span></span>
-<span id="cb20-48"><span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">HOCH2 CO</span></span>
-<span id="cb20-49"><span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">H2NCH2 CN</span></span>
-<span id="cb20-50"><span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">Et CC</span></span>
-<span id="cb20-51"><span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">BnO OCC1=CC=CC=C1</span></span>
-<span id="cb20-52"><span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">AmNH NCCCCC</span></span>
-<span id="cb20-53"><span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">AmO OCCCCC</span></span>
-<span id="cb20-54"><span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">AmO2C C(=O)OCCCCC</span></span>
-<span id="cb20-55"><span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">AmS SCCCCC</span></span>
-<span id="cb20-56"><span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">BnNH NCC1=CC=CC=C1</span></span>
-<span id="cb20-57"><span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">BnO2C C(=O)OCC1=CC=CC=C1</span></span>
-<span id="cb20-58"><span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">Bu3Sn [Sn](CCCC)(CCCC)CCCC</span></span>
-<span id="cb20-59"><span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">BuNH    NCCCC</span></span>
-<span id="cb20-60"><span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">BuO     OCCCC</span></span>
-<span id="cb20-61"><span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">BuO2C   C(=O)OCCCC</span></span>
-<span id="cb20-62"><span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">BuS     SCCCC</span></span>
-<span id="cb20-63"><span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">CBr3    C(Br)(Br)Br</span></span>
-<span id="cb20-64"><span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">CbzNH   NC(=O)OCC1=CC=CC=C1</span></span>
-<span id="cb20-65"><span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">CCl3    C(Cl)(Cl)Cl</span></span>
-<span id="cb20-66"><span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">ClSO2   S(=O)(=O)Cl</span></span>
-<span id="cb20-67"><span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">COBr    C(=O)Br</span></span>
-<span id="cb20-68"><span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">COBu    C(=O)CCCC</span></span>
-<span id="cb20-69"><span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">COCF3   C(=O)C(F)(F)F</span></span>
-<span id="cb20-70"><span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">COCl    C(=O)Cl</span></span>
-<span id="cb20-71"><span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">COCO    C(=O)C=O</span></span>
-<span id="cb20-72"><span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">COEt    C(=O)CC</span></span>
-<span id="cb20-73"><span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">COF     C(=O)F</span></span>
-<span id="cb20-74"><span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">COMe    C(=O)C</span></span>
-<span id="cb20-75"><span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">OCOMe OC(=O)C</span></span>
-<span id="cb20-76"><span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">CONH2   C(=O)N</span></span>
-<span id="cb20-77"><span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">CONHEt  C(=O)NCC</span></span>
-<span id="cb20-78"><span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">CONHMe  C(=O)NC</span></span>
-<span id="cb20-79"><span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">COSH    C(=O)S</span></span>
-<span id="cb20-80"><span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">Et2N    N(CC)CC</span></span>
-<span id="cb20-81"><span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">Et3N    N(CC)(CC)CC</span></span>
-<span id="cb20-82"><span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">EtNH    NCC</span></span>
-<span id="cb20-83"><span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">H2NSO2  S(=O)(N)=O</span></span>
-<span id="cb20-84"><span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">HONH    ON</span></span>
-<span id="cb20-85"><span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">Me2N    N(C)C</span></span>
-<span id="cb20-86"><span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">NCO     N=C=O</span></span>
-<span id="cb20-87"><span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">NCS     N=C=S</span></span>
-<span id="cb20-88"><span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">NHAm    NCCCCC</span></span>
-<span id="cb20-89"><span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">NHBn    NCC1=CC=CC=C1</span></span>
-<span id="cb20-90"><span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">NHBu    NCCCC</span></span>
-<span id="cb20-91"><span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">NHEt    NCC</span></span>
-<span id="cb20-92"><span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">NHOH    NO</span></span>
-<span id="cb20-93"><span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">NHPr    NCCC</span></span>
-<span id="cb20-94"><span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">NO      N=O</span></span>
-<span id="cb20-95"><span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">POEt2   P(OCC)OCC</span></span>
-<span id="cb20-96"><span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">POEt3   P(OCC)(OCC)OCC</span></span>
-<span id="cb20-97"><span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">POOEt2  P(=O)(OCC)OCC</span></span>
-<span id="cb20-98"><span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">PrNH    CCCN</span></span>
-<span id="cb20-99"><span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">SEt     SCC</span></span>
-<span id="cb20-100"></span>
-<span id="cb20-101"><span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">BOC C(=O)OC(C)(C)C</span></span>
-<span id="cb20-102"><span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">MsO OS(=O)(=O)C</span></span>
-<span id="cb20-103"><span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">OTos OS(=O)(=O)c1ccc(C)cc1</span></span>
-<span id="cb20-104"><span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">Tos S(=O)(=O)c1ccc(C)cc1</span></span>
-<span id="cb20-105"><span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">C8H CCCCCCCC</span></span>
-<span id="cb20-106"><span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">C6H CCCCCC</span></span>
-<span id="cb20-107"><span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">CH2CH3 CC</span></span>
-<span id="cb20-108"><span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">N(CH2CH3)2 N(CC)CC</span></span>
-<span id="cb20-109"><span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">N(CH2CH2CH3)2 N(CCC)CCC</span></span>
-<span id="cb20-110"><span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">C(CH3)3 C(C)(C)C</span></span>
-<span id="cb20-111"><span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">COCH3 C(=O)C</span></span>
-<span id="cb20-112"><span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">CH(CH3)2 C(C)C</span></span>
-<span id="cb20-113"><span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">OCF3 OC(F)(F)F</span></span>
-<span id="cb20-114"><span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">OCCl3 OC(Cl)(Cl)Cl</span></span>
-<span id="cb20-115"><span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">OCF2H OC(F)F</span></span>
-<span id="cb20-116"><span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">SO2Me S(=O)(=O)C</span></span>
-<span id="cb20-117"><span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">OCH2CO2H OCC(=O)O</span></span>
-<span id="cb20-118"><span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">OCH2CO2Et OCC(=O)OCC</span></span>
-<span id="cb20-119"><span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">BOC2N N(C(=O)OC(C)(C)C)C(=O)OC(C)(C)C</span></span>
-<span id="cb20-120"><span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">BOCHN NC(=O)OC(C)(C)C</span></span>
-<span id="cb20-121"><span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">NHCbz NC(=O)OCc1ccccc1</span></span>
-<span id="cb20-122"><span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">OCH2CF3 OCC(F)(F)F</span></span>
-<span id="cb20-123"><span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">NHSO2BU NS(=O)(=O)CCCC</span></span>
-<span id="cb20-124"><span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">NHSO2Me NS(=O)(=O)C</span></span>
-<span id="cb20-125"><span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">MeO2SO OS(=O)(=O)C</span></span>
-<span id="cb20-126"><span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">NHCOOEt NC(=O)OCC</span></span>
-<span id="cb20-127"><span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">NHCH3 NC</span></span>
-<span id="cb20-128"><span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">H4NOOC C(=O)ON</span></span>
-<span id="cb20-129"><span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">C3H7 CCC</span></span>
-<span id="cb20-130"><span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">C2H5 CC</span></span>
-<span id="cb20-131"><span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">NHNH2 NN</span></span>
-<span id="cb20-132"><span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">OCH2CH2OH OCCO</span></span>
-<span id="cb20-133"><span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">OCH2CHOHCH2OH OCC(O)CO</span></span>
-<span id="cb20-134"><span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">OCH2CHOHCH2NH OCC(O)CN</span></span>
-<span id="cb20-135"><span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">NHNHCOCH3 NNC(=O)C</span></span>
-<span id="cb20-136"><span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">NHNHCOCF3 NNC(=O)C(F)(F)F</span></span>
-<span id="cb20-137"><span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">NHCOCF3 NC(=O)C(F)(F)F</span></span>
-<span id="cb20-138"><span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">CO2CysPr C(=O)ON[C@H](CS)C(=O)CCC</span></span>
-<span id="cb20-139"><span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">HOH2C CO</span></span>
-<span id="cb20-140"><span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">H3CHN NC</span></span>
-<span id="cb20-141"><span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">H3CO2C C(=O)OC</span></span>
-<span id="cb20-142"><span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">CF3CH2 CC(F)(F)F</span></span>
-<span id="cb20-143"><span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">OBOC OC(=O)OC(C)(C)C</span></span>
-<span id="cb20-144"><span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">Bn2N N(Cc1ccccc1)Cc1ccccc1</span></span>
-<span id="cb20-145"><span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">F5S S(F)(F)(F)(F)F</span></span>
-<span id="cb20-146"><span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">PPh2 P(c1ccccc1)c1ccccc1</span></span>
-<span id="cb20-147"><span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">PPh3 P(c1ccccc1)(c1ccccc1)c1ccccc1</span></span>
-<span id="cb20-148"><span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">OCH2Ph OCc1ccccc1</span></span>
-<span id="cb20-149"><span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">CH2OMe COC</span></span>
-<span id="cb20-150"><span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">PMBN NCc1ccc(OC)cc1</span></span>
-<span id="cb20-151"><span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">SO2 S(=O)=O</span></span>
-<span id="cb20-152"><span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">NH3Cl NCl</span></span>
-<span id="cb20-153"><span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">CF2CF3 C(F)(F)C(F)(F)F</span></span>
-<span id="cb20-154"><span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">CF2CF2H C(F)(F)C(F)(F)</span></span>
-<span id="cb20-155"><span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">Bn Cc1ccccc1</span></span>
-<span id="cb20-156"><span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">OCH2Ph OCc1ccccc1</span></span>
-<span id="cb20-157"><span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">COOCH2Ph C(=O)OCc1ccccc1</span></span>
-<span id="cb20-158"><span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">Ph3CO OC(c1ccccc1)(c1ccccc1)c1ccccc1</span></span>
-<span id="cb20-159"><span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">Ph3C C(c1ccccc1)(c1ccccc1)c1ccccc1</span></span>
-<span id="cb20-160"><span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">Me2NO2S S(C)(C)N(=O)=O</span></span>
-<span id="cb20-161"><span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">SO3Na S(=O)(=O)(=O)[Na]</span></span>
-<span id="cb20-162"><span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">OSO2Ph OS(=O)(=O)c1ccccc1</span></span>
-<span id="cb20-163"><span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">(CH2)5Br CCCCCBr</span></span>
-<span id="cb20-164"><span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">OPh Oc1ccccc1</span></span>
-<span id="cb20-165"><span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">SPh Sc1ccccc1</span></span>
-<span id="cb20-166"><span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">NHPh Nc1ccccc1</span></span>
-<span id="cb20-167"></span>
-<span id="cb20-168"><span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">CONEt2 C(=O)N(CC)CC</span></span>
-<span id="cb20-169"><span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">CONMe2 C(=O)N(C)C</span></span>
-<span id="cb20-170"><span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">EtO2CHN NC(=O)OCC</span></span>
-<span id="cb20-171"><span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">H4NO3S S(=O)(=O)ON</span></span>
-<span id="cb20-172"><span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">TMS [Si](C)(C)(C)</span></span>
-<span id="cb20-173"><span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">COCOOCH2CH3 C(=O)C(=O)OCC</span></span>
-<span id="cb20-174"><span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">OCH2CN OCC#N</span></span>
-<span id="cb20-175"><span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">#</span></span>
-<span id="cb20-176"><span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">#  these are useful for expanding superatoms, but not helpful for collapsing them</span></span>
-<span id="cb20-177"><span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;"># Xx [*]</span></span>
-<span id="cb20-178"><span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;"># X  [*]</span></span>
-<span id="cb20-179"><span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;"># Y [*]</span></span>
-<span id="cb20-180"><span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;"># Z [*]</span></span>
-<span id="cb20-181"><span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;"># R [*]</span></span>
-<span id="cb20-182"><span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;"># R1 [*]</span></span>
-<span id="cb20-183"><span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;"># R2 [*]</span></span>
-<span id="cb20-184"><span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;"># R3 [*]</span></span>
-<span id="cb20-185"><span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;"># R4 [*]</span></span>
-<span id="cb20-186"><span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;"># R5 [*]</span></span>
-<span id="cb20-187"><span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;"># R6 [*]</span></span>
-<span id="cb20-188"><span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;"># R7 [*]</span></span>
-<span id="cb20-189"><span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;"># R8 [*]</span></span>
-<span id="cb20-190"><span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;"># R9 [*]</span></span>
-<span id="cb20-191"><span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;"># R10 [*]</span></span>
-<span id="cb20-192"><span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;"># Y2 [*]</span></span>
-<span id="cb20-193"><span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">#D [*]</span></span>
-<span id="cb20-194"><span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">'''</span></span>
-<span id="cb20-195"><span class="co" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;"># preprocess the definitions:</span></span>
-<span id="cb20-196">defns <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> []</span>
-<span id="cb20-197"><span class="cf" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">for</span> l <span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">in</span> abbrev_defns.split(<span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">'</span><span class="ch" style="color: #20794D;
-background-color: null;
-font-style: inherit;">\n</span><span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">'</span>):</span>
-<span id="cb20-198">    <span class="cf" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">if</span> <span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">not</span> l <span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">or</span> l[<span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">0</span>]<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">==</span><span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">'#'</span>:</span>
-<span id="cb20-199">        <span class="cf" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">continue</span></span>
-<span id="cb20-200">    defn <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> re.sub(<span class="vs" style="color: #20794D;
-background-color: null;
-font-style: inherit;">r'[ ]+'</span>,<span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">'</span><span class="ch" style="color: #20794D;
-background-color: null;
-font-style: inherit;">\t</span><span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">'</span>,l)</span>
-<span id="cb20-201">    sma <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> defn.split(<span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">'</span><span class="ch" style="color: #20794D;
-background-color: null;
-font-style: inherit;">\t</span><span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">'</span>)[<span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">1</span>]</span>
-<span id="cb20-202">    <span class="co" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;"># use the length of the SMARTS as a crude size sort</span></span>
-<span id="cb20-203">    defns.append((<span class="bu" style="color: null;
-background-color: null;
-font-style: inherit;">len</span>(sma),l))</span>
-<span id="cb20-204">abbrev_defns <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> <span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">'</span><span class="ch" style="color: #20794D;
-background-color: null;
-font-style: inherit;">\n</span><span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">'</span>.join([x[<span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">1</span>] <span class="cf" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">for</span> x <span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">in</span> <span class="bu" style="color: null;
-background-color: null;
-font-style: inherit;">sorted</span>(defns,reverse<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span><span class="va" style="color: #111111;
-background-color: null;
-font-style: inherit;">True</span>)])</span>
-<span id="cb20-205"><span class="bu" style="color: null;
-background-color: null;
-font-style: inherit;">print</span>(abbrev_defns)</span>
-<span id="cb20-206">abbrevs <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> rdAbbreviations.ParseAbbreviations(abbrev_defns)</span></code></pre></div>
-<div class="cell-output cell-output-stdout">
-<pre><code>BOC2N N(C(=O)OC(C)(C)C)C(=O)OC(C)(C)C
-Ph3CO OC(c1ccccc1)(c1ccccc1)c1ccccc1
-Ph3C C(c1ccccc1)(c1ccccc1)c1ccccc1
-PPh3 P(c1ccccc1)(c1ccccc1)c1ccccc1
-CO2CysPr C(=O)ON[C@H](CS)C(=O)CCC
-OTos OS(=O)(=O)c1ccc(C)cc1
-Bn2N N(Cc1ccccc1)Cc1ccccc1
-Tos S(=O)(=O)c1ccc(C)cc1
-Bu3Sn [Sn](CCCC)(CCCC)CCCC
-ZNH   NC(=O)OCC1=CC=CC=C1
-PPh2 P(c1ccccc1)c1ccccc1
-CbzNH   NC(=O)OCC1=CC=CC=C1
-OSO2Ph OS(=O)(=O)c1ccccc1
-BnO2C C(=O)OCC1=CC=CC=C1
-SO3Na S(=O)(=O)(=O)[Na]
-BzO OC(=O)C1=CC=CC=C1
-NHCbz NC(=O)OCc1ccccc1
-OBOC OC(=O)OC(C)(C)C
-NHNHCOCF3 NNC(=O)C(F)(F)F
-COOCH2Ph C(=O)OCc1ccccc1
-CF2CF3 C(F)(F)C(F)(F)F
-BOCHN NC(=O)OC(C)(C)C
-THPO     O[C@@H]1OCCCC1
-POEt3   P(OCC)(OCC)OCC
-PMBN NCc1ccc(OC)cc1
-NHSO2BU NS(=O)(=O)CCCC
-NHCOCF3 NC(=O)C(F)(F)F
-Me2NO2S S(C)(C)N(=O)=O
-F5S S(F)(F)(F)(F)F
-CF2CF2H C(F)(F)C(F)(F)
-BOC C(=O)OC(C)(C)C
-TMS [Si](C)(C)(C)
-POOEt2  P(=O)(OCC)OCC
-NHBn    NCC1=CC=CC=C1
-COCOOCH2CH3 C(=O)C(=O)OCC
-COCF3   C(=O)C(F)(F)F
-BnO OCC1=CC=CC=C1
-BnNH NCC1=CC=CC=C1
-OCCl3 OC(Cl)(Cl)Cl
-CONEt2 C(=O)N(CC)CC
-NHSO2Me NS(=O)(=O)C
-MsO OS(=O)(=O)C
-MeO2SO OS(=O)(=O)C
-H4NO3S S(=O)(=O)ON
-Et3N    N(CC)(CC)CC
-ClSO2   S(=O)(=O)Cl
-CCl3    C(Cl)(Cl)Cl
-CBr3    C(Br)(Br)Br
-AmO2C C(=O)OCCCCC
-SO3H     S(=O)(=O)O
-SO2Me S(=O)(=O)C
-OCH2Ph OCc1ccccc1
-OCH2Ph OCc1ccccc1
-OCH2CO2Et OCC(=O)OCC
-OCH2CF3 OCC(F)(F)F
-MeO2S S(=O)(=O)C
-H2NSO2  S(=O)(N)=O
-CONMe2 C(=O)N(C)C
-BuO2C   C(=O)OCCCC
-SPh Sc1ccccc1
-POEt2   P(OCC)OCC
-OPh Oc1ccccc1
-OCF3 OC(F)(F)F
-NHPh Nc1ccccc1
-NHCOOEt NC(=O)OCC
-N(CH2CH2CH3)2 N(CCC)CCC
-F3CN     NC(F)(F)F
-EtO2CHN NC(=O)OCC
-COBu    C(=O)CCCC
-CF3CH2 CC(F)(F)F
-Bn Cc1ccccc1
-tBu      C(C)(C)C
-Ph       c1ccccc1
-OCH2CO2H OCC(=O)O
-OCH2CHOHCH2OH OCC(O)CO
-OCH2CHOHCH2NH OCC(O)CN
-NHNHCOCH3 NNC(=O)C
-CONHEt  C(=O)NCC
-COCO    C(=O)C=O
-CO2Et C(=O)OCC
-CF3      C(F)(F)F
-C8H CCCCCCCC
-C(CH3)3 C(C)(C)C
-SO2 S(=O)=O
-OiBu     OCC(C)C
-OCOMe OC(=O)C
-NO2      N(=O)=O
-NHAc     NC(=O)C
-N(CH2CH3)2 N(CC)CC
-H4NOOC C(=O)ON
-H3CO2C C(=O)OC
-Et2N    N(CC)CC
-CONHMe  C(=O)NC
-COEt    C(=O)CC
-COCl    C(=O)Cl
-COBr    C(=O)Br
-CO2R  C(=O)O*
-CO2Me C(=O)OC
-AcO      OC(=O)C
-(CH2)5Br CCCCCBr
-OCF2H OC(F)F
-NHAm    NCCCCC
-COSH    C(=O)S
-COOH     C(=O)O
-CONH2   C(=O)N
-COMe    C(=O)C
-COF     C(=O)F
-COCH3 C(=O)C
-C6H CCCCCC
-AmS SCCCCC
-AmO OCCCCC
-AmNH NCCCCC
-Ac       C(=O)C
-OCH2CN OCC#N
-NMe2  N(C)C
-NHBu    NCCCC
-NCS     N=C=S
-NCO     N=C=O
-N(OH)CH3 N(O)C
-Me2N    N(C)C
-CH(CH3)2 C(C)C
-BuS     SCCCC
-BuO     OCCCC
-BuNH    NCCCC
-nBu      CCCC
-PrNH    CCCN
-OCH2CH2OH OCCO
-NHPr    NCCC
-iPr      CCC
-SEt     SCC
-NO      N=O
-NO       N=O
-NHEt    NCC
-NH3Cl NCl
-EtO      OCC
-EtNH    NCC
-CN       C#N
-CHO    C=O
-CH2OMe COC
-C3H7 CCC
-OR       O*
-NOH    NO 
-NHOH    NO
-NHNH2 NN
-NHCH3 NC
-MeS      SC
-MeO      OC
-MeN      NC
-HONH    ON
-HOH2C CO
-HOCH2 CO
-H3CHN NC
-H2NCH2 CN
-Et CC
-CH2CH3 CC
-CF       CF
-C2H5 CC
-Me   C</code></pre>
-</div>
-</div>
-<p>We can then use those abbreviations the same way the defaults are used:</p>
-<div id="726f7c38" class="cell" data-executetime="{&quot;end_time&quot;:&quot;2024-01-11T05:39:34.784810Z&quot;,&quot;start_time&quot;:&quot;2024-01-11T05:39:34.779834Z&quot;}" data-execution_count="16">
-<div class="sourceCode cell-code" id="cb22" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb22-1">m <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> Chem.MolFromSmiles(<span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">'c1ccccc1[Si](C)(C)C'</span>)</span>
-<span id="cb22-2">m</span></code></pre></div>
-<div class="cell-output cell-output-display" data-execution_count="16">
-<div>
-<figure class="figure">
-<p><img src="https://greglandrum.github.io/rdkit-blog/posts/2024-01-11-using-abbreviations_files/figure-html/cell-17-output-1.png" class="img-fluid figure-img"></p>
-</figure>
-</div>
-</div>
-</div>
-<div id="fbb9a900" class="cell" data-executetime="{&quot;end_time&quot;:&quot;2024-01-11T05:39:36.306107Z&quot;,&quot;start_time&quot;:&quot;2024-01-11T05:39:36.300946Z&quot;}" data-scrolled="true" data-execution_count="17">
-<div class="sourceCode cell-code" id="cb23" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb23-1">rdAbbreviations.CondenseMolAbbreviations(m,abbrevs,maxCoverage<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span><span class="fl" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">0.6</span>)</span></code></pre></div>
-<div class="cell-output cell-output-display" data-execution_count="17">
-<div>
-<figure class="figure">
-<p><img src="https://greglandrum.github.io/rdkit-blog/posts/2024-01-11-using-abbreviations_files/figure-html/cell-18-output-1.png" class="img-fluid figure-img"></p>
-</figure>
-</div>
-</div>
-</div>
-</section>
-<section id="using-linkers" class="level1">
-<h1>Using linkers</h1>
-<p>Abbreviations are used for terminal groups: a functional group which only has one connection to the rest of the molecule. <code>CondenseMolAbbreviations()</code> can also identify and replace linkers - sets of atoms with connections at both ends.</p>
-<p>This is a bit trickier, and there are far fewer default linkers, but the functionality can still be useful.</p>
-<p>Start by looking at the linkers that are available by default:</p>
-<div id="bfcfbab9" class="cell" data-executetime="{&quot;end_time&quot;:&quot;2024-01-11T05:39:39.902936Z&quot;,&quot;start_time&quot;:&quot;2024-01-11T05:39:39.899930Z&quot;}" data-execution_count="18">
-<div class="sourceCode cell-code" id="cb24" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb24-1">linkers <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span>rdAbbreviations.GetDefaultLinkers()</span>
-<span id="cb24-2"><span class="cf" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">for</span> entry <span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">in</span> linkers:</span>
-<span id="cb24-3">    <span class="bu" style="color: null;
-background-color: null;
-font-style: inherit;">print</span>(entry.label,Chem.MolToSmiles(entry.mol))</span></code></pre></div>
-<div class="cell-output cell-output-stdout">
-<pre><code>PEG6 *OCCOCCOCCOCCOCCOCC
-PEG5 *OCCOCCOCCOCCOCC
-PEG4 *OCCOCCOCCOCC
-PEG3 *OCCOCCOCC
-Dec *CCCCCCCCCC
-Non *CCCCCCCCC
-Oct *CCCCCCCC
-Hept *CCCCCCC</code></pre>
-</div>
-</div>
-<p>We apply linkers the same way we did abbreviations:</p>
-<div id="ee0f87cb" class="cell" data-executetime="{&quot;end_time&quot;:&quot;2024-01-11T05:39:41.463943Z&quot;,&quot;start_time&quot;:&quot;2024-01-11T05:39:41.459322Z&quot;}" data-execution_count="19">
-<div class="sourceCode cell-code" id="cb26" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb26-1">m <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> Chem.MolFromSmiles(<span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">'c1ccccc1CCCCCCCc1ccccc1'</span>)</span>
-<span id="cb26-2">m</span></code></pre></div>
-<div class="cell-output cell-output-display" data-execution_count="19">
-<div>
-<figure class="figure">
-<p><img src="https://greglandrum.github.io/rdkit-blog/posts/2024-01-11-using-abbreviations_files/figure-html/cell-20-output-1.png" class="img-fluid figure-img"></p>
-</figure>
-</div>
-</div>
-</div>
-<div id="50bef20f" class="cell" data-executetime="{&quot;end_time&quot;:&quot;2024-01-11T05:39:42.084283Z&quot;,&quot;start_time&quot;:&quot;2024-01-11T05:39:42.078863Z&quot;}" data-execution_count="20">
-<div class="sourceCode cell-code" id="cb27" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb27-1">amol <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> rdAbbreviations.CondenseMolAbbreviations(m,linkers,maxCoverage<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span><span class="fl" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">0.8</span>)</span>
-<span id="cb27-2">amol</span></code></pre></div>
-<div class="cell-output cell-output-display" data-execution_count="20">
-<div>
-<figure class="figure">
-<p><img src="https://greglandrum.github.io/rdkit-blog/posts/2024-01-11-using-abbreviations_files/figure-html/cell-21-output-1.png" class="img-fluid figure-img"></p>
-</figure>
-</div>
-</div>
-</div>
-<div id="bf24a93b" class="cell" data-executetime="{&quot;end_time&quot;:&quot;2024-01-11T05:39:42.849893Z&quot;,&quot;start_time&quot;:&quot;2024-01-11T05:39:42.844282Z&quot;}" data-execution_count="21">
-<div class="sourceCode cell-code" id="cb28" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb28-1">m <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> Chem.MolFromSmiles(<span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">'c1ccccc1OCCOCCOCCOc1ccccc1'</span>)</span>
-<span id="cb28-2">m</span></code></pre></div>
-<div class="cell-output cell-output-display" data-execution_count="21">
-<div>
-<figure class="figure">
-<p><img src="https://greglandrum.github.io/rdkit-blog/posts/2024-01-11-using-abbreviations_files/figure-html/cell-22-output-1.png" class="img-fluid figure-img"></p>
-</figure>
-</div>
-</div>
-</div>
-<div id="e594e8c6" class="cell" data-executetime="{&quot;end_time&quot;:&quot;2024-01-11T05:39:44.001721Z&quot;,&quot;start_time&quot;:&quot;2024-01-11T05:39:43.996030Z&quot;}" data-scrolled="false" data-execution_count="22">
-<div class="sourceCode cell-code" id="cb29" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb29-1">amol <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> rdAbbreviations.CondenseMolAbbreviations(m,linkers,maxCoverage<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span><span class="fl" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">0.8</span>)</span>
-<span id="cb29-2">amol</span></code></pre></div>
-<div class="cell-output cell-output-display" data-execution_count="22">
-<div>
-<figure class="figure">
-<p><img src="https://greglandrum.github.io/rdkit-blog/posts/2024-01-11-using-abbreviations_files/figure-html/cell-23-output-1.png" class="img-fluid figure-img"></p>
-</figure>
-</div>
-</div>
-</div>
-<p>One can argue about whether or not that last O should also be matched by the PEG3 linker. I’m happy to hear opinions about that.</p>
-
-
-</section>
-
- ]]></description>
-  <category>tutorial</category>
-  <category>documentation</category>
-  <guid>https://greglandrum.github.io/rdkit-blog/posts/2024-01-11-using-abbreviations.html</guid>
-  <pubDate>Wed, 10 Jan 2024 23:00:00 GMT</pubDate>
-  <media:content url="https://greglandrum.github.io/rdkit-blog/posts/images/blog/abbreviations-1.png" medium="image" type="image/png" height="115" width="144"/>
 </item>
 </channel>
 </rss>
