@@ -10,7 +10,1120 @@
 <atom:link href="https://greglandrum.github.io/rdkit-blog/index.xml" rel="self" type="application/rss+xml"/>
 <description>RDKit experiments, tips, and tutorials</description>
 <generator>quarto-1.6.39</generator>
-<lastBuildDate>Fri, 28 Feb 2025 23:00:00 GMT</lastBuildDate>
+<lastBuildDate>Thu, 06 Mar 2025 23:00:00 GMT</lastBuildDate>
+<item>
+  <title>Drawing on drawings</title>
+  <link>https://greglandrum.github.io/rdkit-blog/posts/2025-03-07-drawing-on-drawings.html</link>
+  <description><![CDATA[ 
+
+
+
+
+<p>In addition to the expected functions to draw one more more molecules, the RDKit <code>MolDraw2D</code> objects lets you add annotations (text, lines, arrows, shapes, etc) to your drawings. This post shows how to use that to layout the molecules and data from some free-energy calculations.</p>
+<p>The data here and the overall figure layout is from <a href="https://link.springer.com/article/10.1007/s10822-021-00436-z/figures/8">Figure 8</a> of <a href="https://link.springer.com/article/10.1007/s10822-021-00436-z">this open-access paper</a> from our group.</p>
+<div id="933592b3" class="cell" data-scrolled="true" data-execution_count="1">
+<div class="sourceCode cell-code" id="cb1" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb1-1"><span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">from</span> rdkit <span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">import</span> Chem</span>
+<span id="cb1-2"><span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">from</span> rdkit.Chem <span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">import</span> Draw</span>
+<span id="cb1-3"><span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">from</span> rdkit.Chem <span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">import</span> rdDepictor</span>
+<span id="cb1-4">rdDepictor.SetPreferCoordGen(<span class="va" style="color: #111111;
+background-color: null;
+font-style: inherit;">True</span>)</span>
+<span id="cb1-5"><span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">from</span> rdkit.Chem.Draw <span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">import</span> IPythonConsole</span>
+<span id="cb1-6">IPythonConsole.molSize <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> <span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">350</span>,<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">300</span></span>
+<span id="cb1-7"><span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">import</span> rdkit</span>
+<span id="cb1-8"><span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">print</span>(rdkit.__version__)</span></code></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>2024.09.6</code></pre>
+</div>
+</div>
+<p>Start with the scaffold for the molecules:</p>
+<div id="64244b6f" class="cell" data-execution_count="2">
+<div class="sourceCode cell-code" id="cb3" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb3-1">core <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> Chem.MolFromMolBlock(<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'''</span></span>
+<span id="cb3-2"><span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">  Mrv2401 03062519142D          </span></span>
+<span id="cb3-3"></span>
+<span id="cb3-4"><span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">  0  0  0     0  0            999 V3000</span></span>
+<span id="cb3-5"><span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">M  V30 BEGIN CTAB</span></span>
+<span id="cb3-6"><span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">M  V30 COUNTS 21 23 0 0 0</span></span>
+<span id="cb3-7"><span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">M  V30 BEGIN ATOM</span></span>
+<span id="cb3-8"><span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">M  V30 1 C -1.8519 5.7623 0 0</span></span>
+<span id="cb3-9"><span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">M  V30 2 C -3.1855 4.9922 0 0</span></span>
+<span id="cb3-10"><span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">M  V30 3 C -3.1855 3.4522 0 0</span></span>
+<span id="cb3-11"><span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">M  V30 4 C -1.8519 2.6822 0 0</span></span>
+<span id="cb3-12"><span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">M  V30 5 C -0.5182 3.4522 0 0</span></span>
+<span id="cb3-13"><span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">M  V30 6 C -0.5182 4.9922 0 0</span></span>
+<span id="cb3-14"><span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">M  V30 7 N -1.8519 1.1422 0 0</span></span>
+<span id="cb3-15"><span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">M  V30 8 C -3.1855 0.3722 0 0</span></span>
+<span id="cb3-16"><span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">M  V30 9 C -3.1855 -1.1679 0 0</span></span>
+<span id="cb3-17"><span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">M  V30 10 N -1.8519 -1.9379 0 0</span></span>
+<span id="cb3-18"><span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">M  V30 11 C -0.5182 -1.1679 0 0</span></span>
+<span id="cb3-19"><span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">M  V30 12 C -0.5182 0.3722 0 0</span></span>
+<span id="cb3-20"><span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">M  V30 13 N -4.5192 2.6822 0 0</span></span>
+<span id="cb3-21"><span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">M  V30 14 C -5.8529 3.4522 0 0</span></span>
+<span id="cb3-22"><span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">M  V30 15 C -7.1866 2.6822 0 0</span></span>
+<span id="cb3-23"><span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">M  V30 16 O -5.8529 4.9922 0 0</span></span>
+<span id="cb3-24"><span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">M  V30 17 N -8.5934 3.3086 0 0</span></span>
+<span id="cb3-25"><span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">M  V30 18 C -9.6238 2.1642 0 0</span></span>
+<span id="cb3-26"><span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">M  V30 19 S -8.8538 0.8305 0 0</span></span>
+<span id="cb3-27"><span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">M  V30 20 C -7.3476 1.1507 0 0</span></span>
+<span id="cb3-28"><span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">M  V30 21 A -11.1554 2.3252 0 1</span></span>
+<span id="cb3-29"><span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">M  V30 END ATOM</span></span>
+<span id="cb3-30"><span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">M  V30 BEGIN BOND</span></span>
+<span id="cb3-31"><span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">M  V30 1 1 1 2</span></span>
+<span id="cb3-32"><span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">M  V30 2 2 2 3</span></span>
+<span id="cb3-33"><span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">M  V30 3 1 3 4</span></span>
+<span id="cb3-34"><span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">M  V30 4 2 4 5</span></span>
+<span id="cb3-35"><span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">M  V30 5 1 5 6</span></span>
+<span id="cb3-36"><span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">M  V30 6 2 1 6</span></span>
+<span id="cb3-37"><span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">M  V30 7 1 4 7</span></span>
+<span id="cb3-38"><span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">M  V30 8 1 8 9</span></span>
+<span id="cb3-39"><span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">M  V30 9 1 9 10</span></span>
+<span id="cb3-40"><span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">M  V30 10 1 10 11</span></span>
+<span id="cb3-41"><span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">M  V30 11 1 11 12</span></span>
+<span id="cb3-42"><span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">M  V30 12 1 7 8</span></span>
+<span id="cb3-43"><span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">M  V30 13 1 7 12</span></span>
+<span id="cb3-44"><span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">M  V30 14 1 3 13</span></span>
+<span id="cb3-45"><span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">M  V30 15 1 13 14</span></span>
+<span id="cb3-46"><span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">M  V30 16 1 14 15</span></span>
+<span id="cb3-47"><span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">M  V30 17 2 14 16</span></span>
+<span id="cb3-48"><span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">M  V30 18 1 18 19</span></span>
+<span id="cb3-49"><span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">M  V30 19 1 19 20</span></span>
+<span id="cb3-50"><span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">M  V30 20 1 15 17</span></span>
+<span id="cb3-51"><span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">M  V30 21 2 15 20</span></span>
+<span id="cb3-52"><span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">M  V30 22 2 17 18</span></span>
+<span id="cb3-53"><span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">M  V30 23 1 18 21</span></span>
+<span id="cb3-54"><span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">M  V30 END BOND</span></span>
+<span id="cb3-55"><span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">M  V30 END CTAB</span></span>
+<span id="cb3-56"><span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">M  END</span></span>
+<span id="cb3-57"><span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'''</span>)</span>
+<span id="cb3-58">core</span></code></pre></div>
+<div class="cell-output cell-output-display" data-execution_count="2">
+<div>
+<figure class="figure">
+<p><img src="https://greglandrum.github.io/rdkit-blog/posts/2025-03-07-drawing-on-drawings_files/figure-html/cell-3-output-1.png" class="img-fluid figure-img"></p>
+</figure>
+</div>
+</div>
+</div>
+<p>Now define the side chains:</p>
+<div id="4226a0fc" class="cell" data-execution_count="3">
+<div class="sourceCode cell-code" id="cb4" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb4-1">chains <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> ((<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'L20'</span>,<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'[*:1]C1=CC2=C(OCO2)C=C1'</span>),</span>
+<span id="cb4-2">          (<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'L1'</span>,<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'[*:1]C1=CC2=C(OCC2)C=C1'</span>),</span>
+<span id="cb4-3">          (<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'L21'</span>,<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'[*:1]C1=CC2=C(OCCO2)C=C1'</span>),</span>
+<span id="cb4-4">          (<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'L17'</span>, <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'[*:1]c1ccc(OC)cc1'</span>),</span>
+<span id="cb4-5">          (<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'L19'</span>, <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'[*:1]c1ccc(OC)c(OC)c1'</span>),</span>
+<span id="cb4-6">         )</span>
+<span id="cb4-7"></span>
+<span id="cb4-8">chainmols <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> [Chem.MolFromSmiles(y) <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">for</span> x,y <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">in</span> chains]</span>
+<span id="cb4-9">Draw.MolsToGridImage(chainmols,legends<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span>[x <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">for</span> x,y <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">in</span> chains])</span></code></pre></div>
+<div class="cell-output cell-output-display" data-execution_count="3">
+<div>
+<figure class="figure">
+<p><img src="https://greglandrum.github.io/rdkit-blog/posts/2025-03-07-drawing-on-drawings_files/figure-html/cell-4-output-1.png" class="img-fluid figure-img"></p>
+</figure>
+</div>
+</div>
+</div>
+<p>I’d like the side chains to all be oriented consistently, so I’m going to construct the full molecules, lay them out, and then remove the core from each of those.</p>
+<p>Here’s the easy way to construct the full molecules, using <code>Chem.molzip()</code></p>
+<div id="5eea12f3" class="cell" data-execution_count="4">
+<div class="sourceCode cell-code" id="cb5" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb5-1">mols <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> []</span>
+<span id="cb5-2"><span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">for</span> lbl,smi <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">in</span> chains:</span>
+<span id="cb5-3">    nm <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> Chem.molzip(core,Chem.MolFromSmiles(smi))</span>
+<span id="cb5-4">    rdDepictor.Compute2DCoords(nm)</span>
+<span id="cb5-5">    mols.append(nm)</span>
+<span id="cb5-6">    </span>
+<span id="cb5-7">Draw.MolsToGridImage(mols,legends <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> [x <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">for</span> x,y <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">in</span> chains])</span></code></pre></div>
+<div class="cell-output cell-output-display" data-execution_count="4">
+<div>
+<figure class="figure">
+<p><img src="https://greglandrum.github.io/rdkit-blog/posts/2025-03-07-drawing-on-drawings_files/figure-html/cell-5-output-1.png" class="img-fluid figure-img"></p>
+</figure>
+</div>
+</div>
+</div>
+<p>Now use <code>Chem.ReplaceCore()</code> to remove the core atoms from each molecule, leaving us with just the sidechains in a consistent orientation:</p>
+<div id="671abb35" class="cell" data-execution_count="5">
+<div class="sourceCode cell-code" id="cb6" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb6-1">justcore <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> Chem.RWMol(core)</span>
+<span id="cb6-2"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># We need to remove the dummy atom:</span></span>
+<span id="cb6-3">justcore.RemoveAtom(<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">20</span>)</span>
+<span id="cb6-4"></span>
+<span id="cb6-5">newchains <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> {}</span>
+<span id="cb6-6"><span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">for</span> (lbl,smi),mol <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">in</span> <span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">zip</span>(chains,mols):</span>
+<span id="cb6-7">    tmol <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> Chem.ReplaceCore(mol,justcore)</span>
+<span id="cb6-8">    <span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># label the dummy atom:</span></span>
+<span id="cb6-9">    <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">for</span> atom <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">in</span> tmol.GetAtoms():</span>
+<span id="cb6-10">        <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">if</span> <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">not</span> atom.GetAtomicNum():</span>
+<span id="cb6-11">            atom.SetProp(<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'atomLabel'</span>,<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"R"</span>)</span>
+<span id="cb6-12">    newchains[lbl] <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> tmol</span>
+<span id="cb6-13"></span>
+<span id="cb6-14">Draw.MolsToGridImage(newchains.values(), legends<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span>newchains.keys())</span></code></pre></div>
+<div class="cell-output cell-output-display" data-execution_count="5">
+<div>
+<figure class="figure">
+<p><img src="https://greglandrum.github.io/rdkit-blog/posts/2025-03-07-drawing-on-drawings_files/figure-html/cell-6-output-1.png" class="img-fluid figure-img"></p>
+</figure>
+</div>
+</div>
+</div>
+<p>The easiest way to reproduce the target figure is by laying the molecules out on a 3x3 grid with some empty spaces:</p>
+<div id="052960a3" class="cell" data-execution_count="6">
+<div class="sourceCode cell-code" id="cb7" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb7-1">lbls <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> [<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'L20'</span>,<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">''</span>,<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'L21'</span>,</span>
+<span id="cb7-2">        <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">''</span>,<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'L17'</span>,<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">''</span>,</span>
+<span id="cb7-3">        <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'L1'</span>,<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">''</span>,<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'L19'</span>]</span>
+<span id="cb7-4">grid <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> [newchains[l] <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">if</span> l <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">else</span> <span class="va" style="color: #111111;
+background-color: null;
+font-style: inherit;">None</span> <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">for</span> l <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">in</span> lbls]</span>
+<span id="cb7-5">Draw.MolsToGridImage(grid,legends<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span>lbls)</span></code></pre></div>
+<div class="cell-output cell-output-display" data-execution_count="6">
+<div>
+<figure class="figure">
+<p><img src="https://greglandrum.github.io/rdkit-blog/posts/2025-03-07-drawing-on-drawings_files/figure-html/cell-7-output-1.png" class="img-fluid figure-img"></p>
+</figure>
+</div>
+</div>
+</div>
+<div id="6dc5b3bd" class="cell" data-execution_count="7">
+<div class="sourceCode cell-code" id="cb8" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb8-1"><span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">from</span> IPython.display <span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">import</span> SVG</span>
+<span id="cb8-2"><span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">from</span> rdkit <span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">import</span> Geometry</span>
+<span id="cb8-3"></span>
+<span id="cb8-4"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># set up the drawing object:</span></span>
+<span id="cb8-5">nRows <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> <span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">3</span></span>
+<span id="cb8-6">nCols <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> <span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">3</span></span>
+<span id="cb8-7">panelx <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> <span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">250</span></span>
+<span id="cb8-8">panely <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> <span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">250</span></span>
+<span id="cb8-9">d2d <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> Draw.MolDraw2DSVG(panelx<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">*</span>nCols,panely<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">*</span>nRows,panelx,panely)</span>
+<span id="cb8-10">dopts <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> d2d.drawOptions()</span>
+<span id="cb8-11">dopts.legendFontSize <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> <span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">20</span></span>
+<span id="cb8-12"></span>
+<span id="cb8-13"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># draw the sidechains</span></span>
+<span id="cb8-14">d2d.DrawMolecules(grid,legends<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span>lbls)</span>
+<span id="cb8-15"></span>
+<span id="cb8-16"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># Now draw all the arrows and add the free-energy values</span></span>
+<span id="cb8-17">d2d.SetLineWidth(<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">4</span>)</span>
+<span id="cb8-18">d2d.SetFontSize(<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">20</span>)</span>
+<span id="cb8-19"></span>
+<span id="cb8-20"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># use gray arrows so that they don't stand out quite so much</span></span>
+<span id="cb8-21"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">#   (the original figure has solid black, but I find this nicer)</span></span>
+<span id="cb8-22">arrowColor <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> (<span class="fl" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">.4</span>,<span class="fl" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">.4</span>,<span class="fl" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">.4</span>)</span>
+<span id="cb8-23"></span>
+<span id="cb8-24">p1 <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> Geometry.Point2D(panelx,panely<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">/</span><span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">2</span>)</span>
+<span id="cb8-25">p2 <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> Geometry.Point2D(<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">2</span><span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">*</span>panelx,panely<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">/</span><span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">2</span>)</span>
+<span id="cb8-26">d2d.DrawArrow(p2,p1,color<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span>arrowColor,rawCoords<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span><span class="va" style="color: #111111;
+background-color: null;
+font-style: inherit;">True</span>, asPolygon<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span><span class="va" style="color: #111111;
+background-color: null;
+font-style: inherit;">True</span>)</span>
+<span id="cb8-27"></span>
+<span id="cb8-28"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># draw the free-energy value slightly offset along the y axis</span></span>
+<span id="cb8-29"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># (this is a horizontal arrow) from the mid-point of the arrow:</span></span>
+<span id="cb8-30">midp <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> p2 <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">+</span> (p1<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">-</span>p2)<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">/</span><span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">2</span></span>
+<span id="cb8-31">midp.y <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">+=</span> <span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">20</span></span>
+<span id="cb8-32">d2d.DrawString(<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"-0.3"</span>,midp,rawCoords<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span><span class="va" style="color: #111111;
+background-color: null;
+font-style: inherit;">True</span>)</span>
+<span id="cb8-33"></span>
+<span id="cb8-34"></span>
+<span id="cb8-35">p1 <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> Geometry.Point2D(panelx<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">/</span><span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">2</span>,panely)</span>
+<span id="cb8-36">p2 <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> Geometry.Point2D(panelx<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">/</span><span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">2</span>,<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">2</span><span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">*</span>panely)</span>
+<span id="cb8-37">d2d.DrawArrow(p2,p1,color<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span>arrowColor,rawCoords<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span><span class="va" style="color: #111111;
+background-color: null;
+font-style: inherit;">True</span>, asPolygon<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span><span class="va" style="color: #111111;
+background-color: null;
+font-style: inherit;">True</span>)</span>
+<span id="cb8-38">midp <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> p2 <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">+</span> (p1<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">-</span>p2)<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">/</span><span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">2</span></span>
+<span id="cb8-39">midp.x <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">+=</span> <span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">20</span></span>
+<span id="cb8-40">d2d.DrawString(<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"2.0"</span>,midp,rawCoords<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span><span class="va" style="color: #111111;
+background-color: null;
+font-style: inherit;">True</span>, align<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span><span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">1</span>)</span>
+<span id="cb8-41"></span>
+<span id="cb8-42">p1 <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> Geometry.Point2D(panelx,<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">2</span><span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">*</span>panely<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">+</span>panely<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">/</span><span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">2</span>)</span>
+<span id="cb8-43">p2 <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> Geometry.Point2D(<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">2</span><span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">*</span>panelx,<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">2</span><span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">*</span>panely<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">+</span>panely<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">/</span><span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">2</span>)</span>
+<span id="cb8-44">d2d.DrawArrow(p1,p2,color<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span>arrowColor,rawCoords<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span><span class="va" style="color: #111111;
+background-color: null;
+font-style: inherit;">True</span>, asPolygon<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span><span class="va" style="color: #111111;
+background-color: null;
+font-style: inherit;">True</span>)</span>
+<span id="cb8-45">midp <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> p2 <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">+</span> (p1<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">-</span>p2)<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">/</span><span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">2</span></span>
+<span id="cb8-46">midp.y <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">+=</span> <span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">20</span></span>
+<span id="cb8-47">d2d.DrawString(<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"4.8"</span>,midp,rawCoords<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span><span class="va" style="color: #111111;
+background-color: null;
+font-style: inherit;">True</span>)</span>
+<span id="cb8-48"></span>
+<span id="cb8-49">p1 <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> Geometry.Point2D(<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">2</span><span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">*</span>panelx <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">+</span> panelx<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">/</span><span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">2</span>,panely)</span>
+<span id="cb8-50">p2 <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> Geometry.Point2D(<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">2</span><span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">*</span>panelx <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">+</span> panelx<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">/</span><span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">2</span>,<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">2</span><span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">*</span>panely)</span>
+<span id="cb8-51">d2d.DrawArrow(p1,p2,color<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span>arrowColor,rawCoords<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span><span class="va" style="color: #111111;
+background-color: null;
+font-style: inherit;">True</span>, asPolygon<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span><span class="va" style="color: #111111;
+background-color: null;
+font-style: inherit;">True</span>)</span>
+<span id="cb8-52">midp <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> p2 <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">+</span> (p1<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">-</span>p2)<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">/</span><span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">2</span></span>
+<span id="cb8-53">midp.x <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">+=</span> <span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">20</span></span>
+<span id="cb8-54">d2d.DrawString(<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"2.5"</span>,midp,rawCoords<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span><span class="va" style="color: #111111;
+background-color: null;
+font-style: inherit;">True</span>, align<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span><span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">1</span>)</span>
+<span id="cb8-55"></span>
+<span id="cb8-56"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># do the diagonals... these are trickier</span></span>
+<span id="cb8-57"></span>
+<span id="cb8-58"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># this is the fraction of the side length of the grid boxes that the arrows</span></span>
+<span id="cb8-59"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># will extend into each box.</span></span>
+<span id="cb8-60">frac <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> <span class="fl" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">0.2</span></span>
+<span id="cb8-61"></span>
+<span id="cb8-62">p1 <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> Geometry.Point2D((<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">1</span><span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">-</span>frac)<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">*</span>panelx,(<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">1</span><span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">-</span>frac)<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">*</span>panely)</span>
+<span id="cb8-63">p2 <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> Geometry.Point2D((<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">1</span><span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">+</span>frac)<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">*</span>panelx,(<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">1</span><span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">+</span>frac)<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">*</span>panely)</span>
+<span id="cb8-64">d2d.DrawArrow(p2,p1,color<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span>arrowColor,rawCoords<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span><span class="va" style="color: #111111;
+background-color: null;
+font-style: inherit;">True</span>, asPolygon<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span><span class="va" style="color: #111111;
+background-color: null;
+font-style: inherit;">True</span>,frac <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> <span class="fl" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">0.1</span>)</span>
+<span id="cb8-65">midp <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> p2 <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">+</span> (p1<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">-</span>p2)<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">/</span><span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">2</span></span>
+<span id="cb8-66">midp.x <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">+=</span> <span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">25</span></span>
+<span id="cb8-67">d2d.DrawString(<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"2.1"</span>,midp,rawCoords<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span><span class="va" style="color: #111111;
+background-color: null;
+font-style: inherit;">True</span>, align<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span><span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">1</span>)</span>
+<span id="cb8-68"></span>
+<span id="cb8-69">p1 <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> Geometry.Point2D((<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">2</span><span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">+</span>frac)<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">*</span>panelx,(<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">1</span><span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">-</span>frac)<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">*</span>panely)</span>
+<span id="cb8-70">p2 <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> Geometry.Point2D((<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">2</span><span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">-</span>frac)<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">*</span>panelx,(<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">1</span><span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">+</span>frac)<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">*</span>panely)</span>
+<span id="cb8-71">d2d.DrawArrow(p2,p1,color<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span>arrowColor,rawCoords<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span><span class="va" style="color: #111111;
+background-color: null;
+font-style: inherit;">True</span>, asPolygon<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span><span class="va" style="color: #111111;
+background-color: null;
+font-style: inherit;">True</span>,frac <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> <span class="fl" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">0.1</span>)</span>
+<span id="cb8-72">midp <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> p2 <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">+</span> (p1<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">-</span>p2)<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">/</span><span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">2</span></span>
+<span id="cb8-73">midp.x <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">-=</span> <span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">25</span></span>
+<span id="cb8-74">d2d.DrawString(<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"2.4"</span>,midp,rawCoords<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span><span class="va" style="color: #111111;
+background-color: null;
+font-style: inherit;">True</span>, align<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span><span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">2</span>)</span>
+<span id="cb8-75"></span>
+<span id="cb8-76">p1 <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> Geometry.Point2D((<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">2</span><span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">+</span>frac)<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">*</span>panelx,(<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">2</span><span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">+</span>frac)<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">*</span>panely)</span>
+<span id="cb8-77">p2 <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> Geometry.Point2D((<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">2</span><span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">-</span>frac)<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">*</span>panelx,(<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">2</span><span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">-</span>frac)<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">*</span>panely)</span>
+<span id="cb8-78">d2d.DrawArrow(p2,p1,color<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span>arrowColor,rawCoords<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span><span class="va" style="color: #111111;
+background-color: null;
+font-style: inherit;">True</span>, asPolygon<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span><span class="va" style="color: #111111;
+background-color: null;
+font-style: inherit;">True</span>,frac <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> <span class="fl" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">0.1</span>)</span>
+<span id="cb8-79">midp <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> p2 <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">+</span> (p1<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">-</span>p2)<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">/</span><span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">2</span></span>
+<span id="cb8-80">midp.x <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">-=</span> <span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">25</span></span>
+<span id="cb8-81">d2d.DrawString(<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"4.9"</span>,midp,rawCoords<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span><span class="va" style="color: #111111;
+background-color: null;
+font-style: inherit;">True</span>, align<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span><span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">2</span>)</span>
+<span id="cb8-82"></span>
+<span id="cb8-83">p1 <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> Geometry.Point2D((<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">1</span><span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">-</span>frac)<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">*</span>panelx,(<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">2</span><span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">+</span>frac)<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">*</span>panely)</span>
+<span id="cb8-84">p2 <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> Geometry.Point2D((<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">1</span><span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">+</span>frac)<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">*</span>panelx,(<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">2</span><span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">-</span>frac)<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">*</span>panely)</span>
+<span id="cb8-85">d2d.DrawArrow(p2,p1,color<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span>arrowColor,rawCoords<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span><span class="va" style="color: #111111;
+background-color: null;
+font-style: inherit;">True</span>, asPolygon<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span><span class="va" style="color: #111111;
+background-color: null;
+font-style: inherit;">True</span>,frac <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> <span class="fl" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">0.1</span>)</span>
+<span id="cb8-86">midp <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> p2 <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">+</span> (p1<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">-</span>p2)<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">/</span><span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">2</span></span>
+<span id="cb8-87">midp.x <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">+=</span> <span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">25</span></span>
+<span id="cb8-88">d2d.DrawString(<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"0.1"</span>,midp,rawCoords<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span><span class="va" style="color: #111111;
+background-color: null;
+font-style: inherit;">True</span>, align<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span><span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">1</span>)</span>
+<span id="cb8-89"></span>
+<span id="cb8-90"></span>
+<span id="cb8-91">d2d.FinishDrawing()</span>
+<span id="cb8-92">svg <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> d2d.GetDrawingText()</span>
+<span id="cb8-93">SVG(svg)</span></code></pre></div>
+<div class="cell-output cell-output-display" data-execution_count="7">
+<div>
+<figure class="figure">
+<p><img src="https://greglandrum.github.io/rdkit-blog/posts/2025-03-07-drawing-on-drawings_files/figure-html/cell-8-output-1.svg" class="img-fluid figure-img"></p>
+</figure>
+</div>
+</div>
+</div>
+<p>At the moment it’s not possible to change the font colour used for <code>DrawText()</code>, so I can’t sensibly add the predicted free energy values to the plot. I will fix that for the next RDKit release and update this post at some point in the future once that has been done.</p>
+<p>If you’re doing a figure for a paper and you want to so some fine tuning of the result, it’s almost definitely faster (and likely better) to save the SVG to a file and then use your favorite drawing package that can open SVG files (inkscape, Adobe Illustrator, whatever) to do the final polishing.</p>
+
+
+
+ ]]></description>
+  <category>tutorial</category>
+  <category>drawing</category>
+  <guid>https://greglandrum.github.io/rdkit-blog/posts/2025-03-07-drawing-on-drawings.html</guid>
+  <pubDate>Thu, 06 Mar 2025 23:00:00 GMT</pubDate>
+  <media:content url="https://greglandrum.github.io/rdkit-blog/posts/images/blog/drawing-on-drawings-1.png" medium="image" type="image/png" height="137" width="144"/>
+</item>
 <item>
   <title>Tuning substructure queries</title>
   <link>https://greglandrum.github.io/rdkit-blog/posts/2025-03-01-more-on-tuning-substructure-queries-1.html</link>
@@ -21231,541 +22344,6 @@ font-style: inherit;">in</span> tapplied])</span></code></pre></div>
   <guid>https://greglandrum.github.io/rdkit-blog/posts/2024-02-23-custom-transformations-and-logging.html</guid>
   <pubDate>Thu, 22 Feb 2024 23:00:00 GMT</pubDate>
   <media:content url="https://greglandrum.github.io/rdkit-blog/posts/images/blog/transforms-and-logging-1.png" medium="image" type="image/png" height="48" width="144"/>
-</item>
-<item>
-  <title>Some new ways to speed RDKit calls up using multiple threads</title>
-  <link>https://greglandrum.github.io/rdkit-blog/posts/2024-02-11-more-multithreading.html</link>
-  <description><![CDATA[ 
-
-
-
-
-<p>This is another in a series of blog posts highlighting built-in RDKit support for speeding up some tasks by running multiple threads at once.</p>
-<p>Previous posts discussing this topic:</p>
-<ul>
-<li><a href="https://greglandrum.github.io/rdkit-blog/posts/2023-11-11-usingmultithreadedreaders.html">Using the Multithreaded Mol Readers</a></li>
-</ul>
-<section id="preliminaries" class="level1">
-<h1>Preliminaries</h1>
-<p>Start by reading in a bunch of molecules, multithreaded of course</p>
-<div id="c2ddcc56" class="cell" data-executetime="{&quot;end_time&quot;:&quot;2024-02-10T06:15:04.235961Z&quot;,&quot;start_time&quot;:&quot;2024-02-10T06:15:04.230530Z&quot;}" data-execution_count="10">
-<div class="sourceCode cell-code" id="cb1" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb1-1"><span class="im" style="color: #00769E;
-background-color: null;
-font-style: inherit;">import</span> rdkit</span>
-<span id="cb1-2"><span class="bu" style="color: null;
-background-color: null;
-font-style: inherit;">print</span>(rdkit.__version__)</span></code></pre></div>
-<div class="cell-output cell-output-stdout">
-<pre><code>2023.09.5</code></pre>
-</div>
-</div>
-<div id="53e514e8" class="cell" data-executetime="{&quot;end_time&quot;:&quot;2024-02-10T06:08:29.992355Z&quot;,&quot;start_time&quot;:&quot;2024-02-10T06:08:29.811336Z&quot;}" data-execution_count="4">
-<div class="sourceCode cell-code" id="cb3" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb3-1"><span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">!</span>head ..<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">/</span>data<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">/</span>BLSets_actives.txt</span></code></pre></div>
-<div class="cell-output cell-output-stdout">
-<pre><code>smiles  target_chembl_id    label   pKi
-Clc1ccc(cc1Cl)N2NC(=O)\C(=C\c3cccc(OCc4ccccc4)c3)\C2=O  CHEMBL1862  inactive    6.00
-Cc1ccc(cc1C)N2NC(=O)\C(=C\c3oc(cc3)c4ccc(C)c(Cl)c4)\C2=O    CHEMBL1862  inactive    5.30
-O=C(Nc1ccccc1)Nc2nnc(Cc3ccccc3)s2   CHEMBL1862  inactive    4.24
-Brc1cc2OCOc2cc1\C=C/3\C(=O)NN(C3=O)c4ccc(I)cc4  CHEMBL1862  inactive    5.60
-Nc1[nH]cnc2nnc(c3ccc(Cl)cc3)c12 CHEMBL1862  inactive    6.30
-Ic1ccc(cc1)N2NC(=O)\C(=C\c3ccccc3)\C2=O CHEMBL1862  inactive    6.22
-Ic1ccc(cc1)C(=O)Nc2nnc(CCc3ccccc3)s2    CHEMBL1862  inactive    6.40
-Ic1ccccc1C(=O)Nc2nnc(CCc3ccccc3)s2  CHEMBL1862  inactive    5.89
-Ic1ccc(\C=C/2\C(=O)NN(C2=O)c3ccc(I)cc3)cc1  CHEMBL1862  inactive    6.10</code></pre>
-</div>
-</div>
-<div id="ccce7b42" class="cell" data-executetime="{&quot;end_time&quot;:&quot;2024-02-10T06:08:53.493421Z&quot;,&quot;start_time&quot;:&quot;2024-02-10T06:08:50.441390Z&quot;}" data-execution_count="5">
-<div class="sourceCode cell-code" id="cb5" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb5-1"><span class="im" style="color: #00769E;
-background-color: null;
-font-style: inherit;">from</span> rdkit <span class="im" style="color: #00769E;
-background-color: null;
-font-style: inherit;">import</span> Chem</span>
-<span id="cb5-2">filename <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> <span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">'../data/BLSets_actives.txt'</span></span>
-<span id="cb5-3">ms <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> [m <span class="cf" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">for</span> m <span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">in</span> Chem.MultithreadedSmilesMolSupplier(filename,numWriterThreads<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span><span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">5</span>) <span class="cf" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">if</span> m <span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">is</span> <span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">not</span> <span class="va" style="color: #111111;
-background-color: null;
-font-style: inherit;">None</span>]</span>
-<span id="cb5-4"><span class="bu" style="color: null;
-background-color: null;
-font-style: inherit;">len</span>(ms)</span></code></pre></div>
-<div class="cell-output cell-output-display" data-execution_count="5">
-<pre><code>91663</code></pre>
-</div>
-</div>
-</section>
-<section id="generating-fingerprints" class="level1">
-<h1>Generating fingerprints</h1>
-<p><code>2023.09.3</code> release</p>
-<div id="c6f0f024" class="cell" data-executetime="{&quot;end_time&quot;:&quot;2024-02-10T06:09:17.882735Z&quot;,&quot;start_time&quot;:&quot;2024-02-10T06:09:17.880740Z&quot;}" data-execution_count="6">
-<div class="sourceCode cell-code" id="cb7" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb7-1"><span class="im" style="color: #00769E;
-background-color: null;
-font-style: inherit;">from</span> rdkit.Chem <span class="im" style="color: #00769E;
-background-color: null;
-font-style: inherit;">import</span> rdFingerprintGenerator</span>
-<span id="cb7-2">fpg <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> rdFingerprintGenerator.GetMorganGenerator()</span></code></pre></div>
-</div>
-<div id="5bd275dd" class="cell" data-executetime="{&quot;end_time&quot;:&quot;2024-02-10T06:10:35.508878Z&quot;,&quot;start_time&quot;:&quot;2024-02-10T06:09:38.512647Z&quot;}" data-execution_count="7">
-<div class="sourceCode cell-code" id="cb8" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb8-1"><span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">%</span>timeit fps<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span>[fpg.GetFingerprint(m) <span class="cf" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">for</span> m <span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">in</span> ms]</span></code></pre></div>
-<div class="cell-output cell-output-stdout">
-<pre><code>7.11 s ± 90.7 ms per loop (mean ± std. dev. of 7 runs, 1 loop each)</code></pre>
-</div>
-</div>
-<p>With the <code>getFingerprints()</code> function we can generate all the fingerprints in a single call. This uses one thread by default and isn’t significantly faster:</p>
-<div id="d26c8ba1" class="cell" data-executetime="{&quot;end_time&quot;:&quot;2024-02-10T06:11:38.858619Z&quot;,&quot;start_time&quot;:&quot;2024-02-10T06:10:42.593054Z&quot;}" data-execution_count="8">
-<div class="sourceCode cell-code" id="cb10" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb10-1"><span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">%</span>timeit fps<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span>fpg.GetFingerprints(ms)</span></code></pre></div>
-<div class="cell-output cell-output-stdout">
-<pre><code>7.02 s ± 44.3 ms per loop (mean ± std. dev. of 7 runs, 1 loop each)</code></pre>
-</div>
-</div>
-<p>But we can also use getFingerprints with multiple threads, this does make a difference in run time:</p>
-<div id="1f35541f" class="cell" data-executetime="{&quot;end_time&quot;:&quot;2024-02-10T06:11:51.474240Z&quot;,&quot;start_time&quot;:&quot;2024-02-10T06:11:38.859698Z&quot;}" data-execution_count="9">
-<div class="sourceCode cell-code" id="cb12" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb12-1"><span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">%</span>timeit fps<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span>fpg.GetFingerprints(ms, numThreads<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span><span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">5</span>)</span></code></pre></div>
-<div class="cell-output cell-output-stdout">
-<pre><code>1.56 s ± 33.5 ms per loop (mean ± std. dev. of 7 runs, 1 loop each)</code></pre>
-</div>
-</div>
-<p>There are three analogous functions for the other fingerprint forms:</p>
-<ul>
-<li><code>fpg.GetCountFingerprints(ms)</code></li>
-<li><code>fpg.GetSparseFingerprints(ms)</code></li>
-<li><code>fpg.GetSparseCountFingerprints(ms)</code></li>
-</ul>
-</section>
-<section id="molecular-standardization" class="level1">
-<h1>Molecular standardization</h1>
-<p><code>2023.09.3</code> and <code>2023.09.4</code> releases</p>
-<p>First check whether or not any of the molecules in the data set have multiple fragments:</p>
-<div id="b9414e9d" class="cell" data-executetime="{&quot;end_time&quot;:&quot;2024-02-10T06:33:35.624651Z&quot;,&quot;start_time&quot;:&quot;2024-02-10T06:33:35.270316Z&quot;}" data-execution_count="15">
-<div class="sourceCode cell-code" id="cb14" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb14-1"><span class="im" style="color: #00769E;
-background-color: null;
-font-style: inherit;">from</span> collections <span class="im" style="color: #00769E;
-background-color: null;
-font-style: inherit;">import</span> Counter</span>
-<span id="cb14-2">cntr <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> Counter()</span>
-<span id="cb14-3"><span class="cf" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">for</span> m <span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">in</span> ms:</span>
-<span id="cb14-4">    frags <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> Chem.GetMolFrags(m)</span>
-<span id="cb14-5">    cntr[<span class="bu" style="color: null;
-background-color: null;
-font-style: inherit;">len</span>(frags)] <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">+=</span> <span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">1</span></span>
-<span id="cb14-6">cntr</span></code></pre></div>
-<div class="cell-output cell-output-display" data-execution_count="15">
-<pre><code>Counter({1: 86368, 2: 4662, 3: 530, 4: 56, 5: 47})</code></pre>
-</div>
-</div>
-<p>Some do… we’ll standardize them by finding the fragment parent:</p>
-<div id="492792e9" class="cell" data-executetime="{&quot;end_time&quot;:&quot;2024-02-10T06:21:29.083452Z&quot;,&quot;start_time&quot;:&quot;2024-02-10T06:21:29.059215Z&quot;}" data-execution_count="14">
-<div class="sourceCode cell-code" id="cb16" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb16-1"><span class="im" style="color: #00769E;
-background-color: null;
-font-style: inherit;">from</span> rdkit.Chem.MolStandardize <span class="im" style="color: #00769E;
-background-color: null;
-font-style: inherit;">import</span> rdMolStandardize</span></code></pre></div>
-</div>
-<p>Since we’re going to be modifying the molecules in place we need to make a copy first so that we can do multiple experiments on the same input molecules. This adds a bit of time to the overall experiments, so let’s figure out how much that is:</p>
-<div id="afb30109" class="cell" data-executetime="{&quot;end_time&quot;:&quot;2024-02-10T06:34:16.801203Z&quot;,&quot;start_time&quot;:&quot;2024-02-10T06:33:56.915407Z&quot;}" data-execution_count="16">
-<div class="sourceCode cell-code" id="cb17" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb17-1"><span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">%</span>timeit cms <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> [Chem.Mol(m) <span class="cf" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">for</span> m <span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">in</span> ms]</span></code></pre></div>
-<div class="cell-output cell-output-stdout">
-<pre><code>1.24 s ± 7.19 ms per loop (mean ± std. dev. of 7 runs, 1 loop each)</code></pre>
-</div>
-</div>
-<p>Find the fragment parent (largest organic fragment) for all of the molecules using a single thread:</p>
-<div id="761825de" class="cell" data-executetime="{&quot;end_time&quot;:&quot;2024-02-10T06:44:07.985106Z&quot;,&quot;start_time&quot;:&quot;2024-02-10T06:35:27.581282Z&quot;}" data-execution_count="18">
-<div class="sourceCode cell-code" id="cb19" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb19-1"><span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">%</span>timeit cms <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> [Chem.Mol(m) <span class="cf" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">for</span> m <span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">in</span> ms]<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">;</span>rdMolStandardize.FragmentParentInPlace(cms,numThreads<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span><span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">1</span>)</span></code></pre></div>
-<div class="cell-output cell-output-stdout">
-<pre><code>1min 3s ± 949 ms per loop (mean ± std. dev. of 7 runs, 1 loop each)</code></pre>
-</div>
-</div>
-<p>Using 5 threads:</p>
-<div id="ba39edb5" class="cell" data-executetime="{&quot;end_time&quot;:&quot;2024-02-10T06:46:12.398976Z&quot;,&quot;start_time&quot;:&quot;2024-02-10T06:44:07.986749Z&quot;}" data-execution_count="19">
-<div class="sourceCode cell-code" id="cb21" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb21-1"><span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">%</span>timeit cms <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> [Chem.Mol(m) <span class="cf" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">for</span> m <span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">in</span> ms]<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">;</span>rdMolStandardize.FragmentParentInPlace(cms,numThreads<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span><span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">5</span>)</span></code></pre></div>
-<div class="cell-output cell-output-stdout">
-<pre><code>14.5 s ± 64.4 ms per loop (mean ± std. dev. of 7 runs, 1 loop each)</code></pre>
-</div>
-</div>
-<p>Other standardization functions that can operate on muliple molecules and support a <code>numThreads</code> argument:</p>
-<ul>
-<li><code>CleanupInPlace()</code>: cleans up the molecule by removing Hs, sanitizing, disconnecting metals, normalizing, reionizing, and assigning stereochemistry.</li>
-<li><code>NormalizeInPlace()</code>: normalizes the molecule by standardizing some functional groups</li>
-<li><code>ReionizeInPlace()</code>: rearranges charges so that the strongest acids ionize first</li>
-<li><code>RemoveFragmentsInPlace()</code>: removes common salts and solvents</li>
-<li><code>TautomerParentInPlace()</code>: finds the canonical tautomer and then calls cleanup</li>
-<li><code>StereoParentInPlace()</code>: removes all stereochemistry markers</li>
-<li><code>IsotopeParentInPlace()</code>: removes all isotope labels</li>
-<li><code>ChargeParentInPlace()</code>: neutralizes the molecule</li>
-<li><code>SuperParentInPlace()</code>: this is the fragment, charge, isotope, stereo, and tautomer parent of the molecule</li>
-</ul>
-<div id="3e060d12" class="cell" data-executetime="{&quot;end_time&quot;:&quot;2024-02-11T05:52:04.701853Z&quot;,&quot;start_time&quot;:&quot;2024-02-11T05:52:04.695591Z&quot;}" data-execution_count="53">
-<div class="sourceCode cell-code" id="cb23" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb23-1">m <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> Chem.MolFromSmiles(<span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">'CC.[Na+].[Cl-].C.[Fe].CCO'</span>)</span>
-<span id="cb23-2">m <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> rdMolStandardize.RemoveFragments(m)</span>
-<span id="cb23-3">Chem.MolToSmiles(m)</span></code></pre></div>
-<div class="cell-output cell-output-display" data-execution_count="53">
-<pre><code>'C.CC.[Fe]'</code></pre>
-</div>
-</div>
-<div id="ed8144da" class="cell" data-executetime="{&quot;end_time&quot;:&quot;2024-02-11T05:58:08.756346Z&quot;,&quot;start_time&quot;:&quot;2024-02-11T05:58:08.750276Z&quot;}" data-execution_count="64">
-<div class="sourceCode cell-code" id="cb25" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb25-1">m <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> Chem.MolFromSmiles(<span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">'CC(O)=CCCO[Na]'</span>)</span>
-<span id="cb25-2">rdMolStandardize.TautomerParentInPlace(m)</span>
-<span id="cb25-3">Chem.MolToSmiles(m)</span></code></pre></div>
-<div class="cell-output cell-output-display" data-execution_count="64">
-<pre><code>'CC(=O)CCC[O-].[Na+]'</code></pre>
-</div>
-</div>
-</section>
-<section id="rmsd-calculations" class="level1">
-<h1>RMSD calculations</h1>
-<p><code>2023.09.3</code> release</p>
-<div id="2498043a" class="cell" data-executetime="{&quot;end_time&quot;:&quot;2024-02-10T06:59:55.690252Z&quot;,&quot;start_time&quot;:&quot;2024-02-10T06:59:55.026845Z&quot;}" data-execution_count="21">
-<div class="sourceCode cell-code" id="cb27" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb27-1"><span class="im" style="color: #00769E;
-background-color: null;
-font-style: inherit;">from</span> rdkit.Chem <span class="im" style="color: #00769E;
-background-color: null;
-font-style: inherit;">import</span> rdDistGeom</span>
-<span id="cb27-2"><span class="im" style="color: #00769E;
-background-color: null;
-font-style: inherit;">from</span> rdkit.Chem <span class="im" style="color: #00769E;
-background-color: null;
-font-style: inherit;">import</span> rdMolAlign</span>
-<span id="cb27-3"><span class="im" style="color: #00769E;
-background-color: null;
-font-style: inherit;">from</span> rdkit.Chem.Draw <span class="im" style="color: #00769E;
-background-color: null;
-font-style: inherit;">import</span> IPythonConsole</span>
-<span id="cb27-4">IPythonConsole.ipython_3d <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> <span class="va" style="color: #111111;
-background-color: null;
-font-style: inherit;">True</span></span></code></pre></div>
-</div>
-<p>Download the ligand from a recent PDB structure</p>
-<div id="b4da90c4" class="cell" data-executetime="{&quot;end_time&quot;:&quot;2024-02-10T07:03:21.511082Z&quot;,&quot;start_time&quot;:&quot;2024-02-10T07:03:21.369610Z&quot;}" data-execution_count="28">
-<div class="sourceCode cell-code" id="cb28" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb28-1"><span class="im" style="color: #00769E;
-background-color: null;
-font-style: inherit;">import</span> requests</span>
-<span id="cb28-2">d <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> requests.get(<span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">'https://www.ebi.ac.uk/pdbe/static/files/pdbechem_v2/U9X_model.sdf'</span>).text</span>
-<span id="cb28-3">mol <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> Chem.MolFromMolBlock(d,removeHs<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span><span class="va" style="color: #111111;
-background-color: null;
-font-style: inherit;">False</span>)</span>
-<span id="cb28-4">mol</span></code></pre></div>
-<div class="cell-output cell-output-stderr">
-<pre><code>[08:03:21] Warning: molecule is tagged as 2D, but at least one Z coordinate is not zero. Marking the mol as 3D.</code></pre>
-</div>
-<div class="cell-output cell-output-display">
-<div id="3dmolviewer_17075486014860165" style="position: relative; width: 400px; height: 400px;">
-        <p id="3dmolwarning_17075486014860165" style="background-color:#ffcccc;color:black">You appear to be running in JupyterLab (or JavaScript failed to load for some other reason).  You need to install the 3dmol extension: <br>
-        <tt>jupyter labextension install jupyterlab_3dmol</tt></p>
-        </div>
-<script>
-
-var loadScriptAsync = function(uri){
-  return new Promise((resolve, reject) => {
-    //this is to ignore the existence of requirejs amd
-    var savedexports, savedmodule;
-    if (typeof exports !== 'undefined') savedexports = exports;
-    else exports = {}
-    if (typeof module !== 'undefined') savedmodule = module;
-    else module = {}
-
-    var tag = document.createElement('script');
-    tag.src = uri;
-    tag.async = true;
-    tag.onload = () => {
-        exports = savedexports;
-        module = savedmodule;
-        resolve();
-    };
-  var firstScriptTag = document.getElementsByTagName('script')[0];
-  firstScriptTag.parentNode.insertBefore(tag, firstScriptTag);
-});
-};
-
-if(typeof $3Dmolpromise === 'undefined') {
-$3Dmolpromise = null;
-  $3Dmolpromise = loadScriptAsync('https://cdnjs.cloudflare.com/ajax/libs/3Dmol/2.0.4/3Dmol-min.js');
-}
-
-var viewer_17075486014860165 = null;
-var warn = document.getElementById("3dmolwarning_17075486014860165");
-if(warn) {
-    warn.parentNode.removeChild(warn);
-}
-$3Dmolpromise.then(function() {
-viewer_17075486014860165 = $3Dmol.createViewer(document.getElementById("3dmolviewer_17075486014860165"),{backgroundColor:"white"});
-viewer_17075486014860165.zoomTo();
-    viewer_17075486014860165.removeAllModels();
-    viewer_17075486014860165.addModel("U9X - Model conformer\n     RDKit          3D\n\n105105  0  0  0  0  0  0  0  0999 V2000\n   16.0270   16.8000   20.8500 O   0  0  0  0  0  0  0  0  0  0  0  0\n   16.7990   16.4390   19.9790 C   0  0  0  0  0  0  0  0  0  0  0  0\n   17.3400   17.4330   19.2990 N   0  0  0  0  0  0  0  0  0  0  0  0\n   18.0420   17.2830   18.0980 C   0  0  0  0  0  0  0  0  0  0  0  0\n   18.3270   16.1950   17.6150 O   0  0  0  0  0  0  0  0  0  0  0  0\n   18.3980   18.5990   17.6350 C   0  0  0  0  0  0  0  0  0  0  0  0\n   17.8480   19.5240   18.4670 C   0  0  0  0  0  0  0  0  0  0  0  0\n   17.9440   20.8720   18.3950 O   0  0  0  0  0  0  0  0  0  0  0  0\n   19.1280   21.4800   17.7580 C   0  0  0  0  0  0  0  0  0  0  0  0\n   17.0630   18.8850   19.6320 C   0  0  2  0  0  0  0  0  0  0  0  0\n   17.5270   19.4170   21.0140 C   0  0  0  0  0  0  0  0  0  0  0  0\n   19.0680   19.4150   21.3670 C   0  0  0  0  0  0  0  0  0  0  0  0\n   19.2870   19.0070   22.8620 C   0  0  0  0  0  0  0  0  0  0  0  0\n   19.7830   20.7680   21.0530 C   0  0  0  0  0  0  0  0  0  0  0  0\n   17.0060   14.9830   19.7300 C   0  0  0  0  0  0  0  0  0  0  0  0\n   16.6710   14.2730   21.0960 C   0  0  0  0  0  0  0  0  0  0  0  0\n   18.0340   13.8310   21.7470 C   0  0  2  0  0  0  0  0  0  0  0  0\n   19.0680   14.9440   21.9900 C   0  0  0  0  0  0  0  0  0  0  0  0\n   18.7760   12.7690   21.0000 N   0  0  0  0  0  0  0  0  0  0  0  0\n   19.1430   11.5820   21.5190 C   0  0  0  0  0  0  0  0  0  0  0  0\n   18.8400   11.2350   22.6560 O   0  0  0  0  0  0  0  0  0  0  0  0\n   19.8850   10.5630   20.6260 C   0  0  2  0  0  0  0  0  0  0  0  0\n   18.9040    9.4340   20.2620 C   0  0  0  0  0  0  0  0  0  0  0  0\n   19.4350    8.4000   19.2350 C   0  0  0  0  0  0  0  0  0  0  0  0\n   19.4730    9.0310   17.8600 C   0  0  0  0  0  0  0  0  0  0  0  0\n   18.6130    7.0980   19.2570 C   0  0  0  0  0  0  0  0  0  0  0  0\n   21.1190   10.0950   21.2550 N   0  0  0  0  0  0  0  0  0  0  0  0\n   22.0340   10.8980   21.8150 C   0  0  0  0  0  0  0  0  0  0  0  0\n   22.0290   12.1620   21.7450 O   0  0  0  0  0  0  0  0  0  0  0  0\n   23.1090   10.2230   22.6590 C   0  0  2  0  0  0  0  0  0  0  0  0\n   22.7380    9.8650   24.0910 C   0  0  0  0  0  0  0  0  0  0  0  0\n   23.8450    9.3000   25.0030 C   0  0  0  0  0  0  0  0  0  0  0  0\n   24.6870    8.1940   24.3070 C   0  0  0  0  0  0  0  0  0  0  0  0\n   23.2640    8.8770   26.3360 C   0  0  0  0  0  0  0  0  0  0  0  0\n   24.1810   11.1970   22.8230 O   0  0  0  0  0  0  0  0  0  0  0  0\n   25.0430   11.4730   21.7940 C   0  0  0  0  0  0  0  0  0  0  0  0\n   24.8970   10.9840   20.6820 O   0  0  0  0  0  0  0  0  0  0  0  0\n   26.1570   12.4310   22.2980 C   0  0  1  0  0  0  0  0  0  0  0  0\n   25.6460   13.7270   22.8180 N   0  0  0  0  0  0  0  0  0  0  0  0\n   25.0130   13.8830   24.1640 C   0  0  0  0  0  0  0  0  0  0  0  0\n   24.9220   14.4890   21.7730 C   0  0  0  0  0  0  0  0  0  0  0  0\n   27.2530   11.6150   23.1340 C   0  0  1  0  0  0  0  0  0  0  0  0\n   26.8760   11.3520   24.6170 C   0  0  0  0  0  0  0  0  0  0  0  0\n   27.9170   10.3460   22.4930 C   0  0  0  0  0  0  0  0  0  0  0  0\n   28.9780    9.5120   23.2370 C   0  0  0  0  0  0  0  0  0  0  0  0\n   19.0040   18.8170   16.7680 H   0  0  0  0  0  0  0  0  0  0  0  0\n   19.0390   22.5760   17.7880 H   0  0  0  0  0  0  0  0  0  0  0  0\n   20.0350   21.1710   18.2990 H   0  0  0  0  0  0  0  0  0  0  0  0\n   19.1930   21.1460   16.7120 H   0  0  0  0  0  0  0  0  0  0  0  0\n   15.9910   19.0950   19.5060 H   0  0  0  0  0  0  0  0  0  0  0  0\n   17.1820   20.4590   21.0890 H   0  0  0  0  0  0  0  0  0  0  0  0\n   17.0220   18.8080   21.7780 H   0  0  0  0  0  0  0  0  0  0  0  0\n   19.5420   18.6420   20.7440 H   0  0  0  0  0  0  0  0  0  0  0  0\n   20.3630   19.0110   23.0900 H   0  0  0  0  0  0  0  0  0  0  0  0\n   18.7710   19.7240   23.5170 H   0  0  0  0  0  0  0  0  0  0  0  0\n   18.8800   17.9990   23.0300 H   0  0  0  0  0  0  0  0  0  0  0  0\n   20.8470   20.6920   21.3230 H   0  0  0  0  0  0  0  0  0  0  0  0\n   19.6920   20.9900   19.9800 H   0  0  0  0  0  0  0  0  0  0  0  0\n   19.3130   21.5740   21.6350 H   0  0  0  0  0  0  0  0  0  0  0  0\n   16.3320   14.6290   18.9370 H   0  0  0  0  0  0  0  0  0  0  0  0\n   18.0490   14.7870   19.4400 H   0  0  0  0  0  0  0  0  0  0  0  0\n   16.1450   14.9720   21.7630 H   0  0  0  0  0  0  0  0  0  0  0  0\n   16.0380   13.3920   20.9160 H   0  0  0  0  0  0  0  0  0  0  0  0\n   17.7820   13.4160   22.7340 H   0  0  0  0  0  0  0  0  0  0  0  0\n   18.5950   15.7710   22.5400 H   0  0  0  0  0  0  0  0  0  0  0  0\n   19.9060   14.5430   22.5790 H   0  0  0  0  0  0  0  0  0  0  0  0\n   19.4430   15.3140   21.0240 H   0  0  0  0  0  0  0  0  0  0  0  0\n   19.0170   12.9540   20.0470 H   0  0  0  0  0  0  0  0  0  0  0  0\n   20.1490   11.0800   19.6920 H   0  0  0  0  0  0  0  0  0  0  0  0\n   17.9970    9.8940   19.8430 H   0  0  0  0  0  0  0  0  0  0  0  0\n   18.6480    8.8950   21.1860 H   0  0  0  0  0  0  0  0  0  0  0  0\n   20.4670    8.1480   19.5220 H   0  0  0  0  0  0  0  0  0  0  0  0\n   20.0700    9.9540   17.8960 H   0  0  0  0  0  0  0  0  0  0  0  0\n   19.9280    8.3280   17.1470 H   0  0  0  0  0  0  0  0  0  0  0  0\n   18.4490    9.2690   17.5370 H   0  0  0  0  0  0  0  0  0  0  0  0\n   18.6150    6.6790   20.2740 H   0  0  0  0  0  0  0  0  0  0  0  0\n   17.5780    7.3130   18.9510 H   0  0  0  0  0  0  0  0  0  0  0  0\n   19.0580    6.3720   18.5610 H   0  0  0  0  0  0  0  0  0  0  0  0\n   21.2920    9.1100   21.2680 H   0  0  0  0  0  0  0  0  0  0  0  0\n   23.4780    9.3270   22.1380 H   0  0  0  0  0  0  0  0  0  0  0  0\n   22.3550   10.7790   24.5680 H   0  0  0  0  0  0  0  0  0  0  0  0\n   21.9370    9.1130   24.0440 H   0  0  0  0  0  0  0  0  0  0  0  0\n   24.5350   10.1320   25.2070 H   0  0  0  0  0  0  0  0  0  0  0  0\n   25.4580    7.8290   25.0010 H   0  0  0  0  0  0  0  0  0  0  0  0\n   24.0300    7.3610   24.0180 H   0  0  0  0  0  0  0  0  0  0  0  0\n   25.1680    8.6100   23.4100 H   0  0  0  0  0  0  0  0  0  0  0  0\n   24.0650    8.4760   26.9750 H   0  0  0  0  0  0  0  0  0  0  0  0\n   22.8030    9.7470   26.8270 H   0  0  0  0  0  0  0  0  0  0  0  0\n   22.5020    8.1010   26.1740 H   0  0  0  0  0  0  0  0  0  0  0  0\n   26.6970   12.7040   21.3790 H   0  0  0  0  0  0  0  0  0  0  0  0\n   25.5810   13.3030   24.9060 H   0  0  0  0  0  0  0  0  0  0  0  0\n   25.0150   14.9450   24.4490 H   0  0  0  0  0  0  0  0  0  0  0  0\n   23.9770   13.5160   24.1270 H   0  0  0  0  0  0  0  0  0  0  0  0\n   24.5610   15.4380   22.1950 H   0  0  0  0  0  0  0  0  0  0  0  0\n   25.6020   14.6960   20.9330 H   0  0  0  0  0  0  0  0  0  0  0  0\n   24.0660   13.8980   21.4150 H   0  0  0  0  0  0  0  0  0  0  0  0\n   28.0880   12.3270   23.2060 H   0  0  0  0  0  0  0  0  0  0  0  0\n   27.6840   10.7890   25.1070 H   0  0  0  0  0  0  0  0  0  0  0  0\n   26.7320   12.3120   25.1340 H   0  0  0  0  0  0  0  0  0  0  0  0\n   25.9440   10.7690   24.6600 H   0  0  0  0  0  0  0  0  0  0  0  0\n   27.0940    9.6550   22.2560 H   0  0  0  0  0  0  0  0  0  0  0  0\n   28.3910   10.6850   21.5600 H   0  0  0  0  0  0  0  0  0  0  0  0\n   29.3010    8.6750   22.6000 H   0  0  0  0  0  0  0  0  0  0  0  0\n   29.8440   10.1480   23.4740 H   0  0  0  0  0  0  0  0  0  0  0  0\n   28.5470    9.1180   24.1690 H   0  0  0  0  0  0  0  0  0  0  0  0\n  5  4  2  0\n  6  4  1  0\n  6  7  2  0\n  9  8  1  0\n 25 24  1  0\n  4  3  1  0\n  8  7  1  0\n  7 10  1  0\n 24 26  1  0\n 24 23  1  0\n  3 10  1  0\n  3  2  1  0\n 10 11  1  0\n 15  2  1  0\n 15 16  1  0\n  2  1  2  0\n 23 22  1  0\n 22 27  1  0\n 22 20  1  0\n 37 36  2  0\n 19 20  1  0\n 19 17  1  0\n 11 12  1  0\n 14 12  1  0\n 16 17  1  0\n 27 28  1  0\n 12 13  1  0\n 20 21  2  0\n 29 28  2  0\n 17 18  1  0\n 41 39  1  0\n 36 38  1  0\n 36 35  1  0\n 28 30  1  0\n 38 39  1  0\n 38 42  1  0\n 44 42  1  0\n 44 45  1  0\n 30 35  1  0\n 30 31  1  0\n 39 40  1  0\n 42 43  1  0\n 31 32  1  0\n 33 32  1  0\n 32 34  1  0\n  6 46  1  0\n  9 47  1  0\n  9 48  1  0\n  9 49  1  0\n 10 50  1  6\n 11 51  1  0\n 11 52  1  0\n 12 53  1  0\n 13 54  1  0\n 13 55  1  0\n 13 56  1  0\n 14 57  1  0\n 14 58  1  0\n 14 59  1  0\n 15 60  1  0\n 15 61  1  0\n 16 62  1  0\n 16 63  1  0\n 17 64  1  1\n 18 65  1  0\n 18 66  1  0\n 18 67  1  0\n 19 68  1  0\n 22 69  1  6\n 23 70  1  0\n 23 71  1  0\n 24 72  1  0\n 25 73  1  0\n 25 74  1  0\n 25 75  1  0\n 26 76  1  0\n 26 77  1  0\n 26 78  1  0\n 27 79  1  0\n 30 80  1  6\n 31 81  1  0\n 31 82  1  0\n 32 83  1  0\n 33 84  1  0\n 33 85  1  0\n 33 86  1  0\n 34 87  1  0\n 34 88  1  0\n 34 89  1  0\n 38 90  1  6\n 40 91  1  0\n 40 92  1  0\n 40 93  1  0\n 41 94  1  0\n 41 95  1  0\n 41 96  1  0\n 42 97  1  1\n 43 98  1  0\n 43 99  1  0\n 43100  1  0\n 44101  1  0\n 44102  1  0\n 45103  1  0\n 45104  1  0\n 45105  1  0\nM  END\n","sdf");
-    viewer_17075486014860165.setStyle({"stick": {}});
-    viewer_17075486014860165.setBackgroundColor("0xeeeeee");
-    viewer_17075486014860165.zoomTo();
-viewer_17075486014860165.render();
-});
-</script>
-</div>
-<div class="cell-output cell-output-display" data-execution_count="28">
-
-</div>
-</div>
-<p>You’ve been able to use multiple threads during conformer generation for a while, it makes a big difference:</p>
-<div id="0450b9de" class="cell" data-executetime="{&quot;end_time&quot;:&quot;2024-02-10T07:24:08.106278Z&quot;,&quot;start_time&quot;:&quot;2024-02-10T07:04:11.985828Z&quot;}" data-execution_count="30">
-<div class="sourceCode cell-code" id="cb30" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb30-1">mcp <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> Chem.Mol(mol)</span>
-<span id="cb30-2">ps <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> rdDistGeom.ETKDGv3()</span>
-<span id="cb30-3">ps.randomSeed <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> <span class="bn" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">0xc0ffee</span></span>
-<span id="cb30-4"></span>
-<span id="cb30-5"><span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">%</span>timeit rdDistGeom.EmbedMultipleConfs(mcp,<span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">500</span>,ps)</span></code></pre></div>
-<div class="cell-output cell-output-stdout">
-<pre><code>2min 29s ± 236 ms per loop (mean ± std. dev. of 7 runs, 1 loop each)</code></pre>
-</div>
-</div>
-<div id="db997242" class="cell" data-executetime="{&quot;end_time&quot;:&quot;2024-02-10T07:28:55.478598Z&quot;,&quot;start_time&quot;:&quot;2024-02-10T07:24:08.107423Z&quot;}" data-execution_count="31">
-<div class="sourceCode cell-code" id="cb32" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb32-1">mcp <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> Chem.Mol(mol)</span>
-<span id="cb32-2">ps <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> rdDistGeom.ETKDGv3()</span>
-<span id="cb32-3">ps.randomSeed <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> <span class="bn" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">0xc0ffee</span></span>
-<span id="cb32-4">ps.numThreads <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> <span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">5</span></span>
-<span id="cb32-5"><span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">%</span>timeit rdDistGeom.EmbedMultipleConfs(mcp,<span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">500</span>,ps)</span></code></pre></div>
-<div class="cell-output cell-output-stdout">
-<pre><code>36 s ± 78.2 ms per loop (mean ± std. dev. of 7 runs, 1 loop each)</code></pre>
-</div>
-</div>
-<p><code>GetAllConformerBestRMS()</code> returns the “distance matrix” between all of the molecule’s conformers, it also can be nicely run in multiple threads:</p>
-<div id="6f486e35" class="cell" data-executetime="{&quot;end_time&quot;:&quot;2024-02-11T05:26:06.890135Z&quot;,&quot;start_time&quot;:&quot;2024-02-11T05:25:38.711850Z&quot;}" data-execution_count="35">
-<div class="sourceCode cell-code" id="cb34" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb34-1">mol_noh <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> Chem.RemoveHs(mol)</span>
-<span id="cb34-2">mcp_noh <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> Chem.RemoveHs(mcp)</span>
-<span id="cb34-3"><span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">%</span>timeit rdMolAlign.GetAllConformerBestRMS(mcp_noh)</span></code></pre></div>
-<div class="cell-output cell-output-stdout">
-<pre><code>3.52 s ± 92.3 ms per loop (mean ± std. dev. of 7 runs, 1 loop each)</code></pre>
-</div>
-</div>
-<div id="c510ef9c" class="cell" data-executetime="{&quot;end_time&quot;:&quot;2024-02-11T05:26:14.435195Z&quot;,&quot;start_time&quot;:&quot;2024-02-11T05:26:06.891667Z&quot;}" data-execution_count="36">
-<div class="sourceCode cell-code" id="cb36" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb36-1"><span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">%</span>timeit rdMolAlign.GetAllConformerBestRMS(mcp_noh, numThreads<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span><span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">5</span>)</span></code></pre></div>
-<div class="cell-output cell-output-stdout">
-<pre><code>937 ms ± 26.4 ms per loop (mean ± std. dev. of 7 runs, 1 loop each)</code></pre>
-</div>
-</div>
-<p>We can use this to quickly find the conformer with the best RMSD to the crystal conformer:</p>
-<div id="2177973d" class="cell" data-executetime="{&quot;end_time&quot;:&quot;2024-02-11T05:33:16.860470Z&quot;,&quot;start_time&quot;:&quot;2024-02-11T05:33:16.855303Z&quot;}" data-execution_count="37">
-<div class="sourceCode cell-code" id="cb38" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb38-1">mcp_noh.GetNumConformers()</span></code></pre></div>
-<div class="cell-output cell-output-display" data-execution_count="37">
-<pre><code>500</code></pre>
-</div>
-</div>
-<p>Add the crystal conformer at the end of the conformer list:</p>
-<div id="a045a19f" class="cell" data-executetime="{&quot;end_time&quot;:&quot;2024-02-11T05:34:09.030550Z&quot;,&quot;start_time&quot;:&quot;2024-02-11T05:34:09.027913Z&quot;}" data-execution_count="38">
-<div class="sourceCode cell-code" id="cb40" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb40-1">mcp_noh.AddConformer(mol_noh.GetConformer(),assignId<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span><span class="va" style="color: #111111;
-background-color: null;
-font-style: inherit;">True</span>)</span>
-<span id="cb40-2">mcp_noh.GetNumConformers()</span></code></pre></div>
-<div class="cell-output cell-output-display" data-execution_count="38">
-<pre><code>501</code></pre>
-</div>
-</div>
-<div id="6f53cab5" class="cell" data-executetime="{&quot;end_time&quot;:&quot;2024-02-11T05:34:36.825868Z&quot;,&quot;start_time&quot;:&quot;2024-02-11T05:34:35.918774Z&quot;}" data-execution_count="39">
-<div class="sourceCode cell-code" id="cb42" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb42-1">dmat <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> rdMolAlign.GetAllConformerBestRMS(mcp_noh, numThreads<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span><span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">5</span>)</span>
-<span id="cb42-2"><span class="bu" style="color: null;
-background-color: null;
-font-style: inherit;">len</span>(dmat)</span></code></pre></div>
-<div class="cell-output cell-output-display" data-execution_count="39">
-<pre><code>125250</code></pre>
-</div>
-</div>
-<p>The elements of dmat are stored in the RDKit’s usual way for symmetric matrices, with the indices in the order: <code>[(1,0),(2,0),(2,1),(3,0),...]</code>, so the distances to the last conformer (the crystal conformer we just added) are at the end:</p>
-<div id="7d4f3e06" class="cell" data-executetime="{&quot;end_time&quot;:&quot;2024-02-11T05:36:40.399150Z&quot;,&quot;start_time&quot;:&quot;2024-02-11T05:36:40.396683Z&quot;}" data-execution_count="42">
-<div class="sourceCode cell-code" id="cb44" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb44-1">dists_to_xtal <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> dmat[<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">-</span><span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">500</span>:]</span>
-<span id="cb44-2"><span class="bu" style="color: null;
-background-color: null;
-font-style: inherit;">min</span>(dists_to_xtal)</span></code></pre></div>
-<div class="cell-output cell-output-display" data-execution_count="42">
-<pre><code>1.812529263358374</code></pre>
-</div>
-</div>
-<p>That’s not a fantastic result, but the molecule I picked for this demo is super flexible and we only generated 500 conformers.</p>
-
-
-</section>
-
- ]]></description>
-  <category>tutorial</category>
-  <guid>https://greglandrum.github.io/rdkit-blog/posts/2024-02-11-more-multithreading.html</guid>
-  <pubDate>Sat, 10 Feb 2024 23:00:00 GMT</pubDate>
 </item>
 </channel>
 </rss>
