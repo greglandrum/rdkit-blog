@@ -168,30 +168,26 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
     <h2 id="toc-title">On this page</h2>
    
   <ul>
-  <li><a href="#read-in-the-data" id="toc-read-in-the-data" class="nav-link active" data-scroll-target="#read-in-the-data">Read in the data</a></li>
+  <li><a href="#thresholds-for-random-in-fingerprints-the-rdkit-supports" id="toc-thresholds-for-random-in-fingerprints-the-rdkit-supports" class="nav-link active" data-scroll-target="#thresholds-for-random-in-fingerprints-the-rdkit-supports">Thresholds for “random” in fingerprints the RDKit supports</a></li>
+  <li><a href="#read-in-the-data" id="toc-read-in-the-data" class="nav-link" data-scroll-target="#read-in-the-data">Read in the data</a></li>
   <li><a href="#maccs" id="toc-maccs" class="nav-link" data-scroll-target="#maccs">MACCS</a></li>
   <li><a href="#morgan-fps" id="toc-morgan-fps" class="nav-link" data-scroll-target="#morgan-fps">Morgan FPs</a>
   <ul class="collapse">
   <li><a href="#count-based" id="toc-count-based" class="nav-link" data-scroll-target="#count-based">count based</a></li>
-  <li><a href="#bit-vector-based" id="toc-bit-vector-based" class="nav-link" data-scroll-target="#bit-vector-based">bit-vector based</a></li>
   </ul></li>
   <li><a href="#featmorgan" id="toc-featmorgan" class="nav-link" data-scroll-target="#featmorgan">FeatMorgan</a>
   <ul class="collapse">
   <li><a href="#count-based-1" id="toc-count-based-1" class="nav-link" data-scroll-target="#count-based-1">count based</a></li>
-  <li><a href="#bit-vectors" id="toc-bit-vectors" class="nav-link" data-scroll-target="#bit-vectors">bit vectors</a></li>
   </ul></li>
   <li><a href="#rdkit" id="toc-rdkit" class="nav-link" data-scroll-target="#rdkit">RDKit</a>
   <ul class="collapse">
   <li><a href="#branched-default" id="toc-branched-default" class="nav-link" data-scroll-target="#branched-default">Branched (default)</a></li>
   <li><a href="#linear" id="toc-linear" class="nav-link" data-scroll-target="#linear">linear</a></li>
   </ul></li>
-  <li><a href="#atom-pairs-and-torsions" id="toc-atom-pairs-and-torsions" class="nav-link" data-scroll-target="#atom-pairs-and-torsions">Atom pairs and torsions</a>
-  <ul class="collapse">
-  <li><a href="#count-based-2" id="toc-count-based-2" class="nav-link" data-scroll-target="#count-based-2">count-based</a></li>
-  <li><a href="#bit-vectors-1" id="toc-bit-vectors-1" class="nav-link" data-scroll-target="#bit-vectors-1">bit vectors</a></li>
-  </ul></li>
+  <li><a href="#atom-pairs-and-torsions" id="toc-atom-pairs-and-torsions" class="nav-link" data-scroll-target="#atom-pairs-and-torsions">Atom pairs and torsions</a></li>
   <li><a href="#avalon" id="toc-avalon" class="nav-link" data-scroll-target="#avalon">Avalon</a></li>
-  <li><a href="#avalon-counts" id="toc-avalon-counts" class="nav-link" data-scroll-target="#avalon-counts">Avalon Counts</a></li>
+  <li><a href="#pattern" id="toc-pattern" class="nav-link" data-scroll-target="#pattern">Pattern</a></li>
+  <li><a href="#gobbi2d-pharmacophore-fingerprints" id="toc-gobbi2d-pharmacophore-fingerprints" class="nav-link" data-scroll-target="#gobbi2d-pharmacophore-fingerprints">Gobbi2D pharmacophore fingerprints</a></li>
   </ul>
 </nav>
     </div>
@@ -233,11 +229,16 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 </header>
 
 
-<p>This is an updated version of a post. The original version of the notebook can be <a href="https://github.com/greglandrum/rdkit_blog/blob/936b35b77ddca3e843991d1c4b1e3532e754b734/notebooks/Fingerprint%20Thresholds.ipynb">found in github</a>.</p>
+<section id="thresholds-for-random-in-fingerprints-the-rdkit-supports" class="level1">
+<h1>Thresholds for “random” in fingerprints the RDKit supports</h1>
+<p>This post has been updated multiple times. This version is from 16.03.2025. Older version of the notebook can be <a href="https://github.com/greglandrum/rdkit_blog/blob/master/notebooks/Fingerprint%20Thresholds.ipynb">found in github</a>.</p>
+<blockquote class="blockquote">
+<p><strong>Note</strong> that older versions of this post had a mistake in the way the bit-based Morgan and FeatMorgan fingerprints were calculated: I was using the old fingerprint-generation functions and was generating folded count-based fingerprints instead of folded bit-based fingerprints. This led to similarity values and thresholds that were too high.</p>
+</blockquote>
 <p>A frequent question that comes up when considering fingerprint similarity is: “What threshold should I use to determine what a neighbor is?” The answer is poorly defined. Of course it depends heavily on the details of the fingerprint, but there’s also a very subjective component: you want to pick a low enough threshold that you’re sure you won’t miss anything, but you don’t want to pick up too much noise.</p>
-<p>The goal here is to systematically come up with some guidelines that can be used for fingerprints supported within the RDKit. We will do that by looking a similarities between random “drug-like” (MW&lt;600) molecules picked from ChEMBL.</p>
-<p>For the analysis, the 25K similarity values are sorted and the values at particular threshold are examined.</p>
-<p>There’s a fair amount of code and results below, so here’s the summary table. To help interpret this: 22500 of the 25000 pairs (90%) have a MACCS keys similarity value less than 0.528.</p>
+<p>The goal here is to systematically come up with some guidelines that can be used for fingerprints supported within the RDKit. We will do that by looking at similarities between random pairs of molecules picked from ChEMBL. The selection of the molecules used is <a href="https://greglandrum.github.io/rdkit-blog/posts/2025-03-16-building-a-similarity-comparison-set.html">described in another post</a>.</p>
+<p>For the analysis, the 50K similarity values are sorted and the values at particular threshold are examined.</p>
+<p>There’s a fair amount of code and results below, so here’s the summary table. To help interpret this: 45000 of the 50000 pairs (90%) have a MACCS keys similarity value less than 0.549.</p>
 <table>
 <tbody><tr>
 <th>
@@ -270,19 +271,19 @@ MACCS
 Tanimoto
 </td>
 <td>
-0.431
+0.457
 </td>
 <td>
-0.471
+0.494
 </td>
 <td>
-0.528
+0.549
 </td>
 <td>
-0.575
+0.592
 </td>
 <td>
-0.655
+0.667
 </td>
 </tr>
 <tr>
@@ -293,19 +294,42 @@ Morgan0 (counts)
 Tanimoto
 </td>
 <td>
-0.429
+0.439
 </td>
 <td>
-0.471
+0.477
 </td>
 <td>
-0.525
+0.529
 </td>
 <td>
-0.568
+0.575
 </td>
 <td>
-0.651
+0.650
+</td>
+</tr>
+<tr>
+<td>
+Morgan0 (bits)
+</td>
+<td>
+Tanimoto
+</td>
+<td>
+0.500
+</td>
+<td>
+0.533
+</td>
+<td>
+0.600
+</td>
+<td>
+0.647
+</td>
+<td>
+0.750
 </td>
 </tr>
 <tr>
@@ -316,19 +340,42 @@ Morgan1 (counts)
 Tanimoto
 </td>
 <td>
-0.265
+0.267
 </td>
 <td>
-0.293
+0.294
 </td>
 <td>
-0.333
+0.328
 </td>
 <td>
-0.364
+0.360
 </td>
 <td>
-0.429
+0.420
+</td>
+</tr>
+<tr>
+<td>
+Morgan1 (bits)
+</td>
+<td>
+Tanimoto
+</td>
+<td>
+0.213
+</td>
+<td>
+0.234
+</td>
+<td>
+0.267
+</td>
+<td>
+0.295
+</td>
+<td>
+0.356
 </td>
 </tr>
 <tr>
@@ -339,19 +386,42 @@ Morgan2 (counts)
 Tanimoto
 </td>
 <td>
-0.181
+0.182
 </td>
 <td>
-0.201
+0.200
 </td>
 <td>
-0.229
+0.226
 </td>
 <td>
-0.252
+0.248
 </td>
 <td>
-0.305
+0.297
+</td>
+</tr>
+<tr>
+<td>
+Morgan2 (bits)
+</td>
+<td>
+Tanimoto
+</td>
+<td>
+0.133
+</td>
+<td>
+0.146
+</td>
+<td>
+0.167
+</td>
+<td>
+0.185
+</td>
+<td>
+0.226
 </td>
 </tr>
 <tr>
@@ -365,85 +435,16 @@ Tanimoto
 0.141
 </td>
 <td>
-0.156
+0.154
 </td>
 <td>
-0.178
+0.174
 </td>
 <td>
-0.196
+0.192
 </td>
 <td>
-0.238
-</td>
-</tr>
-<tr>
-<td>
-Morgan0 (bits)
-</td>
-<td>
-Tanimoto
-</td>
-<td>
-0.435
-</td>
-<td>
-0.475
-</td>
-<td>
-0.529
-</td>
-<td>
-0.571
-</td>
-<td>
-0.656
-</td>
-</tr>
-<tr>
-<td>
-Morgan1 (bits)
-</td>
-<td>
-Tanimoto
-</td>
-<td>
-0.273
-</td>
-<td>
-0.301
-</td>
-<td>
-0.341
-</td>
-<td>
-0.371
-</td>
-<td>
-0.434
-</td>
-</tr>
-<tr>
-<td>
-Morgan2 (bits)
-</td>
-<td>
-Tanimoto
-</td>
-<td>
-0.197
-</td>
-<td>
-0.217
-</td>
-<td>
-0.246
-</td>
-<td>
-0.269
-</td>
-<td>
-0.322
+0.231
 </td>
 </tr>
 <tr>
@@ -454,19 +455,19 @@ Morgan3 (bits)
 Tanimoto
 </td>
 <td>
-0.165
+0.102
 </td>
 <td>
-0.181
+0.112
 </td>
 <td>
-0.203
+0.127
 </td>
 <td>
-0.222
+0.141
 </td>
 <td>
-0.264
+0.173
 </td>
 </tr>
 <tr>
@@ -477,88 +478,19 @@ FeatMorgan0 (counts)
 Tanimoto
 </td>
 <td>
-0.583
+0.500
 </td>
 <td>
-0.630
+0.538
 </td>
 <td>
-0.690
+0.591
 </td>
 <td>
-0.737
+0.633
 </td>
 <td>
-0.818
-</td>
-</tr>
-<tr>
-<td>
-FeatMorgan1 (counts)
-</td>
-<td>
-Tanimoto
-</td>
-<td>
-0.390
-</td>
-<td>
-0.425
-</td>
-<td>
-0.474
-</td>
-<td>
-0.511
-</td>
-<td>
-0.581
-</td>
-</tr>
-<tr>
-<td>
-FeatMorgan2 (counts)
-</td>
-<td>
-Tanimoto
-</td>
-<td>
-0.272
-</td>
-<td>
-0.298
-</td>
-<td>
-0.333
-</td>
-<td>
-0.364
-</td>
-<td>
-0.424
-</td>
-</tr>
-<tr>
-<td>
-FeatMorgan3 (counts)
-</td>
-<td>
-Tanimoto
-</td>
-<td>
-0.209
-</td>
-<td>
-0.228
-</td>
-<td>
-0.256
-</td>
-<td>
-0.279
-</td>
-<td>
-0.328
+0.710
 </td>
 </tr>
 <tr>
@@ -572,16 +504,39 @@ Tanimoto
 0.583
 </td>
 <td>
-0.630
+0.636
 </td>
 <td>
-0.690
+0.700
 </td>
 <td>
-0.737
+0.778
 </td>
 <td>
-0.818
+0.889
+</td>
+</tr>
+<tr>
+<td>
+FeatMorgan1 (counts)
+</td>
+<td>
+Tanimoto
+</td>
+<td>
+0.300
+</td>
+<td>
+0.326
+</td>
+<td>
+0.364
+</td>
+<td>
+0.395
+</td>
+<td>
+0.455
 </td>
 </tr>
 <tr>
@@ -592,19 +547,42 @@ FeatMorgan1 (bits)
 Tanimoto
 </td>
 <td>
+0.245
+</td>
+<td>
+0.269
+</td>
+<td>
+0.302
+</td>
+<td>
+0.333
+</td>
+<td>
 0.395
 </td>
+</tr>
+<tr>
 <td>
-0.429
+FeatMorgan2 (counts)
 </td>
 <td>
-0.477
+Tanimoto
 </td>
 <td>
-0.514
+0.203
 </td>
 <td>
-0.585
+0.221
+</td>
+<td>
+0.247
+</td>
+<td>
+0.270
+</td>
+<td>
+0.319
 </td>
 </tr>
 <tr>
@@ -615,19 +593,42 @@ FeatMorgan2 (bits)
 Tanimoto
 </td>
 <td>
-0.284
+0.146
 </td>
 <td>
-0.310
+0.160
 </td>
 <td>
-0.347
+0.181
 </td>
 <td>
-0.376
+0.200
 </td>
 <td>
-0.434
+0.241
+</td>
+</tr>
+<tr>
+<td>
+FeatMorgan3 (counts)
+</td>
+<td>
+Tanimoto
+</td>
+<td>
+0.156
+</td>
+<td>
+0.170
+</td>
+<td>
+0.190
+</td>
+<td>
+0.208
+</td>
+<td>
+0.248
 </td>
 </tr>
 <tr>
@@ -638,42 +639,42 @@ FeatMorgan3 (bits)
 Tanimoto
 </td>
 <td>
-0.228
+0.110
 </td>
 <td>
-0.248
+0.120
 </td>
 <td>
-0.276
+0.135
 </td>
 <td>
-0.299
+0.149
 </td>
 <td>
-0.349
+0.181
 </td>
 </tr>
 <tr>
 <td>
-RDKit 4 (bits)
+RDKit 5 (counts)
 </td>
 <td>
 Tanimoto
 </td>
 <td>
-0.209
+0.152
 </td>
 <td>
-0.239
+0.178
 </td>
 <td>
-0.285
+0.216
 </td>
 <td>
-0.325
+0.252
 </td>
 <td>
-0.426
+0.333
 </td>
 </tr>
 <tr>
@@ -684,42 +685,42 @@ RDKit 5 (bits)
 Tanimoto
 </td>
 <td>
-0.197
+0.204
 </td>
 <td>
-0.219
+0.226
 </td>
 <td>
-0.253
+0.262
 </td>
 <td>
-0.287
+0.295
 </td>
 <td>
-0.368
+0.371
 </td>
 </tr>
 <tr>
 <td>
-RDKit 6 (bits)
+RDKit 7 (counts)
 </td>
 <td>
 Tanimoto
 </td>
 <td>
-0.230
+0.065
 </td>
 <td>
-0.250
+0.081
 </td>
 <td>
-0.280
+0.107
 </td>
 <td>
-0.308
+0.133
 </td>
 <td>
-0.369
+0.201
 </td>
 </tr>
 <tr>
@@ -730,42 +731,42 @@ RDKit 7 (bits)
 Tanimoto
 </td>
 <td>
-0.313
+0.327
 </td>
 <td>
-0.346
+0.356
 </td>
 <td>
-0.389
+0.398
 </td>
 <td>
-0.429
+0.433
 </td>
 <td>
-0.507
+0.510
 </td>
 </tr>
 <tr>
 <td>
-linear RDKit 4 (bits)
+linear RDKit 5 (counts)
 </td>
 <td>
 Tanimoto
 </td>
 <td>
-0.225
+0.198
 </td>
 <td>
-0.258
+0.226
 </td>
 <td>
-0.309
+0.267
 </td>
 <td>
-0.354
+0.307
 </td>
 <td>
-0.462
+0.388
 </td>
 </tr>
 <tr>
@@ -776,42 +777,42 @@ linear RDKit 5 (bits)
 Tanimoto
 </td>
 <td>
-0.198
+0.206
 </td>
 <td>
-0.225
+0.234
 </td>
 <td>
-0.269
+0.276
 </td>
 <td>
-0.309
+0.318
 </td>
 <td>
-0.404
+0.405
 </td>
 </tr>
 <tr>
 <td>
-linear RDKit 6 (bits)
+linear RDKit 7 (counts)
 </td>
 <td>
 Tanimoto
 </td>
 <td>
-0.187
+0.123
 </td>
 <td>
-0.210
+0.145
 </td>
 <td>
-0.246
+0.179
 </td>
 <td>
-0.282
+0.211
 </td>
 <td>
-0.365
+0.287
 </td>
 </tr>
 <tr>
@@ -822,19 +823,19 @@ linear RDKit 7 (bits)
 Tanimoto
 </td>
 <td>
-0.182
+0.189
 </td>
 <td>
-0.203
+0.209
 </td>
 <td>
-0.234
+0.240
 </td>
 <td>
-0.264
+0.270
 </td>
 <td>
-0.337
+0.338
 </td>
 </tr>
 <tr>
@@ -845,42 +846,19 @@ Atom Pairs (counts)
 Tanimoto
 </td>
 <td>
-0.180
+0.183
 </td>
 <td>
-0.204
+0.206
 </td>
 <td>
-0.237
-</td>
-<td>
-0.265
-</td>
-<td>
-0.325
-</td>
-</tr>
-<tr>
-<td>
-Torsions (counts)
-</td>
-<td>
-Tanimoto
-</td>
-<td>
-0.107
-</td>
-<td>
-0.130
-</td>
-<td>
-0.165
-</td>
-<td>
-0.194
+0.238
 </td>
 <td>
 0.266
+</td>
+<td>
+0.320
 </td>
 </tr>
 <tr>
@@ -891,227 +869,260 @@ Atom Pairs (bits)
 Tanimoto
 </td>
 <td>
-0.275
+0.285
 </td>
 <td>
-0.301
-</td>
-<td>
-0.335
-</td>
-<td>
-0.363
-</td>
-<td>
-0.415
-</td>
-</tr>
-<tr>
-<td>
-Torsions (bits)
-</td>
-<td>
-Tanimoto
-</td>
-<td>
-0.133
-</td>
-<td>
-0.155
-</td>
-<td>
-0.188
-</td>
-<td>
-0.219
-</td>
-<td>
-0.288
-</td>
-</tr>
-<tr>
-<td>
-Avalon 512 (bits)
-</td>
-<td>
-Tanimoto
-</td>
-<td>
-0.369
-</td>
-<td>
-0.407
-</td>
-<td>
-0.461
-</td>
-<td>
-0.505
-</td>
-<td>
-0.575
-</td>
-</tr>
-<tr>
-<td>
-Avalon 1024 (bits)
-</td>
-<td>
-Tanimoto
-</td>
-<td>
-0.269
-</td>
-<td>
-0.297
-</td>
-<td>
-0.340
-</td>
-<td>
-0.375
-</td>
-<td>
-0.449
-</td>
-</tr>
-<tr>
-<td>
-Avalon 512 (counts)
-</td>
-<td>
-Tanimoto
-</td>
-<td>
-0.300
-</td>
-<td>
-0.333
-</td>
-<td>
-0.379
-</td>
-<td>
-0.418
-</td>
-<td>
-0.491
-</td>
-</tr>
-<tr>
-<td>
-Avalon 1024 (counts)
-</td>
-<td>
-Tanimoto
-</td>
-<td>
-0.267
-</td>
-<td>
-0.299
+0.310
 </td>
 <td>
 0.344
 </td>
 <td>
-0.384
+0.371
 </td>
 <td>
-0.462
+0.419
+</td>
+</tr>
+<tr>
+<td>
+Topological Torsions (counts)
+</td>
+<td>
+Tanimoto
+</td>
+<td>
+0.103
+</td>
+<td>
+0.125
+</td>
+<td>
+0.158
+</td>
+<td>
+0.188
+</td>
+<td>
+0.256
+</td>
+</tr>
+<tr>
+<td>
+Topological Torsions (bits)
+</td>
+<td>
+Tanimoto
+</td>
+<td>
+0.131
+</td>
+<td>
+0.152
+</td>
+<td>
+0.185
+</td>
+<td>
+0.214
+</td>
+<td>
+0.279
+</td>
+</tr>
+<tr>
+<td>
+Avalon (counts)
+</td>
+<td>
+Tanimoto
+</td>
+<td>
+0.307
+</td>
+<td>
+0.339
+</td>
+<td>
+0.385
+</td>
+<td>
+0.424
+</td>
+<td>
+0.499
+</td>
+</tr>
+<tr>
+<td>
+Avalon (bits)
+</td>
+<td>
+Tanimoto
+</td>
+<td>
+0.388
+</td>
+<td>
+0.425
+</td>
+<td>
+0.475
+</td>
+<td>
+0.515
+</td>
+<td>
+0.589
+</td>
+</tr>
+<tr>
+<td>
+Pattern
+</td>
+<td>
+Tanimoto
+</td>
+<td>
+0.605
+</td>
+<td>
+0.633
+</td>
+<td>
+0.669
+</td>
+<td>
+0.698
+</td>
+<td>
+0.750
+</td>
+</tr>
+<tr>
+<td>
+Gobbi2D
+</td>
+<td>
+Tanimoto
+</td>
+<td>
+0.175
+</td>
+<td>
+0.205
+</td>
+<td>
+0.251
+</td>
+<td>
+0.292
+</td>
+<td>
+0.373
 </td>
 </tr>
 </tbody></table>
 <div id="cell-2" class="cell" data-execution_count="1">
 <div class="sourceCode cell-code" id="cb1"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> rdkit <span class="im">import</span> Chem</span>
 <span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> rdkit.Chem <span class="im">import</span> rdMolDescriptors</span>
-<span id="cb1-3"><a href="#cb1-3" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> rdkit.Avalon <span class="im">import</span> pyAvalonTools</span>
-<span id="cb1-4"><a href="#cb1-4" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> rdkit.Chem <span class="im">import</span> Draw</span>
-<span id="cb1-5"><a href="#cb1-5" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> rdkit.Chem.Draw <span class="im">import</span> IPythonConsole</span>
-<span id="cb1-6"><a href="#cb1-6" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> rdkit <span class="im">import</span> rdBase</span>
-<span id="cb1-7"><a href="#cb1-7" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> rdkit <span class="im">import</span> DataStructs</span>
-<span id="cb1-8"><a href="#cb1-8" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> collections <span class="im">import</span> defaultdict</span>
-<span id="cb1-9"><a href="#cb1-9" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> pickle,random,gzip</span>
-<span id="cb1-10"><a href="#cb1-10" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(rdBase.rdkitVersion)</span>
-<span id="cb1-11"><a href="#cb1-11" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> time</span>
-<span id="cb1-12"><a href="#cb1-12" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(time.asctime())</span>
-<span id="cb1-13"><a href="#cb1-13" aria-hidden="true" tabindex="-1"></a><span class="op">%</span>pylab inline</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<span id="cb1-3"><a href="#cb1-3" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> rdkit.Chem <span class="im">import</span> rdFingerprintGenerator</span>
+<span id="cb1-4"><a href="#cb1-4" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> rdkit.Avalon <span class="im">import</span> pyAvalonTools</span>
+<span id="cb1-5"><a href="#cb1-5" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> rdkit.Chem <span class="im">import</span> Draw</span>
+<span id="cb1-6"><a href="#cb1-6" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> rdkit.Chem.Draw <span class="im">import</span> IPythonConsole</span>
+<span id="cb1-7"><a href="#cb1-7" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> rdkit</span>
+<span id="cb1-8"><a href="#cb1-8" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> rdkit <span class="im">import</span> DataStructs</span>
+<span id="cb1-9"><a href="#cb1-9" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> collections <span class="im">import</span> defaultdict</span>
+<span id="cb1-10"><a href="#cb1-10" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> pickle,random,gzip</span>
+<span id="cb1-11"><a href="#cb1-11" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(rdkit.__version__)</span>
+<span id="cb1-12"><a href="#cb1-12" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> time</span>
+<span id="cb1-13"><a href="#cb1-13" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(time.asctime())</span>
+<span id="cb1-14"><a href="#cb1-14" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-15"><a href="#cb1-15" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> matplotlib <span class="im">import</span> pyplot <span class="im">as</span> plt</span>
+<span id="cb1-16"><a href="#cb1-16" aria-hidden="true" tabindex="-1"></a>plt.style.use(<span class="st">'tableau-colorblind10'</span>)</span>
+<span id="cb1-17"><a href="#cb1-17" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-18"><a href="#cb1-18" aria-hidden="true" tabindex="-1"></a><span class="op">%</span>matplotlib inline</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 <div class="cell-output cell-output-stdout">
-<pre><code>2021.03.1
-Tue May 18 06:44:23 2021
-Populating the interactive namespace from numpy and matplotlib</code></pre>
-</div>
-<div class="cell-output cell-output-stderr">
-<pre><code>/home/glandrum/miniconda3/envs/rdkit_blog/lib/python3.9/site-packages/IPython/core/magics/pylab.py:159: UserWarning: pylab import has clobbered these variables: ['random']
-`%matplotlib` prevents importing * from pylab and numpy
-  warn("pylab import has clobbered these variables: %s"  % clobbered +</code></pre>
+<pre><code>2024.09.6
+Sun Mar 16 07:19:01 2025</code></pre>
 </div>
 </div>
+</section>
 <section id="read-in-the-data" class="level1">
 <h1>Read in the data</h1>
-<p>We’re using the set of 25K reference pairs generated in an earlier post: http://rdkit.blogspot.ch/2013/10/building-similarity-comparison-set-goal.html</p>
-<p>As a quick reminder: these are pairs of molecules taken from ChEMBL with MW&lt;600 and a count-based MFP0 similarity of at least 0.7 to each other.</p>
+<p>We’re using the set of 50K reference pairs generated in an earlier post: http://rdkit.blogspot.ch/2013/10/building-similarity-comparison-set-goal.html</p>
+<p>As a quick reminder: these are pairs of molecules taken from ChEMBL with a single fragment, less than 50 heavy atoms, and a count-based MFP0 similarity of at least 0.65 to each other.</p>
 <div id="cell-4" class="cell" data-execution_count="2">
-<div class="sourceCode cell-code" id="cb4"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a>ind <span class="op">=</span> [x.split() <span class="cf">for</span> x <span class="kw">in</span> gzip.<span class="bu">open</span>(<span class="st">'../data/chembl16_25K.pairs.txt.gz'</span>)]</span>
-<span id="cb4-2"><a href="#cb4-2" aria-hidden="true" tabindex="-1"></a>ms1 <span class="op">=</span> []</span>
-<span id="cb4-3"><a href="#cb4-3" aria-hidden="true" tabindex="-1"></a>ms2 <span class="op">=</span> []</span>
-<span id="cb4-4"><a href="#cb4-4" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> i,row <span class="kw">in</span> <span class="bu">enumerate</span>(ind):</span>
-<span id="cb4-5"><a href="#cb4-5" aria-hidden="true" tabindex="-1"></a>    m1 <span class="op">=</span> Chem.MolFromSmiles(row[<span class="dv">1</span>])</span>
-<span id="cb4-6"><a href="#cb4-6" aria-hidden="true" tabindex="-1"></a>    ms1.append((row[<span class="dv">0</span>],m1))</span>
-<span id="cb4-7"><a href="#cb4-7" aria-hidden="true" tabindex="-1"></a>    m2 <span class="op">=</span> Chem.MolFromSmiles(row[<span class="dv">3</span>])</span>
-<span id="cb4-8"><a href="#cb4-8" aria-hidden="true" tabindex="-1"></a>    ms2.append((row[<span class="dv">2</span>],m2))</span>
-<span id="cb4-9"><a href="#cb4-9" aria-hidden="true" tabindex="-1"></a>    </span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="sourceCode cell-code" id="cb3"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a>ind <span class="op">=</span> [x.split(<span class="st">b'</span><span class="ch">\t</span><span class="st">'</span>) <span class="cf">for</span> x <span class="kw">in</span> gzip.<span class="bu">open</span>(<span class="st">'../data/chembl35_50K.mfp0.pairs.txt.gz'</span>)]</span>
+<span id="cb3-2"><a href="#cb3-2" aria-hidden="true" tabindex="-1"></a>ms1 <span class="op">=</span> []</span>
+<span id="cb3-3"><a href="#cb3-3" aria-hidden="true" tabindex="-1"></a>ms2 <span class="op">=</span> []</span>
+<span id="cb3-4"><a href="#cb3-4" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> i,row <span class="kw">in</span> <span class="bu">enumerate</span>(ind):</span>
+<span id="cb3-5"><a href="#cb3-5" aria-hidden="true" tabindex="-1"></a>    m1 <span class="op">=</span> Chem.MolFromSmiles(row[<span class="dv">1</span>])</span>
+<span id="cb3-6"><a href="#cb3-6" aria-hidden="true" tabindex="-1"></a>    ms1.append((row[<span class="dv">0</span>],m1))</span>
+<span id="cb3-7"><a href="#cb3-7" aria-hidden="true" tabindex="-1"></a>    m2 <span class="op">=</span> Chem.MolFromSmiles(row[<span class="dv">3</span>])</span>
+<span id="cb3-8"><a href="#cb3-8" aria-hidden="true" tabindex="-1"></a>    ms2.append((row[<span class="dv">2</span>],m2))</span>
+<span id="cb3-9"><a href="#cb3-9" aria-hidden="true" tabindex="-1"></a>    </span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </div>
 <p>Those pairs are related to each other, but we want random pairs, so shuffle the second list:</p>
 <div id="cell-6" class="cell" data-execution_count="3">
-<div class="sourceCode cell-code" id="cb5"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a>random.seed(<span class="dv">23</span>)</span>
-<span id="cb5-2"><a href="#cb5-2" aria-hidden="true" tabindex="-1"></a>random.shuffle(ms2)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="sourceCode cell-code" id="cb4"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a>random.seed(<span class="dv">23</span>)</span>
+<span id="cb4-2"><a href="#cb4-2" aria-hidden="true" tabindex="-1"></a>random.shuffle(ms2)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </div>
 <div id="cell-7" class="cell" data-execution_count="4">
-<div class="sourceCode cell-code" id="cb6"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb6-1"><a href="#cb6-1" aria-hidden="true" tabindex="-1"></a><span class="cf">try</span>:</span>
-<span id="cb6-2"><a href="#cb6-2" aria-hidden="true" tabindex="-1"></a>    <span class="im">import</span> ipyparallel <span class="im">as</span> ipp</span>
-<span id="cb6-3"><a href="#cb6-3" aria-hidden="true" tabindex="-1"></a>    rc <span class="op">=</span> ipp.Client()</span>
-<span id="cb6-4"><a href="#cb6-4" aria-hidden="true" tabindex="-1"></a>    dview <span class="op">=</span> rc[:]</span>
-<span id="cb6-5"><a href="#cb6-5" aria-hidden="true" tabindex="-1"></a>    dview.execute(<span class="st">'from rdkit import Chem'</span>)</span>
-<span id="cb6-6"><a href="#cb6-6" aria-hidden="true" tabindex="-1"></a>    dview.execute(<span class="st">'from rdkit import Descriptors'</span>)</span>
-<span id="cb6-7"><a href="#cb6-7" aria-hidden="true" tabindex="-1"></a>    dview.execute(<span class="st">'from rdkit.Chem import rdMolDescriptors'</span>)</span>
-<span id="cb6-8"><a href="#cb6-8" aria-hidden="true" tabindex="-1"></a>    dview.execute(<span class="st">'from rdkit.Avalon import pyAvalonTools'</span>)</span>
-<span id="cb6-9"><a href="#cb6-9" aria-hidden="true" tabindex="-1"></a><span class="cf">except</span>:</span>
-<span id="cb6-10"><a href="#cb6-10" aria-hidden="true" tabindex="-1"></a>    <span class="bu">print</span>(<span class="st">"could not use ipyparallel"</span>)</span>
-<span id="cb6-11"><a href="#cb6-11" aria-hidden="true" tabindex="-1"></a>    dview <span class="op">=</span> <span class="va">None</span></span>
-<span id="cb6-12"><a href="#cb6-12" aria-hidden="true" tabindex="-1"></a>    </span>
-<span id="cb6-13"><a href="#cb6-13" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> compareFPs(ms1,ms2,fpfn,fpName):</span>
-<span id="cb6-14"><a href="#cb6-14" aria-hidden="true" tabindex="-1"></a>    <span class="cf">if</span> dview <span class="kw">is</span> <span class="kw">not</span> <span class="va">None</span>:</span>
-<span id="cb6-15"><a href="#cb6-15" aria-hidden="true" tabindex="-1"></a>        fps <span class="op">=</span> dview.map_sync(<span class="kw">lambda</span> x:fpfn(x[<span class="dv">1</span>]),ms1)</span>
-<span id="cb6-16"><a href="#cb6-16" aria-hidden="true" tabindex="-1"></a>        fp2s <span class="op">=</span> dview.map_sync(<span class="kw">lambda</span> x:fpfn(x[<span class="dv">1</span>]),ms2)</span>
-<span id="cb6-17"><a href="#cb6-17" aria-hidden="true" tabindex="-1"></a>    <span class="cf">else</span>:</span>
-<span id="cb6-18"><a href="#cb6-18" aria-hidden="true" tabindex="-1"></a>        fps <span class="op">=</span> [fpfn(x[<span class="dv">1</span>]) <span class="cf">for</span> x <span class="kw">in</span> ms1]</span>
-<span id="cb6-19"><a href="#cb6-19" aria-hidden="true" tabindex="-1"></a>        fp2s <span class="op">=</span> [fpfn(x[<span class="dv">1</span>]) <span class="cf">for</span> x <span class="kw">in</span> ms2]</span>
-<span id="cb6-20"><a href="#cb6-20" aria-hidden="true" tabindex="-1"></a>    sims <span class="op">=</span> [DataStructs.TanimotoSimilarity(x,y) <span class="cf">for</span> x,y <span class="kw">in</span> <span class="bu">zip</span>(fps,fp2s)]</span>
-<span id="cb6-21"><a href="#cb6-21" aria-hidden="true" tabindex="-1"></a>    sl <span class="op">=</span> <span class="bu">sorted</span>(sims)</span>
-<span id="cb6-22"><a href="#cb6-22" aria-hidden="true" tabindex="-1"></a>    np <span class="op">=</span> <span class="bu">len</span>(sl)</span>
-<span id="cb6-23"><a href="#cb6-23" aria-hidden="true" tabindex="-1"></a>    <span class="cf">with</span> <span class="bu">open</span>(<span class="st">'fp_results.txt'</span>,<span class="st">'a+'</span>) <span class="im">as</span> outf:</span>
-<span id="cb6-24"><a href="#cb6-24" aria-hidden="true" tabindex="-1"></a>        outf.write(<span class="ss">f'&lt;tr&gt;&lt;td&gt;</span><span class="sc">{</span>fpName<span class="sc">}</span><span class="ss">&lt;/td&gt;&lt;td&gt;Tanimoto&lt;/td&gt;</span><span class="ch">\n</span><span class="ss">'</span>)</span>
-<span id="cb6-25"><a href="#cb6-25" aria-hidden="true" tabindex="-1"></a>        <span class="cf">for</span> <span class="bu">bin</span> <span class="kw">in</span> (<span class="fl">.7</span>,<span class="fl">.8</span>,<span class="fl">.9</span>,<span class="fl">.95</span>,<span class="fl">.99</span>):</span>
-<span id="cb6-26"><a href="#cb6-26" aria-hidden="true" tabindex="-1"></a>            simv <span class="op">=</span> sl[<span class="bu">int</span>(<span class="bu">bin</span><span class="op">*</span>np)]</span>
-<span id="cb6-27"><a href="#cb6-27" aria-hidden="true" tabindex="-1"></a>            <span class="bu">print</span>( <span class="bu">bin</span>,simv)</span>
-<span id="cb6-28"><a href="#cb6-28" aria-hidden="true" tabindex="-1"></a>            outf.write(<span class="ss">f'  &lt;td&gt;</span><span class="sc">{</span>simv<span class="sc">:.3f}</span><span class="ss">&lt;/td&gt;</span><span class="ch">\n</span><span class="ss">'</span>)</span>
-<span id="cb6-29"><a href="#cb6-29" aria-hidden="true" tabindex="-1"></a>        outf.write(<span class="st">'&lt;/tr&gt;'</span>)</span>
-<span id="cb6-30"><a href="#cb6-30" aria-hidden="true" tabindex="-1"></a>    hist(sims,bins<span class="op">=</span><span class="dv">20</span>)</span>
-<span id="cb6-31"><a href="#cb6-31" aria-hidden="true" tabindex="-1"></a>    xlabel(fpName)</span>
-<span id="cb6-32"><a href="#cb6-32" aria-hidden="true" tabindex="-1"></a>    </span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="sourceCode cell-code" id="cb5"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a><span class="cf">try</span>:</span>
+<span id="cb5-2"><a href="#cb5-2" aria-hidden="true" tabindex="-1"></a>    <span class="im">import</span> ipyparallel <span class="im">as</span> ipp</span>
+<span id="cb5-3"><a href="#cb5-3" aria-hidden="true" tabindex="-1"></a>    rc <span class="op">=</span> ipp.Client()</span>
+<span id="cb5-4"><a href="#cb5-4" aria-hidden="true" tabindex="-1"></a>    dview <span class="op">=</span> rc[:]</span>
+<span id="cb5-5"><a href="#cb5-5" aria-hidden="true" tabindex="-1"></a>    dview.execute(<span class="st">'from rdkit import Chem'</span>)</span>
+<span id="cb5-6"><a href="#cb5-6" aria-hidden="true" tabindex="-1"></a>    dview.execute(<span class="st">'from rdkit import Descriptors'</span>)</span>
+<span id="cb5-7"><a href="#cb5-7" aria-hidden="true" tabindex="-1"></a>    dview.execute(<span class="st">'from rdkit.Chem import rdFingerprintGenerator'</span>)</span>
+<span id="cb5-8"><a href="#cb5-8" aria-hidden="true" tabindex="-1"></a>    dview.execute(<span class="st">'from rdkit.Chem import rdMolDescriptors'</span>)</span>
+<span id="cb5-9"><a href="#cb5-9" aria-hidden="true" tabindex="-1"></a>    dview.execute(<span class="st">'from rdkit import DataStructs'</span>)</span>
+<span id="cb5-10"><a href="#cb5-10" aria-hidden="true" tabindex="-1"></a>    dview.execute(<span class="st">'from rdkit.Avalon import pyAvalonTools'</span>)</span>
+<span id="cb5-11"><a href="#cb5-11" aria-hidden="true" tabindex="-1"></a>    dview.execute(<span class="st">'from rdkit.Chem.Pharm2D import Gobbi_Pharm2D,Generate'</span>)</span>
+<span id="cb5-12"><a href="#cb5-12" aria-hidden="true" tabindex="-1"></a><span class="cf">except</span>:</span>
+<span id="cb5-13"><a href="#cb5-13" aria-hidden="true" tabindex="-1"></a>    <span class="bu">print</span>(<span class="st">"could not use ipyparallel"</span>)</span>
+<span id="cb5-14"><a href="#cb5-14" aria-hidden="true" tabindex="-1"></a>    dview <span class="op">=</span> <span class="va">None</span></span>
+<span id="cb5-15"><a href="#cb5-15" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb5-16"><a href="#cb5-16" aria-hidden="true" tabindex="-1"></a>results_accum <span class="op">=</span> <span class="bu">dict</span>()</span>
+<span id="cb5-17"><a href="#cb5-17" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> accumResults(fps,fp2s,fpName):</span>
+<span id="cb5-18"><a href="#cb5-18" aria-hidden="true" tabindex="-1"></a>    sims <span class="op">=</span> [DataStructs.TanimotoSimilarity(x,y) <span class="cf">for</span> x,y <span class="kw">in</span> <span class="bu">zip</span>(fps,fp2s)]</span>
+<span id="cb5-19"><a href="#cb5-19" aria-hidden="true" tabindex="-1"></a>    sl <span class="op">=</span> <span class="bu">sorted</span>(sims)</span>
+<span id="cb5-20"><a href="#cb5-20" aria-hidden="true" tabindex="-1"></a>    np <span class="op">=</span> <span class="bu">len</span>(sl)</span>
+<span id="cb5-21"><a href="#cb5-21" aria-hidden="true" tabindex="-1"></a>    <span class="cf">with</span> <span class="bu">open</span>(<span class="st">'fp_results.txt'</span>,<span class="st">'a+'</span>) <span class="im">as</span> outf:</span>
+<span id="cb5-22"><a href="#cb5-22" aria-hidden="true" tabindex="-1"></a>        outf.write(<span class="ss">f'&lt;tr&gt;&lt;td&gt;</span><span class="sc">{</span>fpName<span class="sc">}</span><span class="ss">&lt;/td&gt;&lt;td&gt;Tanimoto&lt;/td&gt;</span><span class="ch">\n</span><span class="ss">'</span>)</span>
+<span id="cb5-23"><a href="#cb5-23" aria-hidden="true" tabindex="-1"></a>        accum <span class="op">=</span> {}</span>
+<span id="cb5-24"><a href="#cb5-24" aria-hidden="true" tabindex="-1"></a>        <span class="cf">for</span> <span class="bu">bin</span> <span class="kw">in</span> (<span class="fl">.7</span>,<span class="fl">.8</span>,<span class="fl">.9</span>,<span class="fl">.95</span>,<span class="fl">.99</span>):</span>
+<span id="cb5-25"><a href="#cb5-25" aria-hidden="true" tabindex="-1"></a>            simv <span class="op">=</span> sl[<span class="bu">int</span>(<span class="bu">bin</span><span class="op">*</span>np)]</span>
+<span id="cb5-26"><a href="#cb5-26" aria-hidden="true" tabindex="-1"></a>            <span class="bu">print</span>( <span class="bu">bin</span>,simv)</span>
+<span id="cb5-27"><a href="#cb5-27" aria-hidden="true" tabindex="-1"></a>            outf.write(<span class="ss">f'  &lt;td&gt;</span><span class="sc">{</span>simv<span class="sc">:.3f}</span><span class="ss">&lt;/td&gt;</span><span class="ch">\n</span><span class="ss">'</span>)</span>
+<span id="cb5-28"><a href="#cb5-28" aria-hidden="true" tabindex="-1"></a>            accum[<span class="bu">bin</span>] <span class="op">=</span> simv</span>
+<span id="cb5-29"><a href="#cb5-29" aria-hidden="true" tabindex="-1"></a>        outf.write(<span class="st">'&lt;/tr&gt;'</span>)</span>
+<span id="cb5-30"><a href="#cb5-30" aria-hidden="true" tabindex="-1"></a>        results_accum[fpName] <span class="op">=</span> accum</span>
+<span id="cb5-31"><a href="#cb5-31" aria-hidden="true" tabindex="-1"></a>    plt.figure(figsize<span class="op">=</span>(<span class="dv">5</span>,<span class="dv">3</span>))</span>
+<span id="cb5-32"><a href="#cb5-32" aria-hidden="true" tabindex="-1"></a>    plt.hist(sims,bins<span class="op">=</span><span class="dv">20</span>)</span>
+<span id="cb5-33"><a href="#cb5-33" aria-hidden="true" tabindex="-1"></a>    plt.xlabel(fpName)</span>
+<span id="cb5-34"><a href="#cb5-34" aria-hidden="true" tabindex="-1"></a>    </span>
+<span id="cb5-35"><a href="#cb5-35" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> compareFPs(ms1,ms2,fpfn,fpName):</span>
+<span id="cb5-36"><a href="#cb5-36" aria-hidden="true" tabindex="-1"></a>    <span class="cf">if</span> dview <span class="kw">is</span> <span class="kw">not</span> <span class="va">None</span>:</span>
+<span id="cb5-37"><a href="#cb5-37" aria-hidden="true" tabindex="-1"></a>        fps <span class="op">=</span> dview.map_sync(<span class="kw">lambda</span> x:fpfn(x[<span class="dv">1</span>]),ms1)</span>
+<span id="cb5-38"><a href="#cb5-38" aria-hidden="true" tabindex="-1"></a>        fp2s <span class="op">=</span> dview.map_sync(<span class="kw">lambda</span> x:fpfn(x[<span class="dv">1</span>]),ms2)</span>
+<span id="cb5-39"><a href="#cb5-39" aria-hidden="true" tabindex="-1"></a>    <span class="cf">else</span>:</span>
+<span id="cb5-40"><a href="#cb5-40" aria-hidden="true" tabindex="-1"></a>        fps <span class="op">=</span> [fpfn(x[<span class="dv">1</span>]) <span class="cf">for</span> x <span class="kw">in</span> ms1]</span>
+<span id="cb5-41"><a href="#cb5-41" aria-hidden="true" tabindex="-1"></a>        fp2s <span class="op">=</span> [fpfn(x[<span class="dv">1</span>]) <span class="cf">for</span> x <span class="kw">in</span> ms2]</span>
+<span id="cb5-42"><a href="#cb5-42" aria-hidden="true" tabindex="-1"></a>    accumResults(fps,fp2s,fpName)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </div>
 </section>
 <section id="maccs" class="level1">
 <h1>MACCS</h1>
 <div id="cell-9" class="cell" data-execution_count="5">
-<div class="sourceCode cell-code" id="cb7"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb7-1"><a href="#cb7-1" aria-hidden="true" tabindex="-1"></a>compareFPs(ms1,ms2,<span class="kw">lambda</span> x:rdMolDescriptors.GetMACCSKeysFingerprint(x),<span class="st">"MACCS"</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="sourceCode cell-code" id="cb6"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb6-1"><a href="#cb6-1" aria-hidden="true" tabindex="-1"></a>compareFPs(ms1,ms2,<span class="kw">lambda</span> x:rdMolDescriptors.GetMACCSKeysFingerprint(x),<span class="st">"MACCS"</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 <div class="cell-output cell-output-stdout">
-<pre><code>0.7 0.4305555555555556
-0.8 0.47058823529411764
-0.9 0.5283018867924528
-0.95 0.575
-0.99 0.6551724137931034</code></pre>
+<pre><code>0.7 0.45714285714285713
+0.8 0.4936708860759494
+0.9 0.5487804878048781
+0.95 0.5921052631578947
+0.99 0.6666666666666666</code></pre>
 </div>
 <div class="cell-output cell-output-display">
 <div>
@@ -1127,13 +1138,25 @@ Populating the interactive namespace from numpy and matplotlib</code></pre>
 <section id="count-based" class="level2">
 <h2 class="anchored" data-anchor-id="count-based">count based</h2>
 <div id="cell-12" class="cell" data-execution_count="6">
-<div class="sourceCode cell-code" id="cb9"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb9-1"><a href="#cb9-1" aria-hidden="true" tabindex="-1"></a>compareFPs(ms1,ms2,<span class="kw">lambda</span> x:rdMolDescriptors.GetMorganFingerprint(x,<span class="dv">0</span>),<span class="st">"Morgan0 (counts)"</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="sourceCode cell-code" id="cb8"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb8-1"><a href="#cb8-1" aria-hidden="true" tabindex="-1"></a>fpg <span class="op">=</span> rdFingerprintGenerator.GetMorganGenerator(radius<span class="op">=</span><span class="dv">0</span>)</span>
+<span id="cb8-2"><a href="#cb8-2" aria-hidden="true" tabindex="-1"></a>fps <span class="op">=</span> fpg.GetSparseCountFingerprints([x[<span class="dv">1</span>] <span class="cf">for</span> x <span class="kw">in</span> ms1],numThreads<span class="op">=</span><span class="dv">8</span>)</span>
+<span id="cb8-3"><a href="#cb8-3" aria-hidden="true" tabindex="-1"></a>fp2s <span class="op">=</span> fpg.GetSparseCountFingerprints([x[<span class="dv">1</span>] <span class="cf">for</span> x <span class="kw">in</span> ms2],numThreads<span class="op">=</span><span class="dv">8</span>)</span>
+<span id="cb8-4"><a href="#cb8-4" aria-hidden="true" tabindex="-1"></a>accumResults(fps,fp2s,<span class="st">"Morgan0 (counts)"</span>)</span>
+<span id="cb8-5"><a href="#cb8-5" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb8-6"><a href="#cb8-6" aria-hidden="true" tabindex="-1"></a>fps <span class="op">=</span> fpg.GetFingerprints([x[<span class="dv">1</span>] <span class="cf">for</span> x <span class="kw">in</span> ms1],numThreads<span class="op">=</span><span class="dv">8</span>)</span>
+<span id="cb8-7"><a href="#cb8-7" aria-hidden="true" tabindex="-1"></a>fp2s <span class="op">=</span> fpg.GetFingerprints([x[<span class="dv">1</span>] <span class="cf">for</span> x <span class="kw">in</span> ms2],numThreads<span class="op">=</span><span class="dv">8</span>)</span>
+<span id="cb8-8"><a href="#cb8-8" aria-hidden="true" tabindex="-1"></a>accumResults(fps,fp2s,<span class="st">"Morgan0 (bits)"</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 <div class="cell-output cell-output-stdout">
-<pre><code>0.7 0.42857142857142855
-0.8 0.47058823529411764
-0.9 0.525
-0.95 0.5675675675675675
-0.99 0.6511627906976745</code></pre>
+<pre><code>0.7 0.43902439024390244
+0.8 0.4772727272727273
+0.9 0.5294117647058824
+0.95 0.575
+0.99 0.65
+0.7 0.5
+0.8 0.5333333333333333
+0.9 0.6
+0.95 0.6470588235294118
+0.99 0.75</code></pre>
 </div>
 <div class="cell-output cell-output-display">
 <div>
@@ -1142,15 +1165,34 @@ Populating the interactive namespace from numpy and matplotlib</code></pre>
 </figure>
 </div>
 </div>
+<div class="cell-output cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="2021-05-18-fingerprint-thresholds1_files/figure-html/cell-7-output-3.png" class="img-fluid figure-img"></p>
+</figure>
+</div>
+</div>
 </div>
 <div id="cell-13" class="cell" data-execution_count="7">
-<div class="sourceCode cell-code" id="cb11"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb11-1"><a href="#cb11-1" aria-hidden="true" tabindex="-1"></a>compareFPs(ms1,ms2,<span class="kw">lambda</span> x:rdMolDescriptors.GetMorganFingerprint(x,<span class="dv">1</span>),<span class="st">"Morgan1 (counts)"</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="sourceCode cell-code" id="cb10"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb10-1"><a href="#cb10-1" aria-hidden="true" tabindex="-1"></a>fpg <span class="op">=</span> rdFingerprintGenerator.GetMorganGenerator(radius<span class="op">=</span><span class="dv">1</span>)</span>
+<span id="cb10-2"><a href="#cb10-2" aria-hidden="true" tabindex="-1"></a>fps <span class="op">=</span> fpg.GetSparseCountFingerprints([x[<span class="dv">1</span>] <span class="cf">for</span> x <span class="kw">in</span> ms1],numThreads<span class="op">=</span><span class="dv">8</span>)</span>
+<span id="cb10-3"><a href="#cb10-3" aria-hidden="true" tabindex="-1"></a>fp2s <span class="op">=</span> fpg.GetSparseCountFingerprints([x[<span class="dv">1</span>] <span class="cf">for</span> x <span class="kw">in</span> ms2],numThreads<span class="op">=</span><span class="dv">8</span>)</span>
+<span id="cb10-4"><a href="#cb10-4" aria-hidden="true" tabindex="-1"></a>accumResults(fps,fp2s,<span class="st">"Morgan1 (counts)"</span>)</span>
+<span id="cb10-5"><a href="#cb10-5" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb10-6"><a href="#cb10-6" aria-hidden="true" tabindex="-1"></a>fps <span class="op">=</span> fpg.GetFingerprints([x[<span class="dv">1</span>] <span class="cf">for</span> x <span class="kw">in</span> ms1],numThreads<span class="op">=</span><span class="dv">8</span>)</span>
+<span id="cb10-7"><a href="#cb10-7" aria-hidden="true" tabindex="-1"></a>fp2s <span class="op">=</span> fpg.GetFingerprints([x[<span class="dv">1</span>] <span class="cf">for</span> x <span class="kw">in</span> ms2],numThreads<span class="op">=</span><span class="dv">8</span>)</span>
+<span id="cb10-8"><a href="#cb10-8" aria-hidden="true" tabindex="-1"></a>accumResults(fps,fp2s,<span class="st">"Morgan1 (bits)"</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 <div class="cell-output cell-output-stdout">
-<pre><code>0.7 0.2653061224489796
-0.8 0.2926829268292683
-0.9 0.3333333333333333
-0.95 0.36363636363636365
-0.99 0.42857142857142855</code></pre>
+<pre><code>0.7 0.26732673267326734
+0.8 0.29411764705882354
+0.9 0.328
+0.95 0.36
+0.99 0.42028985507246375
+0.7 0.2127659574468085
+0.8 0.23404255319148937
+0.9 0.26666666666666666
+0.95 0.29545454545454547
+0.99 0.35555555555555557</code></pre>
 </div>
 <div class="cell-output cell-output-display">
 <div>
@@ -1159,15 +1201,34 @@ Populating the interactive namespace from numpy and matplotlib</code></pre>
 </figure>
 </div>
 </div>
+<div class="cell-output cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="2021-05-18-fingerprint-thresholds1_files/figure-html/cell-8-output-3.png" class="img-fluid figure-img"></p>
+</figure>
+</div>
+</div>
 </div>
 <div id="cell-14" class="cell" data-execution_count="8">
-<div class="sourceCode cell-code" id="cb13"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb13-1"><a href="#cb13-1" aria-hidden="true" tabindex="-1"></a>compareFPs(ms1,ms2,<span class="kw">lambda</span> x:rdMolDescriptors.GetMorganFingerprint(x,<span class="dv">2</span>),<span class="st">"Morgan2 (counts)"</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="sourceCode cell-code" id="cb12"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb12-1"><a href="#cb12-1" aria-hidden="true" tabindex="-1"></a>fpg <span class="op">=</span> rdFingerprintGenerator.GetMorganGenerator(radius<span class="op">=</span><span class="dv">2</span>)</span>
+<span id="cb12-2"><a href="#cb12-2" aria-hidden="true" tabindex="-1"></a>fps <span class="op">=</span> fpg.GetSparseCountFingerprints([x[<span class="dv">1</span>] <span class="cf">for</span> x <span class="kw">in</span> ms1],numThreads<span class="op">=</span><span class="dv">8</span>)</span>
+<span id="cb12-3"><a href="#cb12-3" aria-hidden="true" tabindex="-1"></a>fp2s <span class="op">=</span> fpg.GetSparseCountFingerprints([x[<span class="dv">1</span>] <span class="cf">for</span> x <span class="kw">in</span> ms2],numThreads<span class="op">=</span><span class="dv">8</span>)</span>
+<span id="cb12-4"><a href="#cb12-4" aria-hidden="true" tabindex="-1"></a>accumResults(fps,fp2s,<span class="st">"Morgan2 (counts)"</span>)</span>
+<span id="cb12-5"><a href="#cb12-5" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb12-6"><a href="#cb12-6" aria-hidden="true" tabindex="-1"></a>fps <span class="op">=</span> fpg.GetFingerprints([x[<span class="dv">1</span>] <span class="cf">for</span> x <span class="kw">in</span> ms1],numThreads<span class="op">=</span><span class="dv">8</span>)</span>
+<span id="cb12-7"><a href="#cb12-7" aria-hidden="true" tabindex="-1"></a>fp2s <span class="op">=</span> fpg.GetFingerprints([x[<span class="dv">1</span>] <span class="cf">for</span> x <span class="kw">in</span> ms2],numThreads<span class="op">=</span><span class="dv">8</span>)</span>
+<span id="cb12-8"><a href="#cb12-8" aria-hidden="true" tabindex="-1"></a>accumResults(fps,fp2s,<span class="st">"Morgan2 (bits)"</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 <div class="cell-output cell-output-stdout">
-<pre><code>0.7 0.18110236220472442
-0.8 0.20125786163522014
-0.9 0.22916666666666666
-0.95 0.2523364485981308
-0.99 0.304635761589404</code></pre>
+<pre><code>0.7 0.18181818181818182
+0.8 0.2
+0.9 0.22560975609756098
+0.95 0.24786324786324787
+0.99 0.2967032967032967
+0.7 0.1326530612244898
+0.8 0.14606741573033707
+0.9 0.16666666666666666
+0.95 0.18518518518518517
+0.99 0.2261904761904762</code></pre>
 </div>
 <div class="cell-output cell-output-display">
 <div>
@@ -1176,15 +1237,34 @@ Populating the interactive namespace from numpy and matplotlib</code></pre>
 </figure>
 </div>
 </div>
+<div class="cell-output cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="2021-05-18-fingerprint-thresholds1_files/figure-html/cell-9-output-3.png" class="img-fluid figure-img"></p>
+</figure>
+</div>
+</div>
 </div>
 <div id="cell-15" class="cell" data-execution_count="9">
-<div class="sourceCode cell-code" id="cb15"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb15-1"><a href="#cb15-1" aria-hidden="true" tabindex="-1"></a>compareFPs(ms1,ms2,<span class="kw">lambda</span> x:rdMolDescriptors.GetMorganFingerprint(x,<span class="dv">3</span>),<span class="st">"Morgan3 (counts)"</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="sourceCode cell-code" id="cb14"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb14-1"><a href="#cb14-1" aria-hidden="true" tabindex="-1"></a>fpg <span class="op">=</span> rdFingerprintGenerator.GetMorganGenerator(radius<span class="op">=</span><span class="dv">3</span>)</span>
+<span id="cb14-2"><a href="#cb14-2" aria-hidden="true" tabindex="-1"></a>fps <span class="op">=</span> fpg.GetSparseCountFingerprints([x[<span class="dv">1</span>] <span class="cf">for</span> x <span class="kw">in</span> ms1],numThreads<span class="op">=</span><span class="dv">8</span>)</span>
+<span id="cb14-3"><a href="#cb14-3" aria-hidden="true" tabindex="-1"></a>fp2s <span class="op">=</span> fpg.GetSparseCountFingerprints([x[<span class="dv">1</span>] <span class="cf">for</span> x <span class="kw">in</span> ms2],numThreads<span class="op">=</span><span class="dv">8</span>)</span>
+<span id="cb14-4"><a href="#cb14-4" aria-hidden="true" tabindex="-1"></a>accumResults(fps,fp2s,<span class="st">"Morgan3 (counts)"</span>)</span>
+<span id="cb14-5"><a href="#cb14-5" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb14-6"><a href="#cb14-6" aria-hidden="true" tabindex="-1"></a>fps <span class="op">=</span> fpg.GetFingerprints([x[<span class="dv">1</span>] <span class="cf">for</span> x <span class="kw">in</span> ms1],numThreads<span class="op">=</span><span class="dv">8</span>)</span>
+<span id="cb14-7"><a href="#cb14-7" aria-hidden="true" tabindex="-1"></a>fp2s <span class="op">=</span> fpg.GetFingerprints([x[<span class="dv">1</span>] <span class="cf">for</span> x <span class="kw">in</span> ms2],numThreads<span class="op">=</span><span class="dv">8</span>)</span>
+<span id="cb14-8"><a href="#cb14-8" aria-hidden="true" tabindex="-1"></a>accumResults(fps,fp2s,<span class="st">"Morgan3 (bits)"</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 <div class="cell-output cell-output-stdout">
-<pre><code>0.7 0.140625
-0.8 0.1557377049180328
-0.9 0.17751479289940827
-0.95 0.19607843137254902
-0.99 0.23841059602649006</code></pre>
+<pre><code>0.7 0.14054054054054055
+0.8 0.15441176470588236
+0.9 0.1743119266055046
+0.95 0.19186046511627908
+0.99 0.23076923076923078
+0.7 0.10240963855421686
+0.8 0.11214953271028037
+0.9 0.12727272727272726
+0.95 0.14084507042253522
+0.99 0.17293233082706766</code></pre>
 </div>
 <div class="cell-output cell-output-display">
 <div>
@@ -1193,74 +1273,10 @@ Populating the interactive namespace from numpy and matplotlib</code></pre>
 </figure>
 </div>
 </div>
-</div>
-</section>
-<section id="bit-vector-based" class="level2">
-<h2 class="anchored" data-anchor-id="bit-vector-based">bit-vector based</h2>
-<div id="cell-17" class="cell" data-execution_count="10">
-<div class="sourceCode cell-code" id="cb17"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb17-1"><a href="#cb17-1" aria-hidden="true" tabindex="-1"></a>compareFPs(ms1,ms2,<span class="kw">lambda</span> x:rdMolDescriptors.GetHashedMorganFingerprint(x,<span class="dv">0</span>,<span class="dv">1024</span>),<span class="st">"Morgan0 (bits)"</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
-<div class="cell-output cell-output-stdout">
-<pre><code>0.7 0.43478260869565216
-0.8 0.475
-0.9 0.5294117647058824
-0.95 0.5714285714285714
-0.99 0.65625</code></pre>
-</div>
 <div class="cell-output cell-output-display">
 <div>
 <figure class="figure">
-<p><img src="2021-05-18-fingerprint-thresholds1_files/figure-html/cell-11-output-2.png" class="img-fluid figure-img"></p>
-</figure>
-</div>
-</div>
-</div>
-<div id="cell-18" class="cell" data-execution_count="11">
-<div class="sourceCode cell-code" id="cb19"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb19-1"><a href="#cb19-1" aria-hidden="true" tabindex="-1"></a>compareFPs(ms1,ms2,<span class="kw">lambda</span> x:rdMolDescriptors.GetHashedMorganFingerprint(x,<span class="dv">1</span>,<span class="dv">1024</span>),<span class="st">"Morgan1 (bits)"</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
-<div class="cell-output cell-output-stdout">
-<pre><code>0.7 0.2727272727272727
-0.8 0.30120481927710846
-0.9 0.34065934065934067
-0.95 0.37142857142857144
-0.99 0.4342105263157895</code></pre>
-</div>
-<div class="cell-output cell-output-display">
-<div>
-<figure class="figure">
-<p><img src="2021-05-18-fingerprint-thresholds1_files/figure-html/cell-12-output-2.png" class="img-fluid figure-img"></p>
-</figure>
-</div>
-</div>
-</div>
-<div id="cell-19" class="cell" data-execution_count="12">
-<div class="sourceCode cell-code" id="cb21"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb21-1"><a href="#cb21-1" aria-hidden="true" tabindex="-1"></a>compareFPs(ms1,ms2,<span class="kw">lambda</span> x:rdMolDescriptors.GetHashedMorganFingerprint(x,<span class="dv">2</span>,<span class="dv">1024</span>),<span class="st">"Morgan2 (bits)"</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
-<div class="cell-output cell-output-stdout">
-<pre><code>0.7 0.19708029197080293
-0.8 0.2169811320754717
-0.9 0.24603174603174602
-0.95 0.2689655172413793
-0.99 0.3217391304347826</code></pre>
-</div>
-<div class="cell-output cell-output-display">
-<div>
-<figure class="figure">
-<p><img src="2021-05-18-fingerprint-thresholds1_files/figure-html/cell-13-output-2.png" class="img-fluid figure-img"></p>
-</figure>
-</div>
-</div>
-</div>
-<div id="cell-20" class="cell" data-execution_count="13">
-<div class="sourceCode cell-code" id="cb23"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb23-1"><a href="#cb23-1" aria-hidden="true" tabindex="-1"></a>compareFPs(ms1,ms2,<span class="kw">lambda</span> x:rdMolDescriptors.GetHashedMorganFingerprint(x,<span class="dv">3</span>,<span class="dv">1024</span>),<span class="st">"Morgan3 (bits)"</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
-<div class="cell-output cell-output-stdout">
-<pre><code>0.7 0.16477272727272727
-0.8 0.18072289156626506
-0.9 0.20261437908496732
-0.95 0.2222222222222222
-0.99 0.26356589147286824</code></pre>
-</div>
-<div class="cell-output cell-output-display">
-<div>
-<figure class="figure">
-<p><img src="2021-05-18-fingerprint-thresholds1_files/figure-html/cell-14-output-2.png" class="img-fluid figure-img"></p>
+<p><img src="2021-05-18-fingerprint-thresholds1_files/figure-html/cell-10-output-3.png" class="img-fluid figure-img"></p>
 </figure>
 </div>
 </div>
@@ -1271,141 +1287,154 @@ Populating the interactive namespace from numpy and matplotlib</code></pre>
 <h1>FeatMorgan</h1>
 <section id="count-based-1" class="level2">
 <h2 class="anchored" data-anchor-id="count-based-1">count based</h2>
-<div id="cell-23" class="cell" data-execution_count="14">
-<div class="sourceCode cell-code" id="cb25"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb25-1"><a href="#cb25-1" aria-hidden="true" tabindex="-1"></a>compareFPs(ms1,ms2,<span class="kw">lambda</span> x:rdMolDescriptors.GetMorganFingerprint(x,<span class="dv">0</span>,useFeatures<span class="op">=</span><span class="va">True</span>),<span class="st">"FeatMorgan0 (counts)"</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div id="cell-18" class="cell" data-execution_count="10">
+<div class="sourceCode cell-code" id="cb16"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb16-1"><a href="#cb16-1" aria-hidden="true" tabindex="-1"></a>fpg <span class="op">=</span> rdFingerprintGenerator.GetMorganGenerator(radius<span class="op">=</span><span class="dv">0</span>,</span>
+<span id="cb16-2"><a href="#cb16-2" aria-hidden="true" tabindex="-1"></a>                                                atomInvariantsGenerator<span class="op">=</span>rdFingerprintGenerator.GetMorganAtomInvGen())</span>
+<span id="cb16-3"><a href="#cb16-3" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb16-4"><a href="#cb16-4" aria-hidden="true" tabindex="-1"></a>fps <span class="op">=</span> fpg.GetSparseCountFingerprints([x[<span class="dv">1</span>] <span class="cf">for</span> x <span class="kw">in</span> ms1],numThreads<span class="op">=</span><span class="dv">8</span>)</span>
+<span id="cb16-5"><a href="#cb16-5" aria-hidden="true" tabindex="-1"></a>fp2s <span class="op">=</span> fpg.GetSparseCountFingerprints([x[<span class="dv">1</span>] <span class="cf">for</span> x <span class="kw">in</span> ms2],numThreads<span class="op">=</span><span class="dv">8</span>)</span>
+<span id="cb16-6"><a href="#cb16-6" aria-hidden="true" tabindex="-1"></a>accumResults(fps,fp2s,<span class="st">"FeatMorgan0 (counts)"</span>)</span>
+<span id="cb16-7"><a href="#cb16-7" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb16-8"><a href="#cb16-8" aria-hidden="true" tabindex="-1"></a>fps <span class="op">=</span> fpg.GetFingerprints([x[<span class="dv">1</span>] <span class="cf">for</span> x <span class="kw">in</span> ms1],numThreads<span class="op">=</span><span class="dv">8</span>)</span>
+<span id="cb16-9"><a href="#cb16-9" aria-hidden="true" tabindex="-1"></a>fp2s <span class="op">=</span> fpg.GetFingerprints([x[<span class="dv">1</span>] <span class="cf">for</span> x <span class="kw">in</span> ms2],numThreads<span class="op">=</span><span class="dv">8</span>)</span>
+<span id="cb16-10"><a href="#cb16-10" aria-hidden="true" tabindex="-1"></a>accumResults(fps,fp2s,<span class="st">"FeatMorgan0 (bits)"</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 <div class="cell-output cell-output-stdout">
-<pre><code>0.7 0.5833333333333334
-0.8 0.6296296296296297
-0.9 0.6896551724137931
-0.95 0.7368421052631579
-0.99 0.8181818181818182</code></pre>
+<pre><code>0.7 0.5
+0.8 0.5384615384615384
+0.9 0.5909090909090909
+0.95 0.6333333333333333
+0.99 0.7096774193548387
+0.7 0.5833333333333334
+0.8 0.6363636363636364
+0.9 0.7
+0.95 0.7777777777777778
+0.99 0.8888888888888888</code></pre>
 </div>
 <div class="cell-output cell-output-display">
 <div>
 <figure class="figure">
-<p><img src="2021-05-18-fingerprint-thresholds1_files/figure-html/cell-15-output-2.png" class="img-fluid figure-img"></p>
+<p><img src="2021-05-18-fingerprint-thresholds1_files/figure-html/cell-11-output-2.png" class="img-fluid figure-img"></p>
+</figure>
+</div>
+</div>
+<div class="cell-output cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="2021-05-18-fingerprint-thresholds1_files/figure-html/cell-11-output-3.png" class="img-fluid figure-img"></p>
 </figure>
 </div>
 </div>
 </div>
-<div id="cell-24" class="cell" data-execution_count="15">
-<div class="sourceCode cell-code" id="cb27"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb27-1"><a href="#cb27-1" aria-hidden="true" tabindex="-1"></a>compareFPs(ms1,ms2,<span class="kw">lambda</span> x:rdMolDescriptors.GetMorganFingerprint(x,<span class="dv">1</span>,useFeatures<span class="op">=</span><span class="va">True</span>),<span class="st">"FeatMorgan1 (counts)"</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div id="cell-19" class="cell" data-execution_count="11">
+<div class="sourceCode cell-code" id="cb18"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb18-1"><a href="#cb18-1" aria-hidden="true" tabindex="-1"></a>fpg <span class="op">=</span> rdFingerprintGenerator.GetMorganGenerator(radius<span class="op">=</span><span class="dv">1</span>,</span>
+<span id="cb18-2"><a href="#cb18-2" aria-hidden="true" tabindex="-1"></a>                                                atomInvariantsGenerator<span class="op">=</span>rdFingerprintGenerator.GetMorganAtomInvGen())</span>
+<span id="cb18-3"><a href="#cb18-3" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb18-4"><a href="#cb18-4" aria-hidden="true" tabindex="-1"></a>fps <span class="op">=</span> fpg.GetSparseCountFingerprints([x[<span class="dv">1</span>] <span class="cf">for</span> x <span class="kw">in</span> ms1],numThreads<span class="op">=</span><span class="dv">8</span>)</span>
+<span id="cb18-5"><a href="#cb18-5" aria-hidden="true" tabindex="-1"></a>fp2s <span class="op">=</span> fpg.GetSparseCountFingerprints([x[<span class="dv">1</span>] <span class="cf">for</span> x <span class="kw">in</span> ms2],numThreads<span class="op">=</span><span class="dv">8</span>)</span>
+<span id="cb18-6"><a href="#cb18-6" aria-hidden="true" tabindex="-1"></a>accumResults(fps,fp2s,<span class="st">"FeatMorgan1 (counts)"</span>)</span>
+<span id="cb18-7"><a href="#cb18-7" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb18-8"><a href="#cb18-8" aria-hidden="true" tabindex="-1"></a>fps <span class="op">=</span> fpg.GetFingerprints([x[<span class="dv">1</span>] <span class="cf">for</span> x <span class="kw">in</span> ms1],numThreads<span class="op">=</span><span class="dv">8</span>)</span>
+<span id="cb18-9"><a href="#cb18-9" aria-hidden="true" tabindex="-1"></a>fp2s <span class="op">=</span> fpg.GetFingerprints([x[<span class="dv">1</span>] <span class="cf">for</span> x <span class="kw">in</span> ms2],numThreads<span class="op">=</span><span class="dv">8</span>)</span>
+<span id="cb18-10"><a href="#cb18-10" aria-hidden="true" tabindex="-1"></a>accumResults(fps,fp2s,<span class="st">"FeatMorgan1 (bits)"</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 <div class="cell-output cell-output-stdout">
-<pre><code>0.7 0.3902439024390244
-0.8 0.42528735632183906
-0.9 0.47368421052631576
-0.95 0.5106382978723404
-0.99 0.5813953488372093</code></pre>
+<pre><code>0.7 0.3
+0.8 0.3263157894736842
+0.9 0.36363636363636365
+0.95 0.39473684210526316
+0.99 0.45454545454545453
+0.7 0.24489795918367346
+0.8 0.2692307692307692
+0.9 0.3023255813953488
+0.95 0.3333333333333333
+0.99 0.39473684210526316</code></pre>
 </div>
 <div class="cell-output cell-output-display">
 <div>
 <figure class="figure">
-<p><img src="2021-05-18-fingerprint-thresholds1_files/figure-html/cell-16-output-2.png" class="img-fluid figure-img"></p>
+<p><img src="2021-05-18-fingerprint-thresholds1_files/figure-html/cell-12-output-2.png" class="img-fluid figure-img"></p>
+</figure>
+</div>
+</div>
+<div class="cell-output cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="2021-05-18-fingerprint-thresholds1_files/figure-html/cell-12-output-3.png" class="img-fluid figure-img"></p>
 </figure>
 </div>
 </div>
 </div>
-<div id="cell-25" class="cell" data-execution_count="16">
-<div class="sourceCode cell-code" id="cb29"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb29-1"><a href="#cb29-1" aria-hidden="true" tabindex="-1"></a>compareFPs(ms1,ms2,<span class="kw">lambda</span> x:rdMolDescriptors.GetMorganFingerprint(x,<span class="dv">2</span>,useFeatures<span class="op">=</span><span class="va">True</span>),<span class="st">"FeatMorgan2 (counts)"</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div id="cell-20" class="cell" data-execution_count="12">
+<div class="sourceCode cell-code" id="cb20"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb20-1"><a href="#cb20-1" aria-hidden="true" tabindex="-1"></a>fpg <span class="op">=</span> rdFingerprintGenerator.GetMorganGenerator(radius<span class="op">=</span><span class="dv">2</span>,</span>
+<span id="cb20-2"><a href="#cb20-2" aria-hidden="true" tabindex="-1"></a>                                                atomInvariantsGenerator<span class="op">=</span>rdFingerprintGenerator.GetMorganAtomInvGen())</span>
+<span id="cb20-3"><a href="#cb20-3" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb20-4"><a href="#cb20-4" aria-hidden="true" tabindex="-1"></a>fps <span class="op">=</span> fpg.GetSparseCountFingerprints([x[<span class="dv">1</span>] <span class="cf">for</span> x <span class="kw">in</span> ms1],numThreads<span class="op">=</span><span class="dv">8</span>)</span>
+<span id="cb20-5"><a href="#cb20-5" aria-hidden="true" tabindex="-1"></a>fp2s <span class="op">=</span> fpg.GetSparseCountFingerprints([x[<span class="dv">1</span>] <span class="cf">for</span> x <span class="kw">in</span> ms2],numThreads<span class="op">=</span><span class="dv">8</span>)</span>
+<span id="cb20-6"><a href="#cb20-6" aria-hidden="true" tabindex="-1"></a>accumResults(fps,fp2s,<span class="st">"FeatMorgan2 (counts)"</span>)</span>
+<span id="cb20-7"><a href="#cb20-7" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb20-8"><a href="#cb20-8" aria-hidden="true" tabindex="-1"></a>fps <span class="op">=</span> fpg.GetFingerprints([x[<span class="dv">1</span>] <span class="cf">for</span> x <span class="kw">in</span> ms1],numThreads<span class="op">=</span><span class="dv">8</span>)</span>
+<span id="cb20-9"><a href="#cb20-9" aria-hidden="true" tabindex="-1"></a>fp2s <span class="op">=</span> fpg.GetFingerprints([x[<span class="dv">1</span>] <span class="cf">for</span> x <span class="kw">in</span> ms2],numThreads<span class="op">=</span><span class="dv">8</span>)</span>
+<span id="cb20-10"><a href="#cb20-10" aria-hidden="true" tabindex="-1"></a>accumResults(fps,fp2s,<span class="st">"FeatMorgan2 (bits)"</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 <div class="cell-output cell-output-stdout">
-<pre><code>0.7 0.272
-0.8 0.29770992366412213
-0.9 0.3333333333333333
-0.95 0.36363636363636365
-0.99 0.424</code></pre>
+<pre><code>0.7 0.20261437908496732
+0.8 0.22115384615384615
+0.9 0.2471264367816092
+0.95 0.26993865030674846
+0.99 0.3191489361702128
+0.7 0.14583333333333334
+0.8 0.1595744680851064
+0.9 0.18055555555555555
+0.95 0.2
+0.99 0.2413793103448276</code></pre>
 </div>
 <div class="cell-output cell-output-display">
 <div>
 <figure class="figure">
-<p><img src="2021-05-18-fingerprint-thresholds1_files/figure-html/cell-17-output-2.png" class="img-fluid figure-img"></p>
+<p><img src="2021-05-18-fingerprint-thresholds1_files/figure-html/cell-13-output-2.png" class="img-fluid figure-img"></p>
+</figure>
+</div>
+</div>
+<div class="cell-output cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="2021-05-18-fingerprint-thresholds1_files/figure-html/cell-13-output-3.png" class="img-fluid figure-img"></p>
 </figure>
 </div>
 </div>
 </div>
-<div id="cell-26" class="cell" data-execution_count="17">
-<div class="sourceCode cell-code" id="cb31"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb31-1"><a href="#cb31-1" aria-hidden="true" tabindex="-1"></a>compareFPs(ms1,ms2,<span class="kw">lambda</span> x:rdMolDescriptors.GetMorganFingerprint(x,<span class="dv">3</span>,useFeatures<span class="op">=</span><span class="va">True</span>),<span class="st">"FeatMorgan3 (counts)"</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div id="cell-21" class="cell" data-execution_count="13">
+<div class="sourceCode cell-code" id="cb22"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb22-1"><a href="#cb22-1" aria-hidden="true" tabindex="-1"></a>fpg <span class="op">=</span> rdFingerprintGenerator.GetMorganGenerator(radius<span class="op">=</span><span class="dv">3</span>,</span>
+<span id="cb22-2"><a href="#cb22-2" aria-hidden="true" tabindex="-1"></a>                                                atomInvariantsGenerator<span class="op">=</span>rdFingerprintGenerator.GetMorganAtomInvGen())</span>
+<span id="cb22-3"><a href="#cb22-3" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb22-4"><a href="#cb22-4" aria-hidden="true" tabindex="-1"></a>fps <span class="op">=</span> fpg.GetSparseCountFingerprints([x[<span class="dv">1</span>] <span class="cf">for</span> x <span class="kw">in</span> ms1],numThreads<span class="op">=</span><span class="dv">8</span>)</span>
+<span id="cb22-5"><a href="#cb22-5" aria-hidden="true" tabindex="-1"></a>fp2s <span class="op">=</span> fpg.GetSparseCountFingerprints([x[<span class="dv">1</span>] <span class="cf">for</span> x <span class="kw">in</span> ms2],numThreads<span class="op">=</span><span class="dv">8</span>)</span>
+<span id="cb22-6"><a href="#cb22-6" aria-hidden="true" tabindex="-1"></a>accumResults(fps,fp2s,<span class="st">"FeatMorgan3 (counts)"</span>)</span>
+<span id="cb22-7"><a href="#cb22-7" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb22-8"><a href="#cb22-8" aria-hidden="true" tabindex="-1"></a>fps <span class="op">=</span> fpg.GetFingerprints([x[<span class="dv">1</span>] <span class="cf">for</span> x <span class="kw">in</span> ms1],numThreads<span class="op">=</span><span class="dv">8</span>)</span>
+<span id="cb22-9"><a href="#cb22-9" aria-hidden="true" tabindex="-1"></a>fp2s <span class="op">=</span> fpg.GetFingerprints([x[<span class="dv">1</span>] <span class="cf">for</span> x <span class="kw">in</span> ms2],numThreads<span class="op">=</span><span class="dv">8</span>)</span>
+<span id="cb22-10"><a href="#cb22-10" aria-hidden="true" tabindex="-1"></a>accumResults(fps,fp2s,<span class="st">"FeatMorgan3 (bits)"</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 <div class="cell-output cell-output-stdout">
-<pre><code>0.7 0.2087378640776699
-0.8 0.22818791946308725
-0.9 0.2558139534883721
-0.95 0.2785714285714286
-0.99 0.3275862068965517</code></pre>
+<pre><code>0.7 0.1564245810055866
+0.8 0.1702127659574468
+0.9 0.1901840490797546
+0.95 0.20833333333333334
+0.99 0.2484472049689441
+0.7 0.11016949152542373
+0.8 0.12
+0.9 0.1348314606741573
+0.95 0.14925373134328357
+0.99 0.18095238095238095</code></pre>
 </div>
 <div class="cell-output cell-output-display">
 <div>
 <figure class="figure">
-<p><img src="2021-05-18-fingerprint-thresholds1_files/figure-html/cell-18-output-2.png" class="img-fluid figure-img"></p>
+<p><img src="2021-05-18-fingerprint-thresholds1_files/figure-html/cell-14-output-2.png" class="img-fluid figure-img"></p>
 </figure>
 </div>
 </div>
-</div>
-</section>
-<section id="bit-vectors" class="level2">
-<h2 class="anchored" data-anchor-id="bit-vectors">bit vectors</h2>
-<div id="cell-28" class="cell" data-execution_count="18">
-<div class="sourceCode cell-code" id="cb33"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb33-1"><a href="#cb33-1" aria-hidden="true" tabindex="-1"></a>compareFPs(ms1,ms2,<span class="kw">lambda</span> x:rdMolDescriptors.GetHashedMorganFingerprint(x,<span class="dv">0</span>,<span class="dv">1024</span>,useFeatures<span class="op">=</span><span class="va">True</span>),<span class="st">"FeatMorgan0 (bits)"</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
-<div class="cell-output cell-output-stdout">
-<pre><code>0.7 0.5833333333333334
-0.8 0.6296296296296297
-0.9 0.6896551724137931
-0.95 0.7368421052631579
-0.99 0.8181818181818182</code></pre>
-</div>
 <div class="cell-output cell-output-display">
 <div>
 <figure class="figure">
-<p><img src="2021-05-18-fingerprint-thresholds1_files/figure-html/cell-19-output-2.png" class="img-fluid figure-img"></p>
-</figure>
-</div>
-</div>
-</div>
-<div id="cell-29" class="cell" data-execution_count="19">
-<div class="sourceCode cell-code" id="cb35"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb35-1"><a href="#cb35-1" aria-hidden="true" tabindex="-1"></a>compareFPs(ms1,ms2,<span class="kw">lambda</span> x:rdMolDescriptors.GetHashedMorganFingerprint(x,<span class="dv">1</span>,<span class="dv">1024</span>,useFeatures<span class="op">=</span><span class="va">True</span>),<span class="st">"FeatMorgan1 (bits)"</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
-<div class="cell-output cell-output-stdout">
-<pre><code>0.7 0.39473684210526316
-0.8 0.42857142857142855
-0.9 0.4772727272727273
-0.95 0.5142857142857142
-0.99 0.5849056603773585</code></pre>
-</div>
-<div class="cell-output cell-output-display">
-<div>
-<figure class="figure">
-<p><img src="2021-05-18-fingerprint-thresholds1_files/figure-html/cell-20-output-2.png" class="img-fluid figure-img"></p>
-</figure>
-</div>
-</div>
-</div>
-<div id="cell-30" class="cell" data-execution_count="20">
-<div class="sourceCode cell-code" id="cb37"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb37-1"><a href="#cb37-1" aria-hidden="true" tabindex="-1"></a>compareFPs(ms1,ms2,<span class="kw">lambda</span> x:rdMolDescriptors.GetHashedMorganFingerprint(x,<span class="dv">2</span>,<span class="dv">1024</span>,useFeatures<span class="op">=</span><span class="va">True</span>),<span class="st">"FeatMorgan2 (bits)"</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
-<div class="cell-output cell-output-stdout">
-<pre><code>0.7 0.28368794326241137
-0.8 0.30973451327433627
-0.9 0.3469387755102041
-0.95 0.37606837606837606
-0.99 0.43434343434343436</code></pre>
-</div>
-<div class="cell-output cell-output-display">
-<div>
-<figure class="figure">
-<p><img src="2021-05-18-fingerprint-thresholds1_files/figure-html/cell-21-output-2.png" class="img-fluid figure-img"></p>
-</figure>
-</div>
-</div>
-</div>
-<div id="cell-31" class="cell" data-execution_count="21">
-<div class="sourceCode cell-code" id="cb39"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb39-1"><a href="#cb39-1" aria-hidden="true" tabindex="-1"></a>compareFPs(ms1,ms2,<span class="kw">lambda</span> x:rdMolDescriptors.GetHashedMorganFingerprint(x,<span class="dv">3</span>,<span class="dv">1024</span>,useFeatures<span class="op">=</span><span class="va">True</span>),<span class="st">"FeatMorgan3 (bits)"</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
-<div class="cell-output cell-output-stdout">
-<pre><code>0.7 0.22807017543859648
-0.8 0.24770642201834864
-0.9 0.27564102564102566
-0.95 0.29901960784313725
-0.99 0.3488372093023256</code></pre>
-</div>
-<div class="cell-output cell-output-display">
-<div>
-<figure class="figure">
-<p><img src="2021-05-18-fingerprint-thresholds1_files/figure-html/cell-22-output-2.png" class="img-fluid figure-img"></p>
+<p><img src="2021-05-18-fingerprint-thresholds1_files/figure-html/cell-14-output-3.png" class="img-fluid figure-img"></p>
 </figure>
 </div>
 </div>
@@ -1416,14 +1445,283 @@ Populating the interactive namespace from numpy and matplotlib</code></pre>
 <h1>RDKit</h1>
 <section id="branched-default" class="level2">
 <h2 class="anchored" data-anchor-id="branched-default">Branched (default)</h2>
-<div id="cell-34" class="cell" data-execution_count="22">
-<div class="sourceCode cell-code" id="cb41"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb41-1"><a href="#cb41-1" aria-hidden="true" tabindex="-1"></a>compareFPs(ms1,ms2,<span class="kw">lambda</span> x:Chem.RDKFingerprint(x,maxPath<span class="op">=</span><span class="dv">4</span>),<span class="st">"RDKit 4 (bits)"</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div id="cell-24" class="cell" data-execution_count="14">
+<div class="sourceCode cell-code" id="cb24"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb24-1"><a href="#cb24-1" aria-hidden="true" tabindex="-1"></a>fpg <span class="op">=</span> rdFingerprintGenerator.GetRDKitFPGenerator(maxPath<span class="op">=</span><span class="dv">5</span>)</span>
+<span id="cb24-2"><a href="#cb24-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb24-3"><a href="#cb24-3" aria-hidden="true" tabindex="-1"></a>fps <span class="op">=</span> fpg.GetSparseCountFingerprints([x[<span class="dv">1</span>] <span class="cf">for</span> x <span class="kw">in</span> ms1],numThreads<span class="op">=</span><span class="dv">8</span>)</span>
+<span id="cb24-4"><a href="#cb24-4" aria-hidden="true" tabindex="-1"></a>fp2s <span class="op">=</span> fpg.GetSparseCountFingerprints([x[<span class="dv">1</span>] <span class="cf">for</span> x <span class="kw">in</span> ms2],numThreads<span class="op">=</span><span class="dv">8</span>)</span>
+<span id="cb24-5"><a href="#cb24-5" aria-hidden="true" tabindex="-1"></a>accumResults(fps,fp2s,<span class="st">"RDKit 5 (counts)"</span>)</span>
+<span id="cb24-6"><a href="#cb24-6" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb24-7"><a href="#cb24-7" aria-hidden="true" tabindex="-1"></a>fps <span class="op">=</span> fpg.GetFingerprints([x[<span class="dv">1</span>] <span class="cf">for</span> x <span class="kw">in</span> ms1],numThreads<span class="op">=</span><span class="dv">8</span>)</span>
+<span id="cb24-8"><a href="#cb24-8" aria-hidden="true" tabindex="-1"></a>fp2s <span class="op">=</span> fpg.GetFingerprints([x[<span class="dv">1</span>] <span class="cf">for</span> x <span class="kw">in</span> ms2],numThreads<span class="op">=</span><span class="dv">8</span>)</span>
+<span id="cb24-9"><a href="#cb24-9" aria-hidden="true" tabindex="-1"></a>accumResults(fps,fp2s,<span class="st">"RDKit 5 (bits)"</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 <div class="cell-output cell-output-stdout">
-<pre><code>0.7 0.2094017094017094
-0.8 0.23863636363636365
-0.9 0.2849462365591398
-0.95 0.3254237288135593
-0.99 0.4258373205741627</code></pre>
+<pre><code>0.7 0.15225563909774437
+0.8 0.17751479289940827
+0.9 0.21566401816118047
+0.95 0.25167336010709507
+0.99 0.33264033264033266
+0.7 0.2035225048923679
+0.8 0.22637106184364061
+0.9 0.2615803814713896
+0.95 0.29458917835671344
+0.99 0.37115839243498816</code></pre>
+</div>
+<div class="cell-output cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="2021-05-18-fingerprint-thresholds1_files/figure-html/cell-15-output-2.png" class="img-fluid figure-img"></p>
+</figure>
+</div>
+</div>
+<div class="cell-output cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="2021-05-18-fingerprint-thresholds1_files/figure-html/cell-15-output-3.png" class="img-fluid figure-img"></p>
+</figure>
+</div>
+</div>
+</div>
+<div id="cell-25" class="cell" data-execution_count="15">
+<div class="sourceCode cell-code" id="cb26"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb26-1"><a href="#cb26-1" aria-hidden="true" tabindex="-1"></a>fpg <span class="op">=</span> rdFingerprintGenerator.GetRDKitFPGenerator(maxPath<span class="op">=</span><span class="dv">7</span>)</span>
+<span id="cb26-2"><a href="#cb26-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb26-3"><a href="#cb26-3" aria-hidden="true" tabindex="-1"></a>fps <span class="op">=</span> fpg.GetSparseCountFingerprints([x[<span class="dv">1</span>] <span class="cf">for</span> x <span class="kw">in</span> ms1],numThreads<span class="op">=</span><span class="dv">8</span>)</span>
+<span id="cb26-4"><a href="#cb26-4" aria-hidden="true" tabindex="-1"></a>fp2s <span class="op">=</span> fpg.GetSparseCountFingerprints([x[<span class="dv">1</span>] <span class="cf">for</span> x <span class="kw">in</span> ms2],numThreads<span class="op">=</span><span class="dv">8</span>)</span>
+<span id="cb26-5"><a href="#cb26-5" aria-hidden="true" tabindex="-1"></a>accumResults(fps,fp2s,<span class="st">"RDKit 7 (counts)"</span>)</span>
+<span id="cb26-6"><a href="#cb26-6" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb26-7"><a href="#cb26-7" aria-hidden="true" tabindex="-1"></a>fps <span class="op">=</span> fpg.GetFingerprints([x[<span class="dv">1</span>] <span class="cf">for</span> x <span class="kw">in</span> ms1],numThreads<span class="op">=</span><span class="dv">8</span>)</span>
+<span id="cb26-8"><a href="#cb26-8" aria-hidden="true" tabindex="-1"></a>fp2s <span class="op">=</span> fpg.GetFingerprints([x[<span class="dv">1</span>] <span class="cf">for</span> x <span class="kw">in</span> ms2],numThreads<span class="op">=</span><span class="dv">8</span>)</span>
+<span id="cb26-9"><a href="#cb26-9" aria-hidden="true" tabindex="-1"></a>accumResults(fps,fp2s,<span class="st">"RDKit 7 (bits)"</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>0.7 0.06525573192239859
+0.8 0.08085106382978724
+0.9 0.10695825049701789
+0.95 0.13349296617779108
+0.99 0.2012158054711246
+0.7 0.32704918032786884
+0.8 0.3560295324036095
+0.9 0.39775413711583923
+0.95 0.4330800701344243
+0.99 0.5104972375690607</code></pre>
+</div>
+<div class="cell-output cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="2021-05-18-fingerprint-thresholds1_files/figure-html/cell-16-output-2.png" class="img-fluid figure-img"></p>
+</figure>
+</div>
+</div>
+<div class="cell-output cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="2021-05-18-fingerprint-thresholds1_files/figure-html/cell-16-output-3.png" class="img-fluid figure-img"></p>
+</figure>
+</div>
+</div>
+</div>
+</section>
+<section id="linear" class="level2">
+<h2 class="anchored" data-anchor-id="linear">linear</h2>
+<div id="cell-27" class="cell" data-execution_count="16">
+<div class="sourceCode cell-code" id="cb28"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb28-1"><a href="#cb28-1" aria-hidden="true" tabindex="-1"></a>fpg <span class="op">=</span> rdFingerprintGenerator.GetRDKitFPGenerator(maxPath<span class="op">=</span><span class="dv">5</span>,branchedPaths<span class="op">=</span><span class="va">False</span>)</span>
+<span id="cb28-2"><a href="#cb28-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb28-3"><a href="#cb28-3" aria-hidden="true" tabindex="-1"></a>fps <span class="op">=</span> fpg.GetSparseCountFingerprints([x[<span class="dv">1</span>] <span class="cf">for</span> x <span class="kw">in</span> ms1],numThreads<span class="op">=</span><span class="dv">8</span>)</span>
+<span id="cb28-4"><a href="#cb28-4" aria-hidden="true" tabindex="-1"></a>fp2s <span class="op">=</span> fpg.GetSparseCountFingerprints([x[<span class="dv">1</span>] <span class="cf">for</span> x <span class="kw">in</span> ms2],numThreads<span class="op">=</span><span class="dv">8</span>)</span>
+<span id="cb28-5"><a href="#cb28-5" aria-hidden="true" tabindex="-1"></a>accumResults(fps,fp2s,<span class="st">"linear RDKit 5 (counts)"</span>)</span>
+<span id="cb28-6"><a href="#cb28-6" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb28-7"><a href="#cb28-7" aria-hidden="true" tabindex="-1"></a>fps <span class="op">=</span> fpg.GetFingerprints([x[<span class="dv">1</span>] <span class="cf">for</span> x <span class="kw">in</span> ms1],numThreads<span class="op">=</span><span class="dv">8</span>)</span>
+<span id="cb28-8"><a href="#cb28-8" aria-hidden="true" tabindex="-1"></a>fp2s <span class="op">=</span> fpg.GetFingerprints([x[<span class="dv">1</span>] <span class="cf">for</span> x <span class="kw">in</span> ms2],numThreads<span class="op">=</span><span class="dv">8</span>)</span>
+<span id="cb28-9"><a href="#cb28-9" aria-hidden="true" tabindex="-1"></a>accumResults(fps,fp2s,<span class="st">"linear RDKit 5 (bits)"</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>0.7 0.19827586206896552
+0.8 0.22613065326633167
+0.9 0.2673913043478261
+0.95 0.3072100313479624
+0.99 0.3875739644970414
+0.7 0.20640569395017794
+0.8 0.23367697594501718
+0.9 0.27647058823529413
+0.95 0.3177257525083612
+0.99 0.40512820512820513</code></pre>
+</div>
+<div class="cell-output cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="2021-05-18-fingerprint-thresholds1_files/figure-html/cell-17-output-2.png" class="img-fluid figure-img"></p>
+</figure>
+</div>
+</div>
+<div class="cell-output cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="2021-05-18-fingerprint-thresholds1_files/figure-html/cell-17-output-3.png" class="img-fluid figure-img"></p>
+</figure>
+</div>
+</div>
+</div>
+<div id="cell-28" class="cell" data-execution_count="17">
+<div class="sourceCode cell-code" id="cb30"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb30-1"><a href="#cb30-1" aria-hidden="true" tabindex="-1"></a>fpg <span class="op">=</span> rdFingerprintGenerator.GetRDKitFPGenerator(maxPath<span class="op">=</span><span class="dv">7</span>,branchedPaths<span class="op">=</span><span class="va">False</span>)</span>
+<span id="cb30-2"><a href="#cb30-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb30-3"><a href="#cb30-3" aria-hidden="true" tabindex="-1"></a>fps <span class="op">=</span> fpg.GetSparseCountFingerprints([x[<span class="dv">1</span>] <span class="cf">for</span> x <span class="kw">in</span> ms1],numThreads<span class="op">=</span><span class="dv">8</span>)</span>
+<span id="cb30-4"><a href="#cb30-4" aria-hidden="true" tabindex="-1"></a>fp2s <span class="op">=</span> fpg.GetSparseCountFingerprints([x[<span class="dv">1</span>] <span class="cf">for</span> x <span class="kw">in</span> ms2],numThreads<span class="op">=</span><span class="dv">8</span>)</span>
+<span id="cb30-5"><a href="#cb30-5" aria-hidden="true" tabindex="-1"></a>accumResults(fps,fp2s,<span class="st">"linear RDKit 7 (counts)"</span>)</span>
+<span id="cb30-6"><a href="#cb30-6" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb30-7"><a href="#cb30-7" aria-hidden="true" tabindex="-1"></a>fps <span class="op">=</span> fpg.GetFingerprints([x[<span class="dv">1</span>] <span class="cf">for</span> x <span class="kw">in</span> ms1],numThreads<span class="op">=</span><span class="dv">8</span>)</span>
+<span id="cb30-8"><a href="#cb30-8" aria-hidden="true" tabindex="-1"></a>fp2s <span class="op">=</span> fpg.GetFingerprints([x[<span class="dv">1</span>] <span class="cf">for</span> x <span class="kw">in</span> ms2],numThreads<span class="op">=</span><span class="dv">8</span>)</span>
+<span id="cb30-9"><a href="#cb30-9" aria-hidden="true" tabindex="-1"></a>accumResults(fps,fp2s,<span class="st">"linear RDKit 7 (bits)"</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>0.7 0.12305516265912306
+0.8 0.14457831325301204
+0.9 0.17861975642760486
+0.95 0.21080368906455862
+0.99 0.28660826032540676
+0.7 0.18908629441624367
+0.8 0.20855614973262032
+0.9 0.24014778325123154
+0.95 0.26991150442477874
+0.99 0.3379174852652259</code></pre>
+</div>
+<div class="cell-output cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="2021-05-18-fingerprint-thresholds1_files/figure-html/cell-18-output-2.png" class="img-fluid figure-img"></p>
+</figure>
+</div>
+</div>
+<div class="cell-output cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="2021-05-18-fingerprint-thresholds1_files/figure-html/cell-18-output-3.png" class="img-fluid figure-img"></p>
+</figure>
+</div>
+</div>
+</div>
+</section>
+</section>
+<section id="atom-pairs-and-torsions" class="level1">
+<h1>Atom pairs and torsions</h1>
+<div id="cell-30" class="cell" data-execution_count="18">
+<div class="sourceCode cell-code" id="cb32"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb32-1"><a href="#cb32-1" aria-hidden="true" tabindex="-1"></a>fpg <span class="op">=</span> rdFingerprintGenerator.GetAtomPairGenerator()</span>
+<span id="cb32-2"><a href="#cb32-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb32-3"><a href="#cb32-3" aria-hidden="true" tabindex="-1"></a>fps <span class="op">=</span> fpg.GetSparseCountFingerprints([x[<span class="dv">1</span>] <span class="cf">for</span> x <span class="kw">in</span> ms1],numThreads<span class="op">=</span><span class="dv">8</span>)</span>
+<span id="cb32-4"><a href="#cb32-4" aria-hidden="true" tabindex="-1"></a>fp2s <span class="op">=</span> fpg.GetSparseCountFingerprints([x[<span class="dv">1</span>] <span class="cf">for</span> x <span class="kw">in</span> ms2],numThreads<span class="op">=</span><span class="dv">8</span>)</span>
+<span id="cb32-5"><a href="#cb32-5" aria-hidden="true" tabindex="-1"></a>accumResults(fps,fp2s,<span class="st">"Atom Pairs (counts)"</span>)</span>
+<span id="cb32-6"><a href="#cb32-6" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb32-7"><a href="#cb32-7" aria-hidden="true" tabindex="-1"></a>fps <span class="op">=</span> fpg.GetFingerprints([x[<span class="dv">1</span>] <span class="cf">for</span> x <span class="kw">in</span> ms1],numThreads<span class="op">=</span><span class="dv">8</span>)</span>
+<span id="cb32-8"><a href="#cb32-8" aria-hidden="true" tabindex="-1"></a>fp2s <span class="op">=</span> fpg.GetFingerprints([x[<span class="dv">1</span>] <span class="cf">for</span> x <span class="kw">in</span> ms2],numThreads<span class="op">=</span><span class="dv">8</span>)</span>
+<span id="cb32-9"><a href="#cb32-9" aria-hidden="true" tabindex="-1"></a>accumResults(fps,fp2s,<span class="st">"Atom Pairs (bits)"</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>0.7 0.1825242718446602
+0.8 0.20576923076923076
+0.9 0.23832923832923833
+0.95 0.2661290322580645
+0.99 0.3203252032520325
+0.7 0.2848101265822785
+0.8 0.3097713097713098
+0.9 0.3438077634011091
+0.95 0.37092731829573933
+0.99 0.41869158878504675</code></pre>
+</div>
+<div class="cell-output cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="2021-05-18-fingerprint-thresholds1_files/figure-html/cell-19-output-2.png" class="img-fluid figure-img"></p>
+</figure>
+</div>
+</div>
+<div class="cell-output cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="2021-05-18-fingerprint-thresholds1_files/figure-html/cell-19-output-3.png" class="img-fluid figure-img"></p>
+</figure>
+</div>
+</div>
+</div>
+<div id="cell-31" class="cell" data-execution_count="19">
+<div class="sourceCode cell-code" id="cb34"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb34-1"><a href="#cb34-1" aria-hidden="true" tabindex="-1"></a>fpg <span class="op">=</span> rdFingerprintGenerator.GetTopologicalTorsionGenerator()</span>
+<span id="cb34-2"><a href="#cb34-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb34-3"><a href="#cb34-3" aria-hidden="true" tabindex="-1"></a>fps <span class="op">=</span> fpg.GetSparseCountFingerprints([x[<span class="dv">1</span>] <span class="cf">for</span> x <span class="kw">in</span> ms1],numThreads<span class="op">=</span><span class="dv">8</span>)</span>
+<span id="cb34-4"><a href="#cb34-4" aria-hidden="true" tabindex="-1"></a>fp2s <span class="op">=</span> fpg.GetSparseCountFingerprints([x[<span class="dv">1</span>] <span class="cf">for</span> x <span class="kw">in</span> ms2],numThreads<span class="op">=</span><span class="dv">8</span>)</span>
+<span id="cb34-5"><a href="#cb34-5" aria-hidden="true" tabindex="-1"></a>accumResults(fps,fp2s,<span class="st">"Topological Torsions (counts)"</span>)</span>
+<span id="cb34-6"><a href="#cb34-6" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb34-7"><a href="#cb34-7" aria-hidden="true" tabindex="-1"></a>fps <span class="op">=</span> fpg.GetFingerprints([x[<span class="dv">1</span>] <span class="cf">for</span> x <span class="kw">in</span> ms1],numThreads<span class="op">=</span><span class="dv">8</span>)</span>
+<span id="cb34-8"><a href="#cb34-8" aria-hidden="true" tabindex="-1"></a>fp2s <span class="op">=</span> fpg.GetFingerprints([x[<span class="dv">1</span>] <span class="cf">for</span> x <span class="kw">in</span> ms2],numThreads<span class="op">=</span><span class="dv">8</span>)</span>
+<span id="cb34-9"><a href="#cb34-9" aria-hidden="true" tabindex="-1"></a>accumResults(fps,fp2s,<span class="st">"Topological Torsions (bits)"</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>0.7 0.10344827586206896
+0.8 0.125
+0.9 0.15789473684210525
+0.95 0.18811881188118812
+0.99 0.2564102564102564
+0.7 0.13114754098360656
+0.8 0.15217391304347827
+0.9 0.18478260869565216
+0.95 0.21428571428571427
+0.99 0.27941176470588236</code></pre>
+</div>
+<div class="cell-output cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="2021-05-18-fingerprint-thresholds1_files/figure-html/cell-20-output-2.png" class="img-fluid figure-img"></p>
+</figure>
+</div>
+</div>
+<div class="cell-output cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="2021-05-18-fingerprint-thresholds1_files/figure-html/cell-20-output-3.png" class="img-fluid figure-img"></p>
+</figure>
+</div>
+</div>
+</div>
+</section>
+<section id="avalon" class="level1">
+<h1>Avalon</h1>
+<div id="cell-33" class="cell" data-scrolled="false" data-execution_count="20">
+<div class="sourceCode cell-code" id="cb36"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb36-1"><a href="#cb36-1" aria-hidden="true" tabindex="-1"></a>compareFPs(ms1,ms2,<span class="kw">lambda</span> x:pyAvalonTools.GetAvalonCountFP(x),<span class="st">"Avalon (counts)"</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>0.7 0.3074761101742552
+0.8 0.3394988066825776
+0.9 0.38517796196977083
+0.95 0.4236111111111111
+0.99 0.4988066825775656</code></pre>
+</div>
+<div class="cell-output cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="2021-05-18-fingerprint-thresholds1_files/figure-html/cell-21-output-2.png" class="img-fluid figure-img"></p>
+</figure>
+</div>
+</div>
+</div>
+<div id="cell-34" class="cell" data-execution_count="21">
+<div class="sourceCode cell-code" id="cb38"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb38-1"><a href="#cb38-1" aria-hidden="true" tabindex="-1"></a>compareFPs(ms1,ms2,<span class="kw">lambda</span> x:pyAvalonTools.GetAvalonFP(x),<span class="st">"Avalon (bits)"</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>0.7 0.38765432098765434
+0.8 0.4245614035087719
+0.9 0.4748201438848921
+0.95 0.5148148148148148
+0.99 0.5888077858880778</code></pre>
+</div>
+<div class="cell-output cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="2021-05-18-fingerprint-thresholds1_files/figure-html/cell-22-output-2.png" class="img-fluid figure-img"></p>
+</figure>
+</div>
+</div>
+</div>
+</section>
+<section id="pattern" class="level1">
+<h1>Pattern</h1>
+<div id="cell-36" class="cell" data-execution_count="22">
+<div class="sourceCode cell-code" id="cb40"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb40-1"><a href="#cb40-1" aria-hidden="true" tabindex="-1"></a>compareFPs(ms1,ms2,<span class="kw">lambda</span> x:Chem.PatternFingerprint(x),<span class="st">"Pattern"</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>0.7 0.6049382716049383
+0.8 0.6327212020033389
+0.9 0.6694677871148459
+0.95 0.6984126984126984
+0.99 0.7504</code></pre>
 </div>
 <div class="cell-output cell-output-display">
 <div>
@@ -1433,31 +1731,26 @@ Populating the interactive namespace from numpy and matplotlib</code></pre>
 </div>
 </div>
 </div>
-<div id="cell-35" class="cell" data-execution_count="23">
-<div class="sourceCode cell-code" id="cb43"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb43-1"><a href="#cb43-1" aria-hidden="true" tabindex="-1"></a>compareFPs(ms1,ms2,<span class="kw">lambda</span> x:Chem.RDKFingerprint(x,maxPath<span class="op">=</span><span class="dv">5</span>),<span class="st">"RDKit 5 (bits)"</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</section>
+<section id="gobbi2d-pharmacophore-fingerprints" class="level1">
+<h1>Gobbi2D pharmacophore fingerprints</h1>
+<div id="cell-38" class="cell" data-execution_count="23">
+<div class="sourceCode cell-code" id="cb42"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb42-1"><a href="#cb42-1" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> rdkit.Chem.Pharm2D <span class="im">import</span> Gobbi_Pharm2D,Generate</span>
+<span id="cb42-2"><a href="#cb42-2" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> Gobbi2D_bits(mol,fpLen<span class="op">=</span><span class="dv">2048</span>):</span>
+<span id="cb42-3"><a href="#cb42-3" aria-hidden="true" tabindex="-1"></a>    res <span class="op">=</span> DataStructs.ExplicitBitVect(fpLen)</span>
+<span id="cb42-4"><a href="#cb42-4" aria-hidden="true" tabindex="-1"></a>    <span class="cf">for</span> bit <span class="kw">in</span> Generate.Gen2DFingerprint(mol,Gobbi_Pharm2D.factory).GetOnBits():</span>
+<span id="cb42-5"><a href="#cb42-5" aria-hidden="true" tabindex="-1"></a>        <span class="co"># the bits are not hashed, so we need to do so before we fold them:</span></span>
+<span id="cb42-6"><a href="#cb42-6" aria-hidden="true" tabindex="-1"></a>        res.SetBit(<span class="bu">hash</span>((bit,))<span class="op">%</span>fpLen)</span>
+<span id="cb42-7"><a href="#cb42-7" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> res</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+<div id="cell-39" class="cell" data-execution_count="24">
+<div class="sourceCode cell-code" id="cb43"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb43-1"><a href="#cb43-1" aria-hidden="true" tabindex="-1"></a>compareFPs(ms1,ms2,Gobbi2D_bits,<span class="st">"Gobbi2D"</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 <div class="cell-output cell-output-stdout">
-<pre><code>0.7 0.19672131147540983
-0.8 0.21875
-0.9 0.2534562211981567
-0.95 0.28735632183908044
-0.99 0.3682170542635659</code></pre>
-</div>
-<div class="cell-output cell-output-display">
-<div>
-<figure class="figure">
-<p><img src="2021-05-18-fingerprint-thresholds1_files/figure-html/cell-24-output-2.png" class="img-fluid figure-img"></p>
-</figure>
-</div>
-</div>
-</div>
-<div id="cell-36" class="cell" data-execution_count="24">
-<div class="sourceCode cell-code" id="cb45"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb45-1"><a href="#cb45-1" aria-hidden="true" tabindex="-1"></a>compareFPs(ms1,ms2,<span class="kw">lambda</span> x:Chem.RDKFingerprint(x,maxPath<span class="op">=</span><span class="dv">6</span>),<span class="st">"RDKit 6 (bits)"</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
-<div class="cell-output cell-output-stdout">
-<pre><code>0.7 0.22965641952983726
-0.8 0.2502120441051739
-0.9 0.28023598820059
-0.95 0.30818767249310025
-0.99 0.3686382393397524</code></pre>
+<pre><code>0.7 0.17470881863560733
+0.8 0.20520231213872833
+0.9 0.25068493150684934
+0.95 0.29214402618657936
+0.99 0.3725124378109453</code></pre>
 </div>
 <div class="cell-output cell-output-display">
 <div>
@@ -1467,245 +1760,8 @@ Populating the interactive namespace from numpy and matplotlib</code></pre>
 </div>
 </div>
 </div>
-<div id="cell-37" class="cell" data-execution_count="25">
-<div class="sourceCode cell-code" id="cb47"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb47-1"><a href="#cb47-1" aria-hidden="true" tabindex="-1"></a>compareFPs(ms1,ms2,<span class="kw">lambda</span> x:Chem.RDKFingerprint(x,maxPath<span class="op">=</span><span class="dv">7</span>),<span class="st">"RDKit 7 (bits)"</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
-<div class="cell-output cell-output-stdout">
-<pre><code>0.7 0.3130372492836676
-0.8 0.34558303886925795
-0.9 0.38909541511771994
-0.95 0.4286600496277916
-0.99 0.5068903535050928</code></pre>
-</div>
-<div class="cell-output cell-output-display">
-<div>
-<figure class="figure">
-<p><img src="2021-05-18-fingerprint-thresholds1_files/figure-html/cell-26-output-2.png" class="img-fluid figure-img"></p>
-</figure>
-</div>
-</div>
-</div>
-</section>
-<section id="linear" class="level2">
-<h2 class="anchored" data-anchor-id="linear">linear</h2>
-<div id="cell-39" class="cell" data-execution_count="26">
-<div class="sourceCode cell-code" id="cb49"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb49-1"><a href="#cb49-1" aria-hidden="true" tabindex="-1"></a>compareFPs(ms1,ms2,<span class="kw">lambda</span> x:Chem.RDKFingerprint(x,maxPath<span class="op">=</span><span class="dv">4</span>,branchedPaths<span class="op">=</span><span class="va">False</span>),<span class="st">"linear RDKit 4 (bits)"</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
-<div class="cell-output cell-output-stdout">
-<pre><code>0.7 0.22456140350877193
-0.8 0.25773195876288657
-0.9 0.30864197530864196
-0.95 0.35403726708074534
-0.99 0.46153846153846156</code></pre>
-</div>
-<div class="cell-output cell-output-display">
-<div>
-<figure class="figure">
-<p><img src="2021-05-18-fingerprint-thresholds1_files/figure-html/cell-27-output-2.png" class="img-fluid figure-img"></p>
-</figure>
-</div>
-</div>
-</div>
-<div id="cell-40" class="cell" data-execution_count="27">
-<div class="sourceCode cell-code" id="cb51"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb51-1"><a href="#cb51-1" aria-hidden="true" tabindex="-1"></a>compareFPs(ms1,ms2,<span class="kw">lambda</span> x:Chem.RDKFingerprint(x,maxPath<span class="op">=</span><span class="dv">5</span>,branchedPaths<span class="op">=</span><span class="va">False</span>),<span class="st">"linear RDKit 5 (bits)"</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
-<div class="cell-output cell-output-stdout">
-<pre><code>0.7 0.19756838905775076
-0.8 0.22549019607843138
-0.9 0.2687224669603524
-0.95 0.3090909090909091
-0.99 0.40425531914893614</code></pre>
-</div>
-<div class="cell-output cell-output-display">
-<div>
-<figure class="figure">
-<p><img src="2021-05-18-fingerprint-thresholds1_files/figure-html/cell-28-output-2.png" class="img-fluid figure-img"></p>
-</figure>
-</div>
-</div>
-</div>
-<div id="cell-41" class="cell" data-execution_count="28">
-<div class="sourceCode cell-code" id="cb53"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb53-1"><a href="#cb53-1" aria-hidden="true" tabindex="-1"></a>compareFPs(ms1,ms2,<span class="kw">lambda</span> x:Chem.RDKFingerprint(x,maxPath<span class="op">=</span><span class="dv">6</span>,branchedPaths<span class="op">=</span><span class="va">False</span>),<span class="st">"linear RDKit 6 (bits)"</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
-<div class="cell-output cell-output-stdout">
-<pre><code>0.7 0.18657937806873978
-0.8 0.21005917159763313
-0.9 0.24612403100775193
-0.95 0.2820069204152249
-0.99 0.36476426799007444</code></pre>
-</div>
-<div class="cell-output cell-output-display">
-<div>
-<figure class="figure">
-<p><img src="2021-05-18-fingerprint-thresholds1_files/figure-html/cell-29-output-2.png" class="img-fluid figure-img"></p>
-</figure>
-</div>
-</div>
-</div>
-<div id="cell-42" class="cell" data-execution_count="29">
-<div class="sourceCode cell-code" id="cb55"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb55-1"><a href="#cb55-1" aria-hidden="true" tabindex="-1"></a>compareFPs(ms1,ms2,<span class="kw">lambda</span> x:Chem.RDKFingerprint(x,maxPath<span class="op">=</span><span class="dv">7</span>,branchedPaths<span class="op">=</span><span class="va">False</span>),<span class="st">"linear RDKit 7 (bits)"</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
-<div class="cell-output cell-output-stdout">
-<pre><code>0.7 0.18204488778054864
-0.8 0.20286085825747724
-0.9 0.23367198838896952
-0.95 0.2640625
-0.99 0.33689024390243905</code></pre>
-</div>
-<div class="cell-output cell-output-display">
-<div>
-<figure class="figure">
-<p><img src="2021-05-18-fingerprint-thresholds1_files/figure-html/cell-30-output-2.png" class="img-fluid figure-img"></p>
-</figure>
-</div>
-</div>
-</div>
-</section>
-</section>
-<section id="atom-pairs-and-torsions" class="level1">
-<h1>Atom pairs and torsions</h1>
-<section id="count-based-2" class="level2">
-<h2 class="anchored" data-anchor-id="count-based-2">count-based</h2>
-<div id="cell-45" class="cell" data-execution_count="30">
-<div class="sourceCode cell-code" id="cb57"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb57-1"><a href="#cb57-1" aria-hidden="true" tabindex="-1"></a>compareFPs(ms1,ms2,<span class="kw">lambda</span> x:rdMolDescriptors.GetAtomPairFingerprint(x),<span class="st">"Atom Pairs (counts)"</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
-<div class="cell-output cell-output-stdout">
-<pre><code>0.7 0.17993630573248406
-0.8 0.20386266094420602
-0.9 0.23671497584541062
-0.95 0.26545454545454544
-0.99 0.32547169811320753</code></pre>
-</div>
-<div class="cell-output cell-output-display">
-<div>
-<figure class="figure">
-<p><img src="2021-05-18-fingerprint-thresholds1_files/figure-html/cell-31-output-2.png" class="img-fluid figure-img"></p>
-</figure>
-</div>
-</div>
-</div>
-<div id="cell-46" class="cell" data-execution_count="31">
-<div class="sourceCode cell-code" id="cb59"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb59-1"><a href="#cb59-1" aria-hidden="true" tabindex="-1"></a>compareFPs(ms1,ms2,<span class="kw">lambda</span> x:rdMolDescriptors.GetTopologicalTorsionFingerprint(x),<span class="st">"Torsions (counts)"</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
-<div class="cell-output cell-output-stdout">
-<pre><code>0.7 0.10714285714285714
-0.8 0.13
-0.9 0.16470588235294117
-0.95 0.19387755102040816
-0.99 0.26582278481012656</code></pre>
-</div>
-<div class="cell-output cell-output-display">
-<div>
-<figure class="figure">
-<p><img src="2021-05-18-fingerprint-thresholds1_files/figure-html/cell-32-output-2.png" class="img-fluid figure-img"></p>
-</figure>
-</div>
-</div>
-</div>
-</section>
-<section id="bit-vectors-1" class="level2">
-<h2 class="anchored" data-anchor-id="bit-vectors-1">bit vectors</h2>
-<div id="cell-48" class="cell" data-execution_count="32">
-<div class="sourceCode cell-code" id="cb61"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb61-1"><a href="#cb61-1" aria-hidden="true" tabindex="-1"></a>compareFPs(ms1,ms2,<span class="kw">lambda</span> x:rdMolDescriptors.GetHashedAtomPairFingerprintAsBitVect(x),<span class="st">"Atom Pairs (bits)"</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
-<div class="cell-output cell-output-stdout">
-<pre><code>0.7 0.27488151658767773
-0.8 0.3008298755186722
-0.9 0.3353658536585366
-0.95 0.36342042755344417
-0.99 0.4146341463414634</code></pre>
-</div>
-<div class="cell-output cell-output-display">
-<div>
-<figure class="figure">
-<p><img src="2021-05-18-fingerprint-thresholds1_files/figure-html/cell-33-output-2.png" class="img-fluid figure-img"></p>
-</figure>
-</div>
-</div>
-</div>
-<div id="cell-49" class="cell" data-execution_count="33">
-<div class="sourceCode cell-code" id="cb63"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb63-1"><a href="#cb63-1" aria-hidden="true" tabindex="-1"></a>compareFPs(ms1,ms2,<span class="kw">lambda</span> x:rdMolDescriptors.GetHashedTopologicalTorsionFingerprintAsBitVect(x),<span class="st">"Torsions (bits)"</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
-<div class="cell-output cell-output-stdout">
-<pre><code>0.7 0.1326530612244898
-0.8 0.1553398058252427
-0.9 0.18840579710144928
-0.95 0.2191780821917808
-0.99 0.2876712328767123</code></pre>
-</div>
-<div class="cell-output cell-output-display">
-<div>
-<figure class="figure">
-<p><img src="2021-05-18-fingerprint-thresholds1_files/figure-html/cell-34-output-2.png" class="img-fluid figure-img"></p>
-</figure>
-</div>
-</div>
-</div>
-</section>
-</section>
-<section id="avalon" class="level1">
-<h1>Avalon</h1>
-<div id="cell-51" class="cell" data-execution_count="34">
-<div class="sourceCode cell-code" id="cb65"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb65-1"><a href="#cb65-1" aria-hidden="true" tabindex="-1"></a>compareFPs(ms1,ms2,<span class="kw">lambda</span> x:pyAvalonTools.GetAvalonFP(x,<span class="dv">512</span>),<span class="st">"Avalon 512 (bits)"</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
-<div class="cell-output cell-output-stdout">
-<pre><code>0.7 0.3693379790940767
-0.8 0.4074074074074074
-0.9 0.46130952380952384
-0.95 0.5054347826086957
-0.99 0.5749318801089919</code></pre>
-</div>
-<div class="cell-output cell-output-display">
-<div>
-<figure class="figure">
-<p><img src="2021-05-18-fingerprint-thresholds1_files/figure-html/cell-35-output-2.png" class="img-fluid figure-img"></p>
-</figure>
-</div>
-</div>
-</div>
-<div id="cell-52" class="cell" data-scrolled="true" data-execution_count="35">
-<div class="sourceCode cell-code" id="cb67"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb67-1"><a href="#cb67-1" aria-hidden="true" tabindex="-1"></a>compareFPs(ms1,ms2,<span class="kw">lambda</span> x:pyAvalonTools.GetAvalonFP(x,<span class="dv">1024</span>),<span class="st">"Avalon 1024 (bits)"</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
-<div class="cell-output cell-output-stdout">
-<pre><code>0.7 0.26932668329177056
-0.8 0.2972972972972973
-0.9 0.3402061855670103
-0.95 0.3747016706443914
-0.99 0.4490909090909091</code></pre>
-</div>
-<div class="cell-output cell-output-display">
-<div>
-<figure class="figure">
-<p><img src="2021-05-18-fingerprint-thresholds1_files/figure-html/cell-36-output-2.png" class="img-fluid figure-img"></p>
-</figure>
-</div>
-</div>
-</div>
-</section>
-<section id="avalon-counts" class="level1">
-<h1>Avalon Counts</h1>
-<div id="cell-54" class="cell" data-scrolled="true" data-execution_count="36">
-<div class="sourceCode cell-code" id="cb69"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb69-1"><a href="#cb69-1" aria-hidden="true" tabindex="-1"></a>compareFPs(ms1,ms2,<span class="kw">lambda</span> x:pyAvalonTools.GetAvalonCountFP(x,<span class="dv">512</span>),<span class="st">"Avalon 512 (counts)"</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
-<div class="cell-output cell-output-stdout">
-<pre><code>0.7 0.30028063610851263
-0.8 0.332624867162593
-0.9 0.3787951807228916
-0.95 0.4175461741424802
-0.99 0.491005291005291</code></pre>
-</div>
-<div class="cell-output cell-output-display">
-<div>
-<figure class="figure">
-<p><img src="2021-05-18-fingerprint-thresholds1_files/figure-html/cell-37-output-2.png" class="img-fluid figure-img"></p>
-</figure>
-</div>
-</div>
-</div>
-<div id="cell-55" class="cell" data-execution_count="37">
-<div class="sourceCode cell-code" id="cb71"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb71-1"><a href="#cb71-1" aria-hidden="true" tabindex="-1"></a>compareFPs(ms1,ms2,<span class="kw">lambda</span> x:pyAvalonTools.GetAvalonCountFP(x,<span class="dv">1024</span>),<span class="st">"Avalon 1024 (counts)"</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
-<div class="cell-output cell-output-stdout">
-<pre><code>0.7 0.26651162790697674
-0.8 0.2988505747126437
-0.9 0.34438775510204084
-0.95 0.3844486589000271
-0.99 0.4624173180998196</code></pre>
-</div>
-<div class="cell-output cell-output-display">
-<div>
-<figure class="figure">
-<p><img src="2021-05-18-fingerprint-thresholds1_files/figure-html/cell-38-output-2.png" class="img-fluid figure-img"></p>
-</figure>
-</div>
-</div>
+<div id="cell-40" class="cell" data-execution_count="25">
+<div class="sourceCode cell-code" id="cb45"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb45-1"><a href="#cb45-1" aria-hidden="true" tabindex="-1"></a>pickle.dump(results_accum,<span class="bu">open</span>(<span class="st">'./results/fp_thresholds_random_accum.pkl'</span>,<span class="st">'wb+'</span>))</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </div>
 
 
