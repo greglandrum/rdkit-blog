@@ -10,7 +10,537 @@
 <atom:link href="https://greglandrum.github.io/rdkit-blog/index.xml" rel="self" type="application/rss+xml"/>
 <description>RDKit experiments, tips, and tutorials</description>
 <generator>quarto-1.6.39</generator>
-<lastBuildDate>Fri, 14 Mar 2025 23:00:00 GMT</lastBuildDate>
+<lastBuildDate>Sat, 15 Mar 2025 23:00:00 GMT</lastBuildDate>
+<item>
+  <title>Building a similarity comparison set</title>
+  <link>https://greglandrum.github.io/rdkit-blog/posts/2025-03-16-building-a-similarity-comparison-set.html</link>
+  <description><![CDATA[ 
+
+
+
+
+<p>This is a revised and expanded version of an <a href="http://rdkit.blogspot.com/2013/10/building-similarity-comparison-set-goal.html">old blog post</a> which has already been <a href="http://rdkit.blogspot.com/2016/04/revisiting-similarity-comparison-set.html">updated once</a>.</p>
+<p>Goal: construct a set of molecular pairs that can be used to compare similarity methods to each other.</p>
+<p>This works with ChEMBL35.</p>
+<p>I want to start with molecules that have some connection to each other, so I will pick pairs that have a baseline similarity: a Tanimoto similarity using count based Morgan0 fingerprints of at least 0.65. I also create a second set of somewhat more closely related molecules where the baseline similarity is 0.55 with a Morgan1 fingerprint. The thresholds were selected based on the analysis <a href="https://greglandrum.github.io/rdkit-blog/posts/2021-05-21-similarity-search-thresholds.html">in this blog post</a></p>
+<p>If you are interested in using the sets generated in this post, you can find them in the <a href="https://github.com/greglandrum/rdkit_blog/tree/master/data">source repo</a> for this blog.</p>
+<section id="creating-the-tables-in-postgresql" class="level1">
+<h1>Creating the tables in PostgreSQL</h1>
+<p>I’m going to use ChEMBL as my data source, so I’ll start by adding a table with count-based morgan fingerprints. Here’s the SQL for that, assuming that you’ve installed the RDKit extension and setup an RDKit schema as described in the <a href="https://www.rdkit.org/docs/Cartridge.html#loading-chembl">docs</a></p>
+<pre><code>select molregno,morgan_fp(m,0) mfp0,morgan_fp(m,1) mfp1,morgan_fp(m,2) mfp2 into rdk.countfps from rdk.mols;
+create index cfps_mfp0 on rdk.countfps using gist(mfp0);
+create index cfps_mfp1 on rdk.countfps using gist(mfp1);
+create index cfps_mfp2 on rdk.countfps using gist(mfp2);</code></pre>
+<p>Fingerprints that only contains molecules with &lt;= 50 heavy atoms and a single fragment (we recognize this because there is no ‘.’ in the SMILES):</p>
+<pre><code>select molregno,mfp0,mfp1 into table rdk.tfps_smaller from rdk.countfps join compound_properties using (molregno) join compound_structures using (molregno) where heavy_atoms&lt;=50 and canonical_smiles not like '%.%';
+create index sfps_mfp0_idx on rdk.tfps_smaller using gist(mfp0);
+create index sfps_mfp1_idx on rdk.tfps_smaller using gist(mfp1);</code></pre>
+<p>And now I’ll build the set of pairs using Python. This is definitely doable in SQL, but my SQL-fu isn’t that strong.</p>
+<p>Start by getting a set of 60K random small molecules:</p>
+<div id="cell-4" class="cell" data-executetime="{&quot;end_time&quot;:&quot;2023-01-16T08:20:51.492914Z&quot;,&quot;start_time&quot;:&quot;2023-01-16T08:20:51.394115Z&quot;}" data-execution_count="1">
+<div class="sourceCode cell-code" id="cb3" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb3-1"><span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">from</span> rdkit <span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">import</span> Chem</span>
+<span id="cb3-2"><span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">import</span> rdkit</span>
+<span id="cb3-3"><span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">print</span>(rdkit.__version__)</span>
+<span id="cb3-4"><span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">import</span> time</span>
+<span id="cb3-5"><span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">print</span>(time.asctime())</span></code></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>2024.09.6
+Sat Mar 15 18:36:20 2025</code></pre>
+</div>
+</div>
+<div id="cell-5" class="cell" data-executetime="{&quot;end_time&quot;:&quot;2023-01-16T08:25:43.609849Z&quot;,&quot;start_time&quot;:&quot;2023-01-16T08:25:35.695948Z&quot;}" data-execution_count="2">
+<div class="sourceCode cell-code" id="cb5" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb5-1"><span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">import</span> psycopg2</span>
+<span id="cb5-2">cn <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> psycopg2.<span class="ex" style="color: null;
+background-color: null;
+font-style: inherit;">connect</span>(host<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span><span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'localhost'</span>,dbname<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span><span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'chembl_35'</span>)</span>
+<span id="cb5-3">curs <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> cn.cursor()</span>
+<span id="cb5-4">curs.execute(<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"select chembl_id,m from rdk.mols join rdk.tfps_smaller using (molregno)"</span></span>
+<span id="cb5-5">             <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">" join chembl_id_lookup on (molregno=entity_id and entity_type='COMPOUND')"</span></span>
+<span id="cb5-6">             <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">" order by random() limit 60000"</span>)</span>
+<span id="cb5-7">qs <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> curs.fetchall()</span></code></pre></div>
+</div>
+<p>And now find one neighbor for 50K of those from the mfp0 table of smallish molecules:</p>
+<div id="cell-7" class="cell" data-executetime="{&quot;end_time&quot;:&quot;2023-01-16T12:48:36.981493Z&quot;,&quot;start_time&quot;:&quot;2023-01-16T12:43:05.733091Z&quot;}" data-execution_count="5">
+<div class="sourceCode cell-code" id="cb6" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb6-1">cn.rollback()</span>
+<span id="cb6-2">curs.execute(<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'set rdkit.tanimoto_threshold=0.65'</span>)</span>
+<span id="cb6-3"></span>
+<span id="cb6-4">keep<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span>[]</span>
+<span id="cb6-5"><span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">for</span> i,row <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">in</span> <span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">enumerate</span>(qs):</span>
+<span id="cb6-6">    curs.execute(<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"select chembl_id,m from rdk.mols join (select chembl_id,molregno from rdk.tfps_smaller "</span></span>
+<span id="cb6-7">                 <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"join chembl_id_lookup on (molregno=entity_id and entity_type='COMPOUND') "</span></span>
+<span id="cb6-8">                 <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"where mfp0</span><span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">%%</span><span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">morgan_fp(</span><span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">%s</span><span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">,0) "</span></span>
+<span id="cb6-9">                 <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"and chembl_id!=</span><span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">%s</span><span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;"> limit 1) t2 using (molregno) "</span></span>
+<span id="cb6-10">                 <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"limit 1"</span>,(row[<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">1</span>],row[<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">0</span>]))</span>
+<span id="cb6-11">    d <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> curs.fetchone()</span>
+<span id="cb6-12">    <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">if</span> <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">not</span> d: </span>
+<span id="cb6-13">        <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">continue</span></span>
+<span id="cb6-14">    keep.append((row[<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">0</span>],row[<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">1</span>],d[<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">0</span>],d[<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">1</span>]))</span>
+<span id="cb6-15">    <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">if</span> <span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">len</span>(keep)<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">&gt;=</span><span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">50000</span>: </span>
+<span id="cb6-16">        <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">break</span></span>
+<span id="cb6-17">    <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">if</span> <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">not</span> i<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">%</span><span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">1000</span>: <span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">print</span>(<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'Done: </span><span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">%d</span><span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'</span><span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">%</span>i)</span></code></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>Done: 0
+Done: 1000
+Done: 2000
+Done: 3000
+Done: 4000
+Done: 5000
+Done: 6000
+Done: 7000
+Done: 8000
+Done: 9000
+Done: 10000
+Done: 11000
+Done: 12000
+Done: 13000
+Done: 14000
+Done: 15000
+Done: 16000
+Done: 17000
+Done: 18000
+Done: 19000
+Done: 20000
+Done: 21000
+Done: 22000
+Done: 23000
+Done: 24000
+Done: 25000
+Done: 26000
+Done: 27000
+Done: 28000
+Done: 29000
+Done: 30000
+Done: 31000
+Done: 32000
+Done: 33000
+Done: 34000
+Done: 35000
+Done: 36000
+Done: 37000
+Done: 38000
+Done: 39000
+Done: 40000
+Done: 41000
+Done: 42000
+Done: 43000
+Done: 44000
+Done: 45000
+Done: 46000
+Done: 47000
+Done: 48000
+Done: 49000
+Done: 50000</code></pre>
+</div>
+</div>
+<p>Finally, write those out to a file so that we can use them elsewhere:</p>
+<div id="cell-9" class="cell" data-executetime="{&quot;end_time&quot;:&quot;2023-01-16T12:48:37.896921Z&quot;,&quot;start_time&quot;:&quot;2023-01-16T12:48:36.983261Z&quot;}" data-execution_count="6">
+<div class="sourceCode cell-code" id="cb8" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb8-1"><span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">import</span> gzip</span>
+<span id="cb8-2"><span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">with</span> gzip.<span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">open</span>(<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'../data/chembl35_50K.mfp0.pairs.txt.gz'</span>,<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'wb+'</span>) <span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">as</span> outf:</span>
+<span id="cb8-3">    <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">for</span> cid1,smi1,cid2,smi2 <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">in</span> keep: </span>
+<span id="cb8-4">        outf.write(<span class="ss" style="color: #20794D;
+background-color: null;
+font-style: inherit;">f'</span><span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">{</span>cid1<span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">}</span><span class="ch" style="color: #20794D;
+background-color: null;
+font-style: inherit;">\t</span><span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">{</span>smi1<span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">}</span><span class="ch" style="color: #20794D;
+background-color: null;
+font-style: inherit;">\t</span><span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">{</span>cid2<span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">}</span><span class="ch" style="color: #20794D;
+background-color: null;
+font-style: inherit;">\t</span><span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">{</span>smi2<span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">}</span><span class="ch" style="color: #20794D;
+background-color: null;
+font-style: inherit;">\n</span><span class="ss" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'</span>.encode(<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'UTF-8'</span>))</span></code></pre></div>
+</div>
+</section>
+<section id="try-molecules-that-are-a-bit-more-similar." class="level1">
+<h1>Try molecules that are a bit more similar.</h1>
+<p>Use a similarity threshold for the pairs using MFP1 bits.</p>
+<div id="cell-11" class="cell" data-executetime="{&quot;end_time&quot;:&quot;2023-01-16T13:17:03.816967Z&quot;,&quot;start_time&quot;:&quot;2023-01-16T12:48:37.898370Z&quot;}" data-execution_count="7">
+<div class="sourceCode cell-code" id="cb9" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb9-1">cn.rollback()</span>
+<span id="cb9-2">curs.execute(<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'set rdkit.tanimoto_threshold=0.55'</span>)</span>
+<span id="cb9-3"></span>
+<span id="cb9-4">keep<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span>[]</span>
+<span id="cb9-5"><span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">for</span> i,row <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">in</span> <span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">enumerate</span>(qs):</span>
+<span id="cb9-6">    curs.execute(<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"select chembl_id,m from rdk.mols join (select chembl_id,molregno from rdk.tfps_smaller "</span></span>
+<span id="cb9-7">                 <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"join chembl_id_lookup on (molregno=entity_id and entity_type='COMPOUND') "</span></span>
+<span id="cb9-8">                 <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"where mfp1</span><span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">%%</span><span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">morgan_fp(</span><span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">%s</span><span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">,1) "</span></span>
+<span id="cb9-9">                 <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"and chembl_id!=</span><span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">%s</span><span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;"> limit 1) t2 using (molregno) "</span></span>
+<span id="cb9-10">                 <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"limit 1"</span>,(row[<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">1</span>],row[<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">0</span>]))</span>
+<span id="cb9-11">    d <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> curs.fetchone()</span>
+<span id="cb9-12">    <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">if</span> <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">not</span> d: </span>
+<span id="cb9-13">        <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">continue</span></span>
+<span id="cb9-14">    keep.append((row[<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">0</span>],row[<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">1</span>],d[<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">0</span>],d[<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">1</span>]))</span>
+<span id="cb9-15">    <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">if</span> <span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">len</span>(keep)<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">&gt;=</span><span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">50000</span>: </span>
+<span id="cb9-16">        <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">break</span></span>
+<span id="cb9-17">    <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">if</span> <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">not</span> i<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">%</span><span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">1000</span>: <span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">print</span>(<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'Done: </span><span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">%d</span><span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'</span><span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">%</span>i)</span></code></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>Done: 0
+Done: 1000
+Done: 2000
+Done: 3000
+Done: 4000
+Done: 5000
+Done: 6000
+Done: 7000
+Done: 8000
+Done: 9000
+Done: 10000
+Done: 11000
+Done: 12000
+Done: 13000
+Done: 14000
+Done: 15000
+Done: 16000
+Done: 17000
+Done: 18000
+Done: 19000
+Done: 20000
+Done: 21000
+Done: 22000
+Done: 23000
+Done: 24000
+Done: 25000
+Done: 26000
+Done: 27000
+Done: 28000
+Done: 29000
+Done: 30000
+Done: 31000
+Done: 32000
+Done: 33000
+Done: 34000
+Done: 35000
+Done: 36000
+Done: 37000
+Done: 38000
+Done: 39000
+Done: 40000
+Done: 41000
+Done: 42000
+Done: 43000
+Done: 44000
+Done: 45000
+Done: 46000
+Done: 47000
+Done: 48000
+Done: 49000
+Done: 50000</code></pre>
+</div>
+</div>
+<div id="cell-12" class="cell" data-executetime="{&quot;end_time&quot;:&quot;2023-01-16T13:23:34.529592Z&quot;,&quot;start_time&quot;:&quot;2023-01-16T13:23:33.517374Z&quot;}" data-execution_count="8">
+<div class="sourceCode cell-code" id="cb11" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb11-1"><span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">import</span> gzip</span>
+<span id="cb11-2"><span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">with</span> gzip.<span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">open</span>(<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'../data/chembl35_50K.mfp1.pairs.txt.gz'</span>,<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'wb+'</span>) <span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">as</span> outf:</span>
+<span id="cb11-3">    <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">for</span> cid1,smi1,cid2,smi2 <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">in</span> keep: </span>
+<span id="cb11-4">        outf.write(<span class="ss" style="color: #20794D;
+background-color: null;
+font-style: inherit;">f'</span><span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">{</span>cid1<span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">}</span><span class="ch" style="color: #20794D;
+background-color: null;
+font-style: inherit;">\t</span><span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">{</span>smi1<span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">}</span><span class="ch" style="color: #20794D;
+background-color: null;
+font-style: inherit;">\t</span><span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">{</span>cid2<span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">}</span><span class="ch" style="color: #20794D;
+background-color: null;
+font-style: inherit;">\t</span><span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">{</span>smi2<span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">}</span><span class="ch" style="color: #20794D;
+background-color: null;
+font-style: inherit;">\n</span><span class="ss" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'</span>.encode(<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'UTF-8'</span>))</span></code></pre></div>
+</div>
+
+
+</section>
+
+ ]]></description>
+  <category>reference</category>
+  <category>similarity</category>
+  <guid>https://greglandrum.github.io/rdkit-blog/posts/2025-03-16-building-a-similarity-comparison-set.html</guid>
+  <pubDate>Sat, 15 Mar 2025 23:00:00 GMT</pubDate>
+</item>
 <item>
   <title>Constructing SAR tables in Jupyter</title>
   <link>https://greglandrum.github.io/rdkit-blog/posts/2025-03-15-constructing-SAR-tables.html</link>
@@ -23129,207 +23659,6 @@ font-style: inherit;">;</span></span></code></pre></div>
   <guid>https://greglandrum.github.io/rdkit-blog/posts/2024-05-14-similarity-and-centrality.html</guid>
   <pubDate>Mon, 13 May 2024 22:00:00 GMT</pubDate>
   <media:content url="https://greglandrum.github.io/rdkit-blog/posts/images/blog/similarity-and-centrality-1.png" medium="image" type="image/png" height="86" width="144"/>
-</item>
-<item>
-  <title>A stub a day keeps the docstrings at bay</title>
-  <link>https://greglandrum.github.io/rdkit-blog/posts/2024-03-08-docstring-stubs.html</link>
-  <description><![CDATA[ 
-
-
-
-
-<p>This is a guest post by Paolo Tosco (GitHub: <span class="citation" data-cites="ptosco">@ptosco</span>), one of the RDKit core maintainers.</p>
-<p>This blog post expands a bit on the topic I presented last year in Mainz during <a href="https://github.com/rdkit/UGM_2023/blob/main/Presentations/Tosco_A_stub_a_day_keeps_the_docstrings_at_bay.pdf">a lightning talk</a> at the 2023 RDKit UGM, <em>i.e.</em>, the generation of RDKit stubs and programmatic patching of existing Python docstrings.</p>
-<section id="tldr" class="level2">
-<h2 class="anchored" data-anchor-id="tldr">TL;DR</h2>
-<p>Starting with the 2023.09.6 release of the RDKit, the visibility and usability of the Python API documentation in VS Code is vastly improved. You now get things like this:</p>
-<div class="quarto-figure quarto-figure-center">
-<figure class="figure">
-<p><img src="https://greglandrum.github.io/rdkit-blog/posts/images/blog/docstrings-stubs-13.png" class="img-fluid figure-img"></p>
-<figcaption>FullyFunctionalHintsVSCode</figcaption>
-</figure>
-</div>
-</section>
-<section id="background" class="level2">
-<h2 class="anchored" data-anchor-id="background">Background</h2>
-<p>I have been annoyed for a while by the fact that, when writing RDKit Python scripts in <a href="https://code.visualstudio.com/">Visual Studio Code</a> (I will it call VS Code from now on for simplicity), the familiar and helpful IntelliSense hints suggesting function or method names were either limited to a handful of functions or were not popping up at all.</p>
-<p>For example, the <code>rdkit.Chem</code> module features a range of <code>MolFrom...</code> and <code>MolTo...</code> functions to generate an RDKit molecule from several formats and export an RDKit molecule to various formats, respectively.</p>
-<p>However, when typing <code>mol = Chem.Mol</code> in VS Code, only InChI-related functions and <code>FindMolChiralCenters</code> were listed in the drop-down pop up:</p>
-<div class="quarto-figure quarto-figure-center">
-<figure class="figure">
-<p><img src="https://greglandrum.github.io/rdkit-blog/posts/images/blog/docstrings-stubs-1.png" class="img-fluid figure-img"></p>
-<figcaption>VSCodeFewFunctions</figcaption>
-</figure>
-</div>
-<p>Even after manually typing <code>Chem.MolFromSmiles</code>, VS Code would still not show any tooltip with the function docstring:</p>
-<div class="quarto-figure quarto-figure-center">
-<figure class="figure">
-<p><img src="https://greglandrum.github.io/rdkit-blog/posts/images/blog/docstrings-stubs-2.png" class="img-fluid figure-img"></p>
-<figcaption>VSCodeNoDocString</figcaption>
-</figure>
-</div>
-<p>Things were working much better in Jupyter Lab, as the drop-down was being populated with the expected methods while typing:</p>
-<div class="quarto-figure quarto-figure-center">
-<figure class="figure">
-<p><img src="https://greglandrum.github.io/rdkit-blog/posts/images/blog/docstrings-stubs-3.png" class="img-fluid figure-img"></p>
-<figcaption>JupyterLabWorksBetter</figcaption>
-</figure>
-</div>
-<p>Also class methods seemed to work as expected:</p>
-<div class="quarto-figure quarto-figure-center">
-<figure class="figure">
-<p><img src="https://greglandrum.github.io/rdkit-blog/posts/images/blog/docstrings-stubs-4.png" class="img-fluid figure-img"></p>
-<figcaption>JupyterLabClassMethodsShowUp</figcaption>
-</figure>
-</div>
-<p>However, something was still not quite right, as Jupyter Lab was not able to figure out the methods for the <code>Atom</code> instance returned by the <code>Mol.GetAtomWithIdx</code> method, and the dropdown was not showing any of the expected <code>Atom</code> methods:</p>
-<div class="quarto-figure quarto-figure-center">
-<figure class="figure">
-<p><img src="https://greglandrum.github.io/rdkit-blog/posts/images/blog/docstrings-stubs-5.png" class="img-fluid figure-img"></p>
-<figcaption>JupyterLabAtomMethodsMissing</figcaption>
-</figure>
-</div>
-<p>At some point I was sufficiently annoyed by all of the above that I decided to invest a bit of time in figuring out why it was happening. I learnt that VS Code hints are powered by <a href="https://microsoft.github.io/pyright/#/">Pyright</a>, which in turn requires <a href="https://mypy.readthedocs.io/en/stable/stubs.html">stubs</a> to do its job, and RDKit does not have them. In the absence of stubs, the only available hints are those that can be obtained by introspection, which is the mechanism used by Jupyter Lab. In VS Code, introspection only works for functions defined in Python files, such as <code>FindMolChiralCenters</code> (<code>rdkit/Chem/__init__.py</code>) or InChI-related functions (<code>rdkit/Chem/inchi.py</code>). Since the large majority of RDKit functions and classes are defined in binary modules (<em>i.e.</em>, files bearing a <code>.so</code>, <code>.dylib</code> or <code>.pyd</code> extension, depending on the platform), now we know why most of the RDKit API is unknown to VS Code.</p>
-<p>Stubs are Python files (though with a different extension, <code>.pyi</code>) containing class and free function definitions; docstrings associated to classes and functions are also included as triple-quoted comments. Function and method signatures are usually associated with parameter types and return types. Types are used by static type checkers such as <a href="https://mypy.readthedocs.io/en/stable/index.html"><code>mypy</code></a>, and by VS Code to figure out that the object returned by a function or class constructor is a class instance. Hovering on the object will show up the docstring associated to the class, and typing a dot after the object will trigger a pop up with all methods and properties available on that object. Once the user selects one of the available methods, VSCode will present a tooltip with the docstring associated to the method, as it had previously done with the class instance.<br></p>
-<p>This works great for Python modules that come with stubs:</p>
-<div class="quarto-figure quarto-figure-center">
-<figure class="figure">
-<p><img src="https://greglandrum.github.io/rdkit-blog/posts/images/blog/docstrings-stubs-6.png" class="img-fluid figure-img"></p>
-<figcaption>VSCodeReHints</figcaption>
-</figure>
-</div>
-<p>Interestingly, Jupyter Lab seems to know that <code>re.compile</code> returns a <code>re.Pattern</code> instance, and presents us with the available methods, contrary to what happened with <code>Mol.GetAtomWithIdx</code>:</p>
-<div class="quarto-figure quarto-figure-center">
-<figure class="figure">
-<p><img src="https://greglandrum.github.io/rdkit-blog/posts/images/blog/docstrings-stubs-7.png" class="img-fluid figure-img"></p>
-<figcaption>reCompileKnowsAboutPatternMethods</figcaption>
-</figure>
-</div>
-<p>In summary, there seemed to be two different issues here:</p>
-<ol type="1">
-<li>The lack of stubs prevented hints from popping up in VS Code</li>
-<li>Something else prevented correct introspection of the class method return type in jupyter Lab</li>
-</ol>
-</section>
-<section id="generating-stubs-for-rdkit" class="level2">
-<h2 class="anchored" data-anchor-id="generating-stubs-for-rdkit">Generating stubs for RDKit</h2>
-<p><code>Mypy</code> comes with a tool for automatic stub generation, <a href="https://mypy.readthedocs.io/en/stable/stubgen.html"><code>stubgen</code></a>. Generating stubs for a Python package is super-simple:</p>
-<pre><code>$ stubgen -p rdkit
-$ ls out/rdkit
-Avalon  Chem  DataManip  DataStructs  Dbase  DistanceGeometry  ForceField  Geometry  __init__.pyi  ML  Numerics  rdBase.pyi  RDConfig.pyi  RDLogger.pyi  RDPaths.pyi  RDRandom.pyi  SimDivFilters  sping  TestRunner.pyi  utils  VLib</code></pre>
-<p>At first glance, <code>stubgen</code> seems to be able to process RDKIt’s binary extension modules and generate stubs. However, upon closer inspection, it proves unable to extract types, parameters and docstrings. Therefore, the generated stubs are <em>really</em> basic and not very useful, as they provide no hints about how to use the various functions and methods, nor any dosctrings:</p>
-<pre><code>$ grep -A3 MolFromSmiles -r out/rdkit
-out/rdkit/Chem/rdmolfiles.pyi:def MolFromSmiles(*args, **kwargs) -&gt; Any: ...
-out/rdkit/Chem/rdmolfiles.pyi-def MolFromTPLBlock(boost) -&gt; Any: ...
-out/rdkit/Chem/rdmolfiles.pyi-def MolFromTPLFile(*args, **kwargs) -&gt; Any: ...
-out/rdkit/Chem/rdmolfiles.pyi-def MolFromXYZBlock(boost) -&gt; Any: ...</code></pre>
-<div class="quarto-figure quarto-figure-center">
-<figure class="figure">
-<p><img src="https://greglandrum.github.io/rdkit-blog/posts/images/blog/docstrings-stubs-8.png" class="img-fluid figure-img"></p>
-<figcaption>stubgenStubsAreVeryBasic</figcaption>
-</figure>
-</div>
-<p>Fortunately, there is another package, <a href="https://pypi.org/project/pybind11-stubgen/"><code>pybind11-stubgen</code></a>, which does a much better job with RDKit’s binary modules, and with a little bit of help can even figure out function parameters and types. I wrote a small Python module, <a href="https://github.com/rdkit/rdkit/tree/master/Scripts/gen_rdkit_stubs"><code>gen_rdkit_stubs</code></a>, which runs in parallel on multiple CPU cores and recursively generates stubs for the whole <code>rdkit</code> package in &lt; 10s:</p>
-<pre><code>$ time ( python -m Scripts.gen_rdkit_stubs )
-
-real    0m6.135s
-user    1m51.786s
-sys     0m27.283s</code></pre>
-<p>VS Code were now looking as they were supposed to, with all functions and methods populated in the dropdown pop-up, plus type hints and docstrings in the right place:</p>
-<div class="quarto-figure quarto-figure-center">
-<figure class="figure">
-<p><img src="https://greglandrum.github.io/rdkit-blog/posts/images/blog/docstrings-stubs-9.png" class="img-fluid figure-img"></p>
-<figcaption>VSCodeStubsGenRDKitStubs</figcaption>
-</figure>
-</div>
-<p>Also the <code>Mol</code> methods were being suggested, and VS Code seemed aware of the fact that <code>Mol.GetAtomWithIdx</code> returns an <code>Atom</code> instance:</p>
-<div class="quarto-figure quarto-figure-center">
-<figure class="figure">
-<p><img src="https://greglandrum.github.io/rdkit-blog/posts/images/blog/docstrings-stubs-10.png" class="img-fluid figure-img"></p>
-<figcaption>VSCodeChemMolMethodsPresent</figcaption>
-</figure>
-</div>
-<p>However, the <code>Atom</code> methods were still not showing up, just as I had previously observed in Jupyter Lab:</p>
-<div class="quarto-figure quarto-figure-center">
-<figure class="figure">
-<p><img src="https://greglandrum.github.io/rdkit-blog/posts/images/blog/docstrings-stubs-11.png" class="img-fluid figure-img"></p>
-<figcaption>VSCodeAtomMethodDoNotShowUp</figcaption>
-</figure>
-</div>
-<p>A closer look at the stubs clarified that stubs were not quite correct yet: firstly, the <code>GetAtomWithIdx</code> method, as well as all of the <code>Mol</code> methods, were incorrectly decorated as <code>@staticmethod</code>; secondly, the <code>Atom</code> return type is not recognized, since the <code>Atom</code> object was not imported from <code>rdkit.Chem</code>, and hence is basically an unknown type:</p>
-<pre><code>$ grep -B1 'def GetAtomWithIdx' -r pybind11-stubgen_rdkit-stubs/
-pybind11-stubgen_rdkit-stubs/Chem/rdchem.pyi-    @staticmethod
-pybind11-stubgen_rdkit-stubs/Chem/rdchem.pyi:    def GetAtomWithIdx(arg1: Mol, arg2: int) -&gt; Atom:</code></pre>
-<p>Manually correcting the stub to the following:</p>
-<pre><code>pybind11-stubgen_rdkit-stubs/Chem/rdchem.pyi-    #@staticmethod
-pybind11-stubgen_rdkit-stubs/Chem/rdchem.pyi:    def GetAtomWithIdx(arg1: self, arg2: int) -&gt; rdkit.Chem.Atom:</code></pre>
-<p>indeed led to the expected hints popping up:</p>
-<div class="quarto-figure quarto-figure-center">
-<figure class="figure">
-<p><img src="https://greglandrum.github.io/rdkit-blog/posts/images/blog/docstrings-stubs-12.png" class="img-fluid figure-img"></p>
-<figcaption>VSCodeManuallyCorrectedStub</figcaption>
-</figure>
-</div>
-<p>In summary, there were three residual issues:</p>
-<ol type="1">
-<li>several hundreds of class method signatures in the C++ source code of RDKit Python wrappers were missing the <code>python::arg("self")</code> parameter, causing the corresponding methods to be incorrectly decorated as <code>@staticmethod</code></li>
-<li><code>pybind11-stubgen</code> does not import objects used as return types; therefore, many return types are perceived as unknown by VS Code, and the associated class methods do not show up</li>
-<li>functions and methods missing explicit <code>python::arg</code> parameters were attributed default parameter names such as <code>arg1</code>, <code>arg2</code>, …, <code>argN</code>, which make many signatures rather obscure compared to their C++ counterparts which have more meaningful parameter names</li>
-</ol>
-<p>It was immediately clear that manually patching the whole RDKit codebase to fix these 3 issues would be a daunting task. Therefore, I explored ways to accomplish the same task programmatically, and the <a href="https://libclang.readthedocs.io/en/latest/">Clang Indexing Library Bindings</a> emerged as the most appealing option.</p>
-<p>The Clang Indexing Library can parse a C++ source file (including the headers that it references) and generate a tree-like structure which can be traversed to find the nodes of interest. Each of this nodes can in turn be related to a source code location (row and column numbers in the source file), making it possible to patch source code not just based on regular expressions, which would not be sufficient for our needs, but on some degree of actual “understanding” of the source code logic.</p>
-<p>For this purpose, I wrote another Python module, <a href="https://github.com/rdkit/rdkit/tree/master/Scripts/patch_rdkit_docstrings"><code>patch_rdkit_docstrings</code></a>, which:</p>
-<ol type="1">
-<li>identifies source code files which relate to Python wrappers and need patching</li>
-<li>generates AST files for each source code file</li>
-<li>traverses AST files to find the places in the source code that need patching</li>
-<li>adds the <code>self</code> parameter where needed to avoid that class methods are incorrectly decorated as <code>@staticmethod</code></li>
-<li>replaces the <code>argN</code> parameter names in Python functions with more meaningful parameter names extracted from the C++ functions that the Python functions are wrapping</li>
-<li>finally, runs <code>clang-format</code> on the patched sources to fix the formatting</li>
-</ol>
-<p>Also <code>patch_rdkit_docstrings</code> runs in parallel to speed up the patching, which takes a few minutes. Since docstring patching is a one-off operation, speed is not a critical factor; however, it definitely was during the development of the module. In fact, <code>patch_rdkit_docstrings</code> required several iterations to have the source code properly patched, and being able to quickly evaluate progress made between iterations was very helpful.</p>
-<p>Once Greg and I were happy with the source code patching made by <code>patch_rdkit_docstrings</code>, as well as with the stubs generated out of the patched source code by <code>gen_rdkit_stubs</code>, I submitted a <a href="https://github.com/rdkit/rdkit/pull/6919/files">PR to RDKit with the programmatic source code patches made by <code>patch_rdkit_docstrings</code></a>.</p>
-<p>The PR covered 91 files, with overall 4,076 lines of code being added and 1,088 being removed: definitely this was not a task that one would have liked to do manually: it would have probably required a comparable amount of time, some functions would have certainly being missed and some mistakes would have been made, and I would not have learnt anything about AST parsing and all the rest.</p>
-</section>
-<section id="summary" class="level2">
-<h2 class="anchored" data-anchor-id="summary">Summary</h2>
-<p>Since Release 2023.09.4, after building and installing in the usual way RDKit libraries and Python modules, stubs can be built and installed with the following command:</p>
-<pre><code>cmake --build . --target stubs</code></pre>
-<p>or, on Linux and macOS platforms, running</p>
-<pre><code>make stubs</code></pre>
-<p>The stubs enable fully functional hints in VS Code:</p>
-<div class="quarto-figure quarto-figure-center">
-<figure class="figure">
-<p><img src="https://greglandrum.github.io/rdkit-blog/posts/images/blog/docstrings-stubs-13.png" class="img-fluid figure-img"></p>
-<figcaption>FullyFunctionalHintsVSCode</figcaption>
-</figure>
-</div>
-<p>As a bonus, thanks to the one-off source patching, also the Jupyter Lab issue described at the beginning is solved:</p>
-<div class="quarto-figure quarto-figure-center">
-<figure class="figure">
-<p><img src="https://greglandrum.github.io/rdkit-blog/posts/images/blog/docstrings-stubs-14.png" class="img-fluid figure-img"></p>
-<figcaption>JupyterLabAlsoWorks</figcaption>
-</figure>
-</div>
-<p>Finally, also <a href="https://rdkit.org/docs/source/rdkit.Chem.rdchem.html#rdkit.Chem.rdchem.Mol.GetAtomWithIdx">the online RDKit documentation</a> looks prettier: <code>argN</code> parameters are replaced by meaningful parameter names taken from the respective C++ functions, while <code>self</code> parameters are now present in non-static methods:</p>
-<div class="quarto-figure quarto-figure-center">
-<figure class="figure">
-<p><img src="https://greglandrum.github.io/rdkit-blog/posts/images/blog/docstrings-stubs-15.png" class="img-fluid figure-img"></p>
-<figcaption>OnlineDocsLookBetter</figcaption>
-</figure>
-</div>
-<p>Starting from Release 2023.09.6, <code>rdkit-stubs</code> are also available as part of <code>conda-forge</code> RDKit packages.</p>
-<p>Happy coding with the new RDKit stubs!</p>
-
-
-</section>
-
- ]]></description>
-  <category>documentation</category>
-  <category>release</category>
-  <guid>https://greglandrum.github.io/rdkit-blog/posts/2024-03-08-docstring-stubs.html</guid>
-  <pubDate>Thu, 07 Mar 2024 23:00:00 GMT</pubDate>
-  <media:content url="https://greglandrum.github.io/rdkit-blog/posts/images/blog/docstrings-stubs-13.png" medium="image" type="image/png" height="56" width="144"/>
 </item>
 </channel>
 </rss>
