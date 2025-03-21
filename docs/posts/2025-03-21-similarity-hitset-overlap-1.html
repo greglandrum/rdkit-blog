@@ -1,0 +1,3243 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en"><head>
+
+<meta charset="utf-8">
+<meta name="generator" content="quarto-1.6.39">
+
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+
+<meta name="dcterms.date" content="2025-03-21">
+<meta name="description" content="Why it’s interesting to use different fingerprints for similarity searching">
+
+<title>Similarity-search hitlist overlap – RDKit blog</title>
+<style>
+code{white-space: pre-wrap;}
+span.smallcaps{font-variant: small-caps;}
+div.columns{display: flex; gap: min(4vw, 1.5em);}
+div.column{flex: auto; overflow-x: auto;}
+div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+ul.task-list{list-style: none;}
+ul.task-list li input[type="checkbox"] {
+  width: 0.8em;
+  margin: 0 0.8em 0.2em -1em; /* quarto-specific, see https://github.com/quarto-dev/quarto-cli/issues/4556 */ 
+  vertical-align: middle;
+}
+/* CSS for syntax highlighting */
+pre > code.sourceCode { white-space: pre; position: relative; }
+pre > code.sourceCode > span { line-height: 1.25; }
+pre > code.sourceCode > span:empty { height: 1.2em; }
+.sourceCode { overflow: visible; }
+code.sourceCode > span { color: inherit; text-decoration: inherit; }
+div.sourceCode { margin: 1em 0; }
+pre.sourceCode { margin: 0; }
+@media screen {
+div.sourceCode { overflow: auto; }
+}
+@media print {
+pre > code.sourceCode { white-space: pre-wrap; }
+pre > code.sourceCode > span { display: inline-block; text-indent: -5em; padding-left: 5em; }
+}
+pre.numberSource code
+  { counter-reset: source-line 0; }
+pre.numberSource code > span
+  { position: relative; left: -4em; counter-increment: source-line; }
+pre.numberSource code > span > a:first-child::before
+  { content: counter(source-line);
+    position: relative; left: -1em; text-align: right; vertical-align: baseline;
+    border: none; display: inline-block;
+    -webkit-touch-callout: none; -webkit-user-select: none;
+    -khtml-user-select: none; -moz-user-select: none;
+    -ms-user-select: none; user-select: none;
+    padding: 0 4px; width: 4em;
+  }
+pre.numberSource { margin-left: 3em;  padding-left: 4px; }
+div.sourceCode
+  {   }
+@media screen {
+pre > code.sourceCode > span > a:first-child::before { text-decoration: underline; }
+}
+</style>
+
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.5.1/jquery.min.js" integrity="sha512-bLT0Qm9VnAYZDflyKcBaQ2gg0hSYNQrJ8RilYldYQ1FxQYoCLtUjuuRuZo+fjqhx/qtq/1itJ0C2ejDxltZVFg==" crossorigin="anonymous"></script><script src="../site_libs/quarto-nav/quarto-nav.js"></script>
+<script src="../site_libs/quarto-nav/headroom.min.js"></script>
+<script src="../site_libs/clipboard/clipboard.min.js"></script>
+<script src="../site_libs/quarto-search/autocomplete.umd.js"></script>
+<script src="../site_libs/quarto-search/fuse.min.js"></script>
+<script src="../site_libs/quarto-search/quarto-search.js"></script>
+<meta name="quarto:offset" content="../">
+<link href="../posts/icons/favicon.ico" rel="icon">
+<script src="../site_libs/quarto-html/quarto.js"></script>
+<script src="../site_libs/quarto-html/popper.min.js"></script>
+<script src="../site_libs/quarto-html/tippy.umd.min.js"></script>
+<script src="../site_libs/quarto-html/anchor.min.js"></script>
+<link href="../site_libs/quarto-html/tippy.css" rel="stylesheet">
+<link href="../site_libs/quarto-html/quarto-syntax-highlighting-e26003cea8cd680ca0c55a263523d882.css" rel="stylesheet" class="quarto-color-scheme" id="quarto-text-highlighting-styles">
+<link href="../site_libs/quarto-html/quarto-syntax-highlighting-dark-d166b450ba5a8e9f7a0ab969bf6592c1.css" rel="prefetch" class="quarto-color-scheme quarto-color-alternate" id="quarto-text-highlighting-styles">
+<script src="../site_libs/bootstrap/bootstrap.min.js"></script>
+<link href="../site_libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
+<link href="../site_libs/bootstrap/bootstrap-a1fb93aa6af6e5138998f4139e0aef3d.min.css" rel="stylesheet" append-hash="true" class="quarto-color-scheme" id="quarto-bootstrap" data-mode="light">
+<link href="../site_libs/bootstrap/bootstrap-dark-98e8d043add42333c0993713f12a6dca.min.css" rel="prefetch" append-hash="true" class="quarto-color-scheme quarto-color-alternate" id="quarto-bootstrap" data-mode="dark">
+<script id="quarto-search-options" type="application/json">{
+  "location": "navbar",
+  "copy-button": false,
+  "collapse-after": 3,
+  "panel-placement": "end",
+  "type": "overlay",
+  "limit": 50,
+  "keyboard-shortcut": [
+    "f",
+    "/",
+    "s"
+  ],
+  "show-item-context": false,
+  "language": {
+    "search-no-results-text": "No results",
+    "search-matching-documents-text": "matching documents",
+    "search-copy-link-title": "Copy link to search",
+    "search-hide-matches-text": "Hide additional matches",
+    "search-more-match-text": "more match in this document",
+    "search-more-matches-text": "more matches in this document",
+    "search-clear-button-title": "Clear",
+    "search-text-placeholder": "",
+    "search-detached-cancel-button-title": "Cancel",
+    "search-submit-button-title": "Submit",
+    "search-label": "Search"
+  }
+}</script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.6/require.min.js" integrity="sha512-c3Nl8+7g4LMSTdrm621y7kf9v3SDPnhxLNhcjFJbKECVnmZHTdo+IRO05sNLTH/D3vA6u1X32ehoLC7WFVdheg==" crossorigin="anonymous"></script>
+
+<script type="application/javascript">define('jquery', [],function() {return window.jQuery;})</script>
+
+
+<link rel="stylesheet" href="../styles.css">
+</head>
+
+<body class="nav-fixed">
+
+<div id="quarto-search-results"></div>
+  <header id="quarto-header" class="headroom fixed-top">
+    <nav class="navbar navbar-expand-lg " data-bs-theme="dark">
+      <div class="navbar-container container-fluid">
+      <div class="navbar-brand-container mx-auto">
+    <a class="navbar-brand" href="../index.html">
+    <span class="navbar-title">RDKit blog</span>
+    </a>
+  </div>
+            <div id="quarto-search" class="" title="Search"></div>
+          <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarCollapse" aria-controls="navbarCollapse" role="menu" aria-expanded="false" aria-label="Toggle navigation" onclick="if (window.quartoToggleHeadroom) { window.quartoToggleHeadroom(); }">
+  <span class="navbar-toggler-icon"></span>
+</button>
+          <div class="collapse navbar-collapse" id="navbarCollapse">
+            <ul class="navbar-nav navbar-nav-scroll ms-auto">
+  <li class="nav-item">
+    <a class="nav-link" href="../about.html"> 
+<span class="menu-text">RDKit experiments, tips, and tutorials</span></a>
+  </li>  
+  <li class="nav-item compact">
+    <a class="nav-link" href="https://github.com/rdkit/rdkit"> <i class="bi bi-github" role="img">
+</i> 
+<span class="menu-text"></span></a>
+  </li>  
+  <li class="nav-item compact">
+    <a class="nav-link" href="https://bsky.app/profile/rdkit.bsky.social"> <i class="bi bi-twitter" role="img">
+</i> 
+<span class="menu-text"></span></a>
+  </li>  
+  <li class="nav-item compact">
+    <a class="nav-link" href="https://www.linkedin.com/groups/8192558/"> <i class="bi bi-linkedin" role="img">
+</i> 
+<span class="menu-text"></span></a>
+  </li>  
+  <li class="nav-item compact">
+    <a class="nav-link" href="../index.xml"> <i class="bi bi-rss" role="img">
+</i> 
+<span class="menu-text"></span></a>
+  </li>  
+</ul>
+          </div> <!-- /navcollapse -->
+            <div class="quarto-navbar-tools">
+  <a href="" class="quarto-color-scheme-toggle quarto-navigation-tool  px-1" onclick="window.quartoToggleColorScheme(); return false;" title="Toggle dark mode"><i class="bi"></i></a>
+</div>
+      </div> <!-- /container-fluid -->
+    </nav>
+</header>
+<!-- content -->
+<div id="quarto-content" class="quarto-container page-columns page-rows-contents page-layout-article page-navbar">
+<!-- sidebar -->
+<!-- margin-sidebar -->
+    <div id="quarto-margin-sidebar" class="sidebar margin-sidebar">
+        <nav id="TOC" role="doc-toc" class="toc-active">
+    <h2 id="toc-title">On this page</h2>
+   
+  <ul>
+  <li><a href="#do-some-statistics" id="toc-do-some-statistics" class="nav-link active" data-scroll-target="#do-some-statistics">Do some statistics</a></li>
+  </ul>
+</nav>
+    </div>
+<!-- main -->
+<main class="content" id="quarto-document-content">
+
+<header id="title-block-header" class="quarto-title-block default">
+<div class="quarto-title">
+<h1 class="title">Similarity-search hitlist overlap</h1>
+  <div class="quarto-categories">
+    <div class="quarto-category">reference</div>
+    <div class="quarto-category">similarity</div>
+    <div class="quarto-category">fingerprints</div>
+  </div>
+  </div>
+
+<div>
+  <div class="description">
+    Why it’s interesting to use different fingerprints for similarity searching
+  </div>
+</div>
+
+
+<div class="quarto-title-meta">
+
+    
+    <div>
+    <div class="quarto-title-meta-heading">Published</div>
+    <div class="quarto-title-meta-contents">
+      <p class="date">March 21, 2025</p>
+    </div>
+  </div>
+  
+    
+  </div>
+  
+
+
+</header>
+
+
+<p>One of the things I say when teaching about fingerprints and similarity searches is that there is no best fingerprint for every use case and that it’s often useful to do similarity searches using different types of fingerprints and combine the results. If you use fingerprints that use quite different features to determine similarity (e.g.&nbsp;Morgan3 and atom pairs), this is a good way to take advantage of the differences between the fingerprints.</p>
+<p>The goal of this post is to explore (and try to quantitate) the differences between the hit sets returned by doing similarity searches with different fingerprint types.</p>
+<p>For this post I will use the 59788 compounds tested in PubChem <a href="https://pubchem.ncbi.nlm.nih.gov/bioassay/373">Bioassay ID 373</a>. This is one of the PubChem screening assays, so the the compounds are taken from a screening deck and should be expected to be reasonably diverse with some small SAR clusters. You can directly access and download the compound structures <a href="https://www.ncbi.nlm.nih.gov/pccompound?linkname=pcassay_pccompound&amp;from_uid=373">here</a>.</p>
+<p>One thing that is worth keeping in mind is that these results almost certainly consider similarity values which are down close to and probably in the region of similarities observed between <a href="https://greglandrum.github.io/rdkit-blog/posts/2021-05-18-fingerprint-thresholds1.html">random compounds</a>. It may be worth refining the analysis in order to only consider similarities which are more significant, but that’s for a possible future post.</p>
+<div id="6127934a" class="cell" data-execution_count="3">
+<div class="sourceCode cell-code" id="cb1"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> rdkit <span class="im">import</span> Chem</span>
+<span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> rdkit.Chem <span class="im">import</span> rdFingerprintGenerator</span>
+<span id="cb1-3"><a href="#cb1-3" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> rdkit.Chem <span class="im">import</span> Draw</span>
+<span id="cb1-4"><a href="#cb1-4" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> rdkit.Chem.Draw <span class="im">import</span> IPythonConsole</span>
+<span id="cb1-5"><a href="#cb1-5" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> rdkit <span class="im">import</span> DataStructs</span>
+<span id="cb1-6"><a href="#cb1-6" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> numpy <span class="im">as</span> np</span>
+<span id="cb1-7"><a href="#cb1-7" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-8"><a href="#cb1-8" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> matplotlib <span class="im">import</span> pyplot <span class="im">as</span> plt</span>
+<span id="cb1-9"><a href="#cb1-9" aria-hidden="true" tabindex="-1"></a>plt.style.use(<span class="st">'tableau-colorblind10'</span>)</span>
+<span id="cb1-10"><a href="#cb1-10" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-11"><a href="#cb1-11" aria-hidden="true" tabindex="-1"></a><span class="op">%</span>matplotlib inline</span>
+<span id="cb1-12"><a href="#cb1-12" aria-hidden="true" tabindex="-1"></a><span class="op">%</span>load_ext sql</span>
+<span id="cb1-13"><a href="#cb1-13" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-14"><a href="#cb1-14" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> rdkit</span>
+<span id="cb1-15"><a href="#cb1-15" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(rdkit.__version__)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>2024.09.6</code></pre>
+</div>
+</div>
+<div id="92e399b5" class="cell" data-execution_count="4">
+<div class="sourceCode cell-code" id="cb3"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> gzip</span>
+<span id="cb3-2"><a href="#cb3-2" aria-hidden="true" tabindex="-1"></a><span class="cf">with</span> gzip.<span class="bu">open</span>(<span class="st">'../data/Pubchem_AID373_compounds.sdf.gz'</span>,<span class="st">'rb'</span>) <span class="im">as</span> inf:</span>
+<span id="cb3-3"><a href="#cb3-3" aria-hidden="true" tabindex="-1"></a>    <span class="cf">with</span> Chem.ForwardSDMolSupplier(inf) <span class="im">as</span> suppl:</span>
+<span id="cb3-4"><a href="#cb3-4" aria-hidden="true" tabindex="-1"></a>        dbmols <span class="op">=</span> [x <span class="cf">for</span> x <span class="kw">in</span> suppl <span class="cf">if</span> x <span class="kw">is</span> <span class="kw">not</span> <span class="va">None</span>]</span>
+<span id="cb3-5"><a href="#cb3-5" aria-hidden="true" tabindex="-1"></a><span class="bu">len</span>(dbmols)</span>
+<span id="cb3-6"><a href="#cb3-6" aria-hidden="true" tabindex="-1"></a>    </span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-display" data-execution_count="4">
+<pre><code>59788</code></pre>
+</div>
+</div>
+<div id="7c3c6e8e" class="cell" data-execution_count="7">
+<div class="sourceCode cell-code" id="cb5"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a>dbmols <span class="op">=</span> ms</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+<div id="6a9fbf6f" class="cell" data-execution_count="5">
+<div class="sourceCode cell-code" id="cb6"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb6-1"><a href="#cb6-1" aria-hidden="true" tabindex="-1"></a>qry <span class="op">=</span> Chem.MolFromSmiles(<span class="st">'CCOC1=C(C=C(C=C1)C2=NOC(=N2)C3=CC=NC=C3)OCC'</span>) <span class="co"># https://pubchem.ncbi.nlm.nih.gov/compound/666359</span></span>
+<span id="cb6-2"><a href="#cb6-2" aria-hidden="true" tabindex="-1"></a>qry</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-display" data-execution_count="5">
+<div>
+<figure class="figure">
+<p><img src="2025-03-21-similarity-hitset-overlap-1_files/figure-html/cell-5-output-1.png" class="img-fluid figure-img"></p>
+</figure>
+</div>
+</div>
+</div>
+<div id="2f8d196f" class="cell" data-execution_count="104">
+<div class="sourceCode cell-code" id="cb7"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb7-1"><a href="#cb7-1" aria-hidden="true" tabindex="-1"></a>runs <span class="op">=</span> [</span>
+<span id="cb7-2"><a href="#cb7-2" aria-hidden="true" tabindex="-1"></a>    (<span class="st">'mfp2'</span>,rdFingerprintGenerator.GetMorganGenerator(radius<span class="op">=</span><span class="dv">2</span>)),</span>
+<span id="cb7-3"><a href="#cb7-3" aria-hidden="true" tabindex="-1"></a>    (<span class="st">'ffp2'</span>,rdFingerprintGenerator.GetMorganGenerator(radius<span class="op">=</span><span class="dv">2</span>,</span>
+<span id="cb7-4"><a href="#cb7-4" aria-hidden="true" tabindex="-1"></a>                                                  atomInvariantsGenerator<span class="op">=</span>rdFingerprintGenerator.GetMorganAtomInvGen())),</span>
+<span id="cb7-5"><a href="#cb7-5" aria-hidden="true" tabindex="-1"></a>    (<span class="st">'mfp3'</span>,rdFingerprintGenerator.GetMorganGenerator(radius<span class="op">=</span><span class="dv">3</span>)),</span>
+<span id="cb7-6"><a href="#cb7-6" aria-hidden="true" tabindex="-1"></a>    (<span class="st">'ffp3'</span>,rdFingerprintGenerator.GetMorganGenerator(radius<span class="op">=</span><span class="dv">3</span>,</span>
+<span id="cb7-7"><a href="#cb7-7" aria-hidden="true" tabindex="-1"></a>                                                  atomInvariantsGenerator<span class="op">=</span>rdFingerprintGenerator.GetMorganAtomInvGen())),</span>
+<span id="cb7-8"><a href="#cb7-8" aria-hidden="true" tabindex="-1"></a>    (<span class="st">'mfp1'</span>,rdFingerprintGenerator.GetMorganGenerator(radius<span class="op">=</span><span class="dv">1</span>)),</span>
+<span id="cb7-9"><a href="#cb7-9" aria-hidden="true" tabindex="-1"></a>    (<span class="st">'ffp1'</span>,rdFingerprintGenerator.GetMorganGenerator(radius<span class="op">=</span><span class="dv">1</span>,</span>
+<span id="cb7-10"><a href="#cb7-10" aria-hidden="true" tabindex="-1"></a>                                                  atomInvariantsGenerator<span class="op">=</span>rdFingerprintGenerator.GetMorganAtomInvGen())),</span>
+<span id="cb7-11"><a href="#cb7-11" aria-hidden="true" tabindex="-1"></a>    (<span class="st">'tt'</span>,rdFingerprintGenerator.GetTopologicalTorsionGenerator()),</span>
+<span id="cb7-12"><a href="#cb7-12" aria-hidden="true" tabindex="-1"></a>    (<span class="st">'ap'</span>,rdFingerprintGenerator.GetAtomPairGenerator()),</span>
+<span id="cb7-13"><a href="#cb7-13" aria-hidden="true" tabindex="-1"></a>    (<span class="st">'rdk5'</span>,rdFingerprintGenerator.GetRDKitFPGenerator(maxPath<span class="op">=</span><span class="dv">5</span>)),</span>
+<span id="cb7-14"><a href="#cb7-14" aria-hidden="true" tabindex="-1"></a>    (<span class="st">'rdk7'</span>,rdFingerprintGenerator.GetRDKitFPGenerator(maxPath<span class="op">=</span><span class="dv">7</span>)),</span>
+<span id="cb7-15"><a href="#cb7-15" aria-hidden="true" tabindex="-1"></a>]</span>
+<span id="cb7-16"><a href="#cb7-16" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb7-17"><a href="#cb7-17" aria-hidden="true" tabindex="-1"></a>accum <span class="op">=</span> {}</span>
+<span id="cb7-18"><a href="#cb7-18" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> nm,fpg <span class="kw">in</span> runs:</span>
+<span id="cb7-19"><a href="#cb7-19" aria-hidden="true" tabindex="-1"></a>    <span class="bu">print</span>(nm)</span>
+<span id="cb7-20"><a href="#cb7-20" aria-hidden="true" tabindex="-1"></a>    fps <span class="op">=</span> fpg.GetFingerprints(dbmols,numThreads<span class="op">=</span><span class="dv">8</span>)</span>
+<span id="cb7-21"><a href="#cb7-21" aria-hidden="true" tabindex="-1"></a>    sims <span class="op">=</span> DataStructs.BulkTanimotoSimilarity(fpg.GetFingerprint(qry),fps)</span>
+<span id="cb7-22"><a href="#cb7-22" aria-hidden="true" tabindex="-1"></a>    accum[<span class="ss">f'</span><span class="sc">{</span>nm<span class="sc">}</span><span class="ss">-b'</span>] <span class="op">=</span> sims</span>
+<span id="cb7-23"><a href="#cb7-23" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb7-24"><a href="#cb7-24" aria-hidden="true" tabindex="-1"></a>    fps <span class="op">=</span> fpg.GetCountFingerprints(dbmols,numThreads<span class="op">=</span><span class="dv">8</span>)</span>
+<span id="cb7-25"><a href="#cb7-25" aria-hidden="true" tabindex="-1"></a>    sims <span class="op">=</span> DataStructs.BulkTanimotoSimilarity(fpg.GetCountFingerprint(qry),<span class="bu">list</span>(fps))</span>
+<span id="cb7-26"><a href="#cb7-26" aria-hidden="true" tabindex="-1"></a>    accum[<span class="ss">f'</span><span class="sc">{</span>nm<span class="sc">}</span><span class="ss">-c'</span>] <span class="op">=</span> sims</span>
+<span id="cb7-27"><a href="#cb7-27" aria-hidden="true" tabindex="-1"></a></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>mfp2
+ffp2
+mfp3
+ffp3
+mfp1
+ffp1
+tt
+ap
+rdk5
+rdk7</code></pre>
+</div>
+</div>
+<div id="812f75b7" class="cell" data-execution_count="118">
+<div class="sourceCode cell-code" id="cb9"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb9-1"><a href="#cb9-1" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> rdkit.Chem.Pharm2D <span class="im">import</span> Gobbi_Pharm2D,Generate</span>
+<span id="cb9-2"><a href="#cb9-2" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> Gobbi2D_bits(mol,fpLen<span class="op">=</span><span class="dv">2048</span>):</span>
+<span id="cb9-3"><a href="#cb9-3" aria-hidden="true" tabindex="-1"></a>    res <span class="op">=</span> DataStructs.ExplicitBitVect(fpLen)</span>
+<span id="cb9-4"><a href="#cb9-4" aria-hidden="true" tabindex="-1"></a>    <span class="cf">for</span> bit <span class="kw">in</span> Generate.Gen2DFingerprint(mol,Gobbi_Pharm2D.factory).GetOnBits():</span>
+<span id="cb9-5"><a href="#cb9-5" aria-hidden="true" tabindex="-1"></a>        <span class="co"># the bits are not hashed, so we need to do so before we fold them:</span></span>
+<span id="cb9-6"><a href="#cb9-6" aria-hidden="true" tabindex="-1"></a>        res.SetBit(<span class="bu">hash</span>((bit,))<span class="op">%</span>fpLen)</span>
+<span id="cb9-7"><a href="#cb9-7" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> res</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+<div id="1c181fc1" class="cell" data-execution_count="119">
+<div class="sourceCode cell-code" id="cb10"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb10-1"><a href="#cb10-1" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> rdkit.Chem <span class="im">import</span> rdMolDescriptors</span>
+<span id="cb10-2"><a href="#cb10-2" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> rdkit.Avalon <span class="im">import</span> pyAvalonTools</span>
+<span id="cb10-3"><a href="#cb10-3" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb10-4"><a href="#cb10-4" aria-hidden="true" tabindex="-1"></a>func_runs <span class="op">=</span> [</span>
+<span id="cb10-5"><a href="#cb10-5" aria-hidden="true" tabindex="-1"></a>    (<span class="st">'gobbi2d'</span>,Gobbi2D_bits),</span>
+<span id="cb10-6"><a href="#cb10-6" aria-hidden="true" tabindex="-1"></a>    (<span class="st">'avalon'</span>,pyAvalonTools.GetAvalonFP),</span>
+<span id="cb10-7"><a href="#cb10-7" aria-hidden="true" tabindex="-1"></a>    (<span class="st">'avalon-c'</span>,pyAvalonTools.GetAvalonCountFP),</span>
+<span id="cb10-8"><a href="#cb10-8" aria-hidden="true" tabindex="-1"></a>    (<span class="st">'pattern'</span>,Chem.PatternFingerprint),</span>
+<span id="cb10-9"><a href="#cb10-9" aria-hidden="true" tabindex="-1"></a>]</span>
+<span id="cb10-10"><a href="#cb10-10" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> nm,func <span class="kw">in</span> func_runs:</span>
+<span id="cb10-11"><a href="#cb10-11" aria-hidden="true" tabindex="-1"></a>    <span class="bu">print</span>(nm)</span>
+<span id="cb10-12"><a href="#cb10-12" aria-hidden="true" tabindex="-1"></a>    fps <span class="op">=</span> [func(m) <span class="cf">for</span> m <span class="kw">in</span> dbmols]</span>
+<span id="cb10-13"><a href="#cb10-13" aria-hidden="true" tabindex="-1"></a>    sims <span class="op">=</span> DataStructs.BulkTanimotoSimilarity(func(qry),fps)</span>
+<span id="cb10-14"><a href="#cb10-14" aria-hidden="true" tabindex="-1"></a>    accum[nm] <span class="op">=</span> sims</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>gobbi2d
+avalon
+avalon-c
+pattern</code></pre>
+</div>
+</div>
+<p>Accumulate the overlaps between the hit sets:</p>
+<div id="3c97fd94" class="cell" data-execution_count="120">
+<div class="sourceCode cell-code" id="cb12"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb12-1"><a href="#cb12-1" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> collections <span class="im">import</span> defaultdict</span>
+<span id="cb12-2"><a href="#cb12-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb12-3"><a href="#cb12-3" aria-hidden="true" tabindex="-1"></a>nms <span class="op">=</span> <span class="bu">list</span>(accum.keys())</span>
+<span id="cb12-4"><a href="#cb12-4" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb12-5"><a href="#cb12-5" aria-hidden="true" tabindex="-1"></a>ovls <span class="op">=</span> defaultdict(<span class="bu">dict</span>)</span>
+<span id="cb12-6"><a href="#cb12-6" aria-hidden="true" tabindex="-1"></a>topNs <span class="op">=</span> [<span class="dv">10</span>,<span class="dv">100</span>,<span class="dv">1000</span>]</span>
+<span id="cb12-7"><a href="#cb12-7" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> i,nmi <span class="kw">in</span> <span class="bu">enumerate</span>(nms):</span>
+<span id="cb12-8"><a href="#cb12-8" aria-hidden="true" tabindex="-1"></a>    topi <span class="op">=</span> [x <span class="cf">for</span> s,x <span class="kw">in</span> <span class="bu">sorted</span>([(s,x) <span class="cf">for</span> x,s <span class="kw">in</span> <span class="bu">enumerate</span>(accum[nmi])],reverse<span class="op">=</span><span class="va">True</span>)]</span>
+<span id="cb12-9"><a href="#cb12-9" aria-hidden="true" tabindex="-1"></a>    <span class="cf">for</span> j <span class="kw">in</span> <span class="bu">range</span>(i):</span>
+<span id="cb12-10"><a href="#cb12-10" aria-hidden="true" tabindex="-1"></a>        nmj <span class="op">=</span> nms[j]</span>
+<span id="cb12-11"><a href="#cb12-11" aria-hidden="true" tabindex="-1"></a>        topj <span class="op">=</span> [x <span class="cf">for</span> s,x <span class="kw">in</span> <span class="bu">sorted</span>([(s,x) <span class="cf">for</span> x,s <span class="kw">in</span> <span class="bu">enumerate</span>(accum[nmj])],reverse<span class="op">=</span><span class="va">True</span>)]</span>
+<span id="cb12-12"><a href="#cb12-12" aria-hidden="true" tabindex="-1"></a>        <span class="cf">for</span> topN <span class="kw">in</span> topNs:</span>
+<span id="cb12-13"><a href="#cb12-13" aria-hidden="true" tabindex="-1"></a>            ovls[nmi,nmj][topN] <span class="op">=</span> <span class="bu">set</span>(topi[:topN]).intersection(topj[:topN])</span>
+<span id="cb12-14"><a href="#cb12-14" aria-hidden="true" tabindex="-1"></a>ovls <span class="op">=</span> <span class="bu">dict</span>(ovls)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+<p>Here’s the full table of concordances between the fingerprints in the top 10, 100, and 1000 results:</p>
+<div id="0f05b787" class="cell" data-execution_count="121">
+<div class="sourceCode cell-code" id="cb13"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb13-1"><a href="#cb13-1" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> IPython.display <span class="im">import</span> HTML</span>
+<span id="cb13-2"><a href="#cb13-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb13-3"><a href="#cb13-3" aria-hidden="true" tabindex="-1"></a>snms <span class="op">=</span> <span class="bu">sorted</span>(nms)</span>
+<span id="cb13-4"><a href="#cb13-4" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb13-5"><a href="#cb13-5" aria-hidden="true" tabindex="-1"></a>html <span class="op">=</span> <span class="st">"&lt;table&gt;"</span></span>
+<span id="cb13-6"><a href="#cb13-6" aria-hidden="true" tabindex="-1"></a>ths <span class="op">=</span> <span class="st">""</span>.join(<span class="ss">f"&lt;th&gt;</span><span class="sc">{</span>nm<span class="sc">}</span><span class="ss">&lt;/th&gt;"</span> <span class="cf">for</span> nm <span class="kw">in</span> snms)</span>
+<span id="cb13-7"><a href="#cb13-7" aria-hidden="true" tabindex="-1"></a>html <span class="op">+=</span> <span class="ss">f"&lt;tr&gt;&lt;td&gt;&lt;/td&gt;</span><span class="sc">{</span>ths<span class="sc">}</span><span class="ss">&lt;/tr&gt;</span><span class="ch">\n</span><span class="ss">"</span></span>
+<span id="cb13-8"><a href="#cb13-8" aria-hidden="true" tabindex="-1"></a>ovls <span class="op">=</span> <span class="bu">dict</span>(ovls)</span>
+<span id="cb13-9"><a href="#cb13-9" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> i,nm <span class="kw">in</span> <span class="bu">enumerate</span>(snms):</span>
+<span id="cb13-10"><a href="#cb13-10" aria-hidden="true" tabindex="-1"></a>    row <span class="op">=</span> <span class="ss">f"&lt;th&gt;</span><span class="sc">{</span>nm<span class="sc">}</span><span class="ss">&lt;/th&gt;"</span></span>
+<span id="cb13-11"><a href="#cb13-11" aria-hidden="true" tabindex="-1"></a>    tds <span class="op">=</span> []</span>
+<span id="cb13-12"><a href="#cb13-12" aria-hidden="true" tabindex="-1"></a>    <span class="cf">for</span> j <span class="kw">in</span> <span class="bu">range</span>(<span class="bu">len</span>(snms)):</span>
+<span id="cb13-13"><a href="#cb13-13" aria-hidden="true" tabindex="-1"></a>        <span class="cf">if</span> i<span class="op">==</span>j:</span>
+<span id="cb13-14"><a href="#cb13-14" aria-hidden="true" tabindex="-1"></a>            tds.append(<span class="st">'&lt;td&gt;&lt;/td&gt;'</span>)</span>
+<span id="cb13-15"><a href="#cb13-15" aria-hidden="true" tabindex="-1"></a>            <span class="cf">continue</span></span>
+<span id="cb13-16"><a href="#cb13-16" aria-hidden="true" tabindex="-1"></a>        nmi <span class="op">=</span> snms[i]</span>
+<span id="cb13-17"><a href="#cb13-17" aria-hidden="true" tabindex="-1"></a>        nmj <span class="op">=</span> snms[j]</span>
+<span id="cb13-18"><a href="#cb13-18" aria-hidden="true" tabindex="-1"></a>        <span class="cf">if</span> (nmi,nmj) <span class="kw">not</span> <span class="kw">in</span> ovls:</span>
+<span id="cb13-19"><a href="#cb13-19" aria-hidden="true" tabindex="-1"></a>            nmi,nmj <span class="op">=</span> nmj,nmi</span>
+<span id="cb13-20"><a href="#cb13-20" aria-hidden="true" tabindex="-1"></a>        tds.append(<span class="ss">f"&lt;td&gt;</span><span class="sc">{</span><span class="bu">len</span>(ovls[nmi,nmj][<span class="dv">10</span>])<span class="sc">}</span><span class="ss">&lt;br /&gt;</span><span class="sc">{</span><span class="bu">len</span>(ovls[nmi,nmj][<span class="dv">100</span>])<span class="sc">}</span><span class="ss">&lt;br /&gt;</span><span class="sc">{</span><span class="bu">len</span>(ovls[nmi,nmj][<span class="dv">1000</span>])<span class="sc">}</span><span class="ss">&lt;/td&gt;"</span>)</span>
+<span id="cb13-21"><a href="#cb13-21" aria-hidden="true" tabindex="-1"></a>    tds <span class="op">=</span> <span class="st">""</span>.join(tds)</span>
+<span id="cb13-22"><a href="#cb13-22" aria-hidden="true" tabindex="-1"></a>    row <span class="op">+=</span> tds</span>
+<span id="cb13-23"><a href="#cb13-23" aria-hidden="true" tabindex="-1"></a>    html <span class="op">+=</span> <span class="ss">f"&lt;tr&gt;</span><span class="sc">{</span>row<span class="sc">}</span><span class="ss">&lt;/tr&gt;</span><span class="ch">\n</span><span class="ss">"</span></span>
+<span id="cb13-24"><a href="#cb13-24" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb13-25"><a href="#cb13-25" aria-hidden="true" tabindex="-1"></a>html <span class="op">+=</span> <span class="st">"&lt;/table&gt;"</span></span>
+<span id="cb13-26"><a href="#cb13-26" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb13-27"><a href="#cb13-27" aria-hidden="true" tabindex="-1"></a>HTML(html)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-display" data-execution_count="121">
+<table class="caption-top table table-sm table-striped small" data-quarto-postprocess="true">
+<colgroup>
+<col style="width: 4%">
+<col style="width: 4%">
+<col style="width: 4%">
+<col style="width: 4%">
+<col style="width: 4%">
+<col style="width: 4%">
+<col style="width: 4%">
+<col style="width: 4%">
+<col style="width: 4%">
+<col style="width: 4%">
+<col style="width: 4%">
+<col style="width: 4%">
+<col style="width: 4%">
+<col style="width: 4%">
+<col style="width: 4%">
+<col style="width: 4%">
+<col style="width: 4%">
+<col style="width: 4%">
+<col style="width: 4%">
+<col style="width: 4%">
+<col style="width: 4%">
+<col style="width: 4%">
+<col style="width: 4%">
+<col style="width: 4%">
+<col style="width: 4%">
+</colgroup>
+<tbody>
+<tr class="odd">
+<td></td>
+<td data-quarto-table-cell-role="th">ap-b</td>
+<td data-quarto-table-cell-role="th">ap-c</td>
+<td data-quarto-table-cell-role="th">avalon</td>
+<td data-quarto-table-cell-role="th">avalon-c</td>
+<td data-quarto-table-cell-role="th">ffp1-b</td>
+<td data-quarto-table-cell-role="th">ffp1-c</td>
+<td data-quarto-table-cell-role="th">ffp2-b</td>
+<td data-quarto-table-cell-role="th">ffp2-c</td>
+<td data-quarto-table-cell-role="th">ffp3-b</td>
+<td data-quarto-table-cell-role="th">ffp3-c</td>
+<td data-quarto-table-cell-role="th">gobbi2d</td>
+<td data-quarto-table-cell-role="th">mfp1-b</td>
+<td data-quarto-table-cell-role="th">mfp1-c</td>
+<td data-quarto-table-cell-role="th">mfp2-b</td>
+<td data-quarto-table-cell-role="th">mfp2-c</td>
+<td data-quarto-table-cell-role="th">mfp3-b</td>
+<td data-quarto-table-cell-role="th">mfp3-c</td>
+<td data-quarto-table-cell-role="th">pattern</td>
+<td data-quarto-table-cell-role="th">rdk5-b</td>
+<td data-quarto-table-cell-role="th">rdk5-c</td>
+<td data-quarto-table-cell-role="th">rdk7-b</td>
+<td data-quarto-table-cell-role="th">rdk7-c</td>
+<td data-quarto-table-cell-role="th">tt-b</td>
+<td data-quarto-table-cell-role="th">tt-c</td>
+</tr>
+<tr class="even">
+<td data-quarto-table-cell-role="th">ap-b</td>
+<td></td>
+<td>9<br>
+77<br>
+724</td>
+<td>7<br>
+40<br>
+245</td>
+<td>7<br>
+40<br>
+255</td>
+<td>6<br>
+43<br>
+317</td>
+<td>8<br>
+38<br>
+383</td>
+<td>7<br>
+46<br>
+281</td>
+<td>7<br>
+42<br>
+336</td>
+<td>7<br>
+43<br>
+260</td>
+<td>6<br>
+41<br>
+310</td>
+<td>3<br>
+51<br>
+235</td>
+<td>7<br>
+43<br>
+323</td>
+<td>8<br>
+41<br>
+380</td>
+<td>7<br>
+47<br>
+303</td>
+<td>7<br>
+43<br>
+337</td>
+<td>7<br>
+46<br>
+264</td>
+<td>7<br>
+45<br>
+314</td>
+<td>5<br>
+35<br>
+237</td>
+<td>6<br>
+46<br>
+292</td>
+<td>6<br>
+46<br>
+325</td>
+<td>7<br>
+47<br>
+279</td>
+<td>6<br>
+46<br>
+290</td>
+<td>7<br>
+39<br>
+298</td>
+<td>7<br>
+41<br>
+306</td>
+</tr>
+<tr class="odd">
+<td data-quarto-table-cell-role="th">ap-c</td>
+<td>9<br>
+77<br>
+724</td>
+<td></td>
+<td>6<br>
+46<br>
+271</td>
+<td>6<br>
+49<br>
+291</td>
+<td>6<br>
+42<br>
+350</td>
+<td>8<br>
+45<br>
+445</td>
+<td>7<br>
+48<br>
+312</td>
+<td>7<br>
+44<br>
+378</td>
+<td>7<br>
+45<br>
+289</td>
+<td>7<br>
+44<br>
+349</td>
+<td>3<br>
+49<br>
+238</td>
+<td>6<br>
+46<br>
+349</td>
+<td>7<br>
+48<br>
+424</td>
+<td>6<br>
+47<br>
+312</td>
+<td>6<br>
+48<br>
+359</td>
+<td>6<br>
+47<br>
+280</td>
+<td>6<br>
+48<br>
+335</td>
+<td>5<br>
+41<br>
+295</td>
+<td>6<br>
+52<br>
+326</td>
+<td>6<br>
+51<br>
+364</td>
+<td>6<br>
+50<br>
+310</td>
+<td>7<br>
+48<br>
+317</td>
+<td>7<br>
+41<br>
+337</td>
+<td>7<br>
+47<br>
+359</td>
+</tr>
+<tr class="even">
+<td data-quarto-table-cell-role="th">avalon</td>
+<td>7<br>
+40<br>
+245</td>
+<td>6<br>
+46<br>
+271</td>
+<td></td>
+<td>9<br>
+70<br>
+588</td>
+<td>7<br>
+57<br>
+512</td>
+<td>8<br>
+40<br>
+399</td>
+<td>8<br>
+57<br>
+428</td>
+<td>9<br>
+43<br>
+357</td>
+<td>8<br>
+51<br>
+354</td>
+<td>8<br>
+43<br>
+320</td>
+<td>5<br>
+37<br>
+290</td>
+<td>8<br>
+65<br>
+552</td>
+<td>9<br>
+48<br>
+451</td>
+<td>9<br>
+60<br>
+529</td>
+<td>9<br>
+50<br>
+443</td>
+<td>8<br>
+54<br>
+429</td>
+<td>9<br>
+51<br>
+382</td>
+<td>6<br>
+56<br>
+518</td>
+<td>7<br>
+83<br>
+625</td>
+<td>8<br>
+74<br>
+502</td>
+<td>8<br>
+73<br>
+502</td>
+<td>8<br>
+68<br>
+487</td>
+<td>8<br>
+54<br>
+399</td>
+<td>8<br>
+60<br>
+446</td>
+</tr>
+<tr class="odd">
+<td data-quarto-table-cell-role="th">avalon-c</td>
+<td>7<br>
+40<br>
+255</td>
+<td>6<br>
+49<br>
+291</td>
+<td>9<br>
+70<br>
+588</td>
+<td></td>
+<td>7<br>
+50<br>
+430</td>
+<td>8<br>
+50<br>
+402</td>
+<td>8<br>
+46<br>
+379</td>
+<td>9<br>
+41<br>
+371</td>
+<td>8<br>
+44<br>
+339</td>
+<td>8<br>
+40<br>
+344</td>
+<td>5<br>
+37<br>
+289</td>
+<td>8<br>
+59<br>
+459</td>
+<td>9<br>
+57<br>
+466</td>
+<td>9<br>
+52<br>
+458</td>
+<td>9<br>
+50<br>
+469</td>
+<td>8<br>
+47<br>
+399</td>
+<td>9<br>
+46<br>
+430</td>
+<td>6<br>
+62<br>
+532</td>
+<td>7<br>
+63<br>
+494</td>
+<td>8<br>
+69<br>
+478</td>
+<td>8<br>
+61<br>
+424</td>
+<td>8<br>
+68<br>
+458</td>
+<td>8<br>
+50<br>
+361</td>
+<td>8<br>
+57<br>
+393</td>
+</tr>
+<tr class="even">
+<td data-quarto-table-cell-role="th">ffp1-b</td>
+<td>6<br>
+43<br>
+317</td>
+<td>6<br>
+42<br>
+350</td>
+<td>7<br>
+57<br>
+512</td>
+<td>7<br>
+50<br>
+430</td>
+<td></td>
+<td>7<br>
+60<br>
+586</td>
+<td>9<br>
+68<br>
+671</td>
+<td>8<br>
+54<br>
+547</td>
+<td>9<br>
+55<br>
+573</td>
+<td>8<br>
+52<br>
+496</td>
+<td>6<br>
+37<br>
+263</td>
+<td>9<br>
+82<br>
+759</td>
+<td>7<br>
+60<br>
+562</td>
+<td>8<br>
+67<br>
+662</td>
+<td>8<br>
+59<br>
+529</td>
+<td>8<br>
+59<br>
+542</td>
+<td>8<br>
+57<br>
+469</td>
+<td>5<br>
+50<br>
+436</td>
+<td>7<br>
+58<br>
+563</td>
+<td>8<br>
+54<br>
+485</td>
+<td>8<br>
+57<br>
+458</td>
+<td>7<br>
+49<br>
+441</td>
+<td>8<br>
+65<br>
+514</td>
+<td>8<br>
+63<br>
+544</td>
+</tr>
+<tr class="odd">
+<td data-quarto-table-cell-role="th">ffp1-c</td>
+<td>8<br>
+38<br>
+383</td>
+<td>8<br>
+45<br>
+445</td>
+<td>8<br>
+40<br>
+399</td>
+<td>8<br>
+50<br>
+402</td>
+<td>7<br>
+60<br>
+586</td>
+<td></td>
+<td>8<br>
+60<br>
+560</td>
+<td>9<br>
+70<br>
+722</td>
+<td>8<br>
+55<br>
+507</td>
+<td>8<br>
+65<br>
+633</td>
+<td>5<br>
+39<br>
+292</td>
+<td>7<br>
+59<br>
+539</td>
+<td>9<br>
+80<br>
+674</td>
+<td>8<br>
+59<br>
+527</td>
+<td>8<br>
+68<br>
+598</td>
+<td>7<br>
+60<br>
+461</td>
+<td>8<br>
+64<br>
+532</td>
+<td>6<br>
+48<br>
+385</td>
+<td>8<br>
+41<br>
+449</td>
+<td>8<br>
+44<br>
+473</td>
+<td>7<br>
+40<br>
+405</td>
+<td>8<br>
+43<br>
+442</td>
+<td>9<br>
+60<br>
+543</td>
+<td>9<br>
+62<br>
+579</td>
+</tr>
+<tr class="even">
+<td data-quarto-table-cell-role="th">ffp2-b</td>
+<td>7<br>
+46<br>
+281</td>
+<td>7<br>
+48<br>
+312</td>
+<td>8<br>
+57<br>
+428</td>
+<td>8<br>
+46<br>
+379</td>
+<td>9<br>
+68<br>
+671</td>
+<td>8<br>
+60<br>
+560</td>
+<td></td>
+<td>9<br>
+75<br>
+682</td>
+<td>10<br>
+82<br>
+804</td>
+<td>9<br>
+73<br>
+649</td>
+<td>6<br>
+49<br>
+285</td>
+<td>9<br>
+62<br>
+582</td>
+<td>8<br>
+61<br>
+483</td>
+<td>9<br>
+84<br>
+658</td>
+<td>9<br>
+78<br>
+539</td>
+<td>9<br>
+82<br>
+598</td>
+<td>9<br>
+79<br>
+510</td>
+<td>5<br>
+39<br>
+385</td>
+<td>8<br>
+61<br>
+511</td>
+<td>8<br>
+56<br>
+479</td>
+<td>9<br>
+63<br>
+453</td>
+<td>8<br>
+57<br>
+447</td>
+<td>9<br>
+70<br>
+595</td>
+<td>9<br>
+74<br>
+611</td>
+</tr>
+<tr class="odd">
+<td data-quarto-table-cell-role="th">ffp2-c</td>
+<td>7<br>
+42<br>
+336</td>
+<td>7<br>
+44<br>
+378</td>
+<td>9<br>
+43<br>
+357</td>
+<td>9<br>
+41<br>
+371</td>
+<td>8<br>
+54<br>
+547</td>
+<td>9<br>
+70<br>
+722</td>
+<td>9<br>
+75<br>
+682</td>
+<td></td>
+<td>9<br>
+78<br>
+669</td>
+<td>9<br>
+90<br>
+848</td>
+<td>6<br>
+41<br>
+314</td>
+<td>8<br>
+52<br>
+483</td>
+<td>9<br>
+65<br>
+564</td>
+<td>9<br>
+71<br>
+559</td>
+<td>9<br>
+81<br>
+655</td>
+<td>8<br>
+76<br>
+553</td>
+<td>9<br>
+80<br>
+625</td>
+<td>6<br>
+32<br>
+347</td>
+<td>8<br>
+47<br>
+430</td>
+<td>9<br>
+45<br>
+441</td>
+<td>8<br>
+47<br>
+387</td>
+<td>9<br>
+44<br>
+413</td>
+<td>9<br>
+64<br>
+578</td>
+<td>9<br>
+67<br>
+603</td>
+</tr>
+<tr class="even">
+<td data-quarto-table-cell-role="th">ffp3-b</td>
+<td>7<br>
+43<br>
+260</td>
+<td>7<br>
+45<br>
+289</td>
+<td>8<br>
+51<br>
+354</td>
+<td>8<br>
+44<br>
+339</td>
+<td>9<br>
+55<br>
+573</td>
+<td>8<br>
+55<br>
+507</td>
+<td>10<br>
+82<br>
+804</td>
+<td>9<br>
+78<br>
+669</td>
+<td></td>
+<td>9<br>
+81<br>
+715</td>
+<td>6<br>
+45<br>
+277</td>
+<td>9<br>
+54<br>
+498</td>
+<td>8<br>
+58<br>
+450</td>
+<td>9<br>
+74<br>
+606</td>
+<td>9<br>
+77<br>
+543</td>
+<td>9<br>
+86<br>
+617</td>
+<td>9<br>
+82<br>
+547</td>
+<td>5<br>
+34<br>
+337</td>
+<td>8<br>
+56<br>
+443</td>
+<td>8<br>
+54<br>
+431</td>
+<td>9<br>
+60<br>
+397</td>
+<td>8<br>
+54<br>
+395</td>
+<td>9<br>
+63<br>
+538</td>
+<td>9<br>
+67<br>
+546</td>
+</tr>
+<tr class="odd">
+<td data-quarto-table-cell-role="th">ffp3-c</td>
+<td>6<br>
+41<br>
+310</td>
+<td>7<br>
+44<br>
+349</td>
+<td>8<br>
+43<br>
+320</td>
+<td>8<br>
+40<br>
+344</td>
+<td>8<br>
+52<br>
+496</td>
+<td>8<br>
+65<br>
+633</td>
+<td>9<br>
+73<br>
+649</td>
+<td>9<br>
+90<br>
+848</td>
+<td>9<br>
+81<br>
+715</td>
+<td></td>
+<td>6<br>
+41<br>
+307</td>
+<td>8<br>
+50<br>
+440</td>
+<td>8<br>
+63<br>
+519</td>
+<td>9<br>
+69<br>
+535</td>
+<td>9<br>
+79<br>
+648</td>
+<td>8<br>
+79<br>
+565</td>
+<td>9<br>
+82<br>
+645</td>
+<td>6<br>
+32<br>
+314</td>
+<td>8<br>
+47<br>
+394</td>
+<td>8<br>
+45<br>
+413</td>
+<td>8<br>
+47<br>
+363</td>
+<td>9<br>
+44<br>
+383</td>
+<td>9<br>
+60<br>
+548</td>
+<td>9<br>
+63<br>
+570</td>
+</tr>
+<tr class="even">
+<td data-quarto-table-cell-role="th">gobbi2d</td>
+<td>3<br>
+51<br>
+235</td>
+<td>3<br>
+49<br>
+238</td>
+<td>5<br>
+37<br>
+290</td>
+<td>5<br>
+37<br>
+289</td>
+<td>6<br>
+37<br>
+263</td>
+<td>5<br>
+39<br>
+292</td>
+<td>6<br>
+49<br>
+285</td>
+<td>6<br>
+41<br>
+314</td>
+<td>6<br>
+45<br>
+277</td>
+<td>6<br>
+41<br>
+307</td>
+<td></td>
+<td>5<br>
+40<br>
+280</td>
+<td>5<br>
+42<br>
+309</td>
+<td>6<br>
+55<br>
+319</td>
+<td>6<br>
+48<br>
+351</td>
+<td>5<br>
+49<br>
+301</td>
+<td>6<br>
+48<br>
+346</td>
+<td>3<br>
+33<br>
+238</td>
+<td>7<br>
+42<br>
+349</td>
+<td>7<br>
+41<br>
+367</td>
+<td>5<br>
+44<br>
+367</td>
+<td>5<br>
+43<br>
+371</td>
+<td>6<br>
+44<br>
+278</td>
+<td>6<br>
+41<br>
+304</td>
+</tr>
+<tr class="odd">
+<td data-quarto-table-cell-role="th">mfp1-b</td>
+<td>7<br>
+43<br>
+323</td>
+<td>6<br>
+46<br>
+349</td>
+<td>8<br>
+65<br>
+552</td>
+<td>8<br>
+59<br>
+459</td>
+<td>9<br>
+82<br>
+759</td>
+<td>7<br>
+59<br>
+539</td>
+<td>9<br>
+62<br>
+582</td>
+<td>8<br>
+52<br>
+483</td>
+<td>9<br>
+54<br>
+498</td>
+<td>8<br>
+50<br>
+440</td>
+<td>5<br>
+40<br>
+280</td>
+<td></td>
+<td>8<br>
+66<br>
+645</td>
+<td>9<br>
+68<br>
+729</td>
+<td>9<br>
+60<br>
+582</td>
+<td>9<br>
+59<br>
+580</td>
+<td>9<br>
+57<br>
+505</td>
+<td>5<br>
+57<br>
+443</td>
+<td>7<br>
+63<br>
+581</td>
+<td>7<br>
+57<br>
+494</td>
+<td>9<br>
+60<br>
+455</td>
+<td>7<br>
+52<br>
+444</td>
+<td>8<br>
+61<br>
+461</td>
+<td>8<br>
+60<br>
+507</td>
+</tr>
+<tr class="even">
+<td data-quarto-table-cell-role="th">mfp1-c</td>
+<td>8<br>
+41<br>
+380</td>
+<td>7<br>
+48<br>
+424</td>
+<td>9<br>
+48<br>
+451</td>
+<td>9<br>
+57<br>
+466</td>
+<td>7<br>
+60<br>
+562</td>
+<td>9<br>
+80<br>
+674</td>
+<td>8<br>
+61<br>
+483</td>
+<td>9<br>
+65<br>
+564</td>
+<td>8<br>
+58<br>
+450</td>
+<td>8<br>
+63<br>
+519</td>
+<td>5<br>
+42<br>
+309</td>
+<td>8<br>
+66<br>
+645</td>
+<td></td>
+<td>9<br>
+65<br>
+613</td>
+<td>9<br>
+75<br>
+729</td>
+<td>8<br>
+65<br>
+530</td>
+<td>9<br>
+69<br>
+628</td>
+<td>6<br>
+53<br>
+408</td>
+<td>7<br>
+48<br>
+481</td>
+<td>8<br>
+51<br>
+483</td>
+<td>8<br>
+48<br>
+414</td>
+<td>8<br>
+50<br>
+439</td>
+<td>8<br>
+59<br>
+434</td>
+<td>8<br>
+60<br>
+482</td>
+</tr>
+<tr class="odd">
+<td data-quarto-table-cell-role="th">mfp2-b</td>
+<td>7<br>
+47<br>
+303</td>
+<td>6<br>
+47<br>
+312</td>
+<td>9<br>
+60<br>
+529</td>
+<td>9<br>
+52<br>
+458</td>
+<td>8<br>
+67<br>
+662</td>
+<td>8<br>
+59<br>
+527</td>
+<td>9<br>
+84<br>
+658</td>
+<td>9<br>
+71<br>
+559</td>
+<td>9<br>
+74<br>
+606</td>
+<td>9<br>
+69<br>
+535</td>
+<td>6<br>
+55<br>
+319</td>
+<td>9<br>
+68<br>
+729</td>
+<td>9<br>
+65<br>
+613</td>
+<td></td>
+<td>10<br>
+81<br>
+694</td>
+<td>9<br>
+83<br>
+780</td>
+<td>10<br>
+80<br>
+643</td>
+<td>6<br>
+44<br>
+449</td>
+<td>8<br>
+61<br>
+605</td>
+<td>8<br>
+57<br>
+534</td>
+<td>9<br>
+64<br>
+504</td>
+<td>8<br>
+57<br>
+490</td>
+<td>9<br>
+74<br>
+480</td>
+<td>9<br>
+75<br>
+521</td>
+</tr>
+<tr class="even">
+<td data-quarto-table-cell-role="th">mfp2-c</td>
+<td>7<br>
+43<br>
+337</td>
+<td>6<br>
+48<br>
+359</td>
+<td>9<br>
+50<br>
+443</td>
+<td>9<br>
+50<br>
+469</td>
+<td>8<br>
+59<br>
+529</td>
+<td>8<br>
+68<br>
+598</td>
+<td>9<br>
+78<br>
+539</td>
+<td>9<br>
+81<br>
+655</td>
+<td>9<br>
+77<br>
+543</td>
+<td>9<br>
+79<br>
+648</td>
+<td>6<br>
+48<br>
+351</td>
+<td>9<br>
+60<br>
+582</td>
+<td>9<br>
+75<br>
+729</td>
+<td>10<br>
+81<br>
+694</td>
+<td></td>
+<td>9<br>
+84<br>
+679</td>
+<td>10<br>
+89<br>
+844</td>
+<td>6<br>
+41<br>
+393</td>
+<td>8<br>
+53<br>
+483</td>
+<td>8<br>
+51<br>
+488</td>
+<td>9<br>
+54<br>
+440</td>
+<td>8<br>
+51<br>
+461</td>
+<td>9<br>
+67<br>
+456</td>
+<td>9<br>
+71<br>
+507</td>
+</tr>
+<tr class="odd">
+<td data-quarto-table-cell-role="th">mfp3-b</td>
+<td>7<br>
+46<br>
+264</td>
+<td>6<br>
+47<br>
+280</td>
+<td>8<br>
+54<br>
+429</td>
+<td>8<br>
+47<br>
+399</td>
+<td>8<br>
+59<br>
+542</td>
+<td>7<br>
+60<br>
+461</td>
+<td>9<br>
+82<br>
+598</td>
+<td>8<br>
+76<br>
+553</td>
+<td>9<br>
+86<br>
+617</td>
+<td>8<br>
+79<br>
+565</td>
+<td>5<br>
+49<br>
+301</td>
+<td>9<br>
+59<br>
+580</td>
+<td>8<br>
+65<br>
+530</td>
+<td>9<br>
+83<br>
+780</td>
+<td>9<br>
+84<br>
+679</td>
+<td></td>
+<td>9<br>
+89<br>
+735</td>
+<td>5<br>
+39<br>
+382</td>
+<td>7<br>
+58<br>
+516</td>
+<td>7<br>
+57<br>
+470</td>
+<td>9<br>
+63<br>
+459</td>
+<td>7<br>
+58<br>
+447</td>
+<td>8<br>
+67<br>
+444</td>
+<td>8<br>
+70<br>
+477</td>
+</tr>
+<tr class="even">
+<td data-quarto-table-cell-role="th">mfp3-c</td>
+<td>7<br>
+45<br>
+314</td>
+<td>6<br>
+48<br>
+335</td>
+<td>9<br>
+51<br>
+382</td>
+<td>9<br>
+46<br>
+430</td>
+<td>8<br>
+57<br>
+469</td>
+<td>8<br>
+64<br>
+532</td>
+<td>9<br>
+79<br>
+510</td>
+<td>9<br>
+80<br>
+625</td>
+<td>9<br>
+82<br>
+547</td>
+<td>9<br>
+82<br>
+645</td>
+<td>6<br>
+48<br>
+346</td>
+<td>9<br>
+57<br>
+505</td>
+<td>9<br>
+69<br>
+628</td>
+<td>10<br>
+80<br>
+643</td>
+<td>10<br>
+89<br>
+844</td>
+<td>9<br>
+89<br>
+735</td>
+<td></td>
+<td>6<br>
+39<br>
+360</td>
+<td>8<br>
+55<br>
+436</td>
+<td>8<br>
+52<br>
+446</td>
+<td>9<br>
+56<br>
+412</td>
+<td>8<br>
+51<br>
+424</td>
+<td>9<br>
+65<br>
+431</td>
+<td>9<br>
+70<br>
+472</td>
+</tr>
+<tr class="odd">
+<td data-quarto-table-cell-role="th">pattern</td>
+<td>5<br>
+35<br>
+237</td>
+<td>5<br>
+41<br>
+295</td>
+<td>6<br>
+56<br>
+518</td>
+<td>6<br>
+62<br>
+532</td>
+<td>5<br>
+50<br>
+436</td>
+<td>6<br>
+48<br>
+385</td>
+<td>5<br>
+39<br>
+385</td>
+<td>6<br>
+32<br>
+347</td>
+<td>5<br>
+34<br>
+337</td>
+<td>6<br>
+32<br>
+314</td>
+<td>3<br>
+33<br>
+238</td>
+<td>5<br>
+57<br>
+443</td>
+<td>6<br>
+53<br>
+408</td>
+<td>6<br>
+44<br>
+449</td>
+<td>6<br>
+41<br>
+393</td>
+<td>5<br>
+39<br>
+382</td>
+<td>6<br>
+39<br>
+360</td>
+<td></td>
+<td>5<br>
+51<br>
+513</td>
+<td>6<br>
+49<br>
+432</td>
+<td>5<br>
+52<br>
+393</td>
+<td>6<br>
+51<br>
+398</td>
+<td>6<br>
+45<br>
+347</td>
+<td>6<br>
+47<br>
+385</td>
+</tr>
+<tr class="even">
+<td data-quarto-table-cell-role="th">rdk5-b</td>
+<td>6<br>
+46<br>
+292</td>
+<td>6<br>
+52<br>
+326</td>
+<td>7<br>
+83<br>
+625</td>
+<td>7<br>
+63<br>
+494</td>
+<td>7<br>
+58<br>
+563</td>
+<td>8<br>
+41<br>
+449</td>
+<td>8<br>
+61<br>
+511</td>
+<td>8<br>
+47<br>
+430</td>
+<td>8<br>
+56<br>
+443</td>
+<td>8<br>
+47<br>
+394</td>
+<td>7<br>
+42<br>
+349</td>
+<td>7<br>
+63<br>
+581</td>
+<td>7<br>
+48<br>
+481</td>
+<td>8<br>
+61<br>
+605</td>
+<td>8<br>
+53<br>
+483</td>
+<td>7<br>
+58<br>
+516</td>
+<td>8<br>
+55<br>
+436</td>
+<td>5<br>
+51<br>
+513</td>
+<td></td>
+<td>8<br>
+83<br>
+736</td>
+<td>7<br>
+84<br>
+705</td>
+<td>7<br>
+73<br>
+663</td>
+<td>9<br>
+61<br>
+504</td>
+<td>9<br>
+67<br>
+548</td>
+</tr>
+<tr class="odd">
+<td data-quarto-table-cell-role="th">rdk5-c</td>
+<td>6<br>
+46<br>
+325</td>
+<td>6<br>
+51<br>
+364</td>
+<td>8<br>
+74<br>
+502</td>
+<td>8<br>
+69<br>
+478</td>
+<td>8<br>
+54<br>
+485</td>
+<td>8<br>
+44<br>
+473</td>
+<td>8<br>
+56<br>
+479</td>
+<td>9<br>
+45<br>
+441</td>
+<td>8<br>
+54<br>
+431</td>
+<td>8<br>
+45<br>
+413</td>
+<td>7<br>
+41<br>
+367</td>
+<td>7<br>
+57<br>
+494</td>
+<td>8<br>
+51<br>
+483</td>
+<td>8<br>
+57<br>
+534</td>
+<td>8<br>
+51<br>
+488</td>
+<td>7<br>
+57<br>
+470</td>
+<td>8<br>
+52<br>
+446</td>
+<td>6<br>
+49<br>
+432</td>
+<td>8<br>
+83<br>
+736</td>
+<td></td>
+<td>7<br>
+85<br>
+701</td>
+<td>8<br>
+86<br>
+812</td>
+<td>8<br>
+59<br>
+509</td>
+<td>8<br>
+64<br>
+539</td>
+</tr>
+<tr class="even">
+<td data-quarto-table-cell-role="th">rdk7-b</td>
+<td>7<br>
+47<br>
+279</td>
+<td>6<br>
+50<br>
+310</td>
+<td>8<br>
+73<br>
+502</td>
+<td>8<br>
+61<br>
+424</td>
+<td>8<br>
+57<br>
+458</td>
+<td>7<br>
+40<br>
+405</td>
+<td>9<br>
+63<br>
+453</td>
+<td>8<br>
+47<br>
+387</td>
+<td>9<br>
+60<br>
+397</td>
+<td>8<br>
+47<br>
+363</td>
+<td>5<br>
+44<br>
+367</td>
+<td>9<br>
+60<br>
+455</td>
+<td>8<br>
+48<br>
+414</td>
+<td>9<br>
+64<br>
+504</td>
+<td>9<br>
+54<br>
+440</td>
+<td>9<br>
+63<br>
+459</td>
+<td>9<br>
+56<br>
+412</td>
+<td>5<br>
+52<br>
+393</td>
+<td>7<br>
+84<br>
+705</td>
+<td>7<br>
+85<br>
+701</td>
+<td></td>
+<td>7<br>
+85<br>
+776</td>
+<td>8<br>
+63<br>
+468</td>
+<td>8<br>
+67<br>
+490</td>
+</tr>
+<tr class="odd">
+<td data-quarto-table-cell-role="th">rdk7-c</td>
+<td>6<br>
+46<br>
+290</td>
+<td>7<br>
+48<br>
+317</td>
+<td>8<br>
+68<br>
+487</td>
+<td>8<br>
+68<br>
+458</td>
+<td>7<br>
+49<br>
+441</td>
+<td>8<br>
+43<br>
+442</td>
+<td>8<br>
+57<br>
+447</td>
+<td>9<br>
+44<br>
+413</td>
+<td>8<br>
+54<br>
+395</td>
+<td>9<br>
+44<br>
+383</td>
+<td>5<br>
+43<br>
+371</td>
+<td>7<br>
+52<br>
+444</td>
+<td>8<br>
+50<br>
+439</td>
+<td>8<br>
+57<br>
+490</td>
+<td>8<br>
+51<br>
+461</td>
+<td>7<br>
+58<br>
+447</td>
+<td>8<br>
+51<br>
+424</td>
+<td>6<br>
+51<br>
+398</td>
+<td>7<br>
+73<br>
+663</td>
+<td>8<br>
+86<br>
+812</td>
+<td>7<br>
+85<br>
+776</td>
+<td></td>
+<td>8<br>
+57<br>
+493</td>
+<td>8<br>
+62<br>
+518</td>
+</tr>
+<tr class="even">
+<td data-quarto-table-cell-role="th">tt-b</td>
+<td>7<br>
+39<br>
+298</td>
+<td>7<br>
+41<br>
+337</td>
+<td>8<br>
+54<br>
+399</td>
+<td>8<br>
+50<br>
+361</td>
+<td>8<br>
+65<br>
+514</td>
+<td>9<br>
+60<br>
+543</td>
+<td>9<br>
+70<br>
+595</td>
+<td>9<br>
+64<br>
+578</td>
+<td>9<br>
+63<br>
+538</td>
+<td>9<br>
+60<br>
+548</td>
+<td>6<br>
+44<br>
+278</td>
+<td>8<br>
+61<br>
+461</td>
+<td>8<br>
+59<br>
+434</td>
+<td>9<br>
+74<br>
+480</td>
+<td>9<br>
+67<br>
+456</td>
+<td>8<br>
+67<br>
+444</td>
+<td>9<br>
+65<br>
+431</td>
+<td>6<br>
+45<br>
+347</td>
+<td>9<br>
+61<br>
+504</td>
+<td>8<br>
+59<br>
+509</td>
+<td>8<br>
+63<br>
+468</td>
+<td>8<br>
+57<br>
+493</td>
+<td></td>
+<td>10<br>
+87<br>
+853</td>
+</tr>
+<tr class="odd">
+<td data-quarto-table-cell-role="th">tt-c</td>
+<td>7<br>
+41<br>
+306</td>
+<td>7<br>
+47<br>
+359</td>
+<td>8<br>
+60<br>
+446</td>
+<td>8<br>
+57<br>
+393</td>
+<td>8<br>
+63<br>
+544</td>
+<td>9<br>
+62<br>
+579</td>
+<td>9<br>
+74<br>
+611</td>
+<td>9<br>
+67<br>
+603</td>
+<td>9<br>
+67<br>
+546</td>
+<td>9<br>
+63<br>
+570</td>
+<td>6<br>
+41<br>
+304</td>
+<td>8<br>
+60<br>
+507</td>
+<td>8<br>
+60<br>
+482</td>
+<td>9<br>
+75<br>
+521</td>
+<td>9<br>
+71<br>
+507</td>
+<td>8<br>
+70<br>
+477</td>
+<td>9<br>
+70<br>
+472</td>
+<td>6<br>
+47<br>
+385</td>
+<td>9<br>
+67<br>
+548</td>
+<td>8<br>
+64<br>
+539</td>
+<td>8<br>
+67<br>
+490</td>
+<td>8<br>
+62<br>
+518</td>
+<td>10<br>
+87<br>
+853</td>
+<td></td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+<p>Look at the highest overlaps (most similar results) for each FP:</p>
+<div id="73a46d7e" class="cell" data-scrolled="false" data-execution_count="124">
+<div class="sourceCode cell-code" id="cb14"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb14-1"><a href="#cb14-1" aria-hidden="true" tabindex="-1"></a>snms <span class="op">=</span> <span class="bu">sorted</span>(nms)</span>
+<span id="cb14-2"><a href="#cb14-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb14-3"><a href="#cb14-3" aria-hidden="true" tabindex="-1"></a>ovls <span class="op">=</span> <span class="bu">dict</span>(ovls)</span>
+<span id="cb14-4"><a href="#cb14-4" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> i <span class="kw">in</span> <span class="bu">range</span>(<span class="bu">len</span>(snms)):</span>
+<span id="cb14-5"><a href="#cb14-5" aria-hidden="true" tabindex="-1"></a>    <span class="bu">print</span>(<span class="st">'-'</span><span class="op">*</span><span class="dv">70</span>)</span>
+<span id="cb14-6"><a href="#cb14-6" aria-hidden="true" tabindex="-1"></a>    <span class="bu">print</span>(snms[i])</span>
+<span id="cb14-7"><a href="#cb14-7" aria-hidden="true" tabindex="-1"></a>    <span class="cf">for</span> cnt <span class="kw">in</span> (<span class="dv">10</span>,<span class="dv">100</span>,<span class="dv">1000</span>):</span>
+<span id="cb14-8"><a href="#cb14-8" aria-hidden="true" tabindex="-1"></a>        row <span class="op">=</span> []</span>
+<span id="cb14-9"><a href="#cb14-9" aria-hidden="true" tabindex="-1"></a>        <span class="cf">for</span> j <span class="kw">in</span> <span class="bu">range</span>(<span class="bu">len</span>(snms)):</span>
+<span id="cb14-10"><a href="#cb14-10" aria-hidden="true" tabindex="-1"></a>            <span class="cf">if</span> i<span class="op">==</span>j:</span>
+<span id="cb14-11"><a href="#cb14-11" aria-hidden="true" tabindex="-1"></a>                <span class="cf">continue</span></span>
+<span id="cb14-12"><a href="#cb14-12" aria-hidden="true" tabindex="-1"></a>            nmi <span class="op">=</span> snms[i]</span>
+<span id="cb14-13"><a href="#cb14-13" aria-hidden="true" tabindex="-1"></a>            nmj <span class="op">=</span> snms[j]</span>
+<span id="cb14-14"><a href="#cb14-14" aria-hidden="true" tabindex="-1"></a>            <span class="cf">if</span> (nmi,nmj) <span class="kw">not</span> <span class="kw">in</span> ovls:</span>
+<span id="cb14-15"><a href="#cb14-15" aria-hidden="true" tabindex="-1"></a>                nmi,nmj <span class="op">=</span> nmj,nmi</span>
+<span id="cb14-16"><a href="#cb14-16" aria-hidden="true" tabindex="-1"></a>            row.append((<span class="bu">len</span>(ovls[nmi,nmj][cnt]),j))</span>
+<span id="cb14-17"><a href="#cb14-17" aria-hidden="true" tabindex="-1"></a>        row <span class="op">=</span> <span class="bu">sorted</span>(row,reverse<span class="op">=</span><span class="va">True</span>)</span>
+<span id="cb14-18"><a href="#cb14-18" aria-hidden="true" tabindex="-1"></a>        nbrs <span class="op">=</span> []</span>
+<span id="cb14-19"><a href="#cb14-19" aria-hidden="true" tabindex="-1"></a>        <span class="cf">for</span> j <span class="kw">in</span> <span class="bu">range</span>(<span class="dv">3</span>):</span>
+<span id="cb14-20"><a href="#cb14-20" aria-hidden="true" tabindex="-1"></a>            nbrs.append(<span class="ss">f'</span><span class="sc">{</span>snms[row[j][<span class="dv">1</span>]]<span class="sc">}</span><span class="ss">(</span><span class="sc">{</span>row[j][<span class="dv">0</span>]<span class="sc">}</span><span class="ss">)'</span>)</span>
+<span id="cb14-21"><a href="#cb14-21" aria-hidden="true" tabindex="-1"></a>        <span class="bu">print</span>(<span class="ss">f'</span><span class="ch">\t</span><span class="sc">{</span>cnt<span class="sc">: 5d}</span><span class="ss">'</span>,<span class="ss">f'</span><span class="sc">{</span>nbrs[<span class="dv">0</span>]<span class="sc">:13s}</span><span class="ss">'</span>,<span class="ss">f'</span><span class="sc">{</span>nbrs[<span class="dv">1</span>]<span class="sc">:13s}</span><span class="ss">'</span>,<span class="ss">f'</span><span class="sc">{</span>nbrs[<span class="dv">2</span>]<span class="sc">:13s}</span><span class="ss">'</span>,)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>----------------------------------------------------------------------
+ap-b
+       10 ap-c(9)       mfp1-c(8)     ffp1-c(8)    
+      100 ap-c(77)      gobbi2d(51)   rdk7-b(47)   
+     1000 ap-c(724)     ffp1-c(383)   mfp1-c(380)  
+----------------------------------------------------------------------
+ap-c
+       10 ap-b(9)       ffp1-c(8)     tt-c(7)      
+      100 ap-b(77)      rdk5-b(52)    rdk5-c(51)   
+     1000 ap-b(724)     ffp1-c(445)   mfp1-c(424)  
+----------------------------------------------------------------------
+avalon
+       10 mfp3-c(9)     mfp2-c(9)     mfp2-b(9)    
+      100 rdk5-b(83)    rdk5-c(74)    rdk7-b(73)   
+     1000 rdk5-b(625)   avalon-c(588) mfp1-b(552)  
+----------------------------------------------------------------------
+avalon-c
+       10 mfp3-c(9)     mfp2-c(9)     mfp2-b(9)    
+      100 avalon(70)    rdk5-c(69)    rdk7-c(68)   
+     1000 avalon(588)   pattern(532)  rdk5-b(494)  
+----------------------------------------------------------------------
+ffp1-b
+       10 mfp1-b(9)     ffp3-b(9)     ffp2-b(9)    
+      100 mfp1-b(82)    ffp2-b(68)    mfp2-b(67)   
+     1000 mfp1-b(759)   ffp2-b(671)   mfp2-b(662)  
+----------------------------------------------------------------------
+ffp1-c
+       10 tt-c(9)       tt-b(9)       mfp1-c(9)    
+      100 mfp1-c(80)    ffp2-c(70)    mfp2-c(68)   
+     1000 ffp2-c(722)   mfp1-c(674)   ffp3-c(633)  
+----------------------------------------------------------------------
+ffp2-b
+       10 ffp3-b(10)    tt-c(9)       tt-b(9)      
+      100 mfp2-b(84)    mfp3-b(82)    ffp3-b(82)   
+     1000 ffp3-b(804)   ffp2-c(682)   ffp1-b(671)  
+----------------------------------------------------------------------
+ffp2-c
+       10 tt-c(9)       tt-b(9)       rdk7-c(9)    
+      100 ffp3-c(90)    mfp2-c(81)    mfp3-c(80)   
+     1000 ffp3-c(848)   ffp1-c(722)   ffp2-b(682)  
+----------------------------------------------------------------------
+ffp3-b
+       10 ffp2-b(10)    tt-c(9)       tt-b(9)      
+      100 mfp3-b(86)    mfp3-c(82)    ffp2-b(82)   
+     1000 ffp2-b(804)   ffp3-c(715)   ffp2-c(669)  
+----------------------------------------------------------------------
+ffp3-c
+       10 tt-c(9)       tt-b(9)       rdk7-c(9)    
+      100 ffp2-c(90)    mfp3-c(82)    ffp3-b(81)   
+     1000 ffp2-c(848)   ffp3-b(715)   ffp2-b(649)  
+----------------------------------------------------------------------
+gobbi2d
+       10 rdk5-c(7)     rdk5-b(7)     tt-c(6)      
+      100 mfp2-b(55)    ap-b(51)      mfp3-b(49)   
+     1000 rdk7-c(371)   rdk7-b(367)   rdk5-c(367)  
+----------------------------------------------------------------------
+mfp1-b
+       10 rdk7-b(9)     mfp3-c(9)     mfp3-b(9)    
+      100 ffp1-b(82)    mfp2-b(68)    mfp1-c(66)   
+     1000 ffp1-b(759)   mfp2-b(729)   mfp1-c(645)  
+----------------------------------------------------------------------
+mfp1-c
+       10 mfp3-c(9)     mfp2-c(9)     mfp2-b(9)    
+      100 ffp1-c(80)    mfp2-c(75)    mfp3-c(69)   
+     1000 mfp2-c(729)   ffp1-c(674)   mfp1-b(645)  
+----------------------------------------------------------------------
+mfp2-b
+       10 mfp3-c(10)    mfp2-c(10)    tt-c(9)      
+      100 ffp2-b(84)    mfp3-b(83)    mfp2-c(81)   
+     1000 mfp3-b(780)   mfp1-b(729)   mfp2-c(694)  
+----------------------------------------------------------------------
+mfp2-c
+       10 mfp3-c(10)    mfp2-b(10)    tt-c(9)      
+      100 mfp3-c(89)    mfp3-b(84)    mfp2-b(81)   
+     1000 mfp3-c(844)   mfp1-c(729)   mfp2-b(694)  
+----------------------------------------------------------------------
+mfp3-b
+       10 rdk7-b(9)     mfp3-c(9)     mfp2-c(9)    
+      100 mfp3-c(89)    ffp3-b(86)    mfp2-c(84)   
+     1000 mfp2-b(780)   mfp3-c(735)   mfp2-c(679)  
+----------------------------------------------------------------------
+mfp3-c
+       10 mfp2-c(10)    mfp2-b(10)    tt-c(9)      
+      100 mfp3-b(89)    mfp2-c(89)    ffp3-c(82)   
+     1000 mfp2-c(844)   mfp3-b(735)   ffp3-c(645)  
+----------------------------------------------------------------------
+pattern
+       10 tt-c(6)       tt-b(6)       rdk7-c(6)    
+      100 avalon-c(62)  mfp1-b(57)    avalon(56)   
+     1000 avalon-c(532) avalon(518)   rdk5-b(513)  
+----------------------------------------------------------------------
+rdk5-b
+       10 tt-c(9)       tt-b(9)       rdk5-c(8)    
+      100 rdk7-b(84)    rdk5-c(83)    avalon(83)   
+     1000 rdk5-c(736)   rdk7-b(705)   rdk7-c(663)  
+----------------------------------------------------------------------
+rdk5-c
+       10 ffp2-c(9)     tt-c(8)       tt-b(8)      
+      100 rdk7-c(86)    rdk7-b(85)    rdk5-b(83)   
+     1000 rdk7-c(812)   rdk5-b(736)   rdk7-b(701)  
+----------------------------------------------------------------------
+rdk7-b
+       10 mfp3-c(9)     mfp3-b(9)     mfp2-c(9)    
+      100 rdk7-c(85)    rdk5-c(85)    rdk5-b(84)   
+     1000 rdk7-c(776)   rdk5-b(705)   rdk5-c(701)  
+----------------------------------------------------------------------
+rdk7-c
+       10 ffp3-c(9)     ffp2-c(9)     tt-c(8)      
+      100 rdk5-c(86)    rdk7-b(85)    rdk5-b(73)   
+     1000 rdk5-c(812)   rdk7-b(776)   rdk5-b(663)  
+----------------------------------------------------------------------
+tt-b
+       10 tt-c(10)      rdk5-b(9)     mfp3-c(9)    
+      100 tt-c(87)      mfp2-b(74)    ffp2-b(70)   
+     1000 tt-c(853)     ffp2-b(595)   ffp2-c(578)  
+----------------------------------------------------------------------
+tt-c
+       10 tt-b(10)      rdk5-b(9)     mfp3-c(9)    
+      100 tt-b(87)      mfp2-b(75)    ffp2-b(74)   
+     1000 tt-b(853)     ffp2-b(611)   ffp2-c(603)  </code></pre>
+</div>
+</div>
+<section id="do-some-statistics" class="level1">
+<h1>Do some statistics</h1>
+<p>Those were just results for a single query molecule. Let’s try and get more robust results by picking 500 molecules and looking at statistics for the overlaps:</p>
+<div id="4e9b9dbb" class="cell" data-execution_count="232">
+<div class="sourceCode cell-code" id="cb16"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb16-1"><a href="#cb16-1" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> random</span>
+<span id="cb16-2"><a href="#cb16-2" aria-hidden="true" tabindex="-1"></a>random.seed(<span class="bn">0xbad5eed</span>)</span>
+<span id="cb16-3"><a href="#cb16-3" aria-hidden="true" tabindex="-1"></a>order <span class="op">=</span> <span class="bu">list</span>(<span class="bu">range</span>(<span class="bu">len</span>(dbmols)))</span>
+<span id="cb16-4"><a href="#cb16-4" aria-hidden="true" tabindex="-1"></a>random.shuffle(order)</span>
+<span id="cb16-5"><a href="#cb16-5" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb16-6"><a href="#cb16-6" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb16-7"><a href="#cb16-7" aria-hidden="true" tabindex="-1"></a>nToDo <span class="op">=</span> <span class="dv">500</span></span>
+<span id="cb16-8"><a href="#cb16-8" aria-hidden="true" tabindex="-1"></a>order <span class="op">=</span> order[:<span class="dv">500</span>]</span>
+<span id="cb16-9"><a href="#cb16-9" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb16-10"><a href="#cb16-10" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb16-11"><a href="#cb16-11" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb16-12"><a href="#cb16-12" aria-hidden="true" tabindex="-1"></a>accum <span class="op">=</span> {}</span>
+<span id="cb16-13"><a href="#cb16-13" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> nm,fpg <span class="kw">in</span> runs:</span>
+<span id="cb16-14"><a href="#cb16-14" aria-hidden="true" tabindex="-1"></a>    <span class="bu">print</span>(nm)</span>
+<span id="cb16-15"><a href="#cb16-15" aria-hidden="true" tabindex="-1"></a>    fps <span class="op">=</span> <span class="bu">list</span>(fpg.GetFingerprints(dbmols,numThreads<span class="op">=</span><span class="dv">8</span>))</span>
+<span id="cb16-16"><a href="#cb16-16" aria-hidden="true" tabindex="-1"></a>    taccum <span class="op">=</span> []</span>
+<span id="cb16-17"><a href="#cb16-17" aria-hidden="true" tabindex="-1"></a>    <span class="cf">for</span> i <span class="kw">in</span> order:</span>
+<span id="cb16-18"><a href="#cb16-18" aria-hidden="true" tabindex="-1"></a>        qry <span class="op">=</span> fps[i]</span>
+<span id="cb16-19"><a href="#cb16-19" aria-hidden="true" tabindex="-1"></a>        sims <span class="op">=</span> [(sim,j) <span class="cf">for</span> j,sim <span class="kw">in</span> <span class="bu">enumerate</span>(DataStructs.BulkTanimotoSimilarity(qry,fps))]</span>
+<span id="cb16-20"><a href="#cb16-20" aria-hidden="true" tabindex="-1"></a>        <span class="co"># remove the self similarity</span></span>
+<span id="cb16-21"><a href="#cb16-21" aria-hidden="true" tabindex="-1"></a>        <span class="kw">del</span> sims[i]</span>
+<span id="cb16-22"><a href="#cb16-22" aria-hidden="true" tabindex="-1"></a>        sims <span class="op">=</span> <span class="bu">sorted</span>(sims,reverse<span class="op">=</span><span class="va">True</span>)[:<span class="dv">1000</span>]</span>
+<span id="cb16-23"><a href="#cb16-23" aria-hidden="true" tabindex="-1"></a>        taccum.append(sims)</span>
+<span id="cb16-24"><a href="#cb16-24" aria-hidden="true" tabindex="-1"></a>    accum[<span class="ss">f'</span><span class="sc">{</span>nm<span class="sc">}</span><span class="ss">-b'</span>] <span class="op">=</span> taccum</span>
+<span id="cb16-25"><a href="#cb16-25" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb16-26"><a href="#cb16-26" aria-hidden="true" tabindex="-1"></a>    fps <span class="op">=</span> <span class="bu">list</span>(fpg.GetCountFingerprints(dbmols,numThreads<span class="op">=</span><span class="dv">8</span>))</span>
+<span id="cb16-27"><a href="#cb16-27" aria-hidden="true" tabindex="-1"></a>    taccum <span class="op">=</span> []</span>
+<span id="cb16-28"><a href="#cb16-28" aria-hidden="true" tabindex="-1"></a>    <span class="cf">for</span> i <span class="kw">in</span> order:</span>
+<span id="cb16-29"><a href="#cb16-29" aria-hidden="true" tabindex="-1"></a>        qry <span class="op">=</span> fps[i]</span>
+<span id="cb16-30"><a href="#cb16-30" aria-hidden="true" tabindex="-1"></a>        sims <span class="op">=</span> [(sim,j) <span class="cf">for</span> j,sim <span class="kw">in</span> <span class="bu">enumerate</span>(DataStructs.BulkTanimotoSimilarity(qry,fps))]</span>
+<span id="cb16-31"><a href="#cb16-31" aria-hidden="true" tabindex="-1"></a>        <span class="co"># remove the self similarity</span></span>
+<span id="cb16-32"><a href="#cb16-32" aria-hidden="true" tabindex="-1"></a>        <span class="kw">del</span> sims[i]</span>
+<span id="cb16-33"><a href="#cb16-33" aria-hidden="true" tabindex="-1"></a>        sims <span class="op">=</span> <span class="bu">sorted</span>(sims,reverse<span class="op">=</span><span class="va">True</span>)[:<span class="dv">1000</span>]</span>
+<span id="cb16-34"><a href="#cb16-34" aria-hidden="true" tabindex="-1"></a>        taccum.append(sims)</span>
+<span id="cb16-35"><a href="#cb16-35" aria-hidden="true" tabindex="-1"></a>    accum[<span class="ss">f'</span><span class="sc">{</span>nm<span class="sc">}</span><span class="ss">-c'</span>] <span class="op">=</span> taccum</span>
+<span id="cb16-36"><a href="#cb16-36" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb16-37"><a href="#cb16-37" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> nm,func <span class="kw">in</span> func_runs:</span>
+<span id="cb16-38"><a href="#cb16-38" aria-hidden="true" tabindex="-1"></a>    <span class="bu">print</span>(nm)</span>
+<span id="cb16-39"><a href="#cb16-39" aria-hidden="true" tabindex="-1"></a>    fps <span class="op">=</span> [func(m) <span class="cf">for</span> m <span class="kw">in</span> dbmols]</span>
+<span id="cb16-40"><a href="#cb16-40" aria-hidden="true" tabindex="-1"></a>    taccum <span class="op">=</span> []</span>
+<span id="cb16-41"><a href="#cb16-41" aria-hidden="true" tabindex="-1"></a>    <span class="cf">for</span> i <span class="kw">in</span> order:</span>
+<span id="cb16-42"><a href="#cb16-42" aria-hidden="true" tabindex="-1"></a>        qry <span class="op">=</span> fps[i]</span>
+<span id="cb16-43"><a href="#cb16-43" aria-hidden="true" tabindex="-1"></a>        sims <span class="op">=</span> [(sim,j) <span class="cf">for</span> j,sim <span class="kw">in</span> <span class="bu">enumerate</span>(DataStructs.BulkTanimotoSimilarity(qry,fps))]</span>
+<span id="cb16-44"><a href="#cb16-44" aria-hidden="true" tabindex="-1"></a>        <span class="co"># remove the self similarity</span></span>
+<span id="cb16-45"><a href="#cb16-45" aria-hidden="true" tabindex="-1"></a>        <span class="kw">del</span> sims[i]</span>
+<span id="cb16-46"><a href="#cb16-46" aria-hidden="true" tabindex="-1"></a>        sims <span class="op">=</span> <span class="bu">sorted</span>(sims,reverse<span class="op">=</span><span class="va">True</span>)[:<span class="dv">1000</span>]</span>
+<span id="cb16-47"><a href="#cb16-47" aria-hidden="true" tabindex="-1"></a>        taccum.append(sims)</span>
+<span id="cb16-48"><a href="#cb16-48" aria-hidden="true" tabindex="-1"></a>    accum[nm] <span class="op">=</span> taccum</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>mfp2
+ffp2
+mfp3
+ffp3
+mfp1
+ffp1
+tt
+ap
+rdk5
+rdk7
+gobbi2d
+avalon
+avalon-c
+pattern</code></pre>
+</div>
+</div>
+<div id="0ce4aa9c" class="cell" data-execution_count="162">
+<div class="sourceCode cell-code" id="cb18"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb18-1"><a href="#cb18-1" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> pickle</span>
+<span id="cb18-2"><a href="#cb18-2" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> gzip</span>
+<span id="cb18-3"><a href="#cb18-3" aria-hidden="true" tabindex="-1"></a><span class="cf">with</span> gzip.<span class="bu">open</span>(<span class="st">'./results/sim_overlaps.pkl.gz'</span>,<span class="st">'wb+'</span>) <span class="im">as</span> outf:</span>
+<span id="cb18-4"><a href="#cb18-4" aria-hidden="true" tabindex="-1"></a>    pickle.dump(accum,outf)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+<p>Accumulate the overlaps:</p>
+<div id="04426233" class="cell" data-execution_count="164">
+<div class="sourceCode cell-code" id="cb19"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb19-1"><a href="#cb19-1" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> collections <span class="im">import</span> defaultdict</span>
+<span id="cb19-2"><a href="#cb19-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb19-3"><a href="#cb19-3" aria-hidden="true" tabindex="-1"></a>nms <span class="op">=</span> <span class="bu">list</span>(accum.keys())</span>
+<span id="cb19-4"><a href="#cb19-4" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb19-5"><a href="#cb19-5" aria-hidden="true" tabindex="-1"></a>ovls <span class="op">=</span> defaultdict(<span class="bu">dict</span>)</span>
+<span id="cb19-6"><a href="#cb19-6" aria-hidden="true" tabindex="-1"></a>topNs <span class="op">=</span> [<span class="dv">10</span>,<span class="dv">100</span>,<span class="dv">1000</span>]</span>
+<span id="cb19-7"><a href="#cb19-7" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> i,nmi <span class="kw">in</span> <span class="bu">enumerate</span>(nms):</span>
+<span id="cb19-8"><a href="#cb19-8" aria-hidden="true" tabindex="-1"></a>    nruns <span class="op">=</span> <span class="bu">len</span>(accum[nmi])</span>
+<span id="cb19-9"><a href="#cb19-9" aria-hidden="true" tabindex="-1"></a>    <span class="cf">for</span> j <span class="kw">in</span> <span class="bu">range</span>(i):</span>
+<span id="cb19-10"><a href="#cb19-10" aria-hidden="true" tabindex="-1"></a>        nmj <span class="op">=</span> nms[j]</span>
+<span id="cb19-11"><a href="#cb19-11" aria-hidden="true" tabindex="-1"></a>        <span class="cf">for</span> topN <span class="kw">in</span> topNs:</span>
+<span id="cb19-12"><a href="#cb19-12" aria-hidden="true" tabindex="-1"></a>            ovls[nmi,nmj][topN] <span class="op">=</span> []</span>
+<span id="cb19-13"><a href="#cb19-13" aria-hidden="true" tabindex="-1"></a>        <span class="cf">for</span> run <span class="kw">in</span> <span class="bu">range</span>(nruns):</span>
+<span id="cb19-14"><a href="#cb19-14" aria-hidden="true" tabindex="-1"></a>            topi <span class="op">=</span> [x <span class="cf">for</span> s,x <span class="kw">in</span> accum[nmi][run]]</span>
+<span id="cb19-15"><a href="#cb19-15" aria-hidden="true" tabindex="-1"></a>            topj <span class="op">=</span> [x <span class="cf">for</span> s,x <span class="kw">in</span> accum[nmj][run]]</span>
+<span id="cb19-16"><a href="#cb19-16" aria-hidden="true" tabindex="-1"></a>            <span class="cf">for</span> topN <span class="kw">in</span> topNs:</span>
+<span id="cb19-17"><a href="#cb19-17" aria-hidden="true" tabindex="-1"></a>                ovls[nmi,nmj][topN].append(<span class="bu">len</span>(<span class="bu">set</span>(topi[:topN]).intersection(topj[:topN])))</span>
+<span id="cb19-18"><a href="#cb19-18" aria-hidden="true" tabindex="-1"></a>ovls <span class="op">=</span> <span class="bu">dict</span>(ovls)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+<p>Find the most similar fingerprint types for each of the fingerprints, this time using the mean overlap across the 500 hit sets:</p>
+<div id="f87c6e49" class="cell" data-scrolled="false" data-execution_count="165">
+<div class="sourceCode cell-code" id="cb20"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb20-1"><a href="#cb20-1" aria-hidden="true" tabindex="-1"></a>snms <span class="op">=</span> <span class="bu">sorted</span>(nms)</span>
+<span id="cb20-2"><a href="#cb20-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb20-3"><a href="#cb20-3" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> i <span class="kw">in</span> <span class="bu">range</span>(<span class="bu">len</span>(snms)):</span>
+<span id="cb20-4"><a href="#cb20-4" aria-hidden="true" tabindex="-1"></a>    <span class="bu">print</span>(<span class="st">'-'</span><span class="op">*</span><span class="dv">70</span>)</span>
+<span id="cb20-5"><a href="#cb20-5" aria-hidden="true" tabindex="-1"></a>    <span class="bu">print</span>(snms[i])</span>
+<span id="cb20-6"><a href="#cb20-6" aria-hidden="true" tabindex="-1"></a>    <span class="cf">for</span> cnt <span class="kw">in</span> (<span class="dv">10</span>,<span class="dv">100</span>,<span class="dv">1000</span>):</span>
+<span id="cb20-7"><a href="#cb20-7" aria-hidden="true" tabindex="-1"></a>        row <span class="op">=</span> []</span>
+<span id="cb20-8"><a href="#cb20-8" aria-hidden="true" tabindex="-1"></a>        <span class="cf">for</span> j <span class="kw">in</span> <span class="bu">range</span>(<span class="bu">len</span>(snms)):</span>
+<span id="cb20-9"><a href="#cb20-9" aria-hidden="true" tabindex="-1"></a>            <span class="cf">if</span> i<span class="op">==</span>j:</span>
+<span id="cb20-10"><a href="#cb20-10" aria-hidden="true" tabindex="-1"></a>                <span class="cf">continue</span></span>
+<span id="cb20-11"><a href="#cb20-11" aria-hidden="true" tabindex="-1"></a>            nmi <span class="op">=</span> snms[i]</span>
+<span id="cb20-12"><a href="#cb20-12" aria-hidden="true" tabindex="-1"></a>            nmj <span class="op">=</span> snms[j]</span>
+<span id="cb20-13"><a href="#cb20-13" aria-hidden="true" tabindex="-1"></a>            <span class="cf">if</span> (nmi,nmj) <span class="kw">not</span> <span class="kw">in</span> ovls:</span>
+<span id="cb20-14"><a href="#cb20-14" aria-hidden="true" tabindex="-1"></a>                nmi,nmj <span class="op">=</span> nmj,nmi</span>
+<span id="cb20-15"><a href="#cb20-15" aria-hidden="true" tabindex="-1"></a>            row.append((np.mean(ovls[nmi,nmj][cnt]),j))</span>
+<span id="cb20-16"><a href="#cb20-16" aria-hidden="true" tabindex="-1"></a>        row <span class="op">=</span> <span class="bu">sorted</span>(row,reverse<span class="op">=</span><span class="va">True</span>)</span>
+<span id="cb20-17"><a href="#cb20-17" aria-hidden="true" tabindex="-1"></a>        nbrs <span class="op">=</span> []</span>
+<span id="cb20-18"><a href="#cb20-18" aria-hidden="true" tabindex="-1"></a>        <span class="cf">for</span> j <span class="kw">in</span> <span class="bu">range</span>(<span class="dv">3</span>):</span>
+<span id="cb20-19"><a href="#cb20-19" aria-hidden="true" tabindex="-1"></a>            nbrs.append(<span class="ss">f'</span><span class="sc">{</span>snms[row[j][<span class="dv">1</span>]]<span class="sc">:8s}</span><span class="ss">(</span><span class="sc">{</span>row[j][<span class="dv">0</span>]<span class="sc">:5.1f}</span><span class="ss">)'</span>)</span>
+<span id="cb20-20"><a href="#cb20-20" aria-hidden="true" tabindex="-1"></a>        <span class="bu">print</span>(<span class="ss">f'</span><span class="ch">\t</span><span class="sc">{</span>cnt<span class="sc">: 5d}</span><span class="ss">'</span>,<span class="ss">f'</span><span class="sc">{</span>nbrs[<span class="dv">0</span>]<span class="sc">:17s}</span><span class="ss">'</span>,<span class="ss">f'</span><span class="sc">{</span>nbrs[<span class="dv">1</span>]<span class="sc">:17s}</span><span class="ss">'</span>,<span class="ss">f'</span><span class="sc">{</span>nbrs[<span class="dv">2</span>]<span class="sc">:16s}</span><span class="ss">'</span>,)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>----------------------------------------------------------------------
+ap-b
+       10 ap-c    (  8.1)   ffp1-c  (  5.0)   mfp1-c  (  5.0) 
+      100 ap-c    ( 74.9)   ffp1-c  ( 40.7)   mfp1-c  ( 39.7) 
+     1000 ap-c    (732.9)   ffp1-c  (395.4)   mfp1-c  (370.4) 
+----------------------------------------------------------------------
+ap-c
+       10 ap-b    (  8.1)   ffp2-c  (  5.1)   ffp1-c  (  5.1) 
+      100 ap-b    ( 74.9)   ffp1-c  ( 43.6)   mfp1-c  ( 41.9) 
+     1000 ap-b    (732.9)   ffp1-c  (432.4)   mfp1-c  (402.0) 
+----------------------------------------------------------------------
+avalon
+       10 avalon-c(  5.6)   rdk7-b  (  5.4)   rdk5-b  (  5.3) 
+      100 avalon-c( 49.7)   rdk5-b  ( 49.3)   rdk7-b  ( 48.1) 
+     1000 avalon-c(452.4)   rdk5-b  (403.7)   rdk5-c  (370.2) 
+----------------------------------------------------------------------
+avalon-c
+       10 avalon  (  5.6)   rdk5-c  (  5.4)   rdk7-c  (  5.1) 
+      100 avalon  ( 49.7)   rdk5-c  ( 45.9)   rdk7-c  ( 43.2) 
+     1000 avalon  (452.4)   rdk5-c  (378.0)   rdk7-c  (358.5) 
+----------------------------------------------------------------------
+ffp1-b
+       10 mfp1-b  (  7.2)   ffp2-b  (  6.7)   mfp2-b  (  6.2) 
+      100 mfp1-b  ( 66.2)   ffp2-b  ( 64.0)   mfp2-b  ( 56.8) 
+     1000 ffp2-b  (645.2)   mfp1-b  (622.2)   mfp2-b  (545.6) 
+----------------------------------------------------------------------
+ffp1-c
+       10 mfp1-c  (  7.6)   ffp2-c  (  7.0)   mfp2-c  (  6.5) 
+      100 mfp1-c  ( 68.0)   ffp2-c  ( 66.5)   mfp2-c  ( 58.3) 
+     1000 ffp2-c  (698.4)   mfp1-c  (652.9)   ffp3-c  (610.5) 
+----------------------------------------------------------------------
+ffp2-b
+       10 ffp3-b  (  8.2)   mfp2-b  (  7.9)   mfp3-b  (  7.5) 
+      100 ffp3-b  ( 80.2)   mfp2-b  ( 74.1)   mfp3-b  ( 70.4) 
+     1000 ffp3-b  (797.6)   mfp2-b  (679.3)   mfp3-b  (651.9) 
+----------------------------------------------------------------------
+ffp2-c
+       10 ffp3-c  (  8.3)   mfp2-c  (  8.1)   mfp3-c  (  7.5) 
+      100 ffp3-c  ( 82.2)   mfp2-c  ( 74.4)   mfp3-c  ( 70.8) 
+     1000 ffp3-c  (840.0)   mfp2-c  (700.4)   ffp1-c  (698.4) 
+----------------------------------------------------------------------
+ffp3-b
+       10 ffp2-b  (  8.2)   mfp3-b  (  8.1)   mfp2-b  (  7.5) 
+      100 ffp2-b  ( 80.2)   mfp3-b  ( 74.7)   ffp3-c  ( 69.5) 
+     1000 ffp2-b  (797.6)   mfp3-b  (662.3)   ffp3-c  (660.8) 
+----------------------------------------------------------------------
+ffp3-c
+       10 ffp2-c  (  8.3)   mfp3-c  (  8.2)   mfp2-c  (  7.6) 
+      100 ffp2-c  ( 82.2)   mfp3-c  ( 75.4)   mfp2-c  ( 70.6) 
+     1000 ffp2-c  (840.0)   mfp3-c  (692.7)   mfp2-c  (674.0) 
+----------------------------------------------------------------------
+gobbi2d
+       10 ap-c    (  3.9)   ap-b    (  3.8)   mfp3-c  (  3.6) 
+      100 ap-c    ( 27.7)   ap-b    ( 27.6)   mfp2-c  ( 27.0) 
+     1000 ap-b    (253.4)   ap-c    (251.7)   mfp2-c  (218.5) 
+----------------------------------------------------------------------
+mfp1-b
+       10 ffp1-b  (  7.2)   mfp2-b  (  7.0)   ffp2-b  (  6.3) 
+      100 mfp2-b  ( 67.2)   ffp1-b  ( 66.2)   ffp2-b  ( 57.9) 
+     1000 mfp2-b  (681.8)   ffp1-b  (622.2)   mfp3-b  (581.7) 
+----------------------------------------------------------------------
+mfp1-c
+       10 ffp1-c  (  7.6)   mfp2-c  (  7.2)   ffp2-c  (  6.5) 
+      100 mfp2-c  ( 69.8)   ffp1-c  ( 68.0)   ffp2-c  ( 60.0) 
+     1000 mfp2-c  (727.6)   ffp1-c  (652.9)   mfp3-c  (644.3) 
+----------------------------------------------------------------------
+mfp2-b
+       10 mfp3-b  (  8.3)   ffp2-b  (  7.9)   ffp3-b  (  7.5) 
+      100 mfp3-b  ( 81.1)   ffp2-b  ( 74.1)   ffp3-b  ( 69.1) 
+     1000 mfp3-b  (807.9)   mfp1-b  (681.8)   ffp2-b  (679.3) 
+----------------------------------------------------------------------
+mfp2-c
+       10 mfp3-c  (  8.3)   ffp2-c  (  8.1)   ffp3-c  (  7.6) 
+      100 mfp3-c  ( 83.4)   ffp2-c  ( 74.4)   ffp3-c  ( 70.6) 
+     1000 mfp3-c  (847.8)   mfp1-c  (727.6)   ffp2-c  (700.4) 
+----------------------------------------------------------------------
+mfp3-b
+       10 mfp2-b  (  8.3)   ffp3-b  (  8.1)   ffp2-b  (  7.5) 
+      100 mfp2-b  ( 81.1)   ffp3-b  ( 74.7)   mfp3-c  ( 71.4) 
+     1000 mfp2-b  (807.9)   mfp3-c  (678.4)   ffp3-b  (662.3) 
+----------------------------------------------------------------------
+mfp3-c
+       10 mfp2-c  (  8.3)   ffp3-c  (  8.2)   ffp2-c  (  7.5) 
+      100 mfp2-c  ( 83.4)   ffp3-c  ( 75.4)   mfp3-b  ( 71.4) 
+     1000 mfp2-c  (847.8)   ffp3-c  (692.7)   ffp2-c  (678.8) 
+----------------------------------------------------------------------
+pattern
+       10 avalon-c(  4.8)   avalon  (  4.3)   rdk5-c  (  4.2) 
+      100 avalon-c( 42.3)   avalon  ( 39.9)   rdk5-c  ( 38.9) 
+     1000 avalon-c(356.0)   rdk5-c  (345.9)   rdk5-b  (340.6) 
+----------------------------------------------------------------------
+rdk5-b
+       10 rdk7-b  (  7.3)   rdk5-c  (  6.4)   rdk7-c  (  6.1) 
+      100 rdk7-b  ( 68.4)   rdk5-c  ( 64.8)   rdk7-c  ( 59.3) 
+     1000 rdk5-c  (651.3)   rdk7-c  (545.5)   rdk7-b  (535.0) 
+----------------------------------------------------------------------
+rdk5-c
+       10 rdk7-c  (  7.5)   rdk5-b  (  6.4)   rdk7-b  (  6.1) 
+      100 rdk7-c  ( 74.9)   rdk5-b  ( 64.8)   rdk7-b  ( 58.2) 
+     1000 rdk7-c  (688.7)   rdk5-b  (651.3)   rdk7-b  (457.5) 
+----------------------------------------------------------------------
+rdk7-b
+       10 rdk5-b  (  7.3)   rdk7-c  (  7.0)   rdk5-c  (  6.1) 
+      100 rdk5-b  ( 68.4)   rdk7-c  ( 63.8)   rdk5-c  ( 58.2) 
+     1000 rdk7-c  (538.0)   rdk5-b  (535.0)   rdk5-c  (457.5) 
+----------------------------------------------------------------------
+rdk7-c
+       10 rdk5-c  (  7.5)   rdk7-b  (  7.0)   rdk5-b  (  6.1) 
+      100 rdk5-c  ( 74.9)   rdk7-b  ( 63.8)   rdk5-b  ( 59.3) 
+     1000 rdk5-c  (688.7)   rdk5-b  (545.5)   rdk7-b  (538.0) 
+----------------------------------------------------------------------
+tt-b
+       10 tt-c    (  8.6)   ffp3-c  (  6.2)   mfp3-c  (  6.1) 
+      100 tt-c    ( 83.4)   ffp2-b  ( 54.9)   mfp2-b  ( 53.5) 
+     1000 tt-c    (824.8)   ffp2-b  (481.9)   ffp2-c  (468.5) 
+----------------------------------------------------------------------
+tt-c
+       10 tt-b    (  8.6)   ffp3-c  (  6.4)   ffp2-c  (  6.3) 
+      100 tt-b    ( 83.4)   ffp2-c  ( 54.9)   ffp3-c  ( 54.6) 
+     1000 tt-b    (824.8)   ffp2-c  (494.2)   ffp2-b  (486.5) </code></pre>
+</div>
+</div>
+<p>Look at histograms of the overlap sizes for a few different fingerprint pairs</p>
+<div id="1a6f7152" class="cell" data-execution_count="217">
+<div class="sourceCode cell-code" id="cb22"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb22-1"><a href="#cb22-1" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> compare(prs,ovls<span class="op">=</span>ovls):</span>
+<span id="cb22-2"><a href="#cb22-2" aria-hidden="true" tabindex="-1"></a>    prs <span class="op">=</span> <span class="bu">list</span>(prs)</span>
+<span id="cb22-3"><a href="#cb22-3" aria-hidden="true" tabindex="-1"></a>    <span class="cf">for</span> i,pr <span class="kw">in</span> <span class="bu">enumerate</span>(prs):</span>
+<span id="cb22-4"><a href="#cb22-4" aria-hidden="true" tabindex="-1"></a>        <span class="cf">if</span> pr <span class="kw">not</span> <span class="kw">in</span> ovls:</span>
+<span id="cb22-5"><a href="#cb22-5" aria-hidden="true" tabindex="-1"></a>            pr <span class="op">=</span> pr[<span class="dv">1</span>],pr[<span class="dv">0</span>]</span>
+<span id="cb22-6"><a href="#cb22-6" aria-hidden="true" tabindex="-1"></a>        prs[i] <span class="op">=</span> pr</span>
+<span id="cb22-7"><a href="#cb22-7" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb22-8"><a href="#cb22-8" aria-hidden="true" tabindex="-1"></a>    plt.figure(figsize<span class="op">=</span>(<span class="dv">12</span>,<span class="dv">5</span>))</span>
+<span id="cb22-9"><a href="#cb22-9" aria-hidden="true" tabindex="-1"></a>    <span class="cf">for</span> i,n <span class="kw">in</span> <span class="bu">enumerate</span>((<span class="dv">100</span>,<span class="dv">1000</span>)):</span>
+<span id="cb22-10"><a href="#cb22-10" aria-hidden="true" tabindex="-1"></a>        plt.subplot(<span class="dv">1</span>,<span class="dv">2</span>,i<span class="op">+</span><span class="dv">1</span>)</span>
+<span id="cb22-11"><a href="#cb22-11" aria-hidden="true" tabindex="-1"></a>        plt.hist([ovls[pr][n] <span class="cf">for</span> pr <span class="kw">in</span> prs],label<span class="op">=</span>prs,bins<span class="op">=</span><span class="dv">20</span>)<span class="op">;</span></span>
+<span id="cb22-12"><a href="#cb22-12" aria-hidden="true" tabindex="-1"></a>        plt.xlim(<span class="dv">0</span>,n)</span>
+<span id="cb22-13"><a href="#cb22-13" aria-hidden="true" tabindex="-1"></a>        plt.xlabel(<span class="ss">f'n=</span><span class="sc">{</span>n<span class="sc">}</span><span class="ss"> overlap'</span>)</span>
+<span id="cb22-14"><a href="#cb22-14" aria-hidden="true" tabindex="-1"></a>        <span class="co">#plt.title(pr)</span></span>
+<span id="cb22-15"><a href="#cb22-15" aria-hidden="true" tabindex="-1"></a>        plt.legend()</span>
+<span id="cb22-16"><a href="#cb22-16" aria-hidden="true" tabindex="-1"></a>    plt.tight_layout()</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+<p>Start with <a href="https://www.rdkit.org/docs/RDKit_Book.html#morgan-and-feature-morgan-fingerprints">FeatureMorgan and Morgan</a>, where there is a reasonably large amount of overlap:</p>
+<div id="c8df404b" class="cell" data-execution_count="219">
+<div class="sourceCode cell-code" id="cb23"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb23-1"><a href="#cb23-1" aria-hidden="true" tabindex="-1"></a>compare(((<span class="st">'ffp2-b'</span>,<span class="st">'mfp2-b'</span>),(<span class="st">'ffp3-b'</span>,<span class="st">'mfp3-b'</span>)))</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="2025-03-21-similarity-hitset-overlap-1_files/figure-html/cell-17-output-1.png" class="img-fluid figure-img"></p>
+</figure>
+</div>
+</div>
+</div>
+<p>Now compare count-based and bit-based Morgan fingerprints. I expected the overlaps here to be higher:</p>
+<div id="01a6402a" class="cell" data-scrolled="false" data-execution_count="220">
+<div class="sourceCode cell-code" id="cb24"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb24-1"><a href="#cb24-1" aria-hidden="true" tabindex="-1"></a>compare(((<span class="st">'mfp3-c'</span>,<span class="st">'mfp3-b'</span>),(<span class="st">'mfp2-c'</span>,<span class="st">'mfp2-b'</span>),))</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="2025-03-21-similarity-hitset-overlap-1_files/figure-html/cell-18-output-1.png" class="img-fluid figure-img"></p>
+</figure>
+</div>
+</div>
+</div>
+<p>Comparing very different types of fingerprints: count-based Morgan3 and both <a href="https://www.rdkit.org/docs/RDKit_Book.html#atom-pair-and-topological-torsion-fingerprints">Topological Torsions and Atom Pairs</a> (these both use <a href="https://greglandrum.github.io/rdkit-blog/posts/2021-07-06-simulating-counts.html">count simulation</a>. Here there are significant differences. These are fingerprints that it would be interesting to use together.</p>
+<div id="76e8ffef" class="cell" data-execution_count="222">
+<div class="sourceCode cell-code" id="cb25"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb25-1"><a href="#cb25-1" aria-hidden="true" tabindex="-1"></a>compare(((<span class="st">'tt-b'</span>,<span class="st">'mfp3-c'</span>),(<span class="st">'ap-b'</span>,<span class="st">'mfp3-c'</span>)))</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="2025-03-21-similarity-hitset-overlap-1_files/figure-html/cell-19-output-1.png" class="img-fluid figure-img"></p>
+</figure>
+</div>
+</div>
+</div>
+<p>Same thing with bit-baseed Morgan3 and <a href="https://www.rdkit.org/docs/RDKit_Book.html#rdkit-fingerprints">RDK5</a>. Again, These are nicely complementary fingerprints:</p>
+<div id="5b8f4a61" class="cell" data-execution_count="224">
+<div class="sourceCode cell-code" id="cb26"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb26-1"><a href="#cb26-1" aria-hidden="true" tabindex="-1"></a>compare(((<span class="st">'tt-b'</span>,<span class="st">'mfp3-b'</span>),(<span class="st">'ap-b'</span>,<span class="st">'mfp3-b'</span>),(<span class="st">'rdk5-b'</span>,<span class="st">'mfp3-b'</span>)))</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="2025-03-21-similarity-hitset-overlap-1_files/figure-html/cell-20-output-1.png" class="img-fluid figure-img"></p>
+</figure>
+</div>
+</div>
+</div>
+<p>Finally compare Morgan3 with the <a href="https://www.rdkit.org/docs/RDKit_Book.html#pattern-fingerprints">pattern fingerprint</a> (normally used for substructure screening, not similarity search), Gobbi2D (a 2D pharmacophore FP) and the Avalon FP. These are also nicely different from each other:</p>
+<div id="76ea761c" class="cell" data-scrolled="false" data-execution_count="226">
+<div class="sourceCode cell-code" id="cb27"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb27-1"><a href="#cb27-1" aria-hidden="true" tabindex="-1"></a>compare(((<span class="st">'pattern'</span>,<span class="st">'mfp3-b'</span>),(<span class="st">'gobbi2d'</span>,<span class="st">'mfp3-b'</span>),(<span class="st">'avalon'</span>,<span class="st">'mfp3-b'</span>)))</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="2025-03-21-similarity-hitset-overlap-1_files/figure-html/cell-21-output-1.png" class="img-fluid figure-img"></p>
+</figure>
+</div>
+</div>
+</div>
+
+
+</section>
+
+</main> <!-- /main -->
+<script id="quarto-html-after-body" type="application/javascript">
+window.document.addEventListener("DOMContentLoaded", function (event) {
+  const toggleBodyColorMode = (bsSheetEl) => {
+    const mode = bsSheetEl.getAttribute("data-mode");
+    const bodyEl = window.document.querySelector("body");
+    if (mode === "dark") {
+      bodyEl.classList.add("quarto-dark");
+      bodyEl.classList.remove("quarto-light");
+    } else {
+      bodyEl.classList.add("quarto-light");
+      bodyEl.classList.remove("quarto-dark");
+    }
+  }
+  const toggleBodyColorPrimary = () => {
+    const bsSheetEl = window.document.querySelector("link#quarto-bootstrap");
+    if (bsSheetEl) {
+      toggleBodyColorMode(bsSheetEl);
+    }
+  }
+  toggleBodyColorPrimary();  
+  const disableStylesheet = (stylesheets) => {
+    for (let i=0; i < stylesheets.length; i++) {
+      const stylesheet = stylesheets[i];
+      stylesheet.rel = 'prefetch';
+    }
+  }
+  const enableStylesheet = (stylesheets) => {
+    for (let i=0; i < stylesheets.length; i++) {
+      const stylesheet = stylesheets[i];
+      stylesheet.rel = 'stylesheet';
+    }
+  }
+  const manageTransitions = (selector, allowTransitions) => {
+    const els = window.document.querySelectorAll(selector);
+    for (let i=0; i < els.length; i++) {
+      const el = els[i];
+      if (allowTransitions) {
+        el.classList.remove('notransition');
+      } else {
+        el.classList.add('notransition');
+      }
+    }
+  }
+  const toggleGiscusIfUsed = (isAlternate, darkModeDefault) => {
+    const baseTheme = document.querySelector('#giscus-base-theme')?.value ?? 'light';
+    const alternateTheme = document.querySelector('#giscus-alt-theme')?.value ?? 'dark';
+    let newTheme = '';
+    if(darkModeDefault) {
+      newTheme = isAlternate ? baseTheme : alternateTheme;
+    } else {
+      newTheme = isAlternate ? alternateTheme : baseTheme;
+    }
+    const changeGiscusTheme = () => {
+      // From: https://github.com/giscus/giscus/issues/336
+      const sendMessage = (message) => {
+        const iframe = document.querySelector('iframe.giscus-frame');
+        if (!iframe) return;
+        iframe.contentWindow.postMessage({ giscus: message }, 'https://giscus.app');
+      }
+      sendMessage({
+        setConfig: {
+          theme: newTheme
+        }
+      });
+    }
+    const isGiscussLoaded = window.document.querySelector('iframe.giscus-frame') !== null;
+    if (isGiscussLoaded) {
+      changeGiscusTheme();
+    }
+  }
+  const toggleColorMode = (alternate) => {
+    // Switch the stylesheets
+    const alternateStylesheets = window.document.querySelectorAll('link.quarto-color-scheme.quarto-color-alternate');
+    manageTransitions('#quarto-margin-sidebar .nav-link', false);
+    if (alternate) {
+      enableStylesheet(alternateStylesheets);
+      for (const sheetNode of alternateStylesheets) {
+        if (sheetNode.id === "quarto-bootstrap") {
+          toggleBodyColorMode(sheetNode);
+        }
+      }
+    } else {
+      disableStylesheet(alternateStylesheets);
+      toggleBodyColorPrimary();
+    }
+    manageTransitions('#quarto-margin-sidebar .nav-link', true);
+    // Switch the toggles
+    const toggles = window.document.querySelectorAll('.quarto-color-scheme-toggle');
+    for (let i=0; i < toggles.length; i++) {
+      const toggle = toggles[i];
+      if (toggle) {
+        if (alternate) {
+          toggle.classList.add("alternate");     
+        } else {
+          toggle.classList.remove("alternate");
+        }
+      }
+    }
+    // Hack to workaround the fact that safari doesn't
+    // properly recolor the scrollbar when toggling (#1455)
+    if (navigator.userAgent.indexOf('Safari') > 0 && navigator.userAgent.indexOf('Chrome') == -1) {
+      manageTransitions("body", false);
+      window.scrollTo(0, 1);
+      setTimeout(() => {
+        window.scrollTo(0, 0);
+        manageTransitions("body", true);
+      }, 40);  
+    }
+  }
+  const isFileUrl = () => { 
+    return window.location.protocol === 'file:';
+  }
+  const hasAlternateSentinel = () => {  
+    let styleSentinel = getColorSchemeSentinel();
+    if (styleSentinel !== null) {
+      return styleSentinel === "alternate";
+    } else {
+      return false;
+    }
+  }
+  const setStyleSentinel = (alternate) => {
+    const value = alternate ? "alternate" : "default";
+    if (!isFileUrl()) {
+      window.localStorage.setItem("quarto-color-scheme", value);
+    } else {
+      localAlternateSentinel = value;
+    }
+  }
+  const getColorSchemeSentinel = () => {
+    if (!isFileUrl()) {
+      const storageValue = window.localStorage.getItem("quarto-color-scheme");
+      return storageValue != null ? storageValue : localAlternateSentinel;
+    } else {
+      return localAlternateSentinel;
+    }
+  }
+  const darkModeDefault = false;
+  let localAlternateSentinel = darkModeDefault ? 'alternate' : 'default';
+  // Dark / light mode switch
+  window.quartoToggleColorScheme = () => {
+    // Read the current dark / light value 
+    let toAlternate = !hasAlternateSentinel();
+    toggleColorMode(toAlternate);
+    setStyleSentinel(toAlternate);
+    toggleGiscusIfUsed(toAlternate, darkModeDefault);
+  };
+  // Ensure there is a toggle, if there isn't float one in the top right
+  if (window.document.querySelector('.quarto-color-scheme-toggle') === null) {
+    const a = window.document.createElement('a');
+    a.classList.add('top-right');
+    a.classList.add('quarto-color-scheme-toggle');
+    a.href = "";
+    a.onclick = function() { try { window.quartoToggleColorScheme(); } catch {} return false; };
+    const i = window.document.createElement("i");
+    i.classList.add('bi');
+    a.appendChild(i);
+    window.document.body.appendChild(a);
+  }
+  // Switch to dark mode if need be
+  if (hasAlternateSentinel()) {
+    toggleColorMode(true);
+  } else {
+    toggleColorMode(false);
+  }
+  const icon = "";
+  const anchorJS = new window.AnchorJS();
+  anchorJS.options = {
+    placement: 'right',
+    icon: icon
+  };
+  anchorJS.add('.anchored');
+  const isCodeAnnotation = (el) => {
+    for (const clz of el.classList) {
+      if (clz.startsWith('code-annotation-')) {                     
+        return true;
+      }
+    }
+    return false;
+  }
+  const onCopySuccess = function(e) {
+    // button target
+    const button = e.trigger;
+    // don't keep focus
+    button.blur();
+    // flash "checked"
+    button.classList.add('code-copy-button-checked');
+    var currentTitle = button.getAttribute("title");
+    button.setAttribute("title", "Copied!");
+    let tooltip;
+    if (window.bootstrap) {
+      button.setAttribute("data-bs-toggle", "tooltip");
+      button.setAttribute("data-bs-placement", "left");
+      button.setAttribute("data-bs-title", "Copied!");
+      tooltip = new bootstrap.Tooltip(button, 
+        { trigger: "manual", 
+          customClass: "code-copy-button-tooltip",
+          offset: [0, -8]});
+      tooltip.show();    
+    }
+    setTimeout(function() {
+      if (tooltip) {
+        tooltip.hide();
+        button.removeAttribute("data-bs-title");
+        button.removeAttribute("data-bs-toggle");
+        button.removeAttribute("data-bs-placement");
+      }
+      button.setAttribute("title", currentTitle);
+      button.classList.remove('code-copy-button-checked');
+    }, 1000);
+    // clear code selection
+    e.clearSelection();
+  }
+  const getTextToCopy = function(trigger) {
+      const codeEl = trigger.previousElementSibling.cloneNode(true);
+      for (const childEl of codeEl.children) {
+        if (isCodeAnnotation(childEl)) {
+          childEl.remove();
+        }
+      }
+      return codeEl.innerText;
+  }
+  const clipboard = new window.ClipboardJS('.code-copy-button:not([data-in-quarto-modal])', {
+    text: getTextToCopy
+  });
+  clipboard.on('success', onCopySuccess);
+  if (window.document.getElementById('quarto-embedded-source-code-modal')) {
+    const clipboardModal = new window.ClipboardJS('.code-copy-button[data-in-quarto-modal]', {
+      text: getTextToCopy,
+      container: window.document.getElementById('quarto-embedded-source-code-modal')
+    });
+    clipboardModal.on('success', onCopySuccess);
+  }
+    var localhostRegex = new RegExp(/^(?:http|https):\/\/localhost\:?[0-9]*\//);
+    var mailtoRegex = new RegExp(/^mailto:/);
+      var filterRegex = new RegExp("https:\/\/greglandrum\.github\.io\/rdkit-blog\/");
+    var isInternal = (href) => {
+        return filterRegex.test(href) || localhostRegex.test(href) || mailtoRegex.test(href);
+    }
+    // Inspect non-navigation links and adorn them if external
+ 	var links = window.document.querySelectorAll('a[href]:not(.nav-link):not(.navbar-brand):not(.toc-action):not(.sidebar-link):not(.sidebar-item-toggle):not(.pagination-link):not(.no-external):not([aria-hidden]):not(.dropdown-item):not(.quarto-navigation-tool):not(.about-link)');
+    for (var i=0; i<links.length; i++) {
+      const link = links[i];
+      if (!isInternal(link.href)) {
+        // undo the damage that might have been done by quarto-nav.js in the case of
+        // links that we want to consider external
+        if (link.dataset.originalHref !== undefined) {
+          link.href = link.dataset.originalHref;
+        }
+      }
+    }
+  function tippyHover(el, contentFn, onTriggerFn, onUntriggerFn) {
+    const config = {
+      allowHTML: true,
+      maxWidth: 500,
+      delay: 100,
+      arrow: false,
+      appendTo: function(el) {
+          return el.parentElement;
+      },
+      interactive: true,
+      interactiveBorder: 10,
+      theme: 'quarto',
+      placement: 'bottom-start',
+    };
+    if (contentFn) {
+      config.content = contentFn;
+    }
+    if (onTriggerFn) {
+      config.onTrigger = onTriggerFn;
+    }
+    if (onUntriggerFn) {
+      config.onUntrigger = onUntriggerFn;
+    }
+    window.tippy(el, config); 
+  }
+  const noterefs = window.document.querySelectorAll('a[role="doc-noteref"]');
+  for (var i=0; i<noterefs.length; i++) {
+    const ref = noterefs[i];
+    tippyHover(ref, function() {
+      // use id or data attribute instead here
+      let href = ref.getAttribute('data-footnote-href') || ref.getAttribute('href');
+      try { href = new URL(href).hash; } catch {}
+      const id = href.replace(/^#\/?/, "");
+      const note = window.document.getElementById(id);
+      if (note) {
+        return note.innerHTML;
+      } else {
+        return "";
+      }
+    });
+  }
+  const xrefs = window.document.querySelectorAll('a.quarto-xref');
+  const processXRef = (id, note) => {
+    // Strip column container classes
+    const stripColumnClz = (el) => {
+      el.classList.remove("page-full", "page-columns");
+      if (el.children) {
+        for (const child of el.children) {
+          stripColumnClz(child);
+        }
+      }
+    }
+    stripColumnClz(note)
+    if (id === null || id.startsWith('sec-')) {
+      // Special case sections, only their first couple elements
+      const container = document.createElement("div");
+      if (note.children && note.children.length > 2) {
+        container.appendChild(note.children[0].cloneNode(true));
+        for (let i = 1; i < note.children.length; i++) {
+          const child = note.children[i];
+          if (child.tagName === "P" && child.innerText === "") {
+            continue;
+          } else {
+            container.appendChild(child.cloneNode(true));
+            break;
+          }
+        }
+        if (window.Quarto?.typesetMath) {
+          window.Quarto.typesetMath(container);
+        }
+        return container.innerHTML
+      } else {
+        if (window.Quarto?.typesetMath) {
+          window.Quarto.typesetMath(note);
+        }
+        return note.innerHTML;
+      }
+    } else {
+      // Remove any anchor links if they are present
+      const anchorLink = note.querySelector('a.anchorjs-link');
+      if (anchorLink) {
+        anchorLink.remove();
+      }
+      if (window.Quarto?.typesetMath) {
+        window.Quarto.typesetMath(note);
+      }
+      if (note.classList.contains("callout")) {
+        return note.outerHTML;
+      } else {
+        return note.innerHTML;
+      }
+    }
+  }
+  for (var i=0; i<xrefs.length; i++) {
+    const xref = xrefs[i];
+    tippyHover(xref, undefined, function(instance) {
+      instance.disable();
+      let url = xref.getAttribute('href');
+      let hash = undefined; 
+      if (url.startsWith('#')) {
+        hash = url;
+      } else {
+        try { hash = new URL(url).hash; } catch {}
+      }
+      if (hash) {
+        const id = hash.replace(/^#\/?/, "");
+        const note = window.document.getElementById(id);
+        if (note !== null) {
+          try {
+            const html = processXRef(id, note.cloneNode(true));
+            instance.setContent(html);
+          } finally {
+            instance.enable();
+            instance.show();
+          }
+        } else {
+          // See if we can fetch this
+          fetch(url.split('#')[0])
+          .then(res => res.text())
+          .then(html => {
+            const parser = new DOMParser();
+            const htmlDoc = parser.parseFromString(html, "text/html");
+            const note = htmlDoc.getElementById(id);
+            if (note !== null) {
+              const html = processXRef(id, note);
+              instance.setContent(html);
+            } 
+          }).finally(() => {
+            instance.enable();
+            instance.show();
+          });
+        }
+      } else {
+        // See if we can fetch a full url (with no hash to target)
+        // This is a special case and we should probably do some content thinning / targeting
+        fetch(url)
+        .then(res => res.text())
+        .then(html => {
+          const parser = new DOMParser();
+          const htmlDoc = parser.parseFromString(html, "text/html");
+          const note = htmlDoc.querySelector('main.content');
+          if (note !== null) {
+            // This should only happen for chapter cross references
+            // (since there is no id in the URL)
+            // remove the first header
+            if (note.children.length > 0 && note.children[0].tagName === "HEADER") {
+              note.children[0].remove();
+            }
+            const html = processXRef(null, note);
+            instance.setContent(html);
+          } 
+        }).finally(() => {
+          instance.enable();
+          instance.show();
+        });
+      }
+    }, function(instance) {
+    });
+  }
+      let selectedAnnoteEl;
+      const selectorForAnnotation = ( cell, annotation) => {
+        let cellAttr = 'data-code-cell="' + cell + '"';
+        let lineAttr = 'data-code-annotation="' +  annotation + '"';
+        const selector = 'span[' + cellAttr + '][' + lineAttr + ']';
+        return selector;
+      }
+      const selectCodeLines = (annoteEl) => {
+        const doc = window.document;
+        const targetCell = annoteEl.getAttribute("data-target-cell");
+        const targetAnnotation = annoteEl.getAttribute("data-target-annotation");
+        const annoteSpan = window.document.querySelector(selectorForAnnotation(targetCell, targetAnnotation));
+        const lines = annoteSpan.getAttribute("data-code-lines").split(",");
+        const lineIds = lines.map((line) => {
+          return targetCell + "-" + line;
+        })
+        let top = null;
+        let height = null;
+        let parent = null;
+        if (lineIds.length > 0) {
+            //compute the position of the single el (top and bottom and make a div)
+            const el = window.document.getElementById(lineIds[0]);
+            top = el.offsetTop;
+            height = el.offsetHeight;
+            parent = el.parentElement.parentElement;
+          if (lineIds.length > 1) {
+            const lastEl = window.document.getElementById(lineIds[lineIds.length - 1]);
+            const bottom = lastEl.offsetTop + lastEl.offsetHeight;
+            height = bottom - top;
+          }
+          if (top !== null && height !== null && parent !== null) {
+            // cook up a div (if necessary) and position it 
+            let div = window.document.getElementById("code-annotation-line-highlight");
+            if (div === null) {
+              div = window.document.createElement("div");
+              div.setAttribute("id", "code-annotation-line-highlight");
+              div.style.position = 'absolute';
+              parent.appendChild(div);
+            }
+            div.style.top = top - 2 + "px";
+            div.style.height = height + 4 + "px";
+            div.style.left = 0;
+            let gutterDiv = window.document.getElementById("code-annotation-line-highlight-gutter");
+            if (gutterDiv === null) {
+              gutterDiv = window.document.createElement("div");
+              gutterDiv.setAttribute("id", "code-annotation-line-highlight-gutter");
+              gutterDiv.style.position = 'absolute';
+              const codeCell = window.document.getElementById(targetCell);
+              const gutter = codeCell.querySelector('.code-annotation-gutter');
+              gutter.appendChild(gutterDiv);
+            }
+            gutterDiv.style.top = top - 2 + "px";
+            gutterDiv.style.height = height + 4 + "px";
+          }
+          selectedAnnoteEl = annoteEl;
+        }
+      };
+      const unselectCodeLines = () => {
+        const elementsIds = ["code-annotation-line-highlight", "code-annotation-line-highlight-gutter"];
+        elementsIds.forEach((elId) => {
+          const div = window.document.getElementById(elId);
+          if (div) {
+            div.remove();
+          }
+        });
+        selectedAnnoteEl = undefined;
+      };
+        // Handle positioning of the toggle
+    window.addEventListener(
+      "resize",
+      throttle(() => {
+        elRect = undefined;
+        if (selectedAnnoteEl) {
+          selectCodeLines(selectedAnnoteEl);
+        }
+      }, 10)
+    );
+    function throttle(fn, ms) {
+    let throttle = false;
+    let timer;
+      return (...args) => {
+        if(!throttle) { // first call gets through
+            fn.apply(this, args);
+            throttle = true;
+        } else { // all the others get throttled
+            if(timer) clearTimeout(timer); // cancel #2
+            timer = setTimeout(() => {
+              fn.apply(this, args);
+              timer = throttle = false;
+            }, ms);
+        }
+      };
+    }
+      // Attach click handler to the DT
+      const annoteDls = window.document.querySelectorAll('dt[data-target-cell]');
+      for (const annoteDlNode of annoteDls) {
+        annoteDlNode.addEventListener('click', (event) => {
+          const clickedEl = event.target;
+          if (clickedEl !== selectedAnnoteEl) {
+            unselectCodeLines();
+            const activeEl = window.document.querySelector('dt[data-target-cell].code-annotation-active');
+            if (activeEl) {
+              activeEl.classList.remove('code-annotation-active');
+            }
+            selectCodeLines(clickedEl);
+            clickedEl.classList.add('code-annotation-active');
+          } else {
+            // Unselect the line
+            unselectCodeLines();
+            clickedEl.classList.remove('code-annotation-active');
+          }
+        });
+      }
+  const findCites = (el) => {
+    const parentEl = el.parentElement;
+    if (parentEl) {
+      const cites = parentEl.dataset.cites;
+      if (cites) {
+        return {
+          el,
+          cites: cites.split(' ')
+        };
+      } else {
+        return findCites(el.parentElement)
+      }
+    } else {
+      return undefined;
+    }
+  };
+  var bibliorefs = window.document.querySelectorAll('a[role="doc-biblioref"]');
+  for (var i=0; i<bibliorefs.length; i++) {
+    const ref = bibliorefs[i];
+    const citeInfo = findCites(ref);
+    if (citeInfo) {
+      tippyHover(citeInfo.el, function() {
+        var popup = window.document.createElement('div');
+        citeInfo.cites.forEach(function(cite) {
+          var citeDiv = window.document.createElement('div');
+          citeDiv.classList.add('hanging-indent');
+          citeDiv.classList.add('csl-entry');
+          var biblioDiv = window.document.getElementById('ref-' + cite);
+          if (biblioDiv) {
+            citeDiv.innerHTML = biblioDiv.innerHTML;
+          }
+          popup.appendChild(citeDiv);
+        });
+        return popup.innerHTML;
+      });
+    }
+  }
+});
+</script>
+<script src="https://utteranc.es/client.js" repo="greglandrum/rdkit-blog" issue-term="pathname" theme="github-light" crossorigin="anonymous" async="">
+</script>
+</div> <!-- /content -->
+<footer class="footer">
+  <div class="nav-footer">
+    <div class="nav-footer-left">
+<p>Copyright (C) 2025 Greg Landrum</p>
+</div>   
+    <div class="nav-footer-center">
+      &nbsp;
+    </div>
+    <div class="nav-footer-right">
+<p><a href="https://www.rdkit.org"><img src="https://www.rdkit.org/logo.small.png" class="img-fluid" alt="RDKit" width="64"></a></p>
+</div>
+  </div>
+</footer>
+
+
+
+
+</body></html>
