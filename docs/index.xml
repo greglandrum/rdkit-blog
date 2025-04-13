@@ -10,7 +10,1238 @@
 <atom:link href="https://greglandrum.github.io/rdkit-blog/index.xml" rel="self" type="application/rss+xml"/>
 <description>RDKit experiments, tips, and tutorials</description>
 <generator>quarto-1.6.39</generator>
-<lastBuildDate>Sat, 05 Apr 2025 22:00:00 GMT</lastBuildDate>
+<lastBuildDate>Sat, 12 Apr 2025 22:00:00 GMT</lastBuildDate>
+<item>
+  <title>Similarity-search hitlist overlap part 2</title>
+  <link>https://greglandrum.github.io/rdkit-blog/posts/2025-04-13-similarity-hitset-overlap-2.html</link>
+  <description><![CDATA[ 
+
+
+
+
+<p>This post is a followup to <a href="https://greglandrum.github.io/rdkit-blog/posts/2025-03-21-similarity-hitset-overlap-1.html">a recent one</a> exploring the amount of overlap in the hit sets returned by doing similarity searches with different fingerprint types.</p>
+<p>At the end of the intro to that post I said:</p>
+<blockquote class="blockquote">
+<p>One thing that is worth keeping in mind is that these results almost certainly consider similarity values which are down close to and probably in the region of similarities observed between <a href="https://greglandrum.github.io/rdkit-blog/posts/2021-05-18-fingerprint-thresholds1.html">random compounds</a>. It may be worth refining the analysis in order to only consider similarities which are more significant, but that’s for a possible future post.</p>
+</blockquote>
+<p>This is that “possible future post”. Here I filter the hit sets to only include similarity values greater than or equal to the 99% threshold for each fingerprint in the <a href="https://greglandrum.github.io/rdkit-blog/posts/2021-05-18-fingerprint-thresholds1.html">post on random similarities</a>.</p>
+<p>Other than skipping the initial examination of searches done with a single compounds, the rest of the analysis is the same as in earlier post. The results are not qualitatively different, but I think this is a more sensible approach overall.</p>
+<div id="6127934a" class="cell" data-execution_count="1">
+<div class="sourceCode cell-code" id="cb1" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb1-1"><span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">from</span> rdkit <span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">import</span> Chem</span>
+<span id="cb1-2"><span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">from</span> rdkit.Chem <span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">import</span> rdFingerprintGenerator</span>
+<span id="cb1-3"><span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">from</span> rdkit.Chem <span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">import</span> Draw</span>
+<span id="cb1-4"><span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">from</span> rdkit.Chem.Draw <span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">import</span> IPythonConsole</span>
+<span id="cb1-5"><span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">from</span> rdkit <span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">import</span> DataStructs</span>
+<span id="cb1-6"><span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">import</span> numpy <span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">as</span> np</span>
+<span id="cb1-7"></span>
+<span id="cb1-8"><span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">from</span> matplotlib <span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">import</span> pyplot <span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">as</span> plt</span>
+<span id="cb1-9">plt.style.use(<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'tableau-colorblind10'</span>)</span>
+<span id="cb1-10"></span>
+<span id="cb1-11"><span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">%</span>matplotlib inline</span>
+<span id="cb1-12"><span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">%</span>load_ext sql</span>
+<span id="cb1-13"></span>
+<span id="cb1-14"><span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">import</span> rdkit</span>
+<span id="cb1-15"><span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">print</span>(rdkit.__version__)</span></code></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>2025.03.1</code></pre>
+</div>
+</div>
+<div id="92e399b5" class="cell" data-execution_count="2">
+<div class="sourceCode cell-code" id="cb3" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb3-1"><span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">import</span> gzip</span>
+<span id="cb3-2"><span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">with</span> gzip.<span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">open</span>(<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'../data/Pubchem_AID373_compounds.sdf.gz'</span>,<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'rb'</span>) <span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">as</span> inf:</span>
+<span id="cb3-3">    <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">with</span> Chem.ForwardSDMolSupplier(inf) <span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">as</span> suppl:</span>
+<span id="cb3-4">        dbmols <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> [x <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">for</span> x <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">in</span> suppl <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">if</span> x <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">is</span> <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">not</span> <span class="va" style="color: #111111;
+background-color: null;
+font-style: inherit;">None</span>]</span>
+<span id="cb3-5"><span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">len</span>(dbmols)</span>
+<span id="cb3-6">    </span></code></pre></div>
+<div class="cell-output cell-output-display" data-execution_count="2">
+<pre><code>59788</code></pre>
+</div>
+</div>
+<p>Define the fingerprints and similarity thresholds we will use:</p>
+<div id="2f8d196f" class="cell" data-execution_count="3">
+<div class="sourceCode cell-code" id="cb5" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb5-1"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># tuple order: (fp name, generator, count_thresh, bit_thresh)</span></span>
+<span id="cb5-2">runs <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> [</span>
+<span id="cb5-3">    (<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'mfp2'</span>,rdFingerprintGenerator.GetMorganGenerator(radius<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span><span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">2</span>), <span class="fl" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">0.30</span>, <span class="fl" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">0.23</span>),</span>
+<span id="cb5-4">    (<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'ffp2'</span>,rdFingerprintGenerator.GetMorganGenerator(radius<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span><span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">2</span>,</span>
+<span id="cb5-5">                                                  atomInvariantsGenerator<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span>rdFingerprintGenerator.GetMorganAtomInvGen()),</span>
+<span id="cb5-6">        <span class="fl" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">0.32</span>, <span class="fl" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">0.24</span>),</span>
+<span id="cb5-7">    (<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'mfp3'</span>,rdFingerprintGenerator.GetMorganGenerator(radius<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span><span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">3</span>), <span class="fl" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">0.23</span>, <span class="fl" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">0.17</span>),</span>
+<span id="cb5-8">    (<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'ffp3'</span>,rdFingerprintGenerator.GetMorganGenerator(radius<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span><span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">3</span>,</span>
+<span id="cb5-9">                                                  atomInvariantsGenerator<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span>rdFingerprintGenerator.GetMorganAtomInvGen()),</span>
+<span id="cb5-10">        <span class="fl" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">0.25</span>, <span class="fl" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">0.18</span>),</span>
+<span id="cb5-11">    (<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'mfp1'</span>,rdFingerprintGenerator.GetMorganGenerator(radius<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span><span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">1</span>), <span class="fl" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">0.42</span>, <span class="fl" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">0.36</span>),</span>
+<span id="cb5-12">    (<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'ffp1'</span>,rdFingerprintGenerator.GetMorganGenerator(radius<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span><span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">1</span>,</span>
+<span id="cb5-13">                                                  atomInvariantsGenerator<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span>rdFingerprintGenerator.GetMorganAtomInvGen()),</span>
+<span id="cb5-14">        <span class="fl" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">0.46</span>, <span class="fl" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">0.40</span>),</span>
+<span id="cb5-15">    (<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'tt'</span>,rdFingerprintGenerator.GetTopologicalTorsionGenerator(), <span class="fl" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">0.26</span>, <span class="fl" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">0.28</span>),</span>
+<span id="cb5-16">    (<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'ap'</span>,rdFingerprintGenerator.GetAtomPairGenerator(), <span class="fl" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">0.32</span>, <span class="fl" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">0.42</span>),</span>
+<span id="cb5-17">    (<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'rdk5'</span>,rdFingerprintGenerator.GetRDKitFPGenerator(maxPath<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span><span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">5</span>), <span class="fl" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">0.33</span>, <span class="fl" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">0.37</span>),</span>
+<span id="cb5-18">    (<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'rdk7'</span>,rdFingerprintGenerator.GetRDKitFPGenerator(maxPath<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span><span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">7</span>), <span class="fl" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">0.20</span>, <span class="fl" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">0.51</span>),</span>
+<span id="cb5-19">]</span></code></pre></div>
+</div>
+<div id="812f75b7" class="cell" data-execution_count="4">
+<div class="sourceCode cell-code" id="cb6" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb6-1"><span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">from</span> rdkit.Chem.Pharm2D <span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">import</span> Gobbi_Pharm2D,Generate</span>
+<span id="cb6-2"><span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">def</span> Gobbi2D_bits(mol,fpLen<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span><span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">2048</span>):</span>
+<span id="cb6-3">    res <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> DataStructs.ExplicitBitVect(fpLen)</span>
+<span id="cb6-4">    <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">for</span> bit <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">in</span> Generate.Gen2DFingerprint(mol,Gobbi_Pharm2D.factory).GetOnBits():</span>
+<span id="cb6-5">        <span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># the bits are not hashed, so we need to do so before we fold them:</span></span>
+<span id="cb6-6">        res.SetBit(<span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">hash</span>((bit,))<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">%</span>fpLen)</span>
+<span id="cb6-7">    <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">return</span> res</span></code></pre></div>
+</div>
+<div id="1c181fc1" class="cell" data-execution_count="5">
+<div class="sourceCode cell-code" id="cb7" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb7-1"><span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">from</span> rdkit.Chem <span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">import</span> rdMolDescriptors</span>
+<span id="cb7-2"><span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">from</span> rdkit.Avalon <span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">import</span> pyAvalonTools</span>
+<span id="cb7-3"></span>
+<span id="cb7-4">func_runs <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> [</span>
+<span id="cb7-5">    (<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'gobbi2d'</span>,Gobbi2D_bits, <span class="fl" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">0.37</span>),</span>
+<span id="cb7-6">    (<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'avalon'</span>,pyAvalonTools.GetAvalonFP, <span class="fl" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">0.59</span>),</span>
+<span id="cb7-7">    (<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'avalon-c'</span>,pyAvalonTools.GetAvalonCountFP, <span class="fl" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">0.50</span>),</span>
+<span id="cb7-8">    (<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'pattern'</span>,Chem.PatternFingerprint, <span class="fl" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">0.75</span>),</span>
+<span id="cb7-9">]</span></code></pre></div>
+</div>
+<p>In order to get some decent statistics, we will do similarity searches with 500 random molecules.</p>
+<p>Running this cell takes a while.</p>
+<div id="4e9b9dbb" class="cell" data-execution_count="6">
+<div class="sourceCode cell-code" id="cb8" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb8-1"><span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">import</span> random</span>
+<span id="cb8-2">random.seed(<span class="bn" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">0xbad5eed</span>)</span>
+<span id="cb8-3">order <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> <span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">list</span>(<span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">range</span>(<span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">len</span>(dbmols)))</span>
+<span id="cb8-4">random.shuffle(order)</span>
+<span id="cb8-5"></span>
+<span id="cb8-6">nToDo <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> <span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">500</span></span>
+<span id="cb8-7">order <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> order[:<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">500</span>]</span>
+<span id="cb8-8"></span>
+<span id="cb8-9">accum <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> {}</span>
+<span id="cb8-10"><span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">for</span> nm,fpg,cthresh,bthresh <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">in</span> runs:</span>
+<span id="cb8-11">    <span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">print</span>(nm)</span>
+<span id="cb8-12">    fps <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> <span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">list</span>(fpg.GetFingerprints(dbmols,numThreads<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span><span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">8</span>))</span>
+<span id="cb8-13">    taccum <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> []</span>
+<span id="cb8-14">    <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">for</span> i <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">in</span> order:</span>
+<span id="cb8-15">        qry <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> fps[i]</span>
+<span id="cb8-16">        sims <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> [(sim,j) <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">for</span> j,sim <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">in</span> <span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">enumerate</span>(DataStructs.BulkTanimotoSimilarity(qry,fps)) <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">if</span> sim<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">&gt;=</span>bthresh <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">and</span> j<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">!=</span>i]</span>
+<span id="cb8-17">        sims <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> <span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">sorted</span>(sims,reverse<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span><span class="va" style="color: #111111;
+background-color: null;
+font-style: inherit;">True</span>)[:<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">1000</span>]</span>
+<span id="cb8-18">        taccum.append(sims)</span>
+<span id="cb8-19">    accum[<span class="ss" style="color: #20794D;
+background-color: null;
+font-style: inherit;">f'</span><span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">{</span>nm<span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">}</span><span class="ss" style="color: #20794D;
+background-color: null;
+font-style: inherit;">-b'</span>] <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> taccum</span>
+<span id="cb8-20"></span>
+<span id="cb8-21">    fps <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> <span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">list</span>(fpg.GetCountFingerprints(dbmols,numThreads<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span><span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">8</span>))</span>
+<span id="cb8-22">    taccum <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> []</span>
+<span id="cb8-23">    <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">for</span> i <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">in</span> order:</span>
+<span id="cb8-24">        qry <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> fps[i]</span>
+<span id="cb8-25">        sims <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> [(sim,j) <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">for</span> j,sim <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">in</span> <span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">enumerate</span>(DataStructs.BulkTanimotoSimilarity(qry,fps)) <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">if</span> sim<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">&gt;=</span>cthresh <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">and</span> j<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">!=</span>i]</span>
+<span id="cb8-26">        sims <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> <span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">sorted</span>(sims,reverse<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span><span class="va" style="color: #111111;
+background-color: null;
+font-style: inherit;">True</span>)[:<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">1000</span>]</span>
+<span id="cb8-27">        taccum.append(sims)</span>
+<span id="cb8-28">    accum[<span class="ss" style="color: #20794D;
+background-color: null;
+font-style: inherit;">f'</span><span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">{</span>nm<span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">}</span><span class="ss" style="color: #20794D;
+background-color: null;
+font-style: inherit;">-c'</span>] <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> taccum</span>
+<span id="cb8-29"></span>
+<span id="cb8-30"><span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">for</span> nm,func,thresh <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">in</span> func_runs:</span>
+<span id="cb8-31">    <span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">print</span>(nm)</span>
+<span id="cb8-32">    fps <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> [func(m) <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">for</span> m <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">in</span> dbmols]</span>
+<span id="cb8-33">    taccum <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> []</span>
+<span id="cb8-34">    <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">for</span> i <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">in</span> order:</span>
+<span id="cb8-35">        qry <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> fps[i]</span>
+<span id="cb8-36">        sims <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> [(sim,j) <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">for</span> j,sim <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">in</span> <span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">enumerate</span>(DataStructs.BulkTanimotoSimilarity(qry,fps)) <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">if</span> sim<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">&gt;=</span>thresh <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">and</span> j<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">!=</span>i]</span>
+<span id="cb8-37">        sims <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> <span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">sorted</span>(sims,reverse<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span><span class="va" style="color: #111111;
+background-color: null;
+font-style: inherit;">True</span>)[:<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">1000</span>]</span>
+<span id="cb8-38">        taccum.append(sims)</span>
+<span id="cb8-39">    accum[nm] <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> taccum</span></code></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>mfp2
+ffp2
+mfp3
+ffp3
+mfp1
+ffp1
+tt
+ap
+rdk5
+rdk7
+gobbi2d
+avalon
+avalon-c
+pattern</code></pre>
+</div>
+</div>
+<div id="0ce4aa9c" class="cell" data-execution_count="7">
+<div class="sourceCode cell-code" id="cb10" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb10-1"><span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">import</span> pickle</span>
+<span id="cb10-2"><span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">import</span> gzip</span>
+<span id="cb10-3"><span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">with</span> gzip.<span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">open</span>(<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'./results/sim_overlaps_thresh.pkl.gz'</span>,<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'wb+'</span>) <span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">as</span> outf:</span>
+<span id="cb10-4">    pickle.dump(accum,outf)</span></code></pre></div>
+</div>
+<p>Accumulate the overlaps:</p>
+<div id="04426233" class="cell" data-execution_count="8">
+<div class="sourceCode cell-code" id="cb11" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb11-1"><span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">from</span> collections <span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">import</span> defaultdict</span>
+<span id="cb11-2"></span>
+<span id="cb11-3">nms <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> <span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">list</span>(accum.keys())</span>
+<span id="cb11-4"></span>
+<span id="cb11-5">ovls <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> defaultdict(<span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">dict</span>)</span>
+<span id="cb11-6">topNs <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> [<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">10</span>,<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">100</span>,<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">1000</span>]</span>
+<span id="cb11-7"><span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">for</span> i,nmi <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">in</span> <span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">enumerate</span>(nms):</span>
+<span id="cb11-8">    nruns <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> <span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">len</span>(accum[nmi])</span>
+<span id="cb11-9">    <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">for</span> j <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">in</span> <span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">range</span>(i):</span>
+<span id="cb11-10">        nmj <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> nms[j]</span>
+<span id="cb11-11">        <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">for</span> topN <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">in</span> topNs:</span>
+<span id="cb11-12">            ovls[nmi,nmj][topN] <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> []</span>
+<span id="cb11-13">        <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">for</span> run <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">in</span> <span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">range</span>(nruns):</span>
+<span id="cb11-14">            topi <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> [x <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">for</span> s,x <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">in</span> accum[nmi][run]]</span>
+<span id="cb11-15">            topj <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> [x <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">for</span> s,x <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">in</span> accum[nmj][run]]</span>
+<span id="cb11-16">            <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">for</span> topN <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">in</span> topNs:</span>
+<span id="cb11-17">                ovls[nmi,nmj][topN].append(<span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">len</span>(<span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">set</span>(topi[:topN]).intersection(topj[:topN])))</span>
+<span id="cb11-18">ovls <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> <span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">dict</span>(ovls)</span></code></pre></div>
+</div>
+<p>Find the most similar fingerprint types for each of the fingerprints, this time using the mean overlap across the 500 hit sets:</p>
+<div id="f87c6e49" class="cell" data-scrolled="false" data-execution_count="9">
+<div class="sourceCode cell-code" id="cb12" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb12-1">snms <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> <span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">sorted</span>(nms)</span>
+<span id="cb12-2"></span>
+<span id="cb12-3"><span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">for</span> i <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">in</span> <span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">range</span>(<span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">len</span>(snms)):</span>
+<span id="cb12-4">    <span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">print</span>(<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'-'</span><span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">*</span><span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">70</span>)</span>
+<span id="cb12-5">    <span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">print</span>(snms[i])</span>
+<span id="cb12-6">    <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">for</span> cnt <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">in</span> (<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">10</span>,<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">100</span>,<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">1000</span>):</span>
+<span id="cb12-7">        row <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> []</span>
+<span id="cb12-8">        <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">for</span> j <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">in</span> <span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">range</span>(<span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">len</span>(snms)):</span>
+<span id="cb12-9">            <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">if</span> i<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">==</span>j:</span>
+<span id="cb12-10">                <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">continue</span></span>
+<span id="cb12-11">            nmi <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> snms[i]</span>
+<span id="cb12-12">            nmj <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> snms[j]</span>
+<span id="cb12-13">            <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">if</span> (nmi,nmj) <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">not</span> <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">in</span> ovls:</span>
+<span id="cb12-14">                nmi,nmj <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> nmj,nmi</span>
+<span id="cb12-15">            row.append((np.mean(ovls[nmi,nmj][cnt]),j))</span>
+<span id="cb12-16">        row <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> <span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">sorted</span>(row,reverse<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span><span class="va" style="color: #111111;
+background-color: null;
+font-style: inherit;">True</span>)</span>
+<span id="cb12-17">        nbrs <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> []</span>
+<span id="cb12-18">        <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">for</span> j <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">in</span> <span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">range</span>(<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">3</span>):</span>
+<span id="cb12-19">            nbrs.append(<span class="ss" style="color: #20794D;
+background-color: null;
+font-style: inherit;">f'</span><span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">{</span>snms[row[j][<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">1</span>]]<span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">:8s}</span><span class="ss" style="color: #20794D;
+background-color: null;
+font-style: inherit;">(</span><span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">{</span>row[j][<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">0</span>]<span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">:5.1f}</span><span class="ss" style="color: #20794D;
+background-color: null;
+font-style: inherit;">)'</span>)</span>
+<span id="cb12-20">        <span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">print</span>(<span class="ss" style="color: #20794D;
+background-color: null;
+font-style: inherit;">f'</span><span class="ch" style="color: #20794D;
+background-color: null;
+font-style: inherit;">\t</span><span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">{</span>cnt<span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">: 5d}</span><span class="ss" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'</span>,<span class="ss" style="color: #20794D;
+background-color: null;
+font-style: inherit;">f'</span><span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">{</span>nbrs[<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">0</span>]<span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">:17s}</span><span class="ss" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'</span>,<span class="ss" style="color: #20794D;
+background-color: null;
+font-style: inherit;">f'</span><span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">{</span>nbrs[<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">1</span>]<span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">:17s}</span><span class="ss" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'</span>,<span class="ss" style="color: #20794D;
+background-color: null;
+font-style: inherit;">f'</span><span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">{</span>nbrs[<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">2</span>]<span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">:16s}</span><span class="ss" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'</span>,)</span></code></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>----------------------------------------------------------------------
+ap-b
+       10 ap-c    (  7.8)   ffp1-c  (  4.9)   mfp1-c  (  4.8) 
+      100 ap-c    ( 61.4)   ffp1-c  ( 34.6)   mfp1-c  ( 34.0) 
+     1000 ap-c    (329.6)   ffp1-c  (189.2)   mfp1-c  (182.2) 
+----------------------------------------------------------------------
+ap-c
+       10 ap-b    (  7.8)   ffp2-c  (  5.1)   ffp1-c  (  5.1) 
+      100 ap-b    ( 61.4)   ffp1-c  ( 40.2)   mfp1-c  ( 39.0) 
+     1000 ap-b    (329.6)   ffp1-c  (264.2)   mfp1-c  (252.7) 
+----------------------------------------------------------------------
+avalon
+       10 avalon-c(  5.3)   rdk5-b  (  5.1)   rdk7-b  (  5.1) 
+      100 rdk5-b  ( 42.7)   avalon-c( 40.3)   rdk7-c  ( 40.1) 
+     1000 rdk7-c  (207.2)   avalon-c(195.1)   rdk5-b  (175.3) 
+----------------------------------------------------------------------
+avalon-c
+       10 avalon  (  5.3)   rdk5-c  (  5.3)   rdk7-c  (  5.1) 
+      100 rdk5-c  ( 42.5)   avalon  ( 40.3)   rdk7-c  ( 40.2) 
+     1000 rdk7-c  (235.7)   rdk5-c  (224.9)   avalon  (195.1) 
+----------------------------------------------------------------------
+ffp1-b
+       10 mfp1-b  (  7.2)   ffp2-b  (  6.7)   mfp2-b  (  6.2) 
+      100 mfp1-b  ( 64.7)   ffp2-b  ( 62.6)   mfp2-b  ( 55.7) 
+     1000 ffp2-b  (493.4)   mfp1-b  (467.8)   mfp2-b  (420.7) 
+----------------------------------------------------------------------
+ffp1-c
+       10 mfp1-c  (  7.5)   ffp2-c  (  6.9)   mfp2-c  (  6.4) 
+      100 mfp1-c  ( 64.1)   ffp2-c  ( 62.5)   mfp2-c  ( 55.2) 
+     1000 ffp2-c  (465.9)   mfp1-c  (435.8)   ffp3-c  (410.9) 
+----------------------------------------------------------------------
+ffp2-b
+       10 ffp3-b  (  8.2)   mfp2-b  (  7.9)   mfp3-b  (  7.5) 
+      100 ffp3-b  ( 79.6)   mfp2-b  ( 73.6)   mfp3-b  ( 69.9) 
+     1000 ffp3-b  (679.8)   mfp2-b  (575.7)   mfp3-b  (568.1) 
+----------------------------------------------------------------------
+ffp2-c
+       10 ffp3-c  (  8.3)   mfp2-c  (  8.1)   mfp3-c  (  7.5) 
+      100 ffp3-c  ( 79.6)   mfp2-c  ( 72.3)   mfp3-c  ( 69.1) 
+     1000 ffp3-c  (631.5)   mfp3-c  (524.9)   mfp2-c  (519.3) 
+----------------------------------------------------------------------
+ffp3-b
+       10 ffp2-b  (  8.2)   mfp3-b  (  8.1)   mfp2-b  (  7.5) 
+      100 ffp2-b  ( 79.6)   mfp3-b  ( 74.3)   mfp2-b  ( 68.6) 
+     1000 ffp2-b  (679.8)   mfp3-b  (589.2)   mfp2-b  (543.7) 
+----------------------------------------------------------------------
+ffp3-c
+       10 ffp2-c  (  8.3)   mfp3-c  (  8.2)   mfp2-c  (  7.6) 
+      100 ffp2-c  ( 79.6)   mfp3-c  ( 74.1)   mfp2-c  ( 68.9) 
+     1000 ffp2-c  (631.5)   mfp3-c  (567.9)   ffp3-b  (539.2) 
+----------------------------------------------------------------------
+gobbi2d
+       10 ap-c    (  3.8)   ap-b    (  3.7)   mfp3-c  (  3.5) 
+      100 ap-c    ( 22.0)   mfp2-c  ( 21.6)   mfp3-c  ( 21.2) 
+     1000 ap-c    ( 73.8)   mfp2-b  ( 72.1)   mfp3-c  ( 70.8) 
+----------------------------------------------------------------------
+mfp1-b
+       10 ffp1-b  (  7.2)   mfp2-b  (  7.0)   ffp2-b  (  6.3) 
+      100 mfp2-b  ( 65.5)   ffp1-b  ( 64.7)   ffp2-b  ( 56.9) 
+     1000 mfp2-b  (515.2)   ffp1-b  (467.8)   mfp3-b  (448.4) 
+----------------------------------------------------------------------
+mfp1-c
+       10 ffp1-c  (  7.5)   mfp2-c  (  7.1)   ffp2-c  (  6.5) 
+      100 mfp2-c  ( 65.6)   ffp1-c  ( 64.1)   ffp2-c  ( 57.2) 
+     1000 mfp2-c  (480.2)   mfp3-c  (436.2)   ffp1-c  (435.8) 
+----------------------------------------------------------------------
+mfp2-b
+       10 mfp3-b  (  8.3)   ffp2-b  (  7.9)   ffp3-b  (  7.5) 
+      100 mfp3-b  ( 80.3)   ffp2-b  ( 73.6)   ffp3-b  ( 68.6) 
+     1000 mfp3-b  (669.9)   ffp2-b  (575.7)   ffp3-b  (543.7) 
+----------------------------------------------------------------------
+mfp2-c
+       10 mfp3-c  (  8.3)   ffp2-c  (  8.1)   ffp3-c  (  7.6) 
+      100 mfp3-c  ( 80.5)   ffp2-c  ( 72.3)   ffp3-c  ( 68.9) 
+     1000 mfp3-c  (614.3)   ffp2-c  (519.3)   ffp3-c  (512.8) 
+----------------------------------------------------------------------
+mfp3-b
+       10 mfp2-b  (  8.3)   ffp3-b  (  8.1)   ffp2-b  (  7.5) 
+      100 mfp2-b  ( 80.3)   ffp3-b  ( 74.3)   mfp3-c  ( 70.0) 
+     1000 mfp2-b  (669.9)   ffp3-b  (589.2)   ffp2-b  (568.1) 
+----------------------------------------------------------------------
+mfp3-c
+       10 mfp2-c  (  8.3)   ffp3-c  (  8.2)   ffp2-c  (  7.5) 
+      100 mfp2-c  ( 80.5)   ffp3-c  ( 74.1)   mfp3-b  ( 70.0) 
+     1000 mfp2-c  (614.3)   ffp3-c  (567.9)   mfp3-b  (546.7) 
+----------------------------------------------------------------------
+pattern
+       10 avalon-c(  4.7)   rdk5-c  (  4.2)   avalon  (  4.2) 
+      100 avalon-c( 37.4)   rdk5-c  ( 35.7)   rdk7-c  ( 34.1) 
+     1000 rdk5-c  (183.8)   rdk7-c  (182.3)   rdk5-b  (170.9) 
+----------------------------------------------------------------------
+rdk5-b
+       10 rdk7-b  (  6.8)   rdk5-c  (  6.4)   rdk7-c  (  6.1) 
+      100 rdk5-c  ( 61.9)   rdk7-c  ( 57.6)   rdk7-b  ( 47.3) 
+     1000 rdk5-c  (383.5)   rdk7-c  (368.5)   ffp2-b  (228.8) 
+----------------------------------------------------------------------
+rdk5-c
+       10 rdk7-c  (  7.5)   rdk5-b  (  6.4)   rdk7-b  (  5.8) 
+      100 rdk7-c  ( 73.4)   rdk5-b  ( 61.9)   tt-c    ( 44.2) 
+     1000 rdk7-c  (521.6)   rdk5-b  (383.5)   tt-c    (265.3) 
+----------------------------------------------------------------------
+rdk7-b
+       10 rdk5-b  (  6.8)   rdk7-c  (  6.6)   rdk5-c  (  5.8) 
+      100 rdk5-b  ( 47.3)   rdk7-c  ( 46.0)   rdk5-c  ( 42.3) 
+     1000 rdk7-c  (163.0)   rdk5-b  (130.0)   rdk5-c  (125.0) 
+----------------------------------------------------------------------
+rdk7-c
+       10 rdk5-c  (  7.5)   rdk7-b  (  6.6)   rdk5-b  (  6.1) 
+      100 rdk5-c  ( 73.4)   rdk5-b  ( 57.6)   rdk7-b  ( 46.0) 
+     1000 rdk5-c  (521.6)   rdk5-b  (368.5)   tt-c    (282.9) 
+----------------------------------------------------------------------
+tt-b
+       10 tt-c    (  8.5)   ffp3-c  (  6.2)   mfp3-c  (  6.1) 
+      100 tt-c    ( 77.6)   ffp2-b  ( 52.7)   mfp2-b  ( 51.4) 
+     1000 tt-c    (470.1)   ffp2-b  (321.8)   mfp2-b  (308.9) 
+----------------------------------------------------------------------
+tt-c
+       10 tt-b    (  8.5)   ffp3-c  (  6.4)   ffp2-c  (  6.3) 
+      100 tt-b    ( 77.6)   ffp2-c  ( 52.6)   ffp3-c  ( 52.6) 
+     1000 tt-b    (470.1)   ffp3-c  (322.5)   ffp2-c  (322.3) </code></pre>
+</div>
+</div>
+<p>Look at histograms of the overlap sizes for a few different fingerprint pairs</p>
+<div id="1a6f7152" class="cell" data-execution_count="10">
+<div class="sourceCode cell-code" id="cb14" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb14-1"><span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">def</span> compare(prs,ovls<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span>ovls):</span>
+<span id="cb14-2">    prs <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> <span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">list</span>(prs)</span>
+<span id="cb14-3">    <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">for</span> i,pr <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">in</span> <span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">enumerate</span>(prs):</span>
+<span id="cb14-4">        <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">if</span> pr <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">not</span> <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">in</span> ovls:</span>
+<span id="cb14-5">            pr <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> pr[<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">1</span>],pr[<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">0</span>]</span>
+<span id="cb14-6">        prs[i] <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> pr</span>
+<span id="cb14-7"></span>
+<span id="cb14-8">    plt.figure(figsize<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span>(<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">12</span>,<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">5</span>))</span>
+<span id="cb14-9">    <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">for</span> i,n <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">in</span> <span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">enumerate</span>((<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">100</span>,<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">1000</span>)):</span>
+<span id="cb14-10">        plt.subplot(<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">1</span>,<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">2</span>,i<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">+</span><span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">1</span>)</span>
+<span id="cb14-11">        plt.hist([ovls[pr][n] <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">for</span> pr <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">in</span> prs],label<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span>prs,bins<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span><span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">20</span>)<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">;</span></span>
+<span id="cb14-12">        plt.xlim(<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">0</span>,n)</span>
+<span id="cb14-13">        plt.xlabel(<span class="ss" style="color: #20794D;
+background-color: null;
+font-style: inherit;">f'n=</span><span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">{</span>n<span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">}</span><span class="ss" style="color: #20794D;
+background-color: null;
+font-style: inherit;"> overlap'</span>)</span>
+<span id="cb14-14">        <span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">#plt.title(pr)</span></span>
+<span id="cb14-15">        plt.legend()</span>
+<span id="cb14-16">    plt.tight_layout()</span></code></pre></div>
+</div>
+<p>Start with <a href="https://www.rdkit.org/docs/RDKit_Book.html#morgan-and-feature-morgan-fingerprints">FeatureMorgan and Morgan</a>, where there is a reasonably large amount of overlap:</p>
+<div id="c8df404b" class="cell" data-execution_count="11">
+<div class="sourceCode cell-code" id="cb15" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb15-1">compare(((<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'ffp2-b'</span>,<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'mfp2-b'</span>),(<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'ffp3-b'</span>,<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'mfp3-b'</span>)))</span></code></pre></div>
+<div class="cell-output cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="https://greglandrum.github.io/rdkit-blog/posts/2025-04-13-similarity-hitset-overlap-2_files/figure-html/cell-12-output-1.png" class="img-fluid figure-img"></p>
+</figure>
+</div>
+</div>
+</div>
+<p>Now compare count-based and bit-based Morgan fingerprints. I expected the overlaps here to be higher:</p>
+<div id="01a6402a" class="cell" data-scrolled="false" data-execution_count="12">
+<div class="sourceCode cell-code" id="cb16" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb16-1">compare(((<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'mfp3-c'</span>,<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'mfp3-b'</span>),(<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'mfp2-c'</span>,<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'mfp2-b'</span>),))</span></code></pre></div>
+<div class="cell-output cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="https://greglandrum.github.io/rdkit-blog/posts/2025-04-13-similarity-hitset-overlap-2_files/figure-html/cell-13-output-1.png" class="img-fluid figure-img"></p>
+</figure>
+</div>
+</div>
+</div>
+<p>Comparing very different types of fingerprints: count-based Morgan3 and both <a href="https://www.rdkit.org/docs/RDKit_Book.html#atom-pair-and-topological-torsion-fingerprints">Topological Torsions and Atom Pairs</a> (these both use <a href="https://greglandrum.github.io/rdkit-blog/posts/2021-07-06-simulating-counts.html">count simulation</a>. Here there are significant differences. These are fingerprints that it would be interesting to use together.</p>
+<div id="76e8ffef" class="cell" data-execution_count="13">
+<div class="sourceCode cell-code" id="cb17" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb17-1">compare(((<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'tt-b'</span>,<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'mfp3-c'</span>),(<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'ap-b'</span>,<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'mfp3-c'</span>)))</span></code></pre></div>
+<div class="cell-output cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="https://greglandrum.github.io/rdkit-blog/posts/2025-04-13-similarity-hitset-overlap-2_files/figure-html/cell-14-output-1.png" class="img-fluid figure-img"></p>
+</figure>
+</div>
+</div>
+</div>
+<p>Same thing with bit-baseed Morgan3 and <a href="https://www.rdkit.org/docs/RDKit_Book.html#rdkit-fingerprints">RDK5</a>. Again, These are nicely complementary fingerprints:</p>
+<div id="5b8f4a61" class="cell" data-execution_count="14">
+<div class="sourceCode cell-code" id="cb18" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb18-1">compare(((<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'tt-b'</span>,<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'mfp3-b'</span>),(<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'ap-b'</span>,<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'mfp3-b'</span>),(<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'rdk5-b'</span>,<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'mfp3-b'</span>)))</span></code></pre></div>
+<div class="cell-output cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="https://greglandrum.github.io/rdkit-blog/posts/2025-04-13-similarity-hitset-overlap-2_files/figure-html/cell-15-output-1.png" class="img-fluid figure-img"></p>
+</figure>
+</div>
+</div>
+</div>
+<p>Finally compare Morgan3 with the <a href="https://www.rdkit.org/docs/RDKit_Book.html#pattern-fingerprints">pattern fingerprint</a> (normally used for substructure screening, not similarity search), Gobbi2D (a 2D pharmacophore FP) and the Avalon FP. These are also nicely different from each other:</p>
+<div id="76ea761c" class="cell" data-scrolled="false" data-execution_count="15">
+<div class="sourceCode cell-code" id="cb19" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb19-1">compare(((<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'pattern'</span>,<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'mfp3-b'</span>),(<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'gobbi2d'</span>,<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'mfp3-b'</span>),(<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'avalon'</span>,<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'mfp3-b'</span>)))</span></code></pre></div>
+<div class="cell-output cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="https://greglandrum.github.io/rdkit-blog/posts/2025-04-13-similarity-hitset-overlap-2_files/figure-html/cell-16-output-1.png" class="img-fluid figure-img"></p>
+</figure>
+</div>
+</div>
+</div>
+
+
+
+ ]]></description>
+  <category>reference</category>
+  <category>similarity</category>
+  <category>fingerprints</category>
+  <guid>https://greglandrum.github.io/rdkit-blog/posts/2025-04-13-similarity-hitset-overlap-2.html</guid>
+  <pubDate>Sat, 12 Apr 2025 22:00:00 GMT</pubDate>
+  <media:content url="https://greglandrum.github.io/rdkit-blog/posts/images/blog/similarity-hitset-overlap-2.png" medium="image" type="image/png" height="121" width="144"/>
+</item>
 <item>
   <title>Interrupting calculations</title>
   <link>https://greglandrum.github.io/rdkit-blog/posts/2025-04-06-interrupting-calculations.html</link>
@@ -21346,2401 +22577,6 @@ font-style: inherit;">6</span>)</span></code></pre></div>
   <category>release</category>
   <guid>https://greglandrum.github.io/rdkit-blog/posts/2024-09-29-whats-new-2024-09-1.html</guid>
   <pubDate>Sat, 28 Sep 2024 22:00:00 GMT</pubDate>
-</item>
-<item>
-  <title>Additive fingerprints</title>
-  <link>https://greglandrum.github.io/rdkit-blog/posts/2024-09-20-additive-fingerprints1.html</link>
-  <description><![CDATA[ 
-
-
-
-
-<p>This is a reformatted and lightly revised version of a <a href="https://rdkit.blogspot.com/2019/11/additive-fingerprints.html">blog post from 2019</a>.</p>
-<p>The goal here is to evaluate one strategy for enabling similarity search of virtual libraries defined via molecular fragments that can be combined using simple rules. One obvious approach is to just enumerate the molecules in the library, generate their fingerprints, and the calculate similarity. This is clearly impractical if the libraries are really big, so I want to see if it’s possible to make things faster by skipping the enumeration step and approximating the fingerprint of a molecule with the sum of the fingerprints that make it up plus constant correction terms.</p>
-<p>For example, suppose I form a molecule by combining the two fragments <code>c1ccccc1-[16*]</code> and <code>CCCCO-[3*]</code> to make <code>c1ccccc1-OCCCC</code>, I want to see how closely I can approximate the fingerprint of the final molecule by adding the fingerprints of the two fragments together with a correction term that is characteristic of the bond type being formed (in this case the <code>16-3</code> combination rule). This obviously won’t work well with fingerprints like Atom Pairs that include terms encompassing the entire molecule, but may be useful for more “local” descriptors like the Morgan fingerprint, topological torsions, or the RDKit fingerprint.</p>
-<p>This isn’t a really new idea - it’s inspired by the idea behind <a href="http://pubs.acs.org/doi/abs/10.1021/ci0504871">Truchon and Bayly’s GLARE algorithm</a> and I’ve explored it a bit in the past - but I haven’t seen it published and never really dug into it. That’s what this post (likely a series of posts) is for.</p>
-<p>Demonstrating that this really works requires a fair amount of effort, but we can get a good initial readout by comparing the calculated similarities between a bunch of real molecules calculated with their “real” fingerprints and then with the “additive” fingerprints. I’ll start here with the Morgan fingerprint, since that’s one of the more popular ones in the RDKit (and one where the approach seems likely to work). If that goes well, I’ll try another fingerprint type or two and maybe do some more comprehensive validation.</p>
-<blockquote class="blockquote">
-<p>Since the original post was published, a <a href="https://pubs.acs.org/doi/full/10.1021/acs.jcim.0c00850">paper from Matthias Rarey’s group</a> explored an efficient strategy for searching combinatorial library spaces using topological fingerprints.</p>
-</blockquote>
-<div id="cell-2" class="cell" data-executetime="{&quot;end_time&quot;:&quot;2024-09-20T05:20:59.978449Z&quot;,&quot;start_time&quot;:&quot;2024-09-20T05:20:59.965723Z&quot;}" data-execution_count="19">
-<div class="sourceCode cell-code" id="cb1" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb1-1"><span class="im" style="color: #00769E;
-background-color: null;
-font-style: inherit;">import</span> numpy <span class="im" style="color: #00769E;
-background-color: null;
-font-style: inherit;">as</span> np</span>
-<span id="cb1-2"><span class="im" style="color: #00769E;
-background-color: null;
-font-style: inherit;">from</span> rdkit <span class="im" style="color: #00769E;
-background-color: null;
-font-style: inherit;">import</span> DataStructs</span>
-<span id="cb1-3"><span class="im" style="color: #00769E;
-background-color: null;
-font-style: inherit;">from</span> rdkit <span class="im" style="color: #00769E;
-background-color: null;
-font-style: inherit;">import</span> Chem</span>
-<span id="cb1-4"><span class="im" style="color: #00769E;
-background-color: null;
-font-style: inherit;">from</span> rdkit.Chem <span class="im" style="color: #00769E;
-background-color: null;
-font-style: inherit;">import</span> rdFingerprintGenerator</span>
-<span id="cb1-5"><span class="im" style="color: #00769E;
-background-color: null;
-font-style: inherit;">from</span> rdkit.Chem.Draw <span class="im" style="color: #00769E;
-background-color: null;
-font-style: inherit;">import</span> IPythonConsole</span>
-<span id="cb1-6"><span class="im" style="color: #00769E;
-background-color: null;
-font-style: inherit;">from</span> rdkit.Chem.MolStandardize <span class="im" style="color: #00769E;
-background-color: null;
-font-style: inherit;">import</span> rdMolStandardize</span>
-<span id="cb1-7"><span class="im" style="color: #00769E;
-background-color: null;
-font-style: inherit;">from</span> rdkit.Chem <span class="im" style="color: #00769E;
-background-color: null;
-font-style: inherit;">import</span> Draw</span>
-<span id="cb1-8"><span class="im" style="color: #00769E;
-background-color: null;
-font-style: inherit;">from</span> rdkit.Chem <span class="im" style="color: #00769E;
-background-color: null;
-font-style: inherit;">import</span> BRICS</span>
-<span id="cb1-9"><span class="im" style="color: #00769E;
-background-color: null;
-font-style: inherit;">import</span> rdkit</span>
-<span id="cb1-10"><span class="bu" style="color: null;
-background-color: null;
-font-style: inherit;">print</span>(rdkit.__version__)</span>
-<span id="cb1-11"><span class="im" style="color: #00769E;
-background-color: null;
-font-style: inherit;">from</span> matplotlib <span class="im" style="color: #00769E;
-background-color: null;
-font-style: inherit;">import</span> pyplot <span class="im" style="color: #00769E;
-background-color: null;
-font-style: inherit;">as</span> plt</span>
-<span id="cb1-12"><span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">%</span>matplotlib inline</span></code></pre></div>
-<div class="cell-output cell-output-stdout">
-<pre><code>2024.03.5</code></pre>
-</div>
-</div>
-<p>Start by reading in the set of molecules we’ll work with. This dataset was described in a recent <a href="https://rdkit.blogspot.com/2019/10/a-new-lessel-and-briem-like-dataset.html">RDKit blog post</a>.</p>
-<p>Bring in the molecules and do salt stripping:</p>
-<div id="cell-4" class="cell" data-executetime="{&quot;end_time&quot;:&quot;2024-09-20T05:20:14.197264Z&quot;,&quot;start_time&quot;:&quot;2024-09-20T05:20:08.117933Z&quot;}" data-execution_count="2">
-<div class="sourceCode cell-code" id="cb3" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb3-1"><span class="im" style="color: #00769E;
-background-color: null;
-font-style: inherit;">from</span> rdkit <span class="im" style="color: #00769E;
-background-color: null;
-font-style: inherit;">import</span> rdBase</span>
-<span id="cb3-2">rdBase.DisableLog(<span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">'rdApp.info'</span>)</span>
-<span id="cb3-3">ms <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> [rdMolStandardize.FragmentParent(x) <span class="cf" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">for</span> x <span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">in</span> Chem.SmilesMolSupplier(<span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">'../data/BLSets_selected_actives.txt'</span>)]</span>
-<span id="cb3-4">_ <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> [Chem.GetSymmSSSR(m) <span class="cf" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">for</span> m <span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">in</span> ms]</span>
-<span id="cb3-5"><span class="bu" style="color: null;
-background-color: null;
-font-style: inherit;">len</span>(ms)</span></code></pre></div>
-<div class="cell-output cell-output-display" data-execution_count="2">
-<pre><code>6359</code></pre>
-</div>
-</div>
-<p>In order to fragment the molecules we’re going to be using the <a href="http://doi.wiley.com/10.1002/cmdc.200800178">BRICS fragmentation rules</a> as implemented in the RDKit. Note that the RDKit implementation has differs from the published BRICS rules in that atom types 2 and 5 (both Ns) have been combined with each other. This is, unfortunately not (yet) documented outside of the code itself, but there’s an explanation here: https://github.com/rdkit/rdkit/blob/master/Code/GraphMol/ChemTransforms/MolFragmenter.cpp#L101</p>
-<p>For the purposes of this evaluation as to whether or not additive fingerprints work, we will only be using the ten most common BRICS bonds in the dataset. Let’s start by finding those.</p>
-<p>This is what the list of BRICS bonds for each molecule looks like:</p>
-<div id="cell-6" class="cell" data-executetime="{&quot;end_time&quot;:&quot;2024-09-20T05:20:14.202874Z&quot;,&quot;start_time&quot;:&quot;2024-09-20T05:20:14.198923Z&quot;}" data-execution_count="3">
-<div class="sourceCode cell-code" id="cb5" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb5-1"><span class="bu" style="color: null;
-background-color: null;
-font-style: inherit;">list</span>(BRICS.FindBRICSBonds(ms[<span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">0</span>]))</span></code></pre></div>
-<div class="cell-output cell-output-display" data-execution_count="3">
-<pre><code>[((2, 1), ('1', '5')),
- ((8, 7), ('1', '5')),
- ((6, 7), ('4', '5')),
- ((15, 20), ('5', '12')),
- ((8, 10), ('6', '13')),
- ((6, 30), ('8', '15')),
- ((23, 24), ('8', '16'))]</code></pre>
-</div>
-</div>
-<p>The first element of each tuple contains the indices of the atoms defining the bond, the second element has the BRICS atom types of those atoms. For example, the first BRICS bond in the molecule above is between atom 2 (BRICS type 1) and atom 1 (BRICS type 5).</p>
-<p>Loop over all the molecules and count the number of times each bond type occurs:</p>
-<div id="cell-8" class="cell" data-executetime="{&quot;end_time&quot;:&quot;2024-09-20T05:20:16.710986Z&quot;,&quot;start_time&quot;:&quot;2024-09-20T05:20:14.203972Z&quot;}" data-execution_count="4">
-<div class="sourceCode cell-code" id="cb7" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb7-1"><span class="im" style="color: #00769E;
-background-color: null;
-font-style: inherit;">from</span> collections <span class="im" style="color: #00769E;
-background-color: null;
-font-style: inherit;">import</span> defaultdict, Counter</span>
-<span id="cb7-2">cntr <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> Counter()</span>
-<span id="cb7-3"><span class="cf" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">for</span> m <span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">in</span> ms:</span>
-<span id="cb7-4">    bbnds <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> BRICS.FindBRICSBonds(m)</span>
-<span id="cb7-5">    <span class="cf" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">for</span> aids,lbls <span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">in</span> bbnds:</span>
-<span id="cb7-6">        cntr[lbls] <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">+=</span> <span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">1</span></span>
-<span id="cb7-7">freqs <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> <span class="bu" style="color: null;
-background-color: null;
-font-style: inherit;">sorted</span>([(y,x) <span class="cf" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">for</span> x,y <span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">in</span> cntr.items()],reverse<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span><span class="va" style="color: #111111;
-background-color: null;
-font-style: inherit;">True</span>)</span>
-<span id="cb7-8">freqs[:<span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">10</span>]</span></code></pre></div>
-<div class="cell-output cell-output-display" data-execution_count="4">
-<pre><code>[(7337, ('4', '5')),
- (4619, ('1', '5')),
- (3488, ('8', '16')),
- (2599, ('3', '16')),
- (1817, ('5', '16')),
- (1507, ('3', '4')),
- (997, ('6', '16')),
- (853, ('5', '15')),
- (789, ('8', '14')),
- (714, ('8', '15'))]</code></pre>
-</div>
-</div>
-<p>The top two bond types are <code>4-5</code>(alkyl C - amine) and <code>1-5</code> (the amide bond).</p>
-<p>Keep those top 10:</p>
-<div id="cell-10" class="cell" data-executetime="{&quot;end_time&quot;:&quot;2024-09-20T05:20:16.714314Z&quot;,&quot;start_time&quot;:&quot;2024-09-20T05:20:16.712437Z&quot;}" data-execution_count="5">
-<div class="sourceCode cell-code" id="cb9" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb9-1">bondsToKeep <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> [y <span class="cf" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">for</span> x,y <span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">in</span> freqs[:<span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">10</span>]]</span></code></pre></div>
-</div>
-<p>In order to clarify what the more complex code below does, here’s a worked example demonstrating fragmenting a single molecule along two bonds, both between BRICS atom types 1 and 5 (these bonds and the types come from the example above where we found the molecule’s BRICS bonds):</p>
-<div id="cell-12" class="cell" data-executetime="{&quot;end_time&quot;:&quot;2024-09-20T05:20:18.088028Z&quot;,&quot;start_time&quot;:&quot;2024-09-20T05:20:16.715288Z&quot;}" data-execution_count="6">
-<div class="sourceCode cell-code" id="cb10" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb10-1">tm<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span>Chem.FragmentOnSomeBonds(ms[<span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">0</span>],[ms[<span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">0</span>].GetBondBetweenAtoms(<span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">2</span>,<span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">1</span>).GetIdx(),ms[<span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">0</span>].GetBondBetweenAtoms(<span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">8</span>,<span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">7</span>).GetIdx()],</span>
-<span id="cb10-2">                         dummyLabels<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span>[[<span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">1</span>,<span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">5</span>],[<span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">1</span>,<span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">5</span>]])</span>
-<span id="cb10-3">[Chem.MolToSmiles(x) <span class="cf" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">for</span> x <span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">in</span> tm]</span></code></pre></div>
-<div class="cell-output cell-output-display" data-execution_count="6">
-<pre><code>['[1*]C(=O)C(=O)C(NC(=O)[C@@H]1CC[C@H]2CN(S(=O)(=O)Cc3ccccc3)CC(=O)N21)[C@H]1CC[C@H](N)CC1.[5*]NC',
- '[1*]C(=O)[C@@H]1CC[C@H]2CN(S(=O)(=O)Cc3ccccc3)CC(=O)N21.[5*]NC(C(=O)C(=O)NC)[C@H]1CC[C@H](N)CC1']</code></pre>
-</div>
-</div>
-<p>To make it visual, here’s a drawing of the two fragmentations:</p>
-<div id="cell-14" class="cell" data-executetime="{&quot;end_time&quot;:&quot;2024-09-20T05:20:18.262798Z&quot;,&quot;start_time&quot;:&quot;2024-09-20T05:20:18.092745Z&quot;}" data-execution_count="7">
-<div class="sourceCode cell-code" id="cb12" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb12-1">fms <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> Chem.FragmentOnSomeBonds(ms[<span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">0</span>],[ms[<span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">0</span>].GetBondBetweenAtoms(<span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">2</span>,<span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">1</span>).GetIdx(),ms[<span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">0</span>].GetBondBetweenAtoms(<span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">8</span>,<span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">7</span>).GetIdx()],</span>
-<span id="cb12-2">                         dummyLabels<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span>[[<span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">1</span>,<span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">5</span>],[<span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">1</span>,<span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">5</span>]])</span>
-<span id="cb12-3">Draw.MolsToGridImage(fms,subImgSize<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span>(<span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">300</span>,<span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">250</span>))</span></code></pre></div>
-<div class="cell-output cell-output-display" data-execution_count="7">
-<div>
-<figure class="figure">
-<p><img src="https://greglandrum.github.io/rdkit-blog/posts/2024-09-20-additive-fingerprints1_files/figure-html/cell-8-output-1.png" class="img-fluid figure-img"></p>
-</figure>
-</div>
-</div>
-</div>
-<p>Let’s define some functions that we’ll use for the rest of this:</p>
-<div id="cell-16" class="cell" data-executetime="{&quot;end_time&quot;:&quot;2024-09-20T05:20:18.348232Z&quot;,&quot;start_time&quot;:&quot;2024-09-20T05:20:18.264046Z&quot;}" data-execution_count="8">
-<div class="sourceCode cell-code" id="cb13" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb13-1"><span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">def</span> splitMol(mol,bondsToKeep):</span>
-<span id="cb13-2">    <span class="co" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">''' fragments a molecule on a particular set of BRICS bonds. </span></span>
-<span id="cb13-3"><span class="co" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">    Partially sanitizes the results </span></span>
-<span id="cb13-4"><span class="co" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">    '''</span></span>
-<span id="cb13-5">    bbnds <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> BRICS.FindBRICSBonds(mol)</span>
-<span id="cb13-6">    bndsToTry <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> []</span>
-<span id="cb13-7">    lbls <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> []</span>
-<span id="cb13-8">    <span class="cf" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">for</span> aids,lbl <span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">in</span> bbnds:</span>
-<span id="cb13-9">        <span class="cf" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">if</span> lbl <span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">in</span> bondsToKeep:</span>
-<span id="cb13-10">            bndsToTry.append(mol.GetBondBetweenAtoms(aids[<span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">0</span>],aids[<span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">1</span>]).GetIdx())</span>
-<span id="cb13-11">            lbls.append([<span class="bu" style="color: null;
-background-color: null;
-font-style: inherit;">int</span>(x) <span class="cf" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">for</span> x <span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">in</span> lbl])</span>
-<span id="cb13-12">    <span class="cf" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">if</span> <span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">not</span> bndsToTry:</span>
-<span id="cb13-13">        <span class="cf" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">return</span> []</span>
-<span id="cb13-14">    res <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> Chem.FragmentOnSomeBonds(mol,bndsToTry,dummyLabels<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span>lbls)</span>
-<span id="cb13-15">    <span class="co" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;"># We need at least a partial sanitization for the rest of what we will be doing:</span></span>
-<span id="cb13-16">    <span class="cf" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">for</span> entry <span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">in</span> res:</span>
-<span id="cb13-17">        entry.UpdatePropertyCache(<span class="va" style="color: #111111;
-background-color: null;
-font-style: inherit;">False</span>)</span>
-<span id="cb13-18">        Chem.FastFindRings(entry)</span>
-<span id="cb13-19">    <span class="cf" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">return</span> res</span>
-<span id="cb13-20"></span>
-<span id="cb13-21"><span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">def</span> getDifferenceFPs(mol,bondsToKeep,fpgen):</span>
-<span id="cb13-22">    <span class="co" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">''' generates the difference fingerprint between the molecule</span></span>
-<span id="cb13-23"><span class="co" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">    and each of its fragmentations based on the BRICS bond types passed in.</span></span>
-<span id="cb13-24"><span class="co" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">    </span></span>
-<span id="cb13-25"><span class="co" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">    This calculates the sum of the fragment fingerprints by just generating the</span></span>
-<span id="cb13-26"><span class="co" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">    fingerprint of the fragmented molecule, so whole-molecule fingerprints like</span></span>
-<span id="cb13-27"><span class="co" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">    atom pairs will not work here. That's fine since they are unlikely to be useful</span></span>
-<span id="cb13-28"><span class="co" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">    with this approach anyway</span></span>
-<span id="cb13-29"><span class="co" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">    '''</span></span>
-<span id="cb13-30">    frags <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> splitMol(mol,bondsToKeep)</span>
-<span id="cb13-31">    <span class="cf" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">if</span> <span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">not</span> frags:</span>
-<span id="cb13-32">        <span class="cf" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">return</span> []</span>
-<span id="cb13-33">    res <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> []</span>
-<span id="cb13-34">    <span class="co" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;"># get the fingerprint for the molecule:</span></span>
-<span id="cb13-35">    molfp <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> fpgen.GetCountFingerprint(mol)</span>
-<span id="cb13-36">    <span class="co" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;"># now loop over each fragmentation</span></span>
-<span id="cb13-37">    <span class="cf" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">for</span> frag <span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">in</span> frags:</span>
-<span id="cb13-38">        <span class="co" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;"># generate the fingerprint of the fragmented molecule</span></span>
-<span id="cb13-39">        <span class="co" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;"># (equivalent to the sum of the fingerprints of the fragments)</span></span>
-<span id="cb13-40">        ffp <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> fpgen.GetCountFingerprint(frag)</span>
-<span id="cb13-41">        <span class="co" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;"># and keep the difference</span></span>
-<span id="cb13-42">        res.append(molfp<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">-</span>ffp)</span>
-<span id="cb13-43">    <span class="cf" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">return</span> res</span>
-<span id="cb13-44"></span>
-<span id="cb13-45"><span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">def</span> getSumFP(fragMol,fpgen,delta):</span>
-<span id="cb13-46">    <span class="co" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">''' Constructs the sum fingerprint for a fragmented molecule using</span></span>
-<span id="cb13-47"><span class="co" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">    delta as a constant offset</span></span>
-<span id="cb13-48"><span class="co" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">    </span></span>
-<span id="cb13-49"><span class="co" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">    note that any elements of the fingerprint that are negative after adding the</span></span>
-<span id="cb13-50"><span class="co" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">    constant offset will be set to zero</span></span>
-<span id="cb13-51"><span class="co" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">    </span></span>
-<span id="cb13-52"><span class="co" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">    '''</span></span>
-<span id="cb13-53">    ffp <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> fpgen.GetCountFingerprint(fragMol)</span>
-<span id="cb13-54">    <span class="cf" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">for</span> idx,v <span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">in</span> delta.GetNonzeroElements().items():</span>
-<span id="cb13-55">        tv <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> ffp[idx] <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">+</span> v</span>
-<span id="cb13-56">        <span class="cf" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">if</span> tv<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">&lt;</span><span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">0</span>:</span>
-<span id="cb13-57">            tv <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> <span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">0</span><span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">;</span></span>
-<span id="cb13-58">        ffp[idx] <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> tv</span>
-<span id="cb13-59">    <span class="cf" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">return</span> ffp</span>
-<span id="cb13-60">        </span></code></pre></div>
-</div>
-<div id="cell-17" class="cell" data-executetime="{&quot;end_time&quot;:&quot;2024-09-20T05:20:18.450797Z&quot;,&quot;start_time&quot;:&quot;2024-09-20T05:20:18.379029Z&quot;}" data-execution_count="9">
-<div class="sourceCode cell-code" id="cb14" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb14-1"><span class="co" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;"># demonstrate what splitMol returns:</span></span>
-<span id="cb14-2">frags <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> splitMol(ms[<span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">0</span>],bondsToKeep[<span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">2</span>:<span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">3</span>])</span>
-<span id="cb14-3">Draw.MolsToGridImage(frags)</span></code></pre></div>
-<div class="cell-output cell-output-display" data-execution_count="9">
-<div>
-<figure class="figure">
-<p><img src="https://greglandrum.github.io/rdkit-blog/posts/2024-09-20-additive-fingerprints1_files/figure-html/cell-10-output-1.png" class="img-fluid figure-img"></p>
-</figure>
-</div>
-</div>
-</div>
-<p>Now walk through the analysis with a single bond type: <code>1-5</code></p>
-<p>The first thing we need to do is determine the constant offset term for this bond type. We will do that by generating difference fingerprints for all the fragmentations it generates and then averaging those difference fingerprints.</p>
-<p>Start by generating the difference fingerprints for all the fragmentations using that bond type:</p>
-<div id="cell-19" class="cell" data-executetime="{&quot;end_time&quot;:&quot;2024-09-20T05:20:22.585306Z&quot;,&quot;start_time&quot;:&quot;2024-09-20T05:20:19.109765Z&quot;}" data-execution_count="10">
-<div class="sourceCode cell-code" id="cb15" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb15-1"><span class="co" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;"># for this analysis we will use a 4096 "bit" count-based Morgan fingerprints with a radius of 2</span></span>
-<span id="cb15-2">fpgen <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> rdFingerprintGenerator.GetMorganGenerator(radius<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span><span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">2</span>,fpSize<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span><span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">4096</span>)</span>
-<span id="cb15-3">dfps<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> []</span>
-<span id="cb15-4"><span class="cf" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">for</span> m <span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">in</span> ms:</span>
-<span id="cb15-5">    dfps.extend(getDifferenceFPs(m,bondsToKeep[<span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">1</span>:<span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">2</span>],fpgen))</span></code></pre></div>
-</div>
-<p>Now find the average value of the difference fingerprint, being careful to keep only integer values:</p>
-<div id="cell-21" class="cell" data-executetime="{&quot;end_time&quot;:&quot;2024-09-20T05:20:22.628417Z&quot;,&quot;start_time&quot;:&quot;2024-09-20T05:20:22.586574Z&quot;}" data-execution_count="11">
-<div class="sourceCode cell-code" id="cb16" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb16-1">delta1 <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> dfps[<span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">0</span>]</span>
-<span id="cb16-2"><span class="cf" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">for</span> dfp <span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">in</span> dfps[<span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">1</span>:]:</span>
-<span id="cb16-3">    delta1 <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">+=</span> dfp</span>
-<span id="cb16-4">nfps <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> <span class="bu" style="color: null;
-background-color: null;
-font-style: inherit;">len</span>(dfps)</span>
-<span id="cb16-5"><span class="cf" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">for</span> k,v <span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">in</span> delta1.GetNonzeroElements().items():</span>
-<span id="cb16-6">    delta1[k] <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> <span class="bu" style="color: null;
-background-color: null;
-font-style: inherit;">round</span>(v<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">/</span>nfps)</span>
-<span id="cb16-7">delta1.GetNonzeroElements()</span></code></pre></div>
-<div class="cell-output cell-output-display" data-execution_count="11">
-<pre><code>{226: -2, 264: -1, 1831: -1}</code></pre>
-</div>
-</div>
-<p>To quickly summarize that this is telling us: We can simulate the MFP2 fingerprint for a molecule by adding the MFP2 fingerprints of its bond type <code>1-5</code> fragments and then substracting one each from the values for bits 264 and 1831 and two from the value for bit 226.</p>
-<p>Let’s look at how well that works across all the molecules. We start by generating the full FP and the <code>1-5</code> fragment FP for every molecule that has a <code>1-5</code> fragment:</p>
-<div id="cell-23" class="cell" data-executetime="{&quot;end_time&quot;:&quot;2024-09-20T05:20:26.476872Z&quot;,&quot;start_time&quot;:&quot;2024-09-20T05:20:22.629421Z&quot;}" data-execution_count="12">
-<div class="sourceCode cell-code" id="cb18" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb18-1">allfps <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> []</span>
-<span id="cb18-2"><span class="cf" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">for</span> m <span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">in</span> ms:</span>
-<span id="cb18-3">    frags <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> splitMol(m,bondsToKeep[<span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">1</span>:<span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">2</span>])</span>
-<span id="cb18-4">    <span class="cf" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">if</span> <span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">not</span> frags:</span>
-<span id="cb18-5">        <span class="cf" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">continue</span></span>
-<span id="cb18-6">    fp1 <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> fpgen.GetCountFingerprint(m)</span>
-<span id="cb18-7">    ffps <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> [getSumFP(x,fpgen,delta1) <span class="cf" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">for</span> x <span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">in</span> frags]</span>
-<span id="cb18-8">    allfps.append((fp1,ffps))</span></code></pre></div>
-</div>
-<div id="cell-24" class="cell" data-executetime="{&quot;end_time&quot;:&quot;2024-09-20T05:20:26.481011Z&quot;,&quot;start_time&quot;:&quot;2024-09-20T05:20:26.478207Z&quot;}" data-execution_count="13">
-<div class="sourceCode cell-code" id="cb19" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb19-1"><span class="bu" style="color: null;
-background-color: null;
-font-style: inherit;">len</span>(allfps)</span></code></pre></div>
-<div class="cell-output cell-output-display" data-execution_count="13">
-<pre><code>2801</code></pre>
-</div>
-</div>
-<p>And calculate the similarity of each molecule to itself by calculating the Tanimoto similarity between the full fingerprint and the fragment fingerprint:</p>
-<div id="cell-26" class="cell" data-executetime="{&quot;end_time&quot;:&quot;2024-09-20T05:20:26.588111Z&quot;,&quot;start_time&quot;:&quot;2024-09-20T05:20:26.481896Z&quot;}" data-execution_count="14">
-<div class="sourceCode cell-code" id="cb21" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb21-1">self_tanis <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> []</span>
-<span id="cb21-2"><span class="cf" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">for</span> fp1,ffps <span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">in</span> allfps:</span>
-<span id="cb21-3">    self_tanis.extend([DataStructs.TanimotoSimilarity(fp1,x) <span class="cf" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">for</span> x <span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">in</span> ffps])</span></code></pre></div>
-</div>
-<p>Visualize those:</p>
-<div id="cell-28" class="cell" data-executetime="{&quot;end_time&quot;:&quot;2024-09-20T05:20:34.867463Z&quot;,&quot;start_time&quot;:&quot;2024-09-20T05:20:34.751222Z&quot;}" data-execution_count="16">
-<div class="sourceCode cell-code" id="cb22" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb22-1">plt.hist(self_tanis,bins<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span><span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">20</span>)<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">;</span></span>
-<span id="cb22-2">plt.title(<span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">"self similarity, fusion 1-5"</span>)<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">;</span></span></code></pre></div>
-<div class="cell-output cell-output-display">
-<div>
-<figure class="figure">
-<p><img src="https://greglandrum.github.io/rdkit-blog/posts/2024-09-20-additive-fingerprints1_files/figure-html/cell-16-output-1.png" class="img-fluid figure-img"></p>
-</figure>
-</div>
-</div>
-</div>
-<p>Though that’s interesting, and good to see that the self-similarities aren’t all too far from 1.0, we’re actually more interested in using the fingerprints for comparing different molecules to each other.</p>
-<p>Look at a bunch of random pairs of molecules that are at least 0.3 similar to each other (the <a href="https://greglandrum.github.io/rdkit-blog/posts/2021-05-18-fingerprint-thresholds1.html">noise threshold</a> for count-based MFP2 is around 0.3), and then look at how different the similarities between their normal and fragment fingerprints are.</p>
-<div id="cell-30" class="cell" data-executetime="{&quot;end_time&quot;:&quot;2024-09-20T05:20:40.232712Z&quot;,&quot;start_time&quot;:&quot;2024-09-20T05:20:39.588025Z&quot;}" data-execution_count="17">
-<div class="sourceCode cell-code" id="cb23" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb23-1"><span class="im" style="color: #00769E;
-background-color: null;
-font-style: inherit;">import</span> random</span>
-<span id="cb23-2">random.seed(<span class="bn" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">0xf00d</span>)</span>
-<span id="cb23-3">ps1 <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> <span class="bu" style="color: null;
-background-color: null;
-font-style: inherit;">list</span>(<span class="bu" style="color: null;
-background-color: null;
-font-style: inherit;">range</span>(<span class="bu" style="color: null;
-background-color: null;
-font-style: inherit;">len</span>(allfps)))</span>
-<span id="cb23-4">random.shuffle(ps1)</span>
-<span id="cb23-5">ps1 <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> ps1[:<span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">500</span>]</span>
-<span id="cb23-6">ps2 <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> <span class="bu" style="color: null;
-background-color: null;
-font-style: inherit;">list</span>(<span class="bu" style="color: null;
-background-color: null;
-font-style: inherit;">range</span>(<span class="bu" style="color: null;
-background-color: null;
-font-style: inherit;">len</span>(allfps)))</span>
-<span id="cb23-7">random.shuffle(ps2)</span>
-<span id="cb23-8">ps2 <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> ps2[:<span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">500</span>]</span>
-<span id="cb23-9"></span>
-<span id="cb23-10">nCompared <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> <span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">0</span></span>
-<span id="cb23-11">other_tanidiff <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> []</span>
-<span id="cb23-12"><span class="cf" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">for</span> i <span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">in</span> ps1:</span>
-<span id="cb23-13">    fp1,frags1 <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> allfps[i]</span>
-<span id="cb23-14">    <span class="cf" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">for</span> j <span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">in</span> ps2:</span>
-<span id="cb23-15">        fp2,frags2 <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> allfps[j]</span>
-<span id="cb23-16">        refTani <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> DataStructs.TanimotoSimilarity(fp1,fp2)</span>
-<span id="cb23-17">        <span class="cf" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">if</span> refTani <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">&lt;</span> <span class="fl" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">0.3</span>:</span>
-<span id="cb23-18">            <span class="cf" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">continue</span></span>
-<span id="cb23-19">        nCompared <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">+=</span> <span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">1</span></span>
-<span id="cb23-20">        ltanis <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> []</span>
-<span id="cb23-21">        <span class="cf" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">for</span> f1 <span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">in</span> frags1:</span>
-<span id="cb23-22">            ltanis.extend(DataStructs.BulkTanimotoSimilarity(f1,frags2))</span>
-<span id="cb23-23">        other_tanidiff.extend([refTani<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">-</span>x <span class="cf" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">for</span> x <span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">in</span> ltanis])</span>
-<span id="cb23-24"><span class="bu" style="color: null;
-background-color: null;
-font-style: inherit;">print</span>(<span class="ss" style="color: #20794D;
-background-color: null;
-font-style: inherit;">f"considered </span><span class="sc" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">{</span>nCompared<span class="sc" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">}</span><span class="ss" style="color: #20794D;
-background-color: null;
-font-style: inherit;"> fingerprint pairs from </span><span class="sc" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">{</span><span class="bu" style="color: null;
-background-color: null;
-font-style: inherit;">len</span>(allfps)<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">**</span><span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">2</span><span class="sc" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">}</span><span class="ss" style="color: #20794D;
-background-color: null;
-font-style: inherit;">"</span>)</span></code></pre></div>
-<div class="cell-output cell-output-stdout">
-<pre><code>considered 15382 fingerprint pairs from 7845601</code></pre>
-</div>
-</div>
-<div id="cell-31" class="cell" data-executetime="{&quot;end_time&quot;:&quot;2024-09-20T05:22:06.692154Z&quot;,&quot;start_time&quot;:&quot;2024-09-20T05:22:06.476816Z&quot;}" data-execution_count="23">
-<div class="sourceCode cell-code" id="cb25" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb25-1">median <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> np.median(np.<span class="bu" style="color: null;
-background-color: null;
-font-style: inherit;">abs</span>(other_tanidiff))</span>
-<span id="cb25-2">bins <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> np.quantile(np.<span class="bu" style="color: null;
-background-color: null;
-font-style: inherit;">abs</span>(other_tanidiff),[<span class="fl" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">0.25</span>,<span class="fl" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">0.75</span>, <span class="fl" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">0.9</span>,<span class="fl" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">0.95</span>])</span>
-<span id="cb25-3">iqr <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> bins[<span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">1</span>]<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">-</span>bins[<span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">0</span>]</span>
-<span id="cb25-4">plt.hist(other_tanidiff,bins<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span><span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">20</span>)<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">;</span></span>
-<span id="cb25-5">gzero <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> np.<span class="bu" style="color: null;
-background-color: null;
-font-style: inherit;">sum</span>(np.array(other_tanidiff)<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">&gt;-</span><span class="fl" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">0.005</span>) <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">/</span> <span class="bu" style="color: null;
-background-color: null;
-font-style: inherit;">len</span>(other_tanidiff)</span>
-<span id="cb25-6">plt.title(<span class="ss" style="color: #20794D;
-background-color: null;
-font-style: inherit;">f'MAD=</span><span class="sc" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">{</span>median<span class="sc" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">:.2f}</span><span class="ss" style="color: #20794D;
-background-color: null;
-font-style: inherit;">, IQR=</span><span class="sc" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">{</span>iqr<span class="sc" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">:.2f}</span><span class="ss" style="color: #20794D;
-background-color: null;
-font-style: inherit;">, 90%=</span><span class="sc" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">{</span>bins[<span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">2</span>]<span class="sc" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">:.2f}</span><span class="ss" style="color: #20794D;
-background-color: null;
-font-style: inherit;">, 95%=</span><span class="sc" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">{</span>bins[<span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">3</span>]<span class="sc" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">:.2f}</span><span class="ss" style="color: #20794D;
-background-color: null;
-font-style: inherit;">, </span><span class="sc" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">{</span>gzero<span class="sc" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">:.2f}</span><span class="ss" style="color: #20794D;
-background-color: null;
-font-style: inherit;">&gt;-.005'</span>)<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">;</span></span>
-<span id="cb25-7">plt.xlabel(<span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">'$</span><span class="ch" style="color: #20794D;
-background-color: null;
-font-style: inherit;">\\</span><span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">Delta$Similarity'</span>)<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">;</span></span>
-<span id="cb25-8">plt.ylabel(<span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">'count'</span>)<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">;</span></span></code></pre></div>
-<div class="cell-output cell-output-display">
-<div>
-<figure class="figure">
-<p><img src="https://greglandrum.github.io/rdkit-blog/posts/2024-09-20-additive-fingerprints1_files/figure-html/cell-18-output-1.png" class="img-fluid figure-img"></p>
-</figure>
-</div>
-</div>
-</div>
-<p>The title of the plot shows statistics about the similarity differences: the median absolute deviation (MAD), the inter-quartile range (IQR), the 90% and 95% bins of the absolute deviations, and the fraction of the differences which are greater than -0.005 (I chose 0.005 as an conservative tolerance value for considering the similarities identical).</p>
-<p>That looks pretty good. For at least the <code>1-5</code> fragmentation, the similarity calculated with the fragment fingerprint is quite similar to that calculated with the full fingerprint. Even better: most of the deviation happens to the high-similarity side (87% exceed the -0.005 tolerance value), so we should be able to safely use the fragment-fingerprint similarity as a filter to identify interesting molecules.</p>
-<section id="validation" class="level1">
-<h1>Validation</h1>
-<p>Repeat that analysis for each of the top 10 fragmentations:</p>
-<div id="cell-34" class="cell" data-executetime="{&quot;end_time&quot;:&quot;2024-09-20T03:30:09.764668Z&quot;,&quot;start_time&quot;:&quot;2024-09-20T03:28:44.748774Z&quot;}" data-execution_count="91">
-<div class="sourceCode cell-code" id="cb26" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb26-1"><span class="im" style="color: #00769E;
-background-color: null;
-font-style: inherit;">import</span> random</span>
-<span id="cb26-2">random.seed(<span class="bn" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">0xf00d</span>)</span>
-<span id="cb26-3"><span class="im" style="color: #00769E;
-background-color: null;
-font-style: inherit;">from</span> collections <span class="im" style="color: #00769E;
-background-color: null;
-font-style: inherit;">import</span> defaultdict</span>
-<span id="cb26-4">results <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> {}</span>
-<span id="cb26-5"><span class="cf" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">for</span> btk <span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">in</span> bondsToKeep:</span>
-<span id="cb26-6">    <span class="bu" style="color: null;
-background-color: null;
-font-style: inherit;">print</span>(<span class="ss" style="color: #20794D;
-background-color: null;
-font-style: inherit;">f"Doing </span><span class="sc" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">{</span>btk<span class="sc" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">}</span><span class="ss" style="color: #20794D;
-background-color: null;
-font-style: inherit;">"</span>)</span>
-<span id="cb26-7">    fpgen <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> rdFingerprintGenerator.GetMorganGenerator(radius<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span><span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">2</span>,fpSize<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span><span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">4096</span>)</span>
-<span id="cb26-8">    dfps<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> []</span>
-<span id="cb26-9">    <span class="cf" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">for</span> m <span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">in</span> ms:</span>
-<span id="cb26-10">        dfps.extend(getDifferenceFPs(m,[btk],fpgen))</span>
-<span id="cb26-11"></span>
-<span id="cb26-12">    delta1 <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> dfps[<span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">0</span>]</span>
-<span id="cb26-13">    <span class="cf" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">for</span> dfp <span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">in</span> dfps[<span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">1</span>:]:</span>
-<span id="cb26-14">        delta1 <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">+=</span> dfp</span>
-<span id="cb26-15">    nfps <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> <span class="bu" style="color: null;
-background-color: null;
-font-style: inherit;">len</span>(dfps)</span>
-<span id="cb26-16">    <span class="cf" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">for</span> k,v <span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">in</span> delta1.GetNonzeroElements().items():</span>
-<span id="cb26-17">        delta1[k] <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> <span class="bu" style="color: null;
-background-color: null;
-font-style: inherit;">round</span>(v<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">/</span>nfps)</span>
-<span id="cb26-18"></span>
-<span id="cb26-19">    allfps <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> []</span>
-<span id="cb26-20">    <span class="cf" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">for</span> m <span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">in</span> ms:</span>
-<span id="cb26-21">        frags <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> splitMol(m,[btk])</span>
-<span id="cb26-22">        <span class="cf" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">if</span> <span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">not</span> frags:</span>
-<span id="cb26-23">            <span class="cf" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">continue</span></span>
-<span id="cb26-24">        fp1 <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> fpgen.GetCountFingerprint(m)</span>
-<span id="cb26-25">        ffps <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> [getSumFP(x,fpgen,delta1) <span class="cf" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">for</span> x <span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">in</span> frags]</span>
-<span id="cb26-26">        allfps.append((fp1,ffps))</span>
-<span id="cb26-27"></span>
-<span id="cb26-28">    self_tanis <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> []</span>
-<span id="cb26-29">    <span class="cf" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">for</span> fp1,ffps <span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">in</span> allfps:</span>
-<span id="cb26-30">        self_tanis.extend([DataStructs.TanimotoSimilarity(fp1,x) <span class="cf" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">for</span> x <span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">in</span> ffps])</span>
-<span id="cb26-31">        </span>
-<span id="cb26-32">    ps1 <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> <span class="bu" style="color: null;
-background-color: null;
-font-style: inherit;">list</span>(<span class="bu" style="color: null;
-background-color: null;
-font-style: inherit;">range</span>(<span class="bu" style="color: null;
-background-color: null;
-font-style: inherit;">len</span>(allfps)))</span>
-<span id="cb26-33">    random.shuffle(ps1)</span>
-<span id="cb26-34">    ps1 <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> ps1[:<span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">1000</span>]</span>
-<span id="cb26-35">    ps2 <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> <span class="bu" style="color: null;
-background-color: null;
-font-style: inherit;">list</span>(<span class="bu" style="color: null;
-background-color: null;
-font-style: inherit;">range</span>(<span class="bu" style="color: null;
-background-color: null;
-font-style: inherit;">len</span>(allfps)))</span>
-<span id="cb26-36">    random.shuffle(ps2)</span>
-<span id="cb26-37">    ps2 <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> ps2[:<span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">1000</span>]</span>
-<span id="cb26-38"></span>
-<span id="cb26-39">    nCompared <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> <span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">0</span></span>
-<span id="cb26-40">    other_tanidiff1 <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> defaultdict(<span class="bu" style="color: null;
-background-color: null;
-font-style: inherit;">list</span>)</span>
-<span id="cb26-41">    other_tanidiff2 <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> defaultdict(<span class="bu" style="color: null;
-background-color: null;
-font-style: inherit;">list</span>)</span>
-<span id="cb26-42">    <span class="cf" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">for</span> i <span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">in</span> ps1:</span>
-<span id="cb26-43">        fp1,frags1 <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> allfps[i]</span>
-<span id="cb26-44">        <span class="cf" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">for</span> j <span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">in</span> ps2:</span>
-<span id="cb26-45">            fp2,frags2 <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> allfps[j]</span>
-<span id="cb26-46">            refTani <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> DataStructs.TanimotoSimilarity(fp1,fp2)</span>
-<span id="cb26-47">            <span class="cf" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">if</span> refTani <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">&lt;</span> <span class="fl" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">0.3</span>:</span>
-<span id="cb26-48">                <span class="cf" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">continue</span></span>
-<span id="cb26-49">            nCompared <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">+=</span> <span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">1</span></span>
-<span id="cb26-50">            ltanis <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> []</span>
-<span id="cb26-51">            <span class="cf" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">for</span> f1 <span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">in</span> frags1:</span>
-<span id="cb26-52">                ltanis.extend(DataStructs.BulkTanimotoSimilarity(f1,frags2))</span>
-<span id="cb26-53">            <span class="cf" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">for</span> thresh <span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">in</span> (<span class="fl" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">0.3</span>,<span class="fl" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">0.5</span>,<span class="fl" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">0.7</span>):</span>
-<span id="cb26-54">                <span class="cf" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">if</span> refTani <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">&lt;</span> thresh:</span>
-<span id="cb26-55">                    <span class="cf" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">continue</span></span>
-<span id="cb26-56">                other_tanidiff1[thresh].extend([refTani<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">-</span>x <span class="cf" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">for</span> x <span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">in</span> ltanis])</span>
-<span id="cb26-57">                other_tanidiff2[thresh].extend([refTani<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">-</span>x <span class="cf" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">for</span> x <span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">in</span> DataStructs.BulkTanimotoSimilarity(fp1,frags2)])</span>
-<span id="cb26-58">                other_tanidiff2[thresh].extend([refTani<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">-</span>x <span class="cf" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">for</span> x <span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">in</span> DataStructs.BulkTanimotoSimilarity(fp2,frags1)])</span>
-<span id="cb26-59"></span>
-<span id="cb26-60">    <span class="bu" style="color: null;
-background-color: null;
-font-style: inherit;">print</span>(<span class="ss" style="color: #20794D;
-background-color: null;
-font-style: inherit;">f"considered </span><span class="sc" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">{</span>nCompared<span class="sc" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">}</span><span class="ss" style="color: #20794D;
-background-color: null;
-font-style: inherit;"> fingerprint pairs from </span><span class="sc" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">{</span><span class="bu" style="color: null;
-background-color: null;
-font-style: inherit;">len</span>(allfps)<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">**</span><span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">2</span><span class="sc" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">}</span><span class="ss" style="color: #20794D;
-background-color: null;
-font-style: inherit;">"</span>)</span>
-<span id="cb26-61">    results[btk] <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> (self_tanis,other_tanidiff1,other_tanidiff2)</span></code></pre></div>
-<div class="cell-output cell-output-stdout">
-<pre><code>Doing ('4', '5')
-considered 66995 fingerprint pairs from 18326961
-Doing ('1', '5')
-considered 63242 fingerprint pairs from 7845601
-Doing ('8', '16')
-considered 54070 fingerprint pairs from 6095961
-Doing ('3', '16')
-considered 95650 fingerprint pairs from 4260096
-Doing ('5', '16')
-considered 217114 fingerprint pairs from 2725801
-Doing ('3', '4')
-considered 112805 fingerprint pairs from 1537600
-Doing ('6', '16')
-considered 98275 fingerprint pairs from 790321
-Doing ('5', '15')
-considered 53490 fingerprint pairs from 640000
-Doing ('8', '14')
-considered 43291 fingerprint pairs from 502681
-Doing ('8', '15')
-considered 35148 fingerprint pairs from 352836</code></pre>
-</div>
-</div>
-<p>Start, again, by looking at self similarities.</p>
-<div id="cell-36" class="cell" data-executetime="{&quot;end_time&quot;:&quot;2024-09-20T03:30:32.384729Z&quot;,&quot;start_time&quot;:&quot;2024-09-20T03:30:31.317658Z&quot;}" data-execution_count="92">
-<div class="sourceCode cell-code" id="cb28" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb28-1">plt.figure(figsize<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span>(<span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">12</span>,<span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">18</span>))</span>
-<span id="cb28-2"><span class="cf" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">for</span> i,btk <span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">in</span> <span class="bu" style="color: null;
-background-color: null;
-font-style: inherit;">enumerate</span>(results.keys()):</span>
-<span id="cb28-3">    plt.subplot(<span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">5</span>,<span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">2</span>,i<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">+</span><span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">1</span>)</span>
-<span id="cb28-4">    self_tanis,other_tanidiff1,other_tanidiff2 <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> results[btk]</span>
-<span id="cb28-5">    plt.hist(self_tanis,bins<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span><span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">20</span>)<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">;</span></span>
-<span id="cb28-6">    plt.title(<span class="ss" style="color: #20794D;
-background-color: null;
-font-style: inherit;">f"self similarity, </span><span class="sc" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">{</span>btk<span class="sc" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">}</span><span class="ss" style="color: #20794D;
-background-color: null;
-font-style: inherit;">"</span>)<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">;</span>    </span>
-<span id="cb28-7">    plt.xlim((<span class="fl" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">0.6</span>,<span class="fl" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">1.0</span>))<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">;</span></span></code></pre></div>
-<div class="cell-output cell-output-display">
-<div>
-<figure class="figure">
-<p><img src="https://greglandrum.github.io/rdkit-blog/posts/2024-09-20-additive-fingerprints1_files/figure-html/cell-20-output-1.png" class="img-fluid figure-img"></p>
-</figure>
-</div>
-</div>
-</div>
-<p>The differences here aren’t huge, but we definitely aren’t getting self-similarities of 1.</p>
-<p>Still, we aren’t really interested in self-similarity. How does the method do when we compute fragment-fragment similarities? This time we plot the difference between the similarities calculated with the full fingerprint and the fragment fingerprints.</p>
-<div id="cell-39" class="cell" data-executetime="{&quot;end_time&quot;:&quot;2024-09-20T03:30:39.576749Z&quot;,&quot;start_time&quot;:&quot;2024-09-20T03:30:35.989374Z&quot;}" data-execution_count="93">
-<div class="sourceCode cell-code" id="cb29" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb29-1">plt.figure(figsize<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span>(<span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">12</span>,<span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">18</span>))</span>
-<span id="cb29-2"><span class="cf" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">for</span> i,btk <span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">in</span> <span class="bu" style="color: null;
-background-color: null;
-font-style: inherit;">enumerate</span>(results.keys()):</span>
-<span id="cb29-3">    plt.subplot(<span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">5</span>,<span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">2</span>,i<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">+</span><span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">1</span>)</span>
-<span id="cb29-4">    self_tanis,other_tanidiff1,other_tanidiff2 <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> results[btk]</span>
-<span id="cb29-5">    other_tanidiff1 <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> other_tanidiff1[<span class="fl" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">0.3</span>]</span>
-<span id="cb29-6">    other_tanidiff2 <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> other_tanidiff2[<span class="fl" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">0.3</span>]</span>
-<span id="cb29-7">    plt.hist(other_tanidiff1,bins<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span><span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">20</span>,label<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span><span class="ss" style="color: #20794D;
-background-color: null;
-font-style: inherit;">f'fragfp-fragfp </span><span class="sc" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">{</span>btk<span class="sc" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">}</span><span class="ss" style="color: #20794D;
-background-color: null;
-font-style: inherit;">'</span>)<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">;</span></span>
-<span id="cb29-8">    plt.legend()</span>
-<span id="cb29-9">    median <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> np.median(np.<span class="bu" style="color: null;
-background-color: null;
-font-style: inherit;">abs</span>(other_tanidiff1))</span>
-<span id="cb29-10">    std <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> np.std(np.<span class="bu" style="color: null;
-background-color: null;
-font-style: inherit;">abs</span>(other_tanidiff1))</span>
-<span id="cb29-11">    bins <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> np.quantile(np.<span class="bu" style="color: null;
-background-color: null;
-font-style: inherit;">abs</span>(other_tanidiff1),[<span class="fl" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">0.25</span>,<span class="fl" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">0.75</span>, <span class="fl" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">0.9</span>,<span class="fl" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">0.95</span>])</span>
-<span id="cb29-12">    iqr <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> bins[<span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">1</span>]<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">-</span>bins[<span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">0</span>]</span>
-<span id="cb29-13">    gzero <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> np.<span class="bu" style="color: null;
-background-color: null;
-font-style: inherit;">sum</span>(np.array(other_tanidiff1)<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">&gt;-</span><span class="fl" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">0.005</span>) <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">/</span> <span class="bu" style="color: null;
-background-color: null;
-font-style: inherit;">len</span>(other_tanidiff1)</span>
-<span id="cb29-14">    plt.title(<span class="ss" style="color: #20794D;
-background-color: null;
-font-style: inherit;">f'MAD=</span><span class="sc" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">{</span>median<span class="sc" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">:.2f}</span><span class="ss" style="color: #20794D;
-background-color: null;
-font-style: inherit;">, IQR=</span><span class="sc" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">{</span>iqr<span class="sc" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">:.2f}</span><span class="ss" style="color: #20794D;
-background-color: null;
-font-style: inherit;">, 90%=</span><span class="sc" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">{</span>bins[<span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">2</span>]<span class="sc" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">:.2f}</span><span class="ss" style="color: #20794D;
-background-color: null;
-font-style: inherit;">, 95%=</span><span class="sc" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">{</span>bins[<span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">3</span>]<span class="sc" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">:.2f}</span><span class="ss" style="color: #20794D;
-background-color: null;
-font-style: inherit;">, </span><span class="sc" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">{</span>gzero<span class="sc" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">:.2f}</span><span class="ss" style="color: #20794D;
-background-color: null;
-font-style: inherit;">&gt;-.005'</span>)<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">;</span></span>
-<span id="cb29-15">    plt.xlim((<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">-</span><span class="fl" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">0.1</span>,<span class="fl" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">0.25</span>))<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">;</span></span>
-<span id="cb29-16">plt.tight_layout()</span></code></pre></div>
-<div class="cell-output cell-output-display">
-<div>
-<figure class="figure">
-<p><img src="https://greglandrum.github.io/rdkit-blog/posts/2024-09-20-additive-fingerprints1_files/figure-html/cell-21-output-1.png" class="img-fluid figure-img"></p>
-</figure>
-</div>
-</div>
-</div>
-<p>Those look good! In general the difference in similarities is within 0.05.</p>
-<p>And, finally, since we could also query the collection of fragment molecules with a full fingerprint, look at the difference between the full FP similarity and the full FP - fragment FP similarity:</p>
-<div id="cell-42" class="cell" data-executetime="{&quot;end_time&quot;:&quot;2024-09-20T03:30:51.488192Z&quot;,&quot;start_time&quot;:&quot;2024-09-20T03:30:47.368017Z&quot;}" data-execution_count="94">
-<div class="sourceCode cell-code" id="cb30" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb30-1">plt.figure(figsize<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span>(<span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">12</span>,<span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">18</span>))</span>
-<span id="cb30-2"><span class="cf" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">for</span> i,btk <span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">in</span> <span class="bu" style="color: null;
-background-color: null;
-font-style: inherit;">enumerate</span>(results.keys()):</span>
-<span id="cb30-3">    plt.subplot(<span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">5</span>,<span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">2</span>,i<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">+</span><span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">1</span>)</span>
-<span id="cb30-4">    self_tanis,other_tanidiff1,other_tanidiff2 <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> results[btk]</span>
-<span id="cb30-5">    other_tanidiff1 <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> other_tanidiff1[<span class="fl" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">0.3</span>]</span>
-<span id="cb30-6">    other_tanidiff2 <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> other_tanidiff2[<span class="fl" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">0.3</span>]</span>
-<span id="cb30-7">    plt.hist(other_tanidiff2,bins<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span><span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">20</span>,label<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span><span class="ss" style="color: #20794D;
-background-color: null;
-font-style: inherit;">f'fp-fragfp </span><span class="sc" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">{</span>btk<span class="sc" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">}</span><span class="ss" style="color: #20794D;
-background-color: null;
-font-style: inherit;">'</span>)<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">;</span></span>
-<span id="cb30-8">    plt.legend()</span>
-<span id="cb30-9">    median <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> np.median(np.<span class="bu" style="color: null;
-background-color: null;
-font-style: inherit;">abs</span>(other_tanidiff2))</span>
-<span id="cb30-10">    std <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> np.std(np.<span class="bu" style="color: null;
-background-color: null;
-font-style: inherit;">abs</span>(other_tanidiff2))</span>
-<span id="cb30-11">    bins <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> np.quantile(np.<span class="bu" style="color: null;
-background-color: null;
-font-style: inherit;">abs</span>(other_tanidiff2),[<span class="fl" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">0.25</span>,<span class="fl" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">0.75</span>, <span class="fl" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">0.9</span>,<span class="fl" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">0.95</span>])</span>
-<span id="cb30-12">    iqr <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> bins[<span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">1</span>]<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">-</span>bins[<span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">0</span>]</span>
-<span id="cb30-13">    gzero <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> np.<span class="bu" style="color: null;
-background-color: null;
-font-style: inherit;">sum</span>(np.array(other_tanidiff2)<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">&gt;-</span><span class="fl" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">0.005</span>) <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">/</span> <span class="bu" style="color: null;
-background-color: null;
-font-style: inherit;">len</span>(other_tanidiff2)</span>
-<span id="cb30-14">    plt.title(<span class="ss" style="color: #20794D;
-background-color: null;
-font-style: inherit;">f'MAD=</span><span class="sc" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">{</span>median<span class="sc" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">:.2f}</span><span class="ss" style="color: #20794D;
-background-color: null;
-font-style: inherit;">, IQR=</span><span class="sc" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">{</span>iqr<span class="sc" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">:.2f}</span><span class="ss" style="color: #20794D;
-background-color: null;
-font-style: inherit;">, 90%=</span><span class="sc" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">{</span>bins[<span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">2</span>]<span class="sc" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">:.2f}</span><span class="ss" style="color: #20794D;
-background-color: null;
-font-style: inherit;">, 95%=</span><span class="sc" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">{</span>bins[<span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">3</span>]<span class="sc" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">:.2f}</span><span class="ss" style="color: #20794D;
-background-color: null;
-font-style: inherit;">, </span><span class="sc" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">{</span>gzero<span class="sc" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">:.2f}</span><span class="ss" style="color: #20794D;
-background-color: null;
-font-style: inherit;">&gt;-.005'</span>)<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">;</span></span>
-<span id="cb30-15"></span>
-<span id="cb30-16">    plt.xlim((<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">-</span><span class="fl" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">0.1</span>,<span class="fl" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">0.25</span>))<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">;</span></span>
-<span id="cb30-17">plt.tight_layout()</span></code></pre></div>
-<div class="cell-output cell-output-display">
-<div>
-<figure class="figure">
-<p><img src="https://greglandrum.github.io/rdkit-blog/posts/2024-09-20-additive-fingerprints1_files/figure-html/cell-22-output-1.png" class="img-fluid figure-img"></p>
-</figure>
-</div>
-</div>
-</div>
-<p>Here the differences are larger than when we search with the fragment fps, but they still aren’t huge. This form of the query also has the characteristic that the similarity calculated against the fragment fps is usually lower than that calculated against the full fp.</p>
-<section id="tolerances-for-searching" class="level2">
-<h2 class="anchored" data-anchor-id="tolerances-for-searching">Tolerances for searching</h2>
-<p>Suppose we want to use the fragment fingerprints for similarity searching with a threshold and be sure that we don’t miss any results. How would we need to adjust the threshold?</p>
-<div id="cell-45" class="cell" data-executetime="{&quot;end_time&quot;:&quot;2024-09-20T03:32:37.594990Z&quot;,&quot;start_time&quot;:&quot;2024-09-20T03:32:37.324895Z&quot;}" data-execution_count="97">
-<div class="sourceCode cell-code" id="cb31" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb31-1"><span class="cf" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">for</span> thresh <span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">in</span> (<span class="fl" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">0.3</span>,<span class="fl" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">0.5</span>,<span class="fl" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">0.7</span>):</span>
-<span id="cb31-2">    <span class="bu" style="color: null;
-background-color: null;
-font-style: inherit;">print</span>(<span class="ss" style="color: #20794D;
-background-color: null;
-font-style: inherit;">f'Threshold: </span><span class="sc" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">{</span>thresh<span class="sc" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">}</span><span class="ss" style="color: #20794D;
-background-color: null;
-font-style: inherit;">'</span>)</span>
-<span id="cb31-3">    <span class="bu" style="color: null;
-background-color: null;
-font-style: inherit;">print</span>(<span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">'            </span><span class="ch" style="color: #20794D;
-background-color: null;
-font-style: inherit;">\t</span><span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">   frag-frag</span><span class="ch" style="color: #20794D;
-background-color: null;
-font-style: inherit;">\t</span><span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">   fp-frag'</span>)</span>
-<span id="cb31-4">    <span class="cf" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">for</span> i,btk <span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">in</span> <span class="bu" style="color: null;
-background-color: null;
-font-style: inherit;">enumerate</span>(results.keys()):</span>
-<span id="cb31-5">        self_tanis,other_tanidiff1,other_tanidiff2 <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> results[btk]</span>
-<span id="cb31-6">        bins1 <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> np.quantile(other_tanidiff1[thresh],[<span class="fl" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">0.01</span>,<span class="fl" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">0.05</span>])</span>
-<span id="cb31-7">        bins2 <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> np.quantile(other_tanidiff2[thresh],[<span class="fl" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">0.01</span>,<span class="fl" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">0.05</span>])</span>
-<span id="cb31-8">        <span class="bu" style="color: null;
-background-color: null;
-font-style: inherit;">print</span>(<span class="ss" style="color: #20794D;
-background-color: null;
-font-style: inherit;">f'</span><span class="sc" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">{</span>btk<span class="sc" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">}</span><span class="ss" style="color: #20794D;
-background-color: null;
-font-style: inherit;">:</span><span class="ch" style="color: #20794D;
-background-color: null;
-font-style: inherit;">\t</span><span class="sc" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">{</span>bins1[<span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">0</span>]<span class="sc" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">: 6.3f}</span><span class="ss" style="color: #20794D;
-background-color: null;
-font-style: inherit;"> </span><span class="sc" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">{</span>bins1[<span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">1</span>]<span class="sc" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">: 6.3f}</span><span class="ch" style="color: #20794D;
-background-color: null;
-font-style: inherit;">\t</span><span class="sc" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">{</span>bins2[<span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">0</span>]<span class="sc" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">: 6.3f}</span><span class="ss" style="color: #20794D;
-background-color: null;
-font-style: inherit;"> </span><span class="sc" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">{</span>bins2[<span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">1</span>]<span class="sc" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">: 6.3f}</span><span class="ss" style="color: #20794D;
-background-color: null;
-font-style: inherit;">'</span>)</span>
-<span id="cb31-9">    <span class="bu" style="color: null;
-background-color: null;
-font-style: inherit;">print</span>(<span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">'-----------'</span>)</span></code></pre></div>
-<div class="cell-output cell-output-stdout">
-<pre><code>Threshold: 0.3
-                   frag-frag       fp-frag
-('4', '5'): -0.025 -0.015   -0.006  0.000
-('1', '5'): -0.022 -0.010   -0.004  0.000
-('8', '16'):    -0.032 -0.021   -0.012 -0.007
-('3', '16'):    -0.026 -0.021   -0.013 -0.010
-('5', '16'):    -0.029 -0.019   -0.016 -0.002
-('3', '4'): -0.032 -0.019   -0.018 -0.009
-('6', '16'):    -0.043 -0.029   -0.025 -0.015
-('5', '15'):    -0.048 -0.026   -0.005 -0.002
-('8', '14'):    -0.042 -0.016   -0.010 -0.002
-('8', '15'):    -0.053 -0.028   -0.014 -0.003
------------
-Threshold: 0.5
-                   frag-frag       fp-frag
-('4', '5'): -0.023 -0.008    0.000  0.004
-('1', '5'): -0.022 -0.004   -0.003  0.000
-('8', '16'):    -0.035 -0.019   -0.012 -0.004
-('3', '16'):    -0.030 -0.012   -0.011  0.000
-('5', '16'):    -0.028 -0.016    0.008  0.014
-('3', '4'): -0.028 -0.009   -0.005  0.004
-('6', '16'):    -0.036 -0.028   -0.004  0.006
-('5', '15'):    -0.060 -0.020   -0.006  0.026
-('8', '14'):    -0.050 -0.016   -0.008  0.000
-('8', '15'):    -0.056 -0.035    0.000  0.006
------------
-Threshold: 0.7
-                   frag-frag       fp-frag
-('4', '5'): -0.016 -0.003    0.000  0.008
-('1', '5'): -0.023 -0.002    0.000  0.005
-('8', '16'):    -0.035 -0.012   -0.009  0.006
-('3', '16'):    -0.034 -0.003   -0.009  0.029
-('5', '16'):    -0.029 -0.012    0.011  0.047
-('3', '4'): -0.022 -0.006   -0.001  0.014
-('6', '16'):    -0.034 -0.009    0.009  0.035
-('5', '15'):    -0.026 -0.012    0.036  0.058
-('8', '14'):    -0.061 -0.021    0.000  0.028
-('8', '15'):    -0.061 -0.032   -0.001  0.017
------------</code></pre>
-</div>
-</div>
-<p>In order to be sure of retrieving 99% of the actual results when searching using the full fingerprint of the query molecule against the fragment fingerprint of the database molecules (these are the fp-frag results), we’d need to use a search threshold of 0.275 (true threshold = 0.3), 0.488 (true threshold = 0.5), or 0.691 (true threshold = 0.7).</p>
-</section>
-</section>
-<section id="what-about-if-we-dont-use-the-constant-offset" class="level1">
-<h1>What about if we don’t use the constant offset?</h1>
-<p>I went into this convinced that the constant offset was important. What if we just use the simple additive fingerprints without including that offset?</p>
-<div id="cell-49" class="cell" data-executetime="{&quot;end_time&quot;:&quot;2024-09-19T17:07:43.102411Z&quot;,&quot;start_time&quot;:&quot;2024-09-19T17:06:17.200690Z&quot;}" data-execution_count="41">
-<div class="sourceCode cell-code" id="cb33" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb33-1"><span class="im" style="color: #00769E;
-background-color: null;
-font-style: inherit;">import</span> random</span>
-<span id="cb33-2">random.seed(<span class="bn" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">0xf00d</span>)</span>
-<span id="cb33-3">noconstant_results <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> {}</span>
-<span id="cb33-4"><span class="cf" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">for</span> btk <span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">in</span> bondsToKeep:</span>
-<span id="cb33-5">    <span class="bu" style="color: null;
-background-color: null;
-font-style: inherit;">print</span>(<span class="ss" style="color: #20794D;
-background-color: null;
-font-style: inherit;">f"Doing </span><span class="sc" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">{</span>btk<span class="sc" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">}</span><span class="ss" style="color: #20794D;
-background-color: null;
-font-style: inherit;">"</span>)</span>
-<span id="cb33-6">    fpgen <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> rdFingerprintGenerator.GetMorganGenerator(radius<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span><span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">2</span>,fpSize<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span><span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">4096</span>)</span>
-<span id="cb33-7">    dfps<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> []</span>
-<span id="cb33-8">    <span class="cf" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">for</span> m <span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">in</span> ms:</span>
-<span id="cb33-9">        dfps.extend(getDifferenceFPs(m,[btk],fpgen))</span>
-<span id="cb33-10"></span>
-<span id="cb33-11">    allfps <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> []</span>
-<span id="cb33-12">    <span class="cf" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">for</span> m <span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">in</span> ms:</span>
-<span id="cb33-13">        frags <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> splitMol(m,[btk])</span>
-<span id="cb33-14">        <span class="cf" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">if</span> <span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">not</span> frags:</span>
-<span id="cb33-15">            <span class="cf" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">continue</span></span>
-<span id="cb33-16">        fp1 <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> fpgen.GetCountFingerprint(m)</span>
-<span id="cb33-17">        ffps <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> [fpgen.GetCountFingerprint(x) <span class="cf" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">for</span> x <span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">in</span> frags]</span>
-<span id="cb33-18">        allfps.append((fp1,ffps))</span>
-<span id="cb33-19"></span>
-<span id="cb33-20">    self_tanis <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> []</span>
-<span id="cb33-21">    <span class="cf" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">for</span> fp1,ffps <span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">in</span> allfps:</span>
-<span id="cb33-22">        self_tanis.extend([DataStructs.TanimotoSimilarity(fp1,x) <span class="cf" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">for</span> x <span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">in</span> ffps])</span>
-<span id="cb33-23">        </span>
-<span id="cb33-24">    ps1 <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> <span class="bu" style="color: null;
-background-color: null;
-font-style: inherit;">list</span>(<span class="bu" style="color: null;
-background-color: null;
-font-style: inherit;">range</span>(<span class="bu" style="color: null;
-background-color: null;
-font-style: inherit;">len</span>(allfps)))</span>
-<span id="cb33-25">    random.shuffle(ps1)</span>
-<span id="cb33-26">    ps1 <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> ps1[:<span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">1000</span>]</span>
-<span id="cb33-27">    ps2 <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> <span class="bu" style="color: null;
-background-color: null;
-font-style: inherit;">list</span>(<span class="bu" style="color: null;
-background-color: null;
-font-style: inherit;">range</span>(<span class="bu" style="color: null;
-background-color: null;
-font-style: inherit;">len</span>(allfps)))</span>
-<span id="cb33-28">    random.shuffle(ps2)</span>
-<span id="cb33-29">    ps2 <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> ps2[:<span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">1000</span>]</span>
-<span id="cb33-30"></span>
-<span id="cb33-31">    nCompared <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> <span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">0</span></span>
-<span id="cb33-32">    other_tanidiff1 <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> []</span>
-<span id="cb33-33">    other_tanidiff2 <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> []</span>
-<span id="cb33-34">    <span class="cf" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">for</span> i <span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">in</span> ps1:</span>
-<span id="cb33-35">        fp1,frags1 <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> allfps[i]</span>
-<span id="cb33-36">        <span class="cf" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">for</span> j <span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">in</span> ps2:</span>
-<span id="cb33-37">            fp2,frags2 <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> allfps[j]</span>
-<span id="cb33-38">            refTani <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> DataStructs.TanimotoSimilarity(fp1,fp2)</span>
-<span id="cb33-39">            <span class="cf" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">if</span> refTani <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">&lt;</span> <span class="fl" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">0.3</span>:</span>
-<span id="cb33-40">                <span class="cf" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">continue</span></span>
-<span id="cb33-41">            nCompared <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">+=</span> <span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">1</span></span>
-<span id="cb33-42">            ltanis <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> []</span>
-<span id="cb33-43">            <span class="cf" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">for</span> f1 <span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">in</span> frags1:</span>
-<span id="cb33-44">                ltanis.extend(DataStructs.BulkTanimotoSimilarity(f1,frags2))</span>
-<span id="cb33-45">            other_tanidiff1.extend([refTani<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">-</span>x <span class="cf" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">for</span> x <span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">in</span> ltanis])</span>
-<span id="cb33-46">            other_tanidiff2.extend([refTani<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">-</span>x <span class="cf" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">for</span> x <span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">in</span> DataStructs.BulkTanimotoSimilarity(fp1,frags2)])</span>
-<span id="cb33-47">            other_tanidiff2.extend([refTani<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">-</span>x <span class="cf" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">for</span> x <span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">in</span> DataStructs.BulkTanimotoSimilarity(fp2,frags1)])</span>
-<span id="cb33-48"></span>
-<span id="cb33-49">    <span class="bu" style="color: null;
-background-color: null;
-font-style: inherit;">print</span>(<span class="ss" style="color: #20794D;
-background-color: null;
-font-style: inherit;">f"considered </span><span class="sc" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">{</span>nCompared<span class="sc" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">}</span><span class="ss" style="color: #20794D;
-background-color: null;
-font-style: inherit;"> fingerprint pairs from </span><span class="sc" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">{</span><span class="bu" style="color: null;
-background-color: null;
-font-style: inherit;">len</span>(allfps)<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">**</span><span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">2</span><span class="sc" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">}</span><span class="ss" style="color: #20794D;
-background-color: null;
-font-style: inherit;">"</span>)</span>
-<span id="cb33-50">    noconstant_results[btk] <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> (self_tanis,other_tanidiff1,other_tanidiff2)</span></code></pre></div>
-<div class="cell-output cell-output-stdout">
-<pre><code>Doing ('4', '5')
-considered 66995 fingerprint pairs from 18326961
-Doing ('1', '5')
-considered 63242 fingerprint pairs from 7845601
-Doing ('8', '16')
-considered 54070 fingerprint pairs from 6095961
-Doing ('3', '16')
-considered 95650 fingerprint pairs from 4260096
-Doing ('5', '16')
-considered 217114 fingerprint pairs from 2725801
-Doing ('3', '4')
-considered 112805 fingerprint pairs from 1537600
-Doing ('6', '16')
-considered 98275 fingerprint pairs from 790321
-Doing ('5', '15')
-considered 53490 fingerprint pairs from 640000
-Doing ('8', '14')
-considered 43291 fingerprint pairs from 502681
-Doing ('8', '15')
-considered 35148 fingerprint pairs from 352836</code></pre>
-</div>
-</div>
-<div id="cell-50" class="cell" data-executetime="{&quot;end_time&quot;:&quot;2024-09-19T17:22:48.750129Z&quot;,&quot;start_time&quot;:&quot;2024-09-19T17:22:47.112204Z&quot;}" data-execution_count="51">
-<div class="sourceCode cell-code" id="cb35" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb35-1">plt.figure(figsize<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span>(<span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">16</span>,<span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">18</span>))</span>
-<span id="cb35-2"><span class="cf" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">for</span> i,btk <span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">in</span> <span class="bu" style="color: null;
-background-color: null;
-font-style: inherit;">enumerate</span>(noconstant_results.keys()):</span>
-<span id="cb35-3">    subplot(<span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">5</span>,<span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">2</span>,i<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">+</span><span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">1</span>)</span>
-<span id="cb35-4">    self_tanis,other_tanidiff1,other_tanidiff2 <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> results[btk]</span>
-<span id="cb35-5">    self_tanis_2,other_tanidiff1_2,other_tanidiff2_2 <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> noconstant_results[btk]</span>
-<span id="cb35-6">    plt.hist([self_tanis,self_tanis_2],bins<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span><span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">20</span>, label<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span>[<span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">'with constant'</span>,<span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">'no constant'</span>])<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">;</span></span>
-<span id="cb35-7">    plt.title(<span class="ss" style="color: #20794D;
-background-color: null;
-font-style: inherit;">f"self similarity, </span><span class="sc" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">{</span>btk<span class="sc" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">}</span><span class="ss" style="color: #20794D;
-background-color: null;
-font-style: inherit;">"</span>)<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">;</span></span>
-<span id="cb35-8">    plt.legend()</span>
-<span id="cb35-9">    plt.xlim((<span class="fl" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">0.6</span>,<span class="fl" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">1.0</span>))</span>
-<span id="cb35-10">plt.tight_layout()</span></code></pre></div>
-<div class="cell-output cell-output-display">
-<div>
-<figure class="figure">
-<p><img src="https://greglandrum.github.io/rdkit-blog/posts/2024-09-20-additive-fingerprints1_files/figure-html/cell-25-output-1.png" class="img-fluid figure-img"></p>
-</figure>
-</div>
-</div>
-</div>
-<p>Here the red histograms are clearly shifted to the left; the constant is helping.</p>
-<div id="cell-52" class="cell" data-executetime="{&quot;end_time&quot;:&quot;2024-09-19T17:22:57.089543Z&quot;,&quot;start_time&quot;:&quot;2024-09-19T17:22:55.280399Z&quot;}" data-execution_count="52">
-<div class="sourceCode cell-code" id="cb36" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb36-1">plt.figure(figsize<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span>(<span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">16</span>,<span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">18</span>))</span>
-<span id="cb36-2"><span class="cf" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">for</span> i,btk <span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">in</span> <span class="bu" style="color: null;
-background-color: null;
-font-style: inherit;">enumerate</span>(noconstant_results.keys()):</span>
-<span id="cb36-3">    plt.subplot(<span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">5</span>,<span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">2</span>,i<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">+</span><span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">1</span>)</span>
-<span id="cb36-4">    self_tanis,other_tanidiff1,other_tanidiff2 <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> results[btk]</span>
-<span id="cb36-5">    self_tanis_2,other_tanidiff1_2,other_tanidiff2_2 <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> noconstant_results[btk]</span>
-<span id="cb36-6">    plt.hist([other_tanidiff1,other_tanidiff1_2],bins<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span><span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">20</span>, label<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span>[<span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">'with constant'</span>,<span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">'no constant'</span>])<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">;</span></span>
-<span id="cb36-7">    plt.legend()<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">;</span></span>
-<span id="cb36-8">    plt.title(<span class="ss" style="color: #20794D;
-background-color: null;
-font-style: inherit;">f"fragfp-fragfp comparison, </span><span class="sc" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">{</span>btk<span class="sc" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">}</span><span class="ss" style="color: #20794D;
-background-color: null;
-font-style: inherit;">"</span>)<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">;</span></span>
-<span id="cb36-9">    <span class="co" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">#yscale('log')</span></span>
-<span id="cb36-10">    plt.xlim((<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">-</span><span class="fl" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">0.1</span>,<span class="fl" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">0.25</span>))<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">;</span></span></code></pre></div>
-<div class="cell-output cell-output-display">
-<div>
-<figure class="figure">
-<p><img src="https://greglandrum.github.io/rdkit-blog/posts/2024-09-20-additive-fingerprints1_files/figure-html/cell-26-output-1.png" class="img-fluid figure-img"></p>
-</figure>
-</div>
-</div>
-</div>
-<p>Here the differences aren’t as pronounced. It looks like the constant term has the consequence of making the similarity a bit lower(the red histograms are shifted a bit to the left). The difference is, in any case, not large</p>
-<div id="cell-54" class="cell" data-executetime="{&quot;end_time&quot;:&quot;2024-09-19T17:23:03.162915Z&quot;,&quot;start_time&quot;:&quot;2024-09-19T17:23:01.313284Z&quot;}" data-execution_count="53">
-<div class="sourceCode cell-code" id="cb37" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb37-1">plt.figure(figsize<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span>(<span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">16</span>,<span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">18</span>))</span>
-<span id="cb37-2"><span class="cf" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">for</span> i,btk <span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">in</span> <span class="bu" style="color: null;
-background-color: null;
-font-style: inherit;">enumerate</span>(noconstant_results.keys()):</span>
-<span id="cb37-3">    plt.subplot(<span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">5</span>,<span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">2</span>,i<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">+</span><span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">1</span>)</span>
-<span id="cb37-4">    self_tanis,other_tanidiff1,other_tanidiff2 <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> results[btk]</span>
-<span id="cb37-5">    self_tanis_2,other_tanidiff1_2,other_tanidiff2_2 <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> noconstant_results[btk]</span>
-<span id="cb37-6">    plt.hist([other_tanidiff2,other_tanidiff2_2],bins<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span><span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">20</span>, label<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span>[<span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">'with constant'</span>,<span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">'no constant'</span>])<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">;</span></span>
-<span id="cb37-7">    plt.legend()<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">;</span></span>
-<span id="cb37-8">    plt.title(<span class="ss" style="color: #20794D;
-background-color: null;
-font-style: inherit;">f"fp-fragfp comparison, </span><span class="sc" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">{</span>btk<span class="sc" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">}</span><span class="ss" style="color: #20794D;
-background-color: null;
-font-style: inherit;">"</span>)<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">;</span></span>
-<span id="cb37-9">    <span class="co" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">#yscale('log')</span></span>
-<span id="cb37-10">    plt.xlim((<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">-</span><span class="fl" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">0.1</span>,<span class="fl" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">0.3</span>))<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">;</span></span></code></pre></div>
-<div class="cell-output cell-output-display">
-<div>
-<figure class="figure">
-<p><img src="https://greglandrum.github.io/rdkit-blog/posts/2024-09-20-additive-fingerprints1_files/figure-html/cell-27-output-1.png" class="img-fluid figure-img"></p>
-</figure>
-</div>
-</div>
-</div>
-<p>Here we again have a clear signal: leaving the constant term out causes a larger similarity difference (the red histograms are shifted to the right).</p>
-<p>I’m going to wrap this one up here. I think the approach clearly works, but there’s some more to do in a future blog post or two: - look at how well the constants generated on this set work on a completely different set of molecules. - look at fragmenting the molecule multiple times (i.e.&nbsp;combining more than 2 fragments to form a molecule) - look at an asymmetric similarity measure like Tversky. This is what we’d want to use if we were searching a large fragment space and incrementally building up the results molecules (like in the <a href="https://dx.doi.org/10.1023/A:1011144622059">FTrees-FS paper</a>).</p>
-
-
-</section>
-
- ]]></description>
-  <category>exploration</category>
-  <category>similarity</category>
-  <category>fingerprints</category>
-  <guid>https://greglandrum.github.io/rdkit-blog/posts/2024-09-20-additive-fingerprints1.html</guid>
-  <pubDate>Thu, 19 Sep 2024 22:00:00 GMT</pubDate>
-  <media:content url="https://greglandrum.github.io/rdkit-blog/posts/images/blog/additive-fingerprints-1.png" medium="image" type="image/png" height="111" width="144"/>
 </item>
 </channel>
 </rss>
