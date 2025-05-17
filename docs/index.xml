@@ -10,7 +10,355 @@
 <atom:link href="https://greglandrum.github.io/rdkit-blog/index.xml" rel="self" type="application/rss+xml"/>
 <description>RDKit experiments, tips, and tutorials</description>
 <generator>quarto-1.6.39</generator>
-<lastBuildDate>Thu, 08 May 2025 22:00:00 GMT</lastBuildDate>
+<lastBuildDate>Fri, 16 May 2025 22:00:00 GMT</lastBuildDate>
+<item>
+  <title>Using custom fingerprints in PostgreSQL</title>
+  <link>https://greglandrum.github.io/rdkit-blog/posts/2025-05-17-custom-fingerprints-in-postgresql.html</link>
+  <description><![CDATA[ 
+
+
+
+
+<p>This is an updated and lightly revised version of an <a href="https://rdkit.blogspot.com/2017/04/using-custom-fingerprint-in-postgresql.html">older post</a>.</p>
+<p>A <a href="http://www.mail-archive.com/rdkit-discuss@lists.sourceforge.net/msg06764.html">question</a> recently came up on the mailing list about how to use custom fingerprints with the RDKit PostgreSQL cartridge without having to edit the cartridge code itself. Since the answer isn’t trivial but may be useful to others, I’m doing a blog post with the answer.</p>
+<p>We’ll start the usual way, with a bunch of imports. In the interests of being maximally explicit and having this whole notebook be normal Python code, I’m handling the database connection with the usual psycopg2 connector to PostgreSQL.</p>
+<div id="cell-2" class="cell" data-execution_count="1">
+<div class="sourceCode cell-code" id="cb1" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb1-1"><span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">from</span> rdkit <span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">import</span> Chem</span>
+<span id="cb1-2"><span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">from</span> rdkit <span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">import</span> DataStructs</span>
+<span id="cb1-3"><span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">from</span> rdkit.Chem.Draw <span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">import</span> IPythonConsole</span>
+<span id="cb1-4"><span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">from</span> rdkit.Chem <span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">import</span> Draw</span>
+<span id="cb1-5"><span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">import</span> rdkit</span>
+<span id="cb1-6"><span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">import</span> psycopg2</span>
+<span id="cb1-7"><span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">print</span>(rdkit.__version__)</span></code></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>2025.03.2</code></pre>
+</div>
+</div>
+<p>Read in a set of molecule data that we’ve used before:</p>
+<div id="cell-4" class="cell" data-execution_count="2">
+<div class="sourceCode cell-code" id="cb3" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb3-1"><span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">with</span> <span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">open</span>(<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'../data/chembl16_2010-2012.smi'</span>) <span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">as</span> inf:</span>
+<span id="cb3-2">    data <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> [x.strip().split() <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">for</span> x <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">in</span> inf]</span>
+<span id="cb3-3"><span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">len</span>(data)</span></code></pre></div>
+<div class="cell-output cell-output-display" data-execution_count="2">
+<pre><code>234681</code></pre>
+</div>
+</div>
+<p>Establish a connection to the database we’ll use and insert that data:</p>
+<div id="cell-6" class="cell" data-execution_count="4">
+<div class="sourceCode cell-code" id="cb5" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb5-1">conn <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> psycopg2.<span class="ex" style="color: null;
+background-color: null;
+font-style: inherit;">connect</span>(database<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span><span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'rdkit_blog_demo'</span>)</span>
+<span id="cb5-2">curs <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> conn.cursor()</span>
+<span id="cb5-3">curs.execute(<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'create extension if not exists rdkit'</span>)</span>
+<span id="cb5-4">curs.execute(<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'drop table if exists raw_data'</span>)</span>
+<span id="cb5-5">curs.execute(<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'create table raw_data (smiles text,molregno int)'</span>)</span>
+<span id="cb5-6">curs.executemany(<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'insert into raw_data values (</span><span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">%s</span><span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">,</span><span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">%s</span><span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">)'</span>,data)</span>
+<span id="cb5-7">conn.commit()</span></code></pre></div>
+</div>
+<p>Create a molecule table with the first 10K rows (we don’t need all the data for the purposes of this post):</p>
+<div id="cell-8" class="cell" data-execution_count="5">
+<div class="sourceCode cell-code" id="cb6" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb6-1">curs.execute(<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'drop table if exists mols'</span>)</span>
+<span id="cb6-2">curs.execute(<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'select molregno,mol_from_smiles(smiles::cstring) as m into mols from raw_data limit 10000'</span>)</span>
+<span id="cb6-3">conn.commit()</span></code></pre></div>
+</div>
+<p>Now generate our custom fingerprints for those molecules. We’re using the topological torsion form of Sheridan’s physicochemical property fingerprints (https://doi.org/10.1021/ci950274j).</p>
+<p>These are just standard topological torsion FPs with different atom types.</p>
+<p>Here’s an example of the atom types:</p>
+<div id="cell-11" class="cell" data-execution_count="7">
+<div class="sourceCode cell-code" id="cb7" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb7-1"><span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">from</span> rdkit.Chem.AtomPairs <span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">import</span> Sheridan</span>
+<span id="cb7-2">mol <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> Chem.MolFromSmiles(<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'OCCCN'</span>)</span>
+<span id="cb7-3"><span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">print</span>(Sheridan.AssignPattyTypes(mol))</span></code></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>['POL', 'HYD', 'HYD', 'HYD', 'CAT']</code></pre>
+</div>
+</div>
+<div id="cell-12" class="cell" data-execution_count="14">
+<div class="sourceCode cell-code" id="cb9" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb9-1"><span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">from</span> rdkit.Chem <span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">import</span> rdFingerprintGenerator</span>
+<span id="cb9-2">fpg <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> rdFingerprintGenerator.GetTopologicalTorsionGenerator()</span>
+<span id="cb9-3"></span>
+<span id="cb9-4">fps <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> []</span>
+<span id="cb9-5"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># grab the molecules, we're pulling them out of the database in their pickled form:</span></span>
+<span id="cb9-6">curs.execute(<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'select molregno,mol_send(m) from mols limit 10000'</span>)</span>
+<span id="cb9-7"><span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">for</span> molregno,pkl <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">in</span> curs.fetchall():</span>
+<span id="cb9-8">    <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">if</span> pkl <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">is</span> <span class="va" style="color: #111111;
+background-color: null;
+font-style: inherit;">None</span>: <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">continue</span></span>
+<span id="cb9-9">    <span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># construct a molecule</span></span>
+<span id="cb9-10">    m <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> Chem.Mol(pkl.tobytes())</span>
+<span id="cb9-11">    typs <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> [Sheridan.typMap[x] <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">for</span> x <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">in</span> Sheridan.AssignPattyTypes(m)]</span>
+<span id="cb9-12">    fp <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> fpg.GetFingerprint(m,customAtomInvariants<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span>typs)</span>
+<span id="cb9-13">    fps.append((molregno,fp))</span></code></pre></div>
+</div>
+<p>Now insert the fingerprints into the database, we do this by sending a byte string to the database using <code>DataStructs.BitVectToBinaryText()</code> on the python side and then converting that into a bit vector in the database using the function <code>bfp_from_binary_text()</code>:</p>
+<div id="cell-14" class="cell" data-execution_count="9">
+<div class="sourceCode cell-code" id="cb10" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb10-1">curs.execute(<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'drop table if exists fps'</span>)</span>
+<span id="cb10-2">curs.execute(<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'create table fps (molregno int, btfp bfp)'</span>)</span>
+<span id="cb10-3">curs.executemany(<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'insert into fps values (</span><span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">%s</span><span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">,bfp_from_binary_text(</span><span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">%s</span><span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">))'</span>,</span>
+<span id="cb10-4">                 [(x,DataStructs.BitVectToBinaryText(y)) <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">for</span> x,y <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">in</span> fps])</span>
+<span id="cb10-5">conn.commit()</span></code></pre></div>
+</div>
+<p>If this were a larger database I’d also create an index on the fingerprint column in order to speed similarity searches up a bit, but since this one’s small we’ll skip that.</p>
+<p>And here’s how you do a query:</p>
+<div id="cell-17" class="cell" data-execution_count="10">
+<div class="sourceCode cell-code" id="cb11" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb11-1">fp <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> fps[<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">-</span><span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">1</span>][<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">-</span><span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">1</span>]</span>
+<span id="cb11-2">curs.execute(<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'set rdkit.tanimoto_threshold=0.6'</span>)</span>
+<span id="cb11-3">curs.execute(<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'select molregno,m from mols join fps using (molregno) where btfp</span><span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">%%</span><span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">bfp_from_binary_text(</span><span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">%s</span><span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">)'</span>,</span>
+<span id="cb11-4">             (DataStructs.BitVectToBinaryText(fp),))</span>
+<span id="cb11-5">res <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> curs.fetchall()</span>
+<span id="cb11-6"><span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">len</span>(res)</span></code></pre></div>
+<div class="cell-output cell-output-display" data-execution_count="10">
+<pre><code>2</code></pre>
+</div>
+</div>
+<p>It’s always good to test that we’re getting the right answers, so let’s verify that by repeating the same process in Python (just to be sure we did everything right!):</p>
+<div id="cell-19" class="cell" data-execution_count="11">
+<div class="sourceCode cell-code" id="cb13" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb13-1"><span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">len</span>([x <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">for</span> (x,y) <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">in</span> fps <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">if</span> DataStructs.TanimotoSimilarity(y,fp)<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">&gt;=</span><span class="fl" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">0.6</span>])</span></code></pre></div>
+<div class="cell-output cell-output-display" data-execution_count="11">
+<pre><code>2</code></pre>
+</div>
+</div>
+<p>Pull back some similarity values:</p>
+<div id="cell-21" class="cell" data-execution_count="12">
+<div class="sourceCode cell-code" id="cb15" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb15-1">curs.execute(<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'select molregno,tanimoto_sml(btfp,bfp_from_binary_text(</span><span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">%s</span><span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">)) from fps limit 10'</span>,</span>
+<span id="cb15-2">             (DataStructs.BitVectToBinaryText(fp),))</span>
+<span id="cb15-3">curs.fetchall()</span></code></pre></div>
+<div class="cell-output cell-output-display" data-execution_count="12">
+<pre><code>[(23, 0.15217391304347827),
+ (97, 0.1643835616438356),
+ (115, 0.21428571428571427),
+ (146, 0.2054794520547945),
+ (147, 0.15517241379310345),
+ (148, 0.1),
+ (173, 0.21818181818181817),
+ (194, 0.13559322033898305),
+ (213, 0.2982456140350877),
+ (205, 0.19696969696969696)]</code></pre>
+</div>
+</div>
+<p>And again, just a test, ensure that we’re getting the same thing we’d see in Python:</p>
+<div id="cell-23" class="cell" data-execution_count="13">
+<div class="sourceCode cell-code" id="cb17" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb17-1">[(x,DataStructs.TanimotoSimilarity(y,fp)) <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">for</span> (x,y) <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">in</span> fps][:<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">10</span>]</span></code></pre></div>
+<div class="cell-output cell-output-display" data-execution_count="13">
+<pre><code>[(23, 0.15217391304347827),
+ (97, 0.1643835616438356),
+ (115, 0.21428571428571427),
+ (146, 0.2054794520547945),
+ (147, 0.15517241379310345),
+ (148, 0.1),
+ (173, 0.21818181818181817),
+ (194, 0.13559322033898305),
+ (213, 0.2982456140350877),
+ (205, 0.19696969696969696)]</code></pre>
+</div>
+</div>
+<p>That’s it. Not particularly complicated, but still a useful thing to know how to do. Following this approach, any bit vector fingerprint (even one’s generated outside of the RDKit) can be inserted into PostgreSQL tables and then searched using the RDKit cartridge.</p>
+
+
+
+ ]]></description>
+  <category>cartridge</category>
+  <category>fingerprints</category>
+  <category>tutorial</category>
+  <guid>https://greglandrum.github.io/rdkit-blog/posts/2025-05-17-custom-fingerprints-in-postgresql.html</guid>
+  <pubDate>Fri, 16 May 2025 22:00:00 GMT</pubDate>
+</item>
 <item>
   <title>Common chemical words</title>
   <link>https://greglandrum.github.io/rdkit-blog/posts/2025-05-09-common-chemical-words-1.html</link>
@@ -21917,1042 +22265,6 @@ font-style: inherit;">1</span>]))</span></code></pre></div>
   <category>tutorial</category>
   <guid>https://greglandrum.github.io/rdkit-blog/posts/2025-01-10-fp-generators-and-invariants.html</guid>
   <pubDate>Thu, 09 Jan 2025 23:00:00 GMT</pubDate>
-</item>
-<item>
-  <title>Introducing Synthon Searching</title>
-  <link>https://greglandrum.github.io/rdkit-blog/posts/2024-12-03-introducing-synthon-search.html</link>
-  <description><![CDATA[ 
-
-
-
-
-<section id="rapid-searching-of-synthon-spaces" class="level1">
-<h1>Rapid Searching of Synthon Spaces</h1>
-<p><strong>Note</strong> this is a guest post written by Dave Cosgrove (GitHub: <span class="citation" data-cites="DavidACosgrove">@DavidACosgrove</span>).</p>
-<p>There are a number of combinatorial libraries now available offering compounds made to order from a vast array of possibilities, such as <a href="https://enamine.net/compound-collections/real-compounds/real-database">Enamine’s REAL</a> or <a href="https://chem-space.com/compounds/freedom-space">ChemSpace’s FreedomSpace</a>. The enumerated versions of these databases run to billions of compounds making them expensive and difficult to manage and search. Several groups have proposed algorithms for the rapid search of these libraries in synthon rather than enumerated form (e.g.&nbsp;<a href="https://doi.org/10.1021/acs.jcim.0c00850">Spacelight</a> and <a href="https://doi.org/10.1021/acs.jcim.3c00290">Liphardt and Sander</a>). This blogpost describes the implementation of substructure and similarity search methods based on the ideas in the latter.</p>
-<p>The examples use the FreedomSpace 2023 library of some 9 billion compounds. The new module, available starting in the 2024.09.3 release, is rdSynthonSpaceSearch. Timings are from my Mac mini M4 Pro (very nice, you should get one!).</p>
-<blockquote class="blockquote">
-<p>Obligatory new functionality disclaimer: this is completely new RDKit functionality and is still a bit experimental. The API and results may change over the next couple of releases as we do more testing and get more feedback from the community</p>
-</blockquote>
-<div id="9e1b6c1c-3bf8-411d-aa34-c760d9c79e5e" class="cell">
-<div class="sourceCode cell-code" id="cb1" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb1-1"><span class="im" style="color: #00769E;
-background-color: null;
-font-style: inherit;">from</span> rdkit <span class="im" style="color: #00769E;
-background-color: null;
-font-style: inherit;">import</span> Chem</span>
-<span id="cb1-2"><span class="im" style="color: #00769E;
-background-color: null;
-font-style: inherit;">from</span> rdkit.Chem <span class="im" style="color: #00769E;
-background-color: null;
-font-style: inherit;">import</span> rdSynthonSpaceSearch, rdFingerprintGenerator</span>
-<span id="cb1-3"><span class="im" style="color: #00769E;
-background-color: null;
-font-style: inherit;">from</span> rdkit.Chem <span class="im" style="color: #00769E;
-background-color: null;
-font-style: inherit;">import</span> Draw</span>
-<span id="cb1-4"><span class="im" style="color: #00769E;
-background-color: null;
-font-style: inherit;">from</span> rdkit.Chem.Draw <span class="im" style="color: #00769E;
-background-color: null;
-font-style: inherit;">import</span> rdMolDraw2D, rdDepictor</span>
-<span id="cb1-5"><span class="im" style="color: #00769E;
-background-color: null;
-font-style: inherit;">from</span> rdkit.Chem.Draw <span class="im" style="color: #00769E;
-background-color: null;
-font-style: inherit;">import</span> IPythonConsole</span>
-<span id="cb1-6"><span class="im" style="color: #00769E;
-background-color: null;
-font-style: inherit;">from</span> IPython.display <span class="im" style="color: #00769E;
-background-color: null;
-font-style: inherit;">import</span> SVG</span>
-<span id="cb1-7"><span class="im" style="color: #00769E;
-background-color: null;
-font-style: inherit;">from</span> rdkit <span class="im" style="color: #00769E;
-background-color: null;
-font-style: inherit;">import</span> rdBase</span>
-<span id="cb1-8"><span class="im" style="color: #00769E;
-background-color: null;
-font-style: inherit;">import</span> time</span>
-<span id="cb1-9"></span>
-<span id="cb1-10">rdDepictor.SetPreferCoordGen(<span class="va" style="color: #111111;
-background-color: null;
-font-style: inherit;">True</span>)</span>
-<span id="cb1-11"><span class="bu" style="color: null;
-background-color: null;
-font-style: inherit;">print</span>(rdBase.rdkitVersion)</span></code></pre></div>
-<div class="cell-output cell-output-stdout">
-<pre><code>2024.09.3</code></pre>
-</div>
-</div>
-<p>Load the library and print some information about it.</p>
-<div id="8c96075c-e9a9-4313-a2b3-5fc45501cdf4" class="cell" data-execution_count="2">
-<div class="sourceCode cell-code" id="cb3" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb3-1">start <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> time.perf_counter()</span>
-<span id="cb3-2">synthonspace <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> rdSynthonSpaceSearch.SynthonSpace()</span>
-<span id="cb3-3">synthonspace.ReadTextFile(<span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">"/Users/david/Projects/FreedomSpace/2023-05_Freedom_synthons.txt"</span>)</span>
-<span id="cb3-4"><span class="bu" style="color: null;
-background-color: null;
-font-style: inherit;">print</span>(<span class="ss" style="color: #20794D;
-background-color: null;
-font-style: inherit;">f"Number of reactions : </span><span class="sc" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">{</span>synthonspace<span class="sc" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">.</span>GetNumReactions()<span class="sc" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">}</span><span class="ss" style="color: #20794D;
-background-color: null;
-font-style: inherit;">"</span>)</span>
-<span id="cb3-5"><span class="bu" style="color: null;
-background-color: null;
-font-style: inherit;">print</span>(<span class="ss" style="color: #20794D;
-background-color: null;
-font-style: inherit;">f"Number of products : </span><span class="sc" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">{</span>synthonspace<span class="sc" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">.</span>GetNumProducts()<span class="sc" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">}</span><span class="ss" style="color: #20794D;
-background-color: null;
-font-style: inherit;">"</span>)</span>
-<span id="cb3-6"><span class="bu" style="color: null;
-background-color: null;
-font-style: inherit;">print</span>(<span class="ss" style="color: #20794D;
-background-color: null;
-font-style: inherit;">f"Time to load : </span><span class="sc" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">{</span>time<span class="sc" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">.</span>perf_counter() <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">-</span> start<span class="sc" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">:4.2f}</span><span class="ss" style="color: #20794D;
-background-color: null;
-font-style: inherit;"> seconds."</span>)</span></code></pre></div>
-<div class="cell-output cell-output-stdout">
-<pre><code>Number of reactions : 10
-Number of products : 9360696185
-Time to load : 26.47 seconds.</code></pre>
-</div>
-</div>
-<p>There’s a binary format that loads much more quickly.</p>
-<div id="903b5221-0dc6-410d-8986-26ef60b6ae0f" class="cell" data-execution_count="3">
-<div class="sourceCode cell-code" id="cb5" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb5-1">synthonspace.WriteDBFile(<span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">"/Users/david/Projects/FreedomSpace/2023-05_Freedom_synthons.spc"</span>)</span>
-<span id="cb5-2">start <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> time.perf_counter()</span>
-<span id="cb5-3">synthonspace.ReadDBFile(<span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">"/Users/david/Projects/FreedomSpace/2023-05_Freedom_synthons.spc"</span>)</span>
-<span id="cb5-4"><span class="bu" style="color: null;
-background-color: null;
-font-style: inherit;">print</span>(<span class="ss" style="color: #20794D;
-background-color: null;
-font-style: inherit;">f"Time to load : </span><span class="sc" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">{</span>time<span class="sc" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">.</span>perf_counter() <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">-</span> start<span class="sc" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">:4.2f}</span><span class="ss" style="color: #20794D;
-background-color: null;
-font-style: inherit;"> seconds."</span>)</span></code></pre></div>
-<div class="cell-output cell-output-stdout">
-<pre><code>Time to load : 4.47 seconds.</code></pre>
-</div>
-</div>
-<p>If you want more information about the library:</p>
-<div id="b1f00c62-a0ce-457c-97f0-a244408629f2" class="cell" data-execution_count="4">
-<div class="sourceCode cell-code" id="cb7" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb7-1">synthonspace.Summarise()</span></code></pre></div>
-<div class="cell-output cell-output-stdout">
-<pre><code>Read from file /Users/david/Projects/FreedomSpace/2023-05_Freedom_synthons.spc
-Number of reactions : 10
-Reaction name a1
-  Synthon set 0 has 18662 synthons
-  Synthon set 1 has 16838 synthons
-Reaction name a2
-  Synthon set 0 has 18540 synthons
-  Synthon set 1 has 1503 synthons
-Reaction name a3
-  Synthon set 0 has 492 synthons
-  Synthon set 1 has 4700 synthons
-Reaction name a4
-  Synthon set 0 has 17547 synthons
-  Synthon set 1 has 4539 synthons
-Reaction name a5
-  Synthon set 0 has 6420 synthons
-  Synthon set 1 has 810 synthons
-Reaction name a6
-  Synthon set 0 has 5126 synthons
-  Synthon set 1 has 11636 synthons
-Reaction name a7
-  Synthon set 0 has 320 synthons
-  Synthon set 1 has 1148 synthons
-  Synthon set 2 has 9608 synthons
-Reaction name a77
-  Synthon set 0 has 80 synthons
-  Synthon set 1 has 5890 synthons
-  Synthon set 2 has 8366 synthons
-Reaction name a8
-  Synthon set 0 has 10060 synthons
-  Synthon set 1 has 34 synthons
-Reaction name a80
-  Synthon set 0 has 20 synthons
-  Synthon set 1 has 8366 synthons
-  Synthon set 2 has 8366 synthons
-Approximate number of molecules in SynthonSpace : 9360696185</code></pre>
-</div>
-</div>
-<p>##&nbsp;Substructure Searching</p>
-<div id="4feda823-f48c-4832-b2f7-3b72b5b0e30a" class="cell" data-execution_count="5">
-<div class="sourceCode cell-code" id="cb9" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb9-1">qmol <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> Chem.MolFromSmarts(<span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">"c12ccc(C)cc1[nH]nc2C(=O)NCc1cncs1"</span>)</span>
-<span id="cb9-2">qmol</span></code></pre></div>
-<div class="cell-output cell-output-display" data-execution_count="5">
-<div>
-<figure class="figure">
-<p><img src="https://greglandrum.github.io/rdkit-blog/posts/2024-12-03-introducing-synthon-search_files/figure-html/cell-6-output-1.png" class="img-fluid figure-img"></p>
-</figure>
-</div>
-</div>
-</div>
-<div id="b7bc6431-d9c5-408f-9838-6c55c1c96119" class="cell" data-execution_count="6">
-<div class="sourceCode cell-code" id="cb10" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb10-1">start <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> time.perf_counter()</span>
-<span id="cb10-2">results <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> synthonspace.SubstructureSearch(qmol)</span>
-<span id="cb10-3">hits <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> results.GetHitMolecules()</span>
-<span id="cb10-4">hit_names <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> [m.GetProp(<span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">"_Name"</span>) <span class="cf" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">for</span> m <span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">in</span> hits]</span>
-<span id="cb10-5"><span class="bu" style="color: null;
-background-color: null;
-font-style: inherit;">print</span>(<span class="ss" style="color: #20794D;
-background-color: null;
-font-style: inherit;">f"Time to search : </span><span class="sc" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">{</span>time<span class="sc" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">.</span>perf_counter() <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">-</span> start<span class="sc" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">:4.2f}</span><span class="ss" style="color: #20794D;
-background-color: null;
-font-style: inherit;"> seconds."</span>)</span>
-<span id="cb10-6"><span class="bu" style="color: null;
-background-color: null;
-font-style: inherit;">print</span>(<span class="ss" style="color: #20794D;
-background-color: null;
-font-style: inherit;">f"Number of hits : </span><span class="sc" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">{</span><span class="bu" style="color: null;
-background-color: null;
-font-style: inherit;">len</span>(hits)<span class="sc" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">}</span><span class="ss" style="color: #20794D;
-background-color: null;
-font-style: inherit;">"</span>)</span></code></pre></div>
-<div class="cell-output cell-output-stdout">
-<pre><code>Time to search : 0.33 seconds.
-Number of hits : 108</code></pre>
-</div>
-</div>
-<div id="804b28b3-ba17-42f5-af20-3df82a081dd3" class="cell" data-execution_count="7">
-<div class="sourceCode cell-code" id="cb12" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb12-1"><span class="cf" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">if</span> hits:</span>
-<span id="cb12-2">    img <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> Draw.MolsToGridImage(hits[:<span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">12</span>], legends<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span>hit_names[:<span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">12</span>], molsPerRow<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span><span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">4</span>)</span>
-<span id="cb12-3"><span class="cf" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">else</span>:</span>
-<span id="cb12-4">    img <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> <span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">"No Hits"</span></span>
-<span id="cb12-5">img</span></code></pre></div>
-<div class="cell-output cell-output-display" data-execution_count="7">
-<div>
-<figure class="figure">
-<p><img src="https://greglandrum.github.io/rdkit-blog/posts/2024-12-03-introducing-synthon-search_files/figure-html/cell-8-output-1.png" class="img-fluid figure-img"></p>
-</figure>
-</div>
-</div>
-</div>
-<p>The molecule names are made up of the reaction name and the synthons for that reaction. So the first hit above is made from synthons 2700 and 25231 and reaction a1.</p>
-<p>Complex SMARTS queries are supported, though can take a little longer to run. The maximum number of hits to be returned is capped at 1000 by default. You can obtain an upper bound on the maximum number of hits possible; there may be fewer hits than this in practice, as duplicate matches are counted but not returned and for other more subtle reasons.</p>
-<div id="7f79cbb5-dff1-4b7e-a5e7-af28d77f85a8" class="cell" data-execution_count="8">
-<div class="sourceCode cell-code" id="cb13" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb13-1">qmol <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> Chem.MolFromSmarts(<span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">"c1c[n,s,o][n,s,o,c]c1C(=O)[$(N1CCCCC1),$(N1CCCC1)]"</span>)</span>
-<span id="cb13-2">qmol</span></code></pre></div>
-<div class="cell-output cell-output-display" data-execution_count="8">
-<div>
-<figure class="figure">
-<p><img src="https://greglandrum.github.io/rdkit-blog/posts/2024-12-03-introducing-synthon-search_files/figure-html/cell-9-output-1.png" class="img-fluid figure-img"></p>
-</figure>
-</div>
-</div>
-</div>
-<div id="5d145188-7547-4bd1-a7d8-292beb253cc7" class="cell" data-execution_count="9">
-<div class="sourceCode cell-code" id="cb14" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb14-1">start <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> time.perf_counter()</span>
-<span id="cb14-2">results <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> synthonspace.SubstructureSearch(qmol)</span>
-<span id="cb14-3">hits <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> results.GetHitMolecules()</span>
-<span id="cb14-4">hit_names <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> [m.GetProp(<span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">"_Name"</span>) <span class="cf" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">for</span> m <span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">in</span> hits]</span>
-<span id="cb14-5"><span class="bu" style="color: null;
-background-color: null;
-font-style: inherit;">print</span>(<span class="ss" style="color: #20794D;
-background-color: null;
-font-style: inherit;">f"Time to search : </span><span class="sc" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">{</span>time<span class="sc" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">.</span>perf_counter() <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">-</span> start<span class="sc" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">:4.2f}</span><span class="ss" style="color: #20794D;
-background-color: null;
-font-style: inherit;"> seconds."</span>)</span>
-<span id="cb14-6"><span class="bu" style="color: null;
-background-color: null;
-font-style: inherit;">print</span>(<span class="ss" style="color: #20794D;
-background-color: null;
-font-style: inherit;">f"Number of hits : </span><span class="sc" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">{</span><span class="bu" style="color: null;
-background-color: null;
-font-style: inherit;">len</span>(hits)<span class="sc" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">}</span><span class="ss" style="color: #20794D;
-background-color: null;
-font-style: inherit;">"</span>)</span>
-<span id="cb14-7"><span class="bu" style="color: null;
-background-color: null;
-font-style: inherit;">print</span>(<span class="ss" style="color: #20794D;
-background-color: null;
-font-style: inherit;">f"Maximum number of hits possible : </span><span class="sc" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">{</span>results<span class="sc" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">.</span>GetMaxNumResults<span class="sc" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">}</span><span class="ss" style="color: #20794D;
-background-color: null;
-font-style: inherit;">"</span>)</span></code></pre></div>
-<div class="cell-output cell-output-stdout">
-<pre><code>Time to search : 0.19 seconds.
-Number of hits : 1000
-Maximum number of hits possible : 2358187</code></pre>
-</div>
-</div>
-<p>You can control the number of hits returned, and also get a random sample of the hits, rather than the first N in the list:</p>
-<div id="d6da6906-bd2c-4678-8a92-5677bdb8d050" class="cell" data-execution_count="10">
-<div class="sourceCode cell-code" id="cb16" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb16-1">params <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> rdSynthonSpaceSearch.SynthonSpaceSearchParams()</span>
-<span id="cb16-2">params.maxHits <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> <span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">12</span></span>
-<span id="cb16-3">params.randomSample <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> <span class="va" style="color: #111111;
-background-color: null;
-font-style: inherit;">True</span></span>
-<span id="cb16-4">start <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> time.perf_counter()</span>
-<span id="cb16-5">results <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> synthonspace.SubstructureSearch(qmol, params)</span>
-<span id="cb16-6">hits <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> results.GetHitMolecules()</span>
-<span id="cb16-7">hit_names <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> [m.GetProp(<span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">"_Name"</span>) <span class="cf" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">for</span> m <span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">in</span> hits]</span>
-<span id="cb16-8"><span class="bu" style="color: null;
-background-color: null;
-font-style: inherit;">print</span>(<span class="ss" style="color: #20794D;
-background-color: null;
-font-style: inherit;">f"Time to search : </span><span class="sc" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">{</span>time<span class="sc" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">.</span>perf_counter() <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">-</span> start<span class="sc" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">:4.2f}</span><span class="ss" style="color: #20794D;
-background-color: null;
-font-style: inherit;"> seconds."</span>)</span>
-<span id="cb16-9"><span class="bu" style="color: null;
-background-color: null;
-font-style: inherit;">print</span>(<span class="ss" style="color: #20794D;
-background-color: null;
-font-style: inherit;">f"Number of hits : </span><span class="sc" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">{</span><span class="bu" style="color: null;
-background-color: null;
-font-style: inherit;">len</span>(hits)<span class="sc" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">}</span><span class="ss" style="color: #20794D;
-background-color: null;
-font-style: inherit;">"</span>)</span>
-<span id="cb16-10"><span class="bu" style="color: null;
-background-color: null;
-font-style: inherit;">print</span>(<span class="ss" style="color: #20794D;
-background-color: null;
-font-style: inherit;">f"Maximum number of hits possible : </span><span class="sc" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">{</span>results<span class="sc" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">.</span>GetMaxNumResults<span class="sc" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">}</span><span class="ss" style="color: #20794D;
-background-color: null;
-font-style: inherit;">"</span>)</span>
-<span id="cb16-11">Draw.MolsToGridImage(hits[:<span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">12</span>], legends<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span>hit_names[:<span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">12</span>], molsPerRow<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span><span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">4</span>)</span></code></pre></div>
-<div class="cell-output cell-output-stdout">
-<pre><code>Time to search : 0.13 seconds.
-Number of hits : 12
-Maximum number of hits possible : 2358187</code></pre>
-</div>
-<div class="cell-output cell-output-display" data-execution_count="10">
-<div>
-<figure class="figure">
-<p><img src="https://greglandrum.github.io/rdkit-blog/posts/2024-12-03-introducing-synthon-search_files/figure-html/cell-11-output-2.png" class="img-fluid figure-img"></p>
-</figure>
-</div>
-</div>
-</div>
-<p>Having looked at the first 1000 hits, you might want to get the next set in the list. Here we get the 1000 starting at 2000.</p>
-<div id="aac848ef-ff4d-4750-8658-1b84de535f3d" class="cell" data-execution_count="11">
-<div class="sourceCode cell-code" id="cb18" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb18-1">params <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> rdSynthonSpaceSearch.SynthonSpaceSearchParams()</span>
-<span id="cb18-2">params.maxHits <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> <span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">1000</span></span>
-<span id="cb18-3">params.hitStart <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> <span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">2000</span></span>
-<span id="cb18-4">start <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> time.perf_counter()</span>
-<span id="cb18-5">results <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> synthonspace.SubstructureSearch(qmol, params)</span>
-<span id="cb18-6">hits <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> results.GetHitMolecules()</span>
-<span id="cb18-7">hit_names <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> [m.GetProp(<span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">"_Name"</span>) <span class="cf" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">for</span> m <span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">in</span> hits]</span>
-<span id="cb18-8"><span class="bu" style="color: null;
-background-color: null;
-font-style: inherit;">print</span>(<span class="ss" style="color: #20794D;
-background-color: null;
-font-style: inherit;">f"Time to search : </span><span class="sc" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">{</span>time<span class="sc" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">.</span>perf_counter() <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">-</span> start<span class="sc" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">:4.2f}</span><span class="ss" style="color: #20794D;
-background-color: null;
-font-style: inherit;"> seconds."</span>)</span>
-<span id="cb18-9"><span class="bu" style="color: null;
-background-color: null;
-font-style: inherit;">print</span>(<span class="ss" style="color: #20794D;
-background-color: null;
-font-style: inherit;">f"Number of hits : </span><span class="sc" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">{</span><span class="bu" style="color: null;
-background-color: null;
-font-style: inherit;">len</span>(hits)<span class="sc" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">}</span><span class="ss" style="color: #20794D;
-background-color: null;
-font-style: inherit;">"</span>)</span>
-<span id="cb18-10">Draw.MolsToGridImage(hits[:<span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">12</span>], legends<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span>hit_names[:<span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">12</span>], molsPerRow<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span><span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">4</span>)</span></code></pre></div>
-<div class="cell-output cell-output-stdout">
-<pre><code>Time to search : 0.19 seconds.
-Number of hits : 1000</code></pre>
-</div>
-<div class="cell-output cell-output-display" data-execution_count="11">
-<div>
-<figure class="figure">
-<p><img src="https://greglandrum.github.io/rdkit-blog/posts/2024-12-03-introducing-synthon-search_files/figure-html/cell-12-output-2.png" class="img-fluid figure-img"></p>
-</figure>
-</div>
-</div>
-</div>
-<p>It is possible to check the upper bound on the number of hits without building them, just to get an idea of whether you need to refine the search or not.</p>
-<div id="423e46c2-5b53-44f4-9fd8-721abbbedb62" class="cell" data-execution_count="12">
-<div class="sourceCode cell-code" id="cb20" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb20-1">qmol <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> Chem.MolFromSmarts(<span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">"c12ccc(C)cc1[nH]nc2C(=O)NCc1cncs1"</span>)</span>
-<span id="cb20-2">params <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> rdSynthonSpaceSearch.SynthonSpaceSearchParams()</span>
-<span id="cb20-3">params.buildHits <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> <span class="va" style="color: #111111;
-background-color: null;
-font-style: inherit;">False</span></span>
-<span id="cb20-4">results <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> synthonspace.SubstructureSearch(qmol, params)</span>
-<span id="cb20-5">hits <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> results.GetHitMolecules()</span>
-<span id="cb20-6"><span class="bu" style="color: null;
-background-color: null;
-font-style: inherit;">print</span>(<span class="ss" style="color: #20794D;
-background-color: null;
-font-style: inherit;">f"Number of hits : </span><span class="sc" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">{</span><span class="bu" style="color: null;
-background-color: null;
-font-style: inherit;">len</span>(hits)<span class="sc" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">}</span><span class="ss" style="color: #20794D;
-background-color: null;
-font-style: inherit;">"</span>)</span>
-<span id="cb20-7"><span class="bu" style="color: null;
-background-color: null;
-font-style: inherit;">print</span>(<span class="ss" style="color: #20794D;
-background-color: null;
-font-style: inherit;">f"Maximum number of hits possible : </span><span class="sc" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">{</span>results<span class="sc" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">.</span>GetMaxNumResults<span class="sc" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">}</span><span class="ss" style="color: #20794D;
-background-color: null;
-font-style: inherit;">"</span>)</span></code></pre></div>
-<div class="cell-output cell-output-stdout">
-<pre><code>Number of hits : 0
-Maximum number of hits possible : 108</code></pre>
-</div>
-</div>
-<p>##&nbsp;Similarity Searching Any of the RDKit fingerprint generators can be used, although the similarity metric is hard-coded as Tanimoto on a hashed fingerprint. The search structure is <a href="https://en.wikipedia.org/wiki/Osimertinib">Osimertinib</a> which is paying my pension so deserves acknowledgement. Similarity values are returned in the property “Similarity” on each molecule. If the binary file doesn’t contain fingerprints, they will need to be generated. This can be done ahead of time or it will be done as part of the first search.</p>
-<div id="f5878504-c918-4896-9878-87c4ade063ee" class="cell" data-execution_count="13">
-<div class="sourceCode cell-code" id="cb22" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb22-1">fpgen <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> rdFingerprintGenerator.GetRDKitFPGenerator(fpSize<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span><span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">2048</span>)</span>
-<span id="cb22-2">synthonspace.BuildSynthonFingerprints(fpgen)</span>
-<span id="cb22-3">qmol <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> Chem.MolFromSmiles(<span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">"C=CC(=O)Nc1cc(Nc2nccc(-c3cn(C)c4ccccc34)n2)c(OC)cc1N(C)CCN(C)C"</span>)</span>
-<span id="cb22-4">qmol</span></code></pre></div>
-<div class="cell-output cell-output-stderr">
-<pre><code>[11:01:56] Building the fingerprints may take some time.</code></pre>
-</div>
-<div class="cell-output cell-output-display" data-execution_count="13">
-<div>
-<figure class="figure">
-<p><img src="https://greglandrum.github.io/rdkit-blog/posts/2024-12-03-introducing-synthon-search_files/figure-html/cell-14-output-2.png" class="img-fluid figure-img"></p>
-</figure>
-</div>
-</div>
-</div>
-<div id="a3907cdc-c9b4-4afe-99f7-b0e4c2bf009e" class="cell" data-execution_count="14">
-<div class="sourceCode cell-code" id="cb24" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb24-1">start <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> time.perf_counter()</span>
-<span id="cb24-2">results <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> synthonspace.FingerprintSearch(qmol, fpgen)</span>
-<span id="cb24-3">hits <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> results.GetHitMolecules()</span>
-<span id="cb24-4">hit_names <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> [<span class="ss" style="color: #20794D;
-background-color: null;
-font-style: inherit;">f'</span><span class="sc" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">{</span>m<span class="sc" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">.</span>GetProp(<span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">"_Name"</span>)<span class="sc" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">}</span><span class="ss" style="color: #20794D;
-background-color: null;
-font-style: inherit;"> : </span><span class="sc" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">{</span><span class="bu" style="color: null;
-background-color: null;
-font-style: inherit;">float</span>(m.GetProp(<span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">"Similarity"</span>))<span class="sc" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">:4.2f}</span><span class="ss" style="color: #20794D;
-background-color: null;
-font-style: inherit;">'</span> <span class="cf" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">for</span> m <span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">in</span> hits]</span>
-<span id="cb24-5"><span class="bu" style="color: null;
-background-color: null;
-font-style: inherit;">print</span>(<span class="ss" style="color: #20794D;
-background-color: null;
-font-style: inherit;">f"Time to search : </span><span class="sc" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">{</span>time<span class="sc" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">.</span>perf_counter() <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">-</span> start<span class="sc" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">:4.2f}</span><span class="ss" style="color: #20794D;
-background-color: null;
-font-style: inherit;"> seconds."</span>)</span>
-<span id="cb24-6"><span class="bu" style="color: null;
-background-color: null;
-font-style: inherit;">print</span>(<span class="ss" style="color: #20794D;
-background-color: null;
-font-style: inherit;">f"Number of hits : </span><span class="sc" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">{</span><span class="bu" style="color: null;
-background-color: null;
-font-style: inherit;">len</span>(hits)<span class="sc" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">}</span><span class="ss" style="color: #20794D;
-background-color: null;
-font-style: inherit;">"</span>)</span>
-<span id="cb24-7"><span class="bu" style="color: null;
-background-color: null;
-font-style: inherit;">print</span>(<span class="ss" style="color: #20794D;
-background-color: null;
-font-style: inherit;">f"Maximum number of hits possible : </span><span class="sc" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">{</span>results<span class="sc" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">.</span>GetMaxNumResults<span class="sc" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">}</span><span class="ss" style="color: #20794D;
-background-color: null;
-font-style: inherit;">"</span>)</span>
-<span id="cb24-8">Draw.MolsToGridImage(hits[:<span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">12</span>], legends<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span>hit_names[:<span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">12</span>], molsPerRow<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span><span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">4</span>)</span></code></pre></div>
-<div class="cell-output cell-output-stdout">
-<pre><code>Time to search : 20.29 seconds.
-Number of hits : 1000
-Maximum number of hits possible : 35911098</code></pre>
-</div>
-<div class="cell-output cell-output-display" data-execution_count="14">
-<div>
-<figure class="figure">
-<p><img src="https://greglandrum.github.io/rdkit-blog/posts/2024-12-03-introducing-synthon-search_files/figure-html/cell-15-output-2.png" class="img-fluid figure-img"></p>
-</figure>
-</div>
-</div>
-</div>
-<p>The extra runtime is due to 2 factors. The first is that osimertinib is a largish molecule, so many fragments are generated that all need to be compared with the synthons. The second is that the screenout by fingerprint is less efficient, as you can see from the fact that 35911098 hits were possible having passed the initial fragment screening, although many of those won’t make the similarity cutoff when the potential hit molecule is built and checked.</p>
-<p>The similarity cutoff can be raised from the default 0.5 however this can result in large search times if there are few hits that meet the threshold - it may have to check all 35911098 potential hits. Note that in the search below we take a random sample of the results, so the hits are not the same as above.</p>
-<div id="780d92fc-45e0-4546-8eb5-f419a6c26221" class="cell" data-execution_count="15">
-<div class="sourceCode cell-code" id="cb26" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb26-1">params <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> rdSynthonSpaceSearch.SynthonSpaceSearchParams()</span>
-<span id="cb26-2">params.maxHits <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> <span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">12</span></span>
-<span id="cb26-3">params.randomSample <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> <span class="va" style="color: #111111;
-background-color: null;
-font-style: inherit;">True</span></span>
-<span id="cb26-4">params.similarityCutoff <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> <span class="fl" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">0.55</span></span>
-<span id="cb26-5">start <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> time.perf_counter()</span>
-<span id="cb26-6">results <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> synthonspace.FingerprintSearch(qmol, fpgen, params)</span>
-<span id="cb26-7">hits <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> results.GetHitMolecules()</span>
-<span id="cb26-8">hit_names <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> [<span class="ss" style="color: #20794D;
-background-color: null;
-font-style: inherit;">f'</span><span class="sc" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">{</span>m<span class="sc" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">.</span>GetProp(<span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">"_Name"</span>)<span class="sc" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">}</span><span class="ss" style="color: #20794D;
-background-color: null;
-font-style: inherit;"> : </span><span class="sc" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">{</span><span class="bu" style="color: null;
-background-color: null;
-font-style: inherit;">float</span>(m.GetProp(<span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">"Similarity"</span>))<span class="sc" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">:4.2f}</span><span class="ss" style="color: #20794D;
-background-color: null;
-font-style: inherit;">'</span> <span class="cf" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">for</span> m <span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">in</span> hits]</span>
-<span id="cb26-9"><span class="bu" style="color: null;
-background-color: null;
-font-style: inherit;">print</span>(<span class="ss" style="color: #20794D;
-background-color: null;
-font-style: inherit;">f"Time to search : </span><span class="sc" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">{</span>time<span class="sc" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">.</span>perf_counter() <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">-</span> start<span class="sc" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">:4.2f}</span><span class="ss" style="color: #20794D;
-background-color: null;
-font-style: inherit;"> seconds."</span>)</span>
-<span id="cb26-10"><span class="bu" style="color: null;
-background-color: null;
-font-style: inherit;">print</span>(<span class="ss" style="color: #20794D;
-background-color: null;
-font-style: inherit;">f"Number of hits : </span><span class="sc" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">{</span><span class="bu" style="color: null;
-background-color: null;
-font-style: inherit;">len</span>(hits)<span class="sc" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">}</span><span class="ss" style="color: #20794D;
-background-color: null;
-font-style: inherit;">"</span>)</span>
-<span id="cb26-11"><span class="bu" style="color: null;
-background-color: null;
-font-style: inherit;">print</span>(<span class="ss" style="color: #20794D;
-background-color: null;
-font-style: inherit;">f"Maximum number of hits possible : </span><span class="sc" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">{</span>results<span class="sc" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">.</span>GetMaxNumResults<span class="sc" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">}</span><span class="ss" style="color: #20794D;
-background-color: null;
-font-style: inherit;">"</span>)</span>
-<span id="cb26-12">Draw.MolsToGridImage(hits[:<span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">12</span>], legends<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span>hit_names[:<span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">12</span>], molsPerRow<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span><span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">4</span>)</span></code></pre></div>
-<div class="cell-output cell-output-stdout">
-<pre><code>Time to search : 15.84 seconds.
-Number of hits : 12
-Maximum number of hits possible : 3925204</code></pre>
-</div>
-<div class="cell-output cell-output-display" data-execution_count="15">
-<div>
-<figure class="figure">
-<p><img src="https://greglandrum.github.io/rdkit-blog/posts/2024-12-03-introducing-synthon-search_files/figure-html/cell-16-output-2.png" class="img-fluid figure-img"></p>
-</figure>
-</div>
-</div>
-</div>
-<p>Tanimoto similarities between small molecules with sparsely populated fingerprints are known to be be lower and more granular than similiarties for larger entities. This is relevant because the search starts by comparing fragments from the query molecule with synthons in the database. Only synthons that match the fragment within the cutoff are considered as a basis for a hit. There is a parameter that lowers the similarity cutoff for the fragment comparison compared to the global cutoff, which defaults to 0.1. Thus, if your similarityCutoff is set to 0.5, synthons are considered a match to a fragment if their Tanimoto similarities are above 0.4. If you want a faster search and don’t mind possibly missing some hits, you can lower that difference.</p>
-<div id="d537a3a3-5c0f-420e-b231-9a6a13109db2" class="cell" data-execution_count="16">
-<div class="sourceCode cell-code" id="cb28" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb28-1">params <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> rdSynthonSpaceSearch.SynthonSpaceSearchParams()</span>
-<span id="cb28-2">params.maxHits <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> <span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">12</span></span>
-<span id="cb28-3">params.randomSample <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> <span class="va" style="color: #111111;
-background-color: null;
-font-style: inherit;">True</span></span>
-<span id="cb28-4">params.similarityCutoff <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> <span class="fl" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">0.5</span></span>
-<span id="cb28-5">params.fragSimilarityAdjuster <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> <span class="fl" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">0.0</span></span>
-<span id="cb28-6">start <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> time.perf_counter()</span>
-<span id="cb28-7">results <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> synthonspace.FingerprintSearch(qmol, fpgen, params)</span>
-<span id="cb28-8">hits <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> results.GetHitMolecules()</span>
-<span id="cb28-9">hit_names <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> [<span class="ss" style="color: #20794D;
-background-color: null;
-font-style: inherit;">f'</span><span class="sc" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">{</span>m<span class="sc" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">.</span>GetProp(<span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">"_Name"</span>)<span class="sc" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">}</span><span class="ss" style="color: #20794D;
-background-color: null;
-font-style: inherit;"> : </span><span class="sc" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">{</span><span class="bu" style="color: null;
-background-color: null;
-font-style: inherit;">float</span>(m.GetProp(<span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">"Similarity"</span>))<span class="sc" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">:4.2f}</span><span class="ss" style="color: #20794D;
-background-color: null;
-font-style: inherit;">'</span> <span class="cf" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">for</span> m <span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">in</span> hits]</span>
-<span id="cb28-10"><span class="bu" style="color: null;
-background-color: null;
-font-style: inherit;">print</span>(<span class="ss" style="color: #20794D;
-background-color: null;
-font-style: inherit;">f"Time to search : </span><span class="sc" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">{</span>time<span class="sc" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">.</span>perf_counter() <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">-</span> start<span class="sc" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">:4.2f}</span><span class="ss" style="color: #20794D;
-background-color: null;
-font-style: inherit;"> seconds."</span>)</span>
-<span id="cb28-11"><span class="bu" style="color: null;
-background-color: null;
-font-style: inherit;">print</span>(<span class="ss" style="color: #20794D;
-background-color: null;
-font-style: inherit;">f"Number of hits : </span><span class="sc" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">{</span><span class="bu" style="color: null;
-background-color: null;
-font-style: inherit;">len</span>(hits)<span class="sc" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">}</span><span class="ss" style="color: #20794D;
-background-color: null;
-font-style: inherit;">"</span>)</span>
-<span id="cb28-12"><span class="bu" style="color: null;
-background-color: null;
-font-style: inherit;">print</span>(<span class="ss" style="color: #20794D;
-background-color: null;
-font-style: inherit;">f"Maximum number of hits possible : </span><span class="sc" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">{</span>results<span class="sc" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">.</span>GetMaxNumResults<span class="sc" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">}</span><span class="ss" style="color: #20794D;
-background-color: null;
-font-style: inherit;">"</span>)</span>
-<span id="cb28-13">Draw.MolsToGridImage(hits[:<span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">12</span>], legends<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span>hit_names[:<span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">12</span>], molsPerRow<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span><span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">4</span>)</span></code></pre></div>
-<div class="cell-output cell-output-stdout">
-<pre><code>Time to search : 15.74 seconds.
-Number of hits : 12
-Maximum number of hits possible : 690134</code></pre>
-</div>
-<div class="cell-output cell-output-display" data-execution_count="16">
-<div>
-<figure class="figure">
-<p><img src="https://greglandrum.github.io/rdkit-blog/posts/2024-12-03-introducing-synthon-search_files/figure-html/cell-17-output-2.png" class="img-fluid figure-img"></p>
-</figure>
-</div>
-</div>
-</div>
-<p>As you can see, the potential number of hits it had to check went down to 690134.</p>
-<section id="working-with-synthon-spaces-yourself" class="level2">
-<h2 class="anchored" data-anchor-id="working-with-synthon-spaces-yourself">Working with synthon spaces yourself</h2>
-<p>In order to use this functionality, you obviously need access to a synthon description of the space you want to search. Due to the size of the files, we don’t include a space description with the RDKit itself, so you need to get the data elsewhere.</p>
-<p>ChemSpace’s FreedomSpace 3.0 and Enamine’s REAL are available on request via the links above. If you just want to experiment then there are small test spaces <a href="https://github.com/rdkit/rdkit/tree/master/Code/GraphMol/SynthonSpaceSearch/data">here</a>. The <a href="https://github.com/rdkit/rdkit/blob/master/Code/GraphMol/SynthonSpaceSearch/data/Syntons_5567.csv">Syntons_5567.csv</a> file is a substantial random extract from the FreedomSpace 2023 library.</p>
-<p>We don’t currently know of any others, but we will update this post as if/when we learn about more. Please leave a comment or get in touch some other way if you have a space you want to share. If you work with a provider of make-on-demand libraries or DELs, ask them if they can provide their libraries in synthon form, and we will add the link above. I (Dave) can work with providers on getting the data in the appropriate format.</p>
-</section>
-<section id="acknowledgements" class="level2">
-<h2 class="anchored" data-anchor-id="acknowledgements">Acknowledgements</h2>
-<p>Thanks to Greg for pointing me (Dave) at the problem and providing valuable insight and discussions.<br>
-Thanks are also due to Olga Tarkhanova and colleagues at ChemSpace for providing the FreedomSpace 2023 library in synthon and enumerated forms for me to use during development and testing, and also to Yurii Moroz at Enamine for help and discussions.</p>
-
-
-</section>
-</section>
-
- ]]></description>
-  <category>release</category>
-  <category>tutorial</category>
-  <guid>https://greglandrum.github.io/rdkit-blog/posts/2024-12-03-introducing-synthon-search.html</guid>
-  <pubDate>Mon, 02 Dec 2024 23:00:00 GMT</pubDate>
 </item>
 </channel>
 </rss>
