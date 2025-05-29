@@ -10,7 +10,1403 @@
 <atom:link href="https://greglandrum.github.io/rdkit-blog/index.xml" rel="self" type="application/rss+xml"/>
 <description>RDKit experiments, tips, and tutorials</description>
 <generator>quarto-1.6.39</generator>
-<lastBuildDate>Wed, 21 May 2025 22:00:00 GMT</lastBuildDate>
+<lastBuildDate>Thu, 29 May 2025 22:00:00 GMT</lastBuildDate>
+<item>
+  <title>Doing extended Hueckel calculations with the RDKit</title>
+  <link>https://greglandrum.github.io/rdkit-blog/posts/2025-05-30-eHT-in-RDKit.html</link>
+  <description><![CDATA[ 
+
+
+
+
+<p>This is an updated and revised version of an <a href="https://rdkit.blogspot.com/2019/06/doing-extended-hueckel-calculations.html">older post</a>.</p>
+<p>The RDKit has included an optional integration with a semi-empirical quantum mechanics package called YAeHMOP since the 2019.03 release. If you build the RDKit yourself, this is disabled by default, but it is part of the RDKit conda-forge and pypi builds, so it’s available to most RDKit users.</p>
+<p>There’s no documentation for this integration yet… thus this blog post.</p>
+<section id="some-background" class="level1">
+<h1>Some background</h1>
+<p>One of my major projects in grad school was to write a software package for performing extended Hueckel calculations and analyzing and visualizing the results. I released the source for YAeHMOP (“Yet Another extended Hueckel Molecular Orbital Package”) way back when using some weird license (the open-source landscape in chemistry was “a bit” different back in the mid-90s). After changing fields, I more or less forgot about YAeHMOP until a couple of years ago when Patrick Avery contacted me about integrating it <a href="https://pubs.acs.org/doi/abs/10.1021/acs.jchemed.7b00698">into Avogadro</a>. To make things easier, I put the source <a href="https://github.com/greglandrum/yaehmop">up on Github</a> and switched to a BSD license. Since that point we’ve done a bit of additional cleanup work on the eHT code (the visualization pieces are still there, but really only have historic interest) and made it useable as a library.</p>
+<p>There are a couple of applications where I think it might be interesting to have access to quick, interpretable QM results from the RDKit. These include getting partial charges and starting to think about quick and dirty descriptors for things like bond strengths and reactivity. So I decided to do an integration of YAeHMOP into the RDKit.</p>
+<p>There are a <em>bunch</em> of books and papers describing extended Hueckel theory and the various types of analysis that one can do with it; I’m not going to cite all of those here. There’s also no formal publication describing YAeHMOP (what a shock!), but there is a <a href="https://drive.google.com/open?id=0BzBynnwxNS0SanJzUkJYYWNFY0h1bzNFR0d0aVBCR0x5NmZV">chapter</a> in my PhD thesis that provides an fairly comprehensive tutorial overview of the theory.</p>
+<div id="cell-2" class="cell" data-execution_count="45">
+<div class="sourceCode cell-code" id="cb1" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb1-1"><span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">from</span> rdkit <span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">import</span> Chem</span>
+<span id="cb1-2"><span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">from</span> rdkit.Chem <span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">import</span> Draw</span>
+<span id="cb1-3"><span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">from</span> rdkit.Chem <span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">import</span> rdDepictor</span>
+<span id="cb1-4"><span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">from</span> rdkit.Chem <span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">import</span> rdDistGeom</span>
+<span id="cb1-5"><span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">from</span> rdkit.Chem <span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">import</span> rdForceFieldHelpers</span>
+<span id="cb1-6"><span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">from</span> rdkit.Chem <span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">import</span> rdMolAlign</span>
+<span id="cb1-7">rdDepictor.SetPreferCoordGen(<span class="va" style="color: #111111;
+background-color: null;
+font-style: inherit;">True</span>)</span>
+<span id="cb1-8"><span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">from</span> rdkit.Chem.Draw <span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">import</span> IPythonConsole</span>
+<span id="cb1-9">IPythonConsole.ipython_3d <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> <span class="va" style="color: #111111;
+background-color: null;
+font-style: inherit;">True</span></span>
+<span id="cb1-10"></span>
+<span id="cb1-11"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># this is the package including the connection to YAeHMOP</span></span>
+<span id="cb1-12"><span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">from</span> rdkit.Chem <span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">import</span> rdEHTTools</span>
+<span id="cb1-13"></span>
+<span id="cb1-14"></span>
+<span id="cb1-15"><span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">import</span> numpy <span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">as</span> np</span>
+<span id="cb1-16"></span>
+<span id="cb1-17"><span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">import</span> rdkit</span>
+<span id="cb1-18"><span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">print</span>(rdkit.__version__)</span>
+<span id="cb1-19"><span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">import</span> time</span>
+<span id="cb1-20"><span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">print</span>(time.asctime())</span></code></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>2025.03.2
+Tue May 27 06:32:31 2025</code></pre>
+</div>
+</div>
+<div id="cell-3" class="cell" data-execution_count="25">
+<div class="sourceCode cell-code" id="cb3" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb3-1"><span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">import</span> matplotlib.pyplot <span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">as</span> plt</span>
+<span id="cb3-2">plt.rcParams[<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'font.size'</span>] <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'16'</span></span>
+<span id="cb3-3"><span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">%</span>matplotlib inline</span></code></pre></div>
+</div>
+</section>
+<section id="running-an-eht-calculation" class="level1">
+<h1>Running an eHT calculation</h1>
+<p>Start by showing how to run an eHT calculation:</p>
+<div id="cell-6" class="cell" data-execution_count="5">
+<div class="sourceCode cell-code" id="cb4" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb4-1"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># imatinib</span></span>
+<span id="cb4-2">m <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> Chem.MolFromSmiles(<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'Cc1ccc(NC(=O)c2ccc(CN3CCN(C)CC3)cc2)cc1Nc1nccc(-c2cccnc2)n1'</span>)</span>
+<span id="cb4-3">m</span></code></pre></div>
+<div class="cell-output cell-output-display" data-execution_count="5">
+<div>
+<figure class="figure">
+<p><img src="https://greglandrum.github.io/rdkit-blog/posts/2025-05-30-eHT-in-RDKit_files/figure-html/cell-4-output-1.png" class="img-fluid figure-img"></p>
+</figure>
+</div>
+</div>
+</div>
+<p>We need to add Hs and generate a conformation:</p>
+<div id="cell-8" class="cell" data-execution_count="6">
+<div class="sourceCode cell-code" id="cb5" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb5-1">mh <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> Chem.AddHs(m)</span>
+<span id="cb5-2"></span>
+<span id="cb5-3">params <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> rdDistGeom.ETKDGv3()</span>
+<span id="cb5-4">params.randomSeed <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> <span class="bn" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">0xf00d</span></span>
+<span id="cb5-5">_ <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> rdDistGeom.EmbedMultipleConfs(mh,<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">50</span>,params)<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">;</span></span></code></pre></div>
+</div>
+<p>And now we can run the calculation, it’s quick:</p>
+<div id="cell-10" class="cell" data-execution_count="7">
+<div class="sourceCode cell-code" id="cb6" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb6-1">passed,res <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> rdEHTTools.RunMol(mh)</span></code></pre></div>
+</div>
+<p>The first return value lets us know if the calculation succeeded:</p>
+<div id="cell-12" class="cell" data-execution_count="8">
+<div class="sourceCode cell-code" id="cb7" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb7-1">passed</span></code></pre></div>
+<div class="cell-output cell-output-display" data-execution_count="8">
+<pre><code>True</code></pre>
+</div>
+</div>
+<p>The second contains the results of the calculation:</p>
+<div id="cell-14" class="cell" data-execution_count="9">
+<div class="sourceCode cell-code" id="cb9" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb9-1">res</span></code></pre></div>
+<div class="cell-output cell-output-display" data-execution_count="9">
+<pre><code>&lt;rdkit.Chem.rdEHTTools.EHTResults at 0x7134eb4fb990&gt;</code></pre>
+</div>
+</div>
+<p>We have access to the atomic charges:</p>
+<div id="cell-16" class="cell" data-execution_count="10">
+<div class="sourceCode cell-code" id="cb11" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb11-1">res.GetAtomicCharges()</span></code></pre></div>
+<div class="cell-output cell-output-display" data-execution_count="10">
+<pre><code>array([-5.73319770e-02, -1.56119578e-02, -4.62356988e-02, -1.18071986e-01,
+        2.86923770e-01, -3.70969432e-01,  1.00722260e+00, -1.21427336e+00,
+        1.03464336e-02,  3.95206419e-03, -5.19248775e-02,  1.13588339e-01,
+        2.38359626e-01, -5.99954120e-01,  2.17722688e-01,  2.27807128e-01,
+       -6.56662561e-01,  1.84484934e-01,  2.16303717e-01,  2.04326750e-01,
+       -6.48170370e-02,  3.50318427e-03, -1.46944980e-01,  2.80281190e-01,
+       -3.39480974e-01,  9.28885393e-01, -9.10924655e-01,  4.27524493e-01,
+       -1.53696399e-01,  4.99938553e-01,  1.25460394e-02,  1.04297689e-01,
+       -5.89901215e-02,  3.62195210e-01, -8.17714649e-01,  3.65798320e-01,
+       -9.06432708e-01,  2.36395863e-02,  2.09410831e-02,  1.39448705e-02,
+        1.96396053e-02,  3.16035160e-02,  2.28935259e-01,  2.99088433e-02,
+        2.12441191e-02, -9.34616751e-03, -1.93856802e-02,  1.28332398e-03,
+       -3.10220683e-03, -4.19893941e-03, -2.37810660e-03,  1.00680225e-02,
+        1.90934569e-03,  1.07324773e-02,  4.87832629e-03,  7.08061277e-04,
+        9.06261240e-03, -9.03297593e-03,  2.21231427e-02,  2.43698118e-02,
+        4.00966866e-02,  2.16945408e-01,  1.45921314e-02,  3.89137638e-02,
+        2.12291420e-02,  2.76350076e-02,  2.16390227e-02,  2.54300922e-02])</code></pre>
+</div>
+</div>
+<p>The reduced overlap population matrix provides the Mulliken overlap population between atoms in the molecule. This tells us something about the strength of the interaction between the atoms. It’s returned as a vector representing a symmetric matrix:</p>
+<div id="cell-18" class="cell" data-execution_count="12">
+<div class="sourceCode cell-code" id="cb13" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb13-1">res.GetReducedOverlapPopulationMatrix()[:<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">6</span>]</span></code></pre></div>
+<div class="cell-output cell-output-display" data-execution_count="12">
+<pre><code>array([ 2.58800014,  0.7866103 ,  2.78382058, -0.08743666,  1.12740458,
+        2.72952681])</code></pre>
+</div>
+</div>
+<div id="cell-19" class="cell" data-execution_count="13">
+<div class="sourceCode cell-code" id="cb15" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb15-1"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># convenience function to set a "MulilkenOverlapPopulation" property on bonds.</span></span>
+<span id="cb15-2"><span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">def</span> set_overlap_populations(m,ehtRes):</span>
+<span id="cb15-3">    rop <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> ehtRes.GetReducedOverlapPopulationMatrix()</span>
+<span id="cb15-4">    <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">for</span> bnd <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">in</span> m.GetBonds():</span>
+<span id="cb15-5">        a1 <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> bnd.GetBeginAtom()</span>
+<span id="cb15-6">        a2 <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> bnd.GetEndAtom()</span>
+<span id="cb15-7">        <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">if</span> a1.GetAtomicNum()<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">==</span><span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">1</span> <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">or</span> a2.GetAtomicNum()<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">==</span><span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">1</span>:</span>
+<span id="cb15-8">            <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">continue</span></span>
+<span id="cb15-9">        <span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># symmetric matrix:</span></span>
+<span id="cb15-10">        i1 <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> <span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">max</span>(a1.GetIdx(),a2.GetIdx())</span>
+<span id="cb15-11">        i2 <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> <span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">min</span>(a1.GetIdx(),a2.GetIdx())</span>
+<span id="cb15-12">        idx <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> (i1<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">*</span>(i1<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">+</span><span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">1</span>))<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">//</span><span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">2</span> <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">+</span> i2</span>
+<span id="cb15-13">        bnd.SetDoubleProp(<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"MullikenOverlapPopulation"</span>,rop[idx])</span></code></pre></div>
+</div>
+<div id="cell-20" class="cell" data-execution_count="14">
+<div class="sourceCode cell-code" id="cb16" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb16-1">set_overlap_populations(mh,res)</span></code></pre></div>
+</div>
+<p>Look at a few of the overlap populations:</p>
+<div id="cell-22" class="cell" data-execution_count="15">
+<div class="sourceCode cell-code" id="cb17" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb17-1"><span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">for</span> bnd <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">in</span> <span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">list</span>(mh.GetBonds())[:<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">5</span>]:</span>
+<span id="cb17-2">    <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">if</span> <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">not</span> bnd.HasProp(<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"MullikenOverlapPopulation"</span>):</span>
+<span id="cb17-3">        <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">continue</span></span>
+<span id="cb17-4">    <span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">print</span>(<span class="ss" style="color: #20794D;
+background-color: null;
+font-style: inherit;">f'</span><span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">{</span>bnd<span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">.</span>GetIdx()<span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">}</span><span class="ss" style="color: #20794D;
+background-color: null;
+font-style: inherit;"> </span><span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">{</span>bnd<span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">.</span>GetBeginAtom()<span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">.</span>GetSymbol()<span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">}</span><span class="ss" style="color: #20794D;
+background-color: null;
+font-style: inherit;">(</span><span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">{</span>bnd<span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">.</span>GetBeginAtomIdx()<span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">}</span><span class="ss" style="color: #20794D;
+background-color: null;
+font-style: inherit;">)-</span><span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">{</span>bnd<span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">.</span>GetEndAtom()<span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">.</span>GetSymbol()<span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">}</span><span class="ss" style="color: #20794D;
+background-color: null;
+font-style: inherit;">(</span><span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">{</span>bnd<span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">.</span>GetEndAtomIdx()<span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">}</span><span class="ss" style="color: #20794D;
+background-color: null;
+font-style: inherit;">) </span><span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">{</span>bnd<span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">.</span>GetBondType()<span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">}</span><span class="ss" style="color: #20794D;
+background-color: null;
+font-style: inherit;"> </span><span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">{</span>bnd<span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">.</span>GetDoubleProp(<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"MullikenOverlapPopulation"</span>) <span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">:.3f}</span><span class="ss" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'</span>)</span></code></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>0 C(0)-C(1) SINGLE 0.787
+1 C(1)-C(2) AROMATIC 1.127
+2 C(2)-C(3) AROMATIC 1.084
+3 C(3)-C(4) AROMATIC 1.113
+4 C(4)-N(5) SINGLE 0.720</code></pre>
+</div>
+</div>
+<p>The wrapper also currently provides the reduced charge matrix (described in that thesis chapter linked above). I’m not going to discuss that here.</p>
+</section>
+<section id="application-look-at-variability-of-charges-between-conformers" class="level1">
+<h1>Application: Look at variability of charges between conformers</h1>
+<p>The rest of this blog post is going to show a straightforward analysis one can do with the eHT results: looking at the variability of the QM charges across the different conformers.</p>
+<div id="cell-25" class="cell" data-execution_count="16">
+<div class="sourceCode cell-code" id="cb19" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb19-1"><span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">def</span> runEHT(mh):</span>
+<span id="cb19-2">    <span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">""" convenience function to run an eHT calculation on all of a molecule's conformers</span></span>
+<span id="cb19-3"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">    </span></span>
+<span id="cb19-4"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">        returns a list of the results structures as well as a list of lists containing the</span></span>
+<span id="cb19-5"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">        charges on each atom in each conformer: chgs[atomId][confId] to use this</span></span>
+<span id="cb19-6"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">    """</span></span>
+<span id="cb19-7">    eres <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> []</span>
+<span id="cb19-8">    charges <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> [[] <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">for</span> x <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">in</span> <span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">range</span>(mh.GetNumHeavyAtoms())]</span>
+<span id="cb19-9">    <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">for</span> cid <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">in</span> <span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">range</span>(mh.GetNumConformers()):</span>
+<span id="cb19-10">        passed,res <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> rdEHTTools.RunMol(mh,confId<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span>cid)</span>
+<span id="cb19-11">        eres.append(res)</span>
+<span id="cb19-12">        <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">if</span> <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">not</span> passed:</span>
+<span id="cb19-13">            <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">raise</span> <span class="pp" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">ValueError</span>(<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"eHT failed"</span>)</span>
+<span id="cb19-14">        hvyIdx <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> <span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">0</span></span>
+<span id="cb19-15">        echgs <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> res.GetAtomicCharges()</span>
+<span id="cb19-16">        <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">for</span> atom <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">in</span> mh.GetAtoms():</span>
+<span id="cb19-17">            <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">if</span> atom.GetAtomicNum()<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">==</span><span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">1</span>:</span>
+<span id="cb19-18">                <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">continue</span></span>
+<span id="cb19-19">            charges[hvyIdx].append(echgs[atom.GetIdx()])</span>
+<span id="cb19-20">            hvyIdx<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">+=</span><span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">1</span></span>
+<span id="cb19-21">    <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">return</span> (eres,charges)</span>
+<span id="cb19-22">    </span></code></pre></div>
+</div>
+<div id="cell-26" class="cell" data-execution_count="17">
+<div class="sourceCode cell-code" id="cb20" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb20-1">eres,charges <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> runEHT(mh)</span></code></pre></div>
+</div>
+<div id="cell-27" class="cell" data-execution_count="26">
+<div class="sourceCode cell-code" id="cb21" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb21-1">plt.figure(figsize<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span>(<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">18</span>,<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">12</span>))</span>
+<span id="cb21-2">plt.violinplot(charges)<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">;</span></span>
+<span id="cb21-3">plt.title(<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"ETKDG"</span>)<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">;</span></span>
+<span id="cb21-4">plt.xlabel(<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'atom ID'</span>)<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">;</span></span>
+<span id="cb21-5">plt.ylabel(<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"partial charge"</span>)<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">;</span></span></code></pre></div>
+<div class="cell-output cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="https://greglandrum.github.io/rdkit-blog/posts/2025-05-30-eHT-in-RDKit_files/figure-html/cell-16-output-1.png" class="img-fluid figure-img"></p>
+</figure>
+</div>
+</div>
+</div>
+<p>To make sense of that, draw the molecule with the atoms numbered:</p>
+<div id="cell-29" class="cell" data-execution_count="23">
+<div class="sourceCode cell-code" id="cb22" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb22-1">IPythonConsole.drawOptions.addAtomIndices <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> <span class="va" style="color: #111111;
+background-color: null;
+font-style: inherit;">True</span></span>
+<span id="cb22-2">IPythonConsole.molSize <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> <span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">500</span>,<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">300</span></span>
+<span id="cb22-3">m</span></code></pre></div>
+<div class="cell-output cell-output-display" data-execution_count="23">
+<div>
+<figure class="figure">
+<p><img src="https://greglandrum.github.io/rdkit-blog/posts/2025-05-30-eHT-in-RDKit_files/figure-html/cell-17-output-1.png" class="img-fluid figure-img"></p>
+</figure>
+</div>
+</div>
+</div>
+<p>Look at the results for a couple of the atoms that show the most variability</p>
+<div id="cell-31" class="cell" data-execution_count="29">
+<div class="sourceCode cell-code" id="cb23" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb23-1">chgRange <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> [<span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">max</span>(x)<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">-</span><span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">min</span>(x) <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">for</span> x <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">in</span> charges]</span>
+<span id="cb23-2">sortedRanges <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> <span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">sorted</span>([(y,x) <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">for</span> x,y <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">in</span> <span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">enumerate</span>(chgRange)], reverse<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span><span class="va" style="color: #111111;
+background-color: null;
+font-style: inherit;">True</span>)</span>
+<span id="cb23-3">sortedRanges[:<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">2</span>]</span></code></pre></div>
+<div class="cell-output cell-output-display" data-execution_count="29">
+<pre><code>[(0.20875282639970938, 24), (0.11463855830843706, 5)]</code></pre>
+</div>
+</div>
+<div id="cell-32" class="cell" data-execution_count="30">
+<div class="sourceCode cell-code" id="cb25" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb25-1">tchgs <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> <span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">sorted</span>((y,x) <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">for</span> x,y <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">in</span> <span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">enumerate</span>(charges[<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">24</span>]))</span>
+<span id="cb25-2">tchgs[:<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">2</span>],tchgs[<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">-</span><span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">2</span>:]</span></code></pre></div>
+<div class="cell-output cell-output-display" data-execution_count="30">
+<pre><code>([(-0.5344846663677152, 7), (-0.5300694785153464, 9)],
+ [(-0.3297127630789536, 46), (-0.3257318399680058, 22)])</code></pre>
+</div>
+</div>
+<div id="cell-33" class="cell" data-execution_count="31">
+<div class="sourceCode cell-code" id="cb27" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb27-1">tchgs <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> <span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">sorted</span>((y,x) <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">for</span> x,y <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">in</span> <span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">enumerate</span>(charges[<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">5</span>]))</span>
+<span id="cb27-2">tchgs[:<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">2</span>],tchgs[<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">-</span><span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">2</span>:]</span></code></pre></div>
+<div class="cell-output cell-output-display" data-execution_count="31">
+<pre><code>([(-0.37553939142960324, 12), (-0.3740573280350843, 4)],
+ [(-0.2660340113875628, 14), (-0.2609008331211662, 30)])</code></pre>
+</div>
+</div>
+<p>Look at the two conformers where the charges on atom 24 differ the most:</p>
+<div id="cell-35" class="cell" data-execution_count="34">
+<div class="sourceCode cell-code" id="cb29" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb29-1">m.__sssAtoms <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> [<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">24</span>]</span>
+<span id="cb29-2">m</span></code></pre></div>
+<div class="cell-output cell-output-display" data-execution_count="34">
+<div>
+<figure class="figure">
+<p><img src="https://greglandrum.github.io/rdkit-blog/posts/2025-05-30-eHT-in-RDKit_files/figure-html/cell-21-output-1.png" class="img-fluid figure-img"></p>
+</figure>
+</div>
+</div>
+</div>
+<div id="cell-36" class="cell" data-execution_count="32">
+<div class="sourceCode cell-code" id="cb30" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb30-1">tm7 <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> Chem.MolFromMolBlock(Chem.MolToMolBlock(mh,confId<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span><span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">7</span>))</span>
+<span id="cb30-2">tm7</span></code></pre></div>
+<div class="cell-output cell-output-display">
+<div id="3dmolviewer_17483188092931037" style="position: relative; width: 400px; height: 400px;">
+        <p id="3dmolwarning_17483188092931037" style="background-color:#ffcccc;color:black">3Dmol.js failed to load for some reason.  Please check your browser console for error messages.<br></p>
+        </div>
+<script>
+
+var loadScriptAsync = function(uri){
+  return new Promise((resolve, reject) => {
+    //this is to ignore the existence of requirejs amd
+    var savedexports, savedmodule;
+    if (typeof exports !== 'undefined') savedexports = exports;
+    else exports = {}
+    if (typeof module !== 'undefined') savedmodule = module;
+    else module = {}
+
+    var tag = document.createElement('script');
+    tag.src = uri;
+    tag.async = true;
+    tag.onload = () => {
+        exports = savedexports;
+        module = savedmodule;
+        resolve();
+    };
+  var firstScriptTag = document.getElementsByTagName('script')[0];
+  firstScriptTag.parentNode.insertBefore(tag, firstScriptTag);
+});
+};
+
+if(typeof $3Dmolpromise === 'undefined') {
+$3Dmolpromise = null;
+  $3Dmolpromise = loadScriptAsync('https://cdnjs.cloudflare.com/ajax/libs/3Dmol/2.4.0/3Dmol-min.js');
+}
+
+var viewer_17483188092931037 = null;
+var warn = document.getElementById("3dmolwarning_17483188092931037");
+if(warn) {
+    warn.parentNode.removeChild(warn);
+}
+$3Dmolpromise.then(function() {
+viewer_17483188092931037 = $3Dmol.createViewer(document.getElementById("3dmolviewer_17483188092931037"),{backgroundColor:"white"});
+viewer_17483188092931037.zoomTo();
+    viewer_17483188092931037.removeAllModels();
+    viewer_17483188092931037.addModel("\n     RDKit          3D\n\n 37 41  0  0  0  0  0  0  0  0999 V2000\n   -4.0652   -5.3614    2.5183 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -3.1772   -4.4307    1.7734 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -1.8350   -4.7025    1.6874 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -0.9790   -3.8638    1.0044 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -1.4905   -2.7421    0.4057 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -0.5619   -1.8974   -0.2967 N   0  0  0  0  0  0  0  0  0  0  0  0\n    0.0926   -0.8899    0.4674 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -0.2263   -0.8560    1.7044 O   0  0  0  0  0  0  0  0  0  0  0  0\n    1.0577    0.0416   -0.1000 C   0  0  0  0  0  0  0  0  0  0  0  0\n    1.3393    0.0494   -1.4410 C   0  0  0  0  0  0  0  0  0  0  0  0\n    2.2683    0.9409   -1.9879 C   0  0  0  0  0  0  0  0  0  0  0  0\n    2.8824    1.8074   -1.1041 C   0  0  0  0  0  0  0  0  0  0  0  0\n    3.8821    2.7989   -1.5701 C   0  0  0  0  0  0  0  0  0  0  0  0\n    5.2340    2.3400   -1.5765 N   0  0  0  0  0  0  0  0  0  0  0  0\n    5.4009    1.2251   -2.4922 C   0  0  0  0  0  0  0  0  0  0  0  0\n    6.7618    0.6040   -2.3843 C   0  0  0  0  0  0  0  0  0  0  0  0\n    7.6567    1.4701   -1.6720 N   0  0  0  0  0  0  0  0  0  0  0  0\n    9.0310    1.0094   -1.7270 C   0  0  0  0  0  0  0  0  0  0  0  0\n    7.2491    1.8210   -0.3476 C   0  0  0  0  0  0  0  0  0  0  0  0\n    5.7403    1.9433   -0.2981 C   0  0  0  0  0  0  0  0  0  0  0  0\n    2.6037    1.8063    0.2526 C   0  0  0  0  0  0  0  0  0  0  0  0\n    1.6748    0.9157    0.8042 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -2.8529   -2.4091    0.4571 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -3.6434   -3.2980    1.1592 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -5.0449   -2.9662    1.2322 N   0  0  0  0  0  0  0  0  0  0  0  0\n   -5.5887   -1.8260    0.5829 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -6.1625   -2.0308   -0.6296 N   0  0  0  0  0  0  0  0  0  0  0  0\n   -6.7113   -1.0312   -1.3602 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -6.6560    0.2477   -0.7925 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -6.0769    0.4715    0.4378 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -5.9879    1.7816    1.0651 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -5.3781    1.8701    2.2917 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -5.2655    3.1020    2.9383 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -5.7849    4.2365    2.3122 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -6.3796    4.1191    1.1049 N   0  0  0  0  0  0  0  0  0  0  0  0\n   -6.4805    2.9324    0.4964 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -5.5418   -0.5822    1.1228 N   0  0  0  0  0  0  0  0  0  0  0  0\n  1  2  1  0\n  2  3  2  0\n  3  4  1  0\n  4  5  2  0\n  5  6  1  0\n  6  7  1  0\n  7  8  2  0\n  7  9  1  0\n  9 10  2  0\n 10 11  1  0\n 11 12  2  0\n 12 13  1  0\n 13 14  1  0\n 14 15  1  0\n 15 16  1  0\n 16 17  1  0\n 17 18  1  0\n 17 19  1  0\n 19 20  1  0\n 12 21  1  0\n 21 22  2  0\n  5 23  1  0\n 23 24  2  0\n 24 25  1  0\n 25 26  1  0\n 26 27  2  0\n 27 28  1  0\n 28 29  2  0\n 29 30  1  0\n 30 31  1  0\n 31 32  2  0\n 32 33  1  0\n 33 34  2  0\n 34 35  1  0\n 35 36  2  0\n 30 37  2  0\n 24  2  1  0\n 37 26  1  0\n 22  9  1  0\n 36 31  1  0\n 20 14  1  0\nM  END\n","sdf");
+    viewer_17483188092931037.setStyle({"stick": {}});
+    viewer_17483188092931037.setBackgroundColor("0xeeeeee");
+    viewer_17483188092931037.zoomTo();
+viewer_17483188092931037.render();
+});
+</script>
+</div>
+<div class="cell-output cell-output-display" data-execution_count="32">
+
+</div>
+</div>
+<div id="cell-37" class="cell" data-execution_count="33">
+<div class="sourceCode cell-code" id="cb31" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb31-1">tm22 <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> Chem.MolFromMolBlock(Chem.MolToMolBlock(mh,confId<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span><span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">22</span>))</span>
+<span id="cb31-2">tm22</span></code></pre></div>
+<div class="cell-output cell-output-display">
+<div id="3dmolviewer_17483188364847312" style="position: relative; width: 400px; height: 400px;">
+        <p id="3dmolwarning_17483188364847312" style="background-color:#ffcccc;color:black">3Dmol.js failed to load for some reason.  Please check your browser console for error messages.<br></p>
+        </div>
+<script>
+
+var loadScriptAsync = function(uri){
+  return new Promise((resolve, reject) => {
+    //this is to ignore the existence of requirejs amd
+    var savedexports, savedmodule;
+    if (typeof exports !== 'undefined') savedexports = exports;
+    else exports = {}
+    if (typeof module !== 'undefined') savedmodule = module;
+    else module = {}
+
+    var tag = document.createElement('script');
+    tag.src = uri;
+    tag.async = true;
+    tag.onload = () => {
+        exports = savedexports;
+        module = savedmodule;
+        resolve();
+    };
+  var firstScriptTag = document.getElementsByTagName('script')[0];
+  firstScriptTag.parentNode.insertBefore(tag, firstScriptTag);
+});
+};
+
+if(typeof $3Dmolpromise === 'undefined') {
+$3Dmolpromise = null;
+  $3Dmolpromise = loadScriptAsync('https://cdnjs.cloudflare.com/ajax/libs/3Dmol/2.4.0/3Dmol-min.js');
+}
+
+var viewer_17483188364847312 = null;
+var warn = document.getElementById("3dmolwarning_17483188364847312");
+if(warn) {
+    warn.parentNode.removeChild(warn);
+}
+$3Dmolpromise.then(function() {
+viewer_17483188364847312 = $3Dmol.createViewer(document.getElementById("3dmolviewer_17483188364847312"),{backgroundColor:"white"});
+viewer_17483188364847312.zoomTo();
+    viewer_17483188364847312.removeAllModels();
+    viewer_17483188364847312.addModel("\n     RDKit          3D\n\n 37 41  0  0  0  0  0  0  0  0999 V2000\n    4.2792   -2.7557   -5.4828 C   0  0  0  0  0  0  0  0  0  0  0  0\n    3.4159   -2.0166   -4.5216 C   0  0  0  0  0  0  0  0  0  0  0  0\n    2.1234   -1.7346   -4.9046 C   0  0  0  0  0  0  0  0  0  0  0  0\n    1.2567   -1.0558   -4.0789 C   0  0  0  0  0  0  0  0  0  0  0  0\n    1.7235   -0.6617   -2.8449 C   0  0  0  0  0  0  0  0  0  0  0  0\n    0.8115    0.0420   -1.9863 N   0  0  0  0  0  0  0  0  0  0  0  0\n    0.0448   -0.7715   -1.1024 C   0  0  0  0  0  0  0  0  0  0  0  0\n    0.2199   -2.0169   -1.1370 O   0  0  0  0  0  0  0  0  0  0  0  0\n   -0.9252   -0.2127   -0.1693 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -1.5824   -1.1171    0.6645 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -2.5237   -0.7216    1.5891 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -2.8216    0.6215    1.6877 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -3.8369    1.0221    2.6930 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -5.1686    1.0289    2.2343 N   0  0  0  0  0  0  0  0  0  0  0  0\n   -6.1943    1.4050    3.1334 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -7.4283    0.5903    2.8122 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -7.7465    0.5949    1.4145 N   0  0  0  0  0  0  0  0  0  0  0  0\n   -8.7005    1.5764    1.0045 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -6.6607    0.3715    0.5219 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -5.4103    1.1789    0.8494 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -2.1726    1.5154    0.8641 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -1.2191    1.1100   -0.0716 C   0  0  0  0  0  0  0  0  0  0  0  0\n    3.0199   -0.9503   -2.4729 C   0  0  0  0  0  0  0  0  0  0  0  0\n    3.9169   -1.6254   -3.2663 C   0  0  0  0  0  0  0  0  0  0  0  0\n    5.2345   -1.9458   -2.9309 N   0  0  0  0  0  0  0  0  0  0  0  0\n    5.9279   -1.6461   -1.7472 C   0  0  0  0  0  0  0  0  0  0  0  0\n    7.2199   -2.0763   -1.6186 N   0  0  0  0  0  0  0  0  0  0  0  0\n    7.9795   -1.8566   -0.5508 C   0  0  0  0  0  0  0  0  0  0  0  0\n    7.4233   -1.1381    0.5139 C   0  0  0  0  0  0  0  0  0  0  0  0\n    6.1309   -0.6879    0.4270 C   0  0  0  0  0  0  0  0  0  0  0  0\n    5.5319    0.0571    1.5121 C   0  0  0  0  0  0  0  0  0  0  0  0\n    4.2287    0.5335    1.4704 C   0  0  0  0  0  0  0  0  0  0  0  0\n    3.6712    1.2476    2.5244 C   0  0  0  0  0  0  0  0  0  0  0  0\n    4.4140    1.5036    3.6564 C   0  0  0  0  0  0  0  0  0  0  0  0\n    5.6714    1.0438    3.6959 N   0  0  0  0  0  0  0  0  0  0  0  0\n    6.2284    0.3475    2.6791 C   0  0  0  0  0  0  0  0  0  0  0  0\n    5.4495   -0.9643   -0.6978 N   0  0  0  0  0  0  0  0  0  0  0  0\n  1  2  1  0\n  2  3  2  0\n  3  4  1  0\n  4  5  2  0\n  5  6  1  0\n  6  7  1  0\n  7  8  2  0\n  7  9  1  0\n  9 10  2  0\n 10 11  1  0\n 11 12  2  0\n 12 13  1  0\n 13 14  1  0\n 14 15  1  0\n 15 16  1  0\n 16 17  1  0\n 17 18  1  0\n 17 19  1  0\n 19 20  1  0\n 12 21  1  0\n 21 22  2  0\n  5 23  1  0\n 23 24  2  0\n 24 25  1  0\n 25 26  1  0\n 26 27  2  0\n 27 28  1  0\n 28 29  2  0\n 29 30  1  0\n 30 31  1  0\n 31 32  2  0\n 32 33  1  0\n 33 34  2  0\n 34 35  1  0\n 35 36  2  0\n 30 37  2  0\n 24  2  1  0\n 37 26  1  0\n 22  9  1  0\n 36 31  1  0\n 20 14  1  0\nM  END\n","sdf");
+    viewer_17483188364847312.setStyle({"stick": {}});
+    viewer_17483188364847312.setBackgroundColor("0xeeeeee");
+    viewer_17483188364847312.zoomTo();
+viewer_17483188364847312.render();
+});
+</script>
+</div>
+<div class="cell-output cell-output-display" data-execution_count="33">
+
+</div>
+</div>
+<p>The difference here is the relative orientations of the two aromatic rings that N24 is bonded to. In the first case (more negative N), the rings are perpendicular to each other. In the second (less negative N), they are parallel.</p>
+<p>What if we do an MMFF minimization of each conformer?</p>
+<div id="cell-40" class="cell" data-execution_count="37">
+<div class="sourceCode cell-code" id="cb32" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb32-1">mh_mmff <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> Chem.Mol(mh)</span>
+<span id="cb32-2">optRes <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> rdForceFieldHelpers.MMFFOptimizeMoleculeConfs(mh_mmff,maxIters<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span><span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">500</span>)</span>
+<span id="cb32-3"><span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">for</span> i,needsMore <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">in</span> <span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">enumerate</span>(optRes):</span>
+<span id="cb32-4">    <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">while</span> needsMore:</span>
+<span id="cb32-5">        needsMore <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> rdForceFieldHelpers.MMFFOptimizeMolecule(mh_mmff,maxIters<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span><span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">500</span>,confId<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span>i)</span></code></pre></div>
+</div>
+<div id="cell-41" class="cell" data-execution_count="38">
+<div class="sourceCode cell-code" id="cb33" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb33-1">eres,mmff_charges <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> runEHT(mh_mmff)</span></code></pre></div>
+</div>
+<div id="cell-42" class="cell" data-execution_count="39">
+<div class="sourceCode cell-code" id="cb34" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb34-1">plt.figure(figsize<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span>(<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">18</span>,<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">12</span>))</span>
+<span id="cb34-2">plt.violinplot(mmff_charges)<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">;</span></span>
+<span id="cb34-3">plt.title(<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"MMFF"</span>)<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">;</span></span>
+<span id="cb34-4">plt.xlabel(<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'atom ID'</span>)<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">;</span></span>
+<span id="cb34-5">plt.ylabel(<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"partial charge"</span>)<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">;</span></span></code></pre></div>
+<div class="cell-output cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="https://greglandrum.github.io/rdkit-blog/posts/2025-05-30-eHT-in-RDKit_files/figure-html/cell-26-output-1.png" class="img-fluid figure-img"></p>
+</figure>
+</div>
+</div>
+</div>
+<div id="cell-43" class="cell" data-execution_count="40">
+<div class="sourceCode cell-code" id="cb35" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb35-1">chgRange <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> [<span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">max</span>(x)<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">-</span><span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">min</span>(x) <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">for</span> x <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">in</span> mmff_charges]</span>
+<span id="cb35-2">sortedRanges <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> <span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">sorted</span>([(y,x) <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">for</span> x,y <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">in</span> <span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">enumerate</span>(chgRange)], reverse<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span><span class="va" style="color: #111111;
+background-color: null;
+font-style: inherit;">True</span>)</span>
+<span id="cb35-3">sortedRanges[:<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">2</span>]</span></code></pre></div>
+<div class="cell-output cell-output-display" data-execution_count="40">
+<pre><code>[(0.03803692881100473, 13), (0.025728042579126975, 19)]</code></pre>
+</div>
+</div>
+<p>Those are much smaller changes (as we saw in the distributions).</p>
+<p>What about the N24, the atom we looked at above?</p>
+<div id="cell-45" class="cell" data-execution_count="41">
+<div class="sourceCode cell-code" id="cb37" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb37-1">tchgs <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> <span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">sorted</span>((y,x) <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">for</span> x,y <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">in</span> <span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">enumerate</span>(charges[<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">24</span>]))</span>
+<span id="cb37-2">tchgs[:<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">2</span>],tchgs[<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">-</span><span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">2</span>:]</span></code></pre></div>
+<div class="cell-output cell-output-display" data-execution_count="41">
+<pre><code>([(-0.5344846663677152, 7), (-0.5300694785153464, 9)],
+ [(-0.3297127630789536, 46), (-0.3257318399680058, 22)])</code></pre>
+</div>
+</div>
+<p>Almost no difference at all there. Are the neighboring rings now consistently orented?</p>
+<div id="cell-47" class="cell" data-execution_count="43">
+<div class="sourceCode cell-code" id="cb39" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb39-1">tm7 <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> Chem.MolFromMolBlock(Chem.MolToMolBlock(mh,confId<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span><span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">7</span>))</span>
+<span id="cb39-2">tm7</span></code></pre></div>
+<div class="cell-output cell-output-display">
+<div id="3dmolviewer_1748319664848715" style="position: relative; width: 400px; height: 400px;">
+        <p id="3dmolwarning_1748319664848715" style="background-color:#ffcccc;color:black">3Dmol.js failed to load for some reason.  Please check your browser console for error messages.<br></p>
+        </div>
+<script>
+
+var loadScriptAsync = function(uri){
+  return new Promise((resolve, reject) => {
+    //this is to ignore the existence of requirejs amd
+    var savedexports, savedmodule;
+    if (typeof exports !== 'undefined') savedexports = exports;
+    else exports = {}
+    if (typeof module !== 'undefined') savedmodule = module;
+    else module = {}
+
+    var tag = document.createElement('script');
+    tag.src = uri;
+    tag.async = true;
+    tag.onload = () => {
+        exports = savedexports;
+        module = savedmodule;
+        resolve();
+    };
+  var firstScriptTag = document.getElementsByTagName('script')[0];
+  firstScriptTag.parentNode.insertBefore(tag, firstScriptTag);
+});
+};
+
+if(typeof $3Dmolpromise === 'undefined') {
+$3Dmolpromise = null;
+  $3Dmolpromise = loadScriptAsync('https://cdnjs.cloudflare.com/ajax/libs/3Dmol/2.4.0/3Dmol-min.js');
+}
+
+var viewer_1748319664848715 = null;
+var warn = document.getElementById("3dmolwarning_1748319664848715");
+if(warn) {
+    warn.parentNode.removeChild(warn);
+}
+$3Dmolpromise.then(function() {
+viewer_1748319664848715 = $3Dmol.createViewer(document.getElementById("3dmolviewer_1748319664848715"),{backgroundColor:"white"});
+viewer_1748319664848715.zoomTo();
+    viewer_1748319664848715.removeAllModels();
+    viewer_1748319664848715.addModel("\n     RDKit          3D\n\n 37 41  0  0  0  0  0  0  0  0999 V2000\n   -4.0652   -5.3614    2.5183 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -3.1772   -4.4307    1.7734 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -1.8350   -4.7025    1.6874 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -0.9790   -3.8638    1.0044 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -1.4905   -2.7421    0.4057 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -0.5619   -1.8974   -0.2967 N   0  0  0  0  0  0  0  0  0  0  0  0\n    0.0926   -0.8899    0.4674 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -0.2263   -0.8560    1.7044 O   0  0  0  0  0  0  0  0  0  0  0  0\n    1.0577    0.0416   -0.1000 C   0  0  0  0  0  0  0  0  0  0  0  0\n    1.3393    0.0494   -1.4410 C   0  0  0  0  0  0  0  0  0  0  0  0\n    2.2683    0.9409   -1.9879 C   0  0  0  0  0  0  0  0  0  0  0  0\n    2.8824    1.8074   -1.1041 C   0  0  0  0  0  0  0  0  0  0  0  0\n    3.8821    2.7989   -1.5701 C   0  0  0  0  0  0  0  0  0  0  0  0\n    5.2340    2.3400   -1.5765 N   0  0  0  0  0  0  0  0  0  0  0  0\n    5.4009    1.2251   -2.4922 C   0  0  0  0  0  0  0  0  0  0  0  0\n    6.7618    0.6040   -2.3843 C   0  0  0  0  0  0  0  0  0  0  0  0\n    7.6567    1.4701   -1.6720 N   0  0  0  0  0  0  0  0  0  0  0  0\n    9.0310    1.0094   -1.7270 C   0  0  0  0  0  0  0  0  0  0  0  0\n    7.2491    1.8210   -0.3476 C   0  0  0  0  0  0  0  0  0  0  0  0\n    5.7403    1.9433   -0.2981 C   0  0  0  0  0  0  0  0  0  0  0  0\n    2.6037    1.8063    0.2526 C   0  0  0  0  0  0  0  0  0  0  0  0\n    1.6748    0.9157    0.8042 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -2.8529   -2.4091    0.4571 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -3.6434   -3.2980    1.1592 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -5.0449   -2.9662    1.2322 N   0  0  0  0  0  0  0  0  0  0  0  0\n   -5.5887   -1.8260    0.5829 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -6.1625   -2.0308   -0.6296 N   0  0  0  0  0  0  0  0  0  0  0  0\n   -6.7113   -1.0312   -1.3602 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -6.6560    0.2477   -0.7925 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -6.0769    0.4715    0.4378 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -5.9879    1.7816    1.0651 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -5.3781    1.8701    2.2917 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -5.2655    3.1020    2.9383 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -5.7849    4.2365    2.3122 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -6.3796    4.1191    1.1049 N   0  0  0  0  0  0  0  0  0  0  0  0\n   -6.4805    2.9324    0.4964 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -5.5418   -0.5822    1.1228 N   0  0  0  0  0  0  0  0  0  0  0  0\n  1  2  1  0\n  2  3  2  0\n  3  4  1  0\n  4  5  2  0\n  5  6  1  0\n  6  7  1  0\n  7  8  2  0\n  7  9  1  0\n  9 10  2  0\n 10 11  1  0\n 11 12  2  0\n 12 13  1  0\n 13 14  1  0\n 14 15  1  0\n 15 16  1  0\n 16 17  1  0\n 17 18  1  0\n 17 19  1  0\n 19 20  1  0\n 12 21  1  0\n 21 22  2  0\n  5 23  1  0\n 23 24  2  0\n 24 25  1  0\n 25 26  1  0\n 26 27  2  0\n 27 28  1  0\n 28 29  2  0\n 29 30  1  0\n 30 31  1  0\n 31 32  2  0\n 32 33  1  0\n 33 34  2  0\n 34 35  1  0\n 35 36  2  0\n 30 37  2  0\n 24  2  1  0\n 37 26  1  0\n 22  9  1  0\n 36 31  1  0\n 20 14  1  0\nM  END\n","sdf");
+    viewer_1748319664848715.setStyle({"stick": {}});
+    viewer_1748319664848715.setBackgroundColor("0xeeeeee");
+    viewer_1748319664848715.zoomTo();
+viewer_1748319664848715.render();
+});
+</script>
+</div>
+<div class="cell-output cell-output-display" data-execution_count="43">
+
+</div>
+</div>
+<div id="cell-48" class="cell" data-execution_count="44">
+<div class="sourceCode cell-code" id="cb40" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb40-1">tm9 <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> Chem.MolFromMolBlock(Chem.MolToMolBlock(mh,confId<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span><span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">9</span>))</span>
+<span id="cb40-2">tm9</span></code></pre></div>
+<div class="cell-output cell-output-display">
+<div id="3dmolviewer_17483196896326954" style="position: relative; width: 400px; height: 400px;">
+        <p id="3dmolwarning_17483196896326954" style="background-color:#ffcccc;color:black">3Dmol.js failed to load for some reason.  Please check your browser console for error messages.<br></p>
+        </div>
+<script>
+
+var loadScriptAsync = function(uri){
+  return new Promise((resolve, reject) => {
+    //this is to ignore the existence of requirejs amd
+    var savedexports, savedmodule;
+    if (typeof exports !== 'undefined') savedexports = exports;
+    else exports = {}
+    if (typeof module !== 'undefined') savedmodule = module;
+    else module = {}
+
+    var tag = document.createElement('script');
+    tag.src = uri;
+    tag.async = true;
+    tag.onload = () => {
+        exports = savedexports;
+        module = savedmodule;
+        resolve();
+    };
+  var firstScriptTag = document.getElementsByTagName('script')[0];
+  firstScriptTag.parentNode.insertBefore(tag, firstScriptTag);
+});
+};
+
+if(typeof $3Dmolpromise === 'undefined') {
+$3Dmolpromise = null;
+  $3Dmolpromise = loadScriptAsync('https://cdnjs.cloudflare.com/ajax/libs/3Dmol/2.4.0/3Dmol-min.js');
+}
+
+var viewer_17483196896326954 = null;
+var warn = document.getElementById("3dmolwarning_17483196896326954");
+if(warn) {
+    warn.parentNode.removeChild(warn);
+}
+$3Dmolpromise.then(function() {
+viewer_17483196896326954 = $3Dmol.createViewer(document.getElementById("3dmolviewer_17483196896326954"),{backgroundColor:"white"});
+viewer_17483196896326954.zoomTo();
+    viewer_17483196896326954.removeAllModels();
+    viewer_17483196896326954.addModel("\n     RDKit          3D\n\n 37 41  0  0  0  0  0  0  0  0999 V2000\n   -5.1228   -4.6227   -2.5779 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -3.9076   -3.8364   -2.2482 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -2.7092   -4.0084   -2.9039 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -1.6089   -3.2593   -2.5663 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -1.6230   -2.2955   -1.5615 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -0.4419   -1.5803   -1.2843 N   0  0  0  0  0  0  0  0  0  0  0  0\n   -0.2390   -0.6092   -0.2993 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -1.1555   -0.2781    0.4625 O   0  0  0  0  0  0  0  0  0  0  0  0\n    1.0533    0.0816   -0.0925 C   0  0  0  0  0  0  0  0  0  0  0  0\n    1.1590    1.0008    0.9289 C   0  0  0  0  0  0  0  0  0  0  0  0\n    2.3398    1.6864    1.1880 C   0  0  0  0  0  0  0  0  0  0  0  0\n    3.4692    1.4482    0.3958 C   0  0  0  0  0  0  0  0  0  0  0  0\n    4.7519    2.1574    0.6383 C   0  0  0  0  0  0  0  0  0  0  0  0\n    5.6241    1.4900    1.5611 N   0  0  0  0  0  0  0  0  0  0  0  0\n    6.8622    2.1865    1.8022 C   0  0  0  0  0  0  0  0  0  0  0  0\n    7.6968    2.1806    0.5466 C   0  0  0  0  0  0  0  0  0  0  0  0\n    7.8985    0.9032   -0.0178 N   0  0  0  0  0  0  0  0  0  0  0  0\n    9.2635    0.4838   -0.1487 C   0  0  0  0  0  0  0  0  0  0  0  0\n    6.9373   -0.1025    0.1972 C   0  0  0  0  0  0  0  0  0  0  0  0\n    5.9188    0.1275    1.2564 C   0  0  0  0  0  0  0  0  0  0  0  0\n    3.3240    0.5181   -0.6207 C   0  0  0  0  0  0  0  0  0  0  0  0\n    2.1548   -0.1540   -0.8697 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -2.8236   -2.1270   -0.9086 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -3.9371   -2.8870   -1.2526 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -5.1577   -2.6824   -0.5368 N   0  0  0  0  0  0  0  0  0  0  0  0\n   -5.2772   -1.6893    0.4901 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -4.9250   -1.8980    1.7596 N   0  0  0  0  0  0  0  0  0  0  0  0\n   -5.0946   -0.8847    2.6278 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -5.6170    0.3460    2.2390 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -5.9692    0.5268    0.9248 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -6.5314    1.7607    0.3950 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -6.8515    1.8109   -0.9513 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -7.3916    2.9637   -1.4903 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -7.6092    4.0693   -0.6680 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -7.2952    4.0135    0.6422 N   0  0  0  0  0  0  0  0  0  0  0  0\n   -6.7722    2.8825    1.1407 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -5.7879   -0.5002    0.0863 N   0  0  0  0  0  0  0  0  0  0  0  0\n  1  2  1  0\n  2  3  2  0\n  3  4  1  0\n  4  5  2  0\n  5  6  1  0\n  6  7  1  0\n  7  8  2  0\n  7  9  1  0\n  9 10  2  0\n 10 11  1  0\n 11 12  2  0\n 12 13  1  0\n 13 14  1  0\n 14 15  1  0\n 15 16  1  0\n 16 17  1  0\n 17 18  1  0\n 17 19  1  0\n 19 20  1  0\n 12 21  1  0\n 21 22  2  0\n  5 23  1  0\n 23 24  2  0\n 24 25  1  0\n 25 26  1  0\n 26 27  2  0\n 27 28  1  0\n 28 29  2  0\n 29 30  1  0\n 30 31  1  0\n 31 32  2  0\n 32 33  1  0\n 33 34  2  0\n 34 35  1  0\n 35 36  2  0\n 30 37  2  0\n 24  2  1  0\n 37 26  1  0\n 22  9  1  0\n 36 31  1  0\n 20 14  1  0\nM  END\n","sdf");
+    viewer_17483196896326954.setStyle({"stick": {}});
+    viewer_17483196896326954.setBackgroundColor("0xeeeeee");
+    viewer_17483196896326954.zoomTo();
+viewer_17483196896326954.render();
+});
+</script>
+</div>
+<div class="cell-output cell-output-display" data-execution_count="44">
+
+</div>
+</div>
+<p>They are: the rings are more or less perpendicular in both conformers.</p>
+<p>The charge variability has dropped considerably, are the MMFF conformers actually different from each other?</p>
+<div id="cell-51" class="cell" data-execution_count="49">
+<div class="sourceCode cell-code" id="cb41" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb41-1">rmsds <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> []</span>
+<span id="cb41-2">cp1 <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> Chem.RemoveHs(mh_mmff)</span>
+<span id="cb41-3">cp2 <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> Chem.RemoveHs(mh_mmff)</span>
+<span id="cb41-4"><span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">for</span> i <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">in</span> <span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">range</span>(mh_mmff.GetNumConformers()):</span>
+<span id="cb41-5">    <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">for</span> j <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">in</span> <span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">range</span>(i<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">+</span><span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">1</span>,mh_mmff.GetNumConformers()):</span>
+<span id="cb41-6">        rmsds.append(rdMolAlign.GetBestRMS(cp1,cp2,prbId<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span>i,refId<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span>j))</span>
+<span id="cb41-7">plt.figure(figsize<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span>(<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">12</span>,<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">6</span>))</span>
+<span id="cb41-8">plt.hist(rmsds,bins<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span><span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">20</span>)<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">;</span></span>
+<span id="cb41-9">plt.xlabel(<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'RMSD'</span>)<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">;</span></span></code></pre></div>
+<div class="cell-output cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="https://greglandrum.github.io/rdkit-blog/posts/2025-05-30-eHT-in-RDKit_files/figure-html/cell-31-output-1.png" class="img-fluid figure-img"></p>
+</figure>
+</div>
+</div>
+</div>
+<p>So the conformers are still different from each other but the charge differences are now much smaller than they were previously.</p>
+</section>
+<section id="repeat-the-analysis-for-another-molecule" class="level1">
+<h1>Repeat the analysis for another molecule</h1>
+<div id="cell-54" class="cell" data-execution_count="52">
+<div class="sourceCode cell-code" id="cb42" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb42-1"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># rivaroxaban</span></span>
+<span id="cb42-2">m2 <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> Chem.MolFromSmiles(<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'O=C(NC[C@H]1CN(c2ccc(N3CCOCC3=O)cc2)C(=O)O1)c1ccc(Cl)s1'</span>)</span>
+<span id="cb42-3">m2</span></code></pre></div>
+<div class="cell-output cell-output-display" data-execution_count="52">
+<div>
+<figure class="figure">
+<p><img src="https://greglandrum.github.io/rdkit-blog/posts/2025-05-30-eHT-in-RDKit_files/figure-html/cell-32-output-1.png" class="img-fluid figure-img"></p>
+</figure>
+</div>
+</div>
+</div>
+<div id="cell-55" class="cell" data-execution_count="55">
+<div class="sourceCode cell-code" id="cb43" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb43-1">mh2 <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> Chem.AddHs(m2)</span>
+<span id="cb43-2">rdDistGeom.EmbedMultipleConfs(mh2,<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">50</span>,params)</span>
+<span id="cb43-3">mh2_mmff <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> Chem.Mol(mh2)</span>
+<span id="cb43-4">optRes <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> rdForceFieldHelpers.MMFFOptimizeMoleculeConfs(mh2_mmff,maxIters<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span><span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">500</span>)</span>
+<span id="cb43-5"><span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">for</span> i,needsMore <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">in</span> <span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">enumerate</span>(optRes):</span>
+<span id="cb43-6">    <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">while</span> needsMore:</span>
+<span id="cb43-7">        needsMore <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> rdForceFieldHelpers.MMFFOptimizeMolecule(mh2_mmff,maxIters<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span><span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">500</span>,confId<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span>i)</span></code></pre></div>
+</div>
+<div id="cell-56" class="cell" data-execution_count="56">
+<div class="sourceCode cell-code" id="cb44" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb44-1">eres,charges2 <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> runEHT(mh2)</span>
+<span id="cb44-2">eres,mmff_charges2 <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> runEHT(mh2_mmff)</span></code></pre></div>
+</div>
+<div id="cell-57" class="cell" data-execution_count="57">
+<div class="sourceCode cell-code" id="cb45" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb45-1">plt.figure(figsize<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span>(<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">18</span>,<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">12</span>))</span>
+<span id="cb45-2">plt.violinplot(charges2)<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">;</span></span>
+<span id="cb45-3">plt.title(<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"ETKDG"</span>)<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">;</span></span>
+<span id="cb45-4">plt.xlabel(<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'atom ID'</span>)<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">;</span></span>
+<span id="cb45-5">plt.ylabel(<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"partial charge"</span>)<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">;</span></span></code></pre></div>
+<div class="cell-output cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="https://greglandrum.github.io/rdkit-blog/posts/2025-05-30-eHT-in-RDKit_files/figure-html/cell-35-output-1.png" class="img-fluid figure-img"></p>
+</figure>
+</div>
+</div>
+</div>
+<p>Less variability than we had with the ETKDG conformers of imatinib, but there is still some. This almost entirely vanishes when using the MMFF-optimized conformers:</p>
+<div id="cell-59" class="cell" data-execution_count="58">
+<div class="sourceCode cell-code" id="cb46" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb46-1">plt.figure(figsize<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span>(<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">18</span>,<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">12</span>))</span>
+<span id="cb46-2">plt.violinplot(mmff_charges2)<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">;</span></span>
+<span id="cb46-3">plt.title(<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"MMFF"</span>)<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">;</span></span>
+<span id="cb46-4">plt.xlabel(<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'atom ID'</span>)<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">;</span></span>
+<span id="cb46-5">plt.ylabel(<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"partial charge"</span>)<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">;</span></span></code></pre></div>
+<div class="cell-output cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="https://greglandrum.github.io/rdkit-blog/posts/2025-05-30-eHT-in-RDKit_files/figure-html/cell-36-output-1.png" class="img-fluid figure-img"></p>
+</figure>
+</div>
+</div>
+</div>
+<p>Confirm again that the MMFF conformers actually different:</p>
+<div id="cell-61" class="cell" data-execution_count="60">
+<div class="sourceCode cell-code" id="cb47" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb47-1">rmsds <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> []</span>
+<span id="cb47-2">cp1 <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> Chem.RemoveHs(mh2_mmff)</span>
+<span id="cb47-3">cp2 <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> Chem.RemoveHs(mh2_mmff)</span>
+<span id="cb47-4"><span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">for</span> i <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">in</span> <span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">range</span>(mh2_mmff.GetNumConformers()):</span>
+<span id="cb47-5">    <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">for</span> j <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">in</span> <span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">range</span>(i<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">+</span><span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">1</span>,mh2_mmff.GetNumConformers()):</span>
+<span id="cb47-6">        rmsds.append(rdMolAlign.GetBestRMS(cp1,cp2,prbId<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span>i,refId<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span>j))</span>
+<span id="cb47-7">plt.figure(figsize<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span>(<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">12</span>,<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">6</span>))</span>
+<span id="cb47-8">plt.hist(rmsds,bins<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span><span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">20</span>)<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">;</span></span>
+<span id="cb47-9">plt.xlabel(<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'RMSD'</span>)<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">;</span></span></code></pre></div>
+<div class="cell-output cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="https://greglandrum.github.io/rdkit-blog/posts/2025-05-30-eHT-in-RDKit_files/figure-html/cell-37-output-1.png" class="img-fluid figure-img"></p>
+</figure>
+</div>
+</div>
+</div>
+<p>They are.</p>
+</section>
+<section id="performance" class="level1">
+<h1>Performance</h1>
+<p>How long does it take to do this analysis?</p>
+<p>Start by looking at the time required to generate a conformer:</p>
+<div id="cell-65" class="cell" data-execution_count="62">
+<div class="sourceCode cell-code" id="cb48" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb48-1">tempM <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> Chem.Mol(mh2)</span>
+<span id="cb48-2"><span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">%</span>timeit _ <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> rdDistGeom.EmbedMolecule(tempM,params)</span></code></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>22 ms ± 164 μs per loop (mean ± std. dev. of 7 runs, 10 loops each)</code></pre>
+</div>
+</div>
+<p>Or to generate a conformer and MMFF minimize it:</p>
+<div id="cell-67" class="cell" data-execution_count="63">
+<div class="sourceCode cell-code" id="cb50" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb50-1"><span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">%</span>timeit _ <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> rdDistGeom.EmbedMolecule(tempM,params)<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">;</span>rdForceFieldHelpers.MMFFOptimizeMolecule(tempM,maxIters<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span><span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">500</span>)</span></code></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>40.3 ms ± 391 μs per loop (mean ± std. dev. of 7 runs, 10 loops each)</code></pre>
+</div>
+</div>
+<p>Do the eHT calculation:</p>
+<div id="cell-69" class="cell" data-execution_count="64">
+<div class="sourceCode cell-code" id="cb52" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb52-1"><span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">%</span>timeit _ <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> rdEHTTools.RunMol(tempM)</span></code></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>19.4 ms ± 51.5 μs per loop (mean ± std. dev. of 7 runs, 10 loops each)</code></pre>
+</div>
+</div>
+<p>So we can generate a conformer for rivaroxaban, MMFF minimize it, and then do the eHT calculation to get, for example, partial charges (remember these don’t seem to change that much across MMFF conformers) in about 60ms. Not bad!</p>
+
+
+</section>
+
+ ]]></description>
+  <category>tutorial</category>
+  <guid>https://greglandrum.github.io/rdkit-blog/posts/2025-05-30-eHT-in-RDKit.html</guid>
+  <pubDate>Thu, 29 May 2025 22:00:00 GMT</pubDate>
+  <media:content url="https://greglandrum.github.io/rdkit-blog/posts/images/blog/eHT-in-RDKit-1.png" medium="image" type="image/png" height="99" width="144"/>
+</item>
 <item>
   <title>Common chemical words II</title>
   <link>https://greglandrum.github.io/rdkit-blog/posts/2025-05-22-common-chemical-words-2.html</link>
@@ -22227,591 +23623,6 @@ CC 0 v1 v2
   <category>tutorial</category>
   <guid>https://greglandrum.github.io/rdkit-blog/posts/2025-01-24-property-tutorial.html</guid>
   <pubDate>Thu, 23 Jan 2025 23:00:00 GMT</pubDate>
-</item>
-<item>
-  <title>Efficient molecule editing</title>
-  <link>https://greglandrum.github.io/rdkit-blog/posts/2025-01-18-efficient-molecule-editing.html</link>
-  <description><![CDATA[ 
-
-
-
-
-<p>This is another tutorial post, this time looking at editing molecules: adding and removing atoms and bonds.</p>
-<div id="c2ecfdb3" class="cell" data-scrolled="true" data-execution_count="1">
-<div class="sourceCode cell-code" id="cb1" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb1-1"><span class="im" style="color: #00769E;
-background-color: null;
-font-style: inherit;">from</span> rdkit <span class="im" style="color: #00769E;
-background-color: null;
-font-style: inherit;">import</span> Chem</span>
-<span id="cb1-2"><span class="im" style="color: #00769E;
-background-color: null;
-font-style: inherit;">from</span> rdkit.Chem <span class="im" style="color: #00769E;
-background-color: null;
-font-style: inherit;">import</span> Draw</span>
-<span id="cb1-3"><span class="im" style="color: #00769E;
-background-color: null;
-font-style: inherit;">from</span> rdkit.Chem.Draw <span class="im" style="color: #00769E;
-background-color: null;
-font-style: inherit;">import</span> IPythonConsole</span>
-<span id="cb1-4"><span class="im" style="color: #00769E;
-background-color: null;
-font-style: inherit;">import</span> rdkit</span>
-<span id="cb1-5"><span class="bu" style="color: null;
-background-color: null;
-font-style: inherit;">print</span>(rdkit.__version__)</span></code></pre></div>
-<div class="cell-output cell-output-stdout">
-<pre><code>2024.09.4</code></pre>
-</div>
-</div>
-<div id="d0a6c4e1" class="cell" data-execution_count="2">
-<div class="sourceCode cell-code" id="cb3" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb3-1">IPythonConsole.drawOptions.addAtomIndices <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> <span class="va" style="color: #111111;
-background-color: null;
-font-style: inherit;">True</span></span>
-<span id="cb3-2">IPythonConsole.molSize <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> <span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">300</span>,<span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">300</span></span></code></pre></div>
-</div>
-<div id="04e159ff" class="cell" data-execution_count="3">
-<div class="sourceCode cell-code" id="cb4" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb4-1">m <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> Chem.MolFromSmiles(<span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">'c1c(Cl)cc(F)cc1O'</span>)</span>
-<span id="cb4-2">m</span></code></pre></div>
-<div class="cell-output cell-output-display" data-execution_count="3">
-<div>
-<figure class="figure">
-<p><img src="https://greglandrum.github.io/rdkit-blog/posts/2025-01-18-efficient-molecule-editing_files/figure-html/cell-4-output-1.png" class="img-fluid figure-img"></p>
-</figure>
-</div>
-</div>
-</div>
-<section id="removing-atoms-and-bonds" class="level2">
-<h2 class="anchored" data-anchor-id="removing-atoms-and-bonds">Removing atoms and bonds</h2>
-<p>If we want to add or remove atoms and bonds we construct an <code>RWMol</code> (a Read/Write molecule) and then call <code>RemoveAtom()</code>:</p>
-<div id="a3a333a7" class="cell" data-execution_count="4">
-<div class="sourceCode cell-code" id="cb5" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb5-1">rwm <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> Chem.RWMol(m)</span>
-<span id="cb5-2">rwm.RemoveAtom(<span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">8</span>)</span>
-<span id="cb5-3">rwm</span></code></pre></div>
-<div class="cell-output cell-output-display" data-execution_count="4">
-<div>
-<figure class="figure">
-<p><img src="https://greglandrum.github.io/rdkit-blog/posts/2025-01-18-efficient-molecule-editing_files/figure-html/cell-5-output-1.png" class="img-fluid figure-img"></p>
-</figure>
-</div>
-</div>
-</div>
-<p>To remove bonds, we provide the atom indices:</p>
-<div id="5c2c3963" class="cell" data-execution_count="5">
-<div class="sourceCode cell-code" id="cb6" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb6-1">rwm.RemoveBond(<span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">4</span>,<span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">5</span>)</span>
-<span id="cb6-2">rwm</span></code></pre></div>
-<div class="cell-output cell-output-display" data-execution_count="5">
-<div>
-<figure class="figure">
-<p><img src="https://greglandrum.github.io/rdkit-blog/posts/2025-01-18-efficient-molecule-editing_files/figure-html/cell-6-output-1.png" class="img-fluid figure-img"></p>
-</figure>
-</div>
-</div>
-</div>
-<p>This is a bit awkward since atom numbers change when we remove atoms. We can see this by getting a new copy of the original molecule and removing atom 2:</p>
-<div id="f83966df" class="cell" data-execution_count="6">
-<div class="sourceCode cell-code" id="cb7" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb7-1">rwm <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> Chem.RWMol(m)</span>
-<span id="cb7-2">rwm.RemoveAtom(<span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">2</span>)</span>
-<span id="cb7-3">rwm</span></code></pre></div>
-<div class="cell-output cell-output-display" data-execution_count="6">
-<div>
-<figure class="figure">
-<p><img src="https://greglandrum.github.io/rdkit-blog/posts/2025-01-18-efficient-molecule-editing_files/figure-html/cell-7-output-1.png" class="img-fluid figure-img"></p>
-</figure>
-</div>
-</div>
-</div>
-<p>Now the O is atom 7 instead of being atom 8 and atoms 4 and 5 are no longer connected (the bond we want is between atoms 3 and 4).</p>
-<p>So when working this way, we need to be sure to remove the atoms in order of decreasing atomic index, and to remove bonds before we remove atoms. Otherwise we get errors or incorrect results:</p>
-<div id="53517ba2" class="cell" data-execution_count="7">
-<div class="sourceCode cell-code" id="cb8" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb8-1">rwm.RemoveAtom(<span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">8</span>)</span></code></pre></div>
-<div class="cell-output cell-output-stderr">
-<pre><code>[05:24:31] 
-
-****
-Range Error
-idx
-Violation occurred on line 209 in file /home/conda/feedstock_root/build_artifacts/rdkit-meta_1736094075412/work/Code/GraphMol/ROMol.cpp
-Failed Expression: 8 &lt; 8
-----------
-Stacktrace:
- 0# Invar::Invariant::toString[abi:cxx11]() const in /home/glandrum/mambaforge/envs/rdkit_blog/lib/python3.12/site-packages/rdkit/../../../libRDKitRDGeneral.so.1
- 1# Invar::operator&lt;&lt;(std::ostream&amp;, Invar::Invariant const&amp;) in /home/glandrum/mambaforge/envs/rdkit_blog/lib/python3.12/site-packages/rdkit/../../../libRDKitRDGeneral.so.1
- 2# RDKit::ROMol::getAtomWithIdx(unsigned int) in /home/glandrum/mambaforge/envs/rdkit_blog/lib/python3.12/site-packages/rdkit/Chem/../../../../libRDKitGraphMol.so.1
- 3# RDKit::RWMol::removeAtom(unsigned int) in /home/glandrum/mambaforge/envs/rdkit_blog/lib/python3.12/site-packages/rdkit/Chem/../../../../libRDKitGraphMol.so.1
- 4# 0x0000735214F7531E in /home/glandrum/mambaforge/envs/rdkit_blog/lib/python3.12/site-packages/rdkit/Chem/rdchem.so
- 5# boost::python::objects::function::call(_object*, _object*) const in /home/glandrum/mambaforge/envs/rdkit_blog/lib/python3.12/site-packages/rdkit/../../../libboost_python312.so.1.86.0
- 6# 0x00007353092E0779 in /home/glandrum/mambaforge/envs/rdkit_blog/lib/python3.12/site-packages/rdkit/../../../libboost_python312.so.1.86.0
- 7# boost::python::detail::exception_handler::operator()(boost::function_n&lt;void&gt; const&amp;) const in /home/glandrum/mambaforge/envs/rdkit_blog/lib/python3.12/site-packages/rdkit/../../../libboost_python312.so.1.86.0
- 8# 0x00007352EA17E134 in /home/glandrum/mambaforge/envs/rdkit_blog/lib/python3.12/site-packages/rdkit/Chem/rdChemReactions.so
- 9# 0x00007352EA17E184 in /home/glandrum/mambaforge/envs/rdkit_blog/lib/python3.12/site-packages/rdkit/Chem/rdChemReactions.so
-10# 0x00007352F7582864 in /home/glandrum/mambaforge/envs/rdkit_blog/lib/python3.12/site-packages/rdkit/Chem/rdDepictor.so
-11# 0x0000735300D1DD14 in /home/glandrum/mambaforge/envs/rdkit_blog/lib/python3.12/site-packages/rdkit/Chem/rdmolfiles.so
-12# 0x0000735300D1DD64 in /home/glandrum/mambaforge/envs/rdkit_blog/lib/python3.12/site-packages/rdkit/Chem/rdmolfiles.so
-13# 0x0000735309C0A8E4 in /home/glandrum/mambaforge/envs/rdkit_blog/lib/python3.12/site-packages/rdkit/Chem/rdCIPLabeler.so
-14# 0x0000735214F76EF4 in /home/glandrum/mambaforge/envs/rdkit_blog/lib/python3.12/site-packages/rdkit/Chem/rdchem.so
-15# 0x0000735214F09CBD in /home/glandrum/mambaforge/envs/rdkit_blog/lib/python3.12/site-packages/rdkit/Chem/rdchem.so
-16# 0x0000735214F0992D in /home/glandrum/mambaforge/envs/rdkit_blog/lib/python3.12/site-packages/rdkit/Chem/rdchem.so
-17# 0x0000735214F0959D in /home/glandrum/mambaforge/envs/rdkit_blog/lib/python3.12/site-packages/rdkit/Chem/rdchem.so
-18# 0x0000735214F0920D in /home/glandrum/mambaforge/envs/rdkit_blog/lib/python3.12/site-packages/rdkit/Chem/rdchem.so
-19# 0x0000735214F08E7D in /home/glandrum/mambaforge/envs/rdkit_blog/lib/python3.12/site-packages/rdkit/Chem/rdchem.so
-20# 0x0000735308652C04 in /home/glandrum/mambaforge/envs/rdkit_blog/lib/python3.12/site-packages/rdkit/rdBase.so
-21# 0x0000735308652C54 in /home/glandrum/mambaforge/envs/rdkit_blog/lib/python3.12/site-packages/rdkit/rdBase.so
-22# 0x0000735308652CA4 in /home/glandrum/mambaforge/envs/rdkit_blog/lib/python3.12/site-packages/rdkit/rdBase.so
-23# 0x0000735308652CF4 in /home/glandrum/mambaforge/envs/rdkit_blog/lib/python3.12/site-packages/rdkit/rdBase.so
-24# boost::python::handle_exception_impl(boost::function_n&lt;void&gt;) in /home/glandrum/mambaforge/envs/rdkit_blog/lib/python3.12/site-packages/rdkit/../../../libboost_python312.so.1.86.0
-25# 0x00007353092DD3B3 in /home/glandrum/mambaforge/envs/rdkit_blog/lib/python3.12/site-packages/rdkit/../../../libboost_python312.so.1.86.0
-26# _PyObject_MakeTpCall in /home/glandrum/mambaforge/envs/rdkit_blog/bin/python
-27# 0x000055BEF1BF62F7 in /home/glandrum/mambaforge/envs/rdkit_blog/bin/python
-28# PyEval_EvalCode in /home/glandrum/mambaforge/envs/rdkit_blog/bin/python
-29# 0x000055BEF1DB9E2E in /home/glandrum/mambaforge/envs/rdkit_blog/bin/python
-30# 0x000055BEF1BF6BE4 in /home/glandrum/mambaforge/envs/rdkit_blog/bin/python
-31# 0x000055BEF1DB490F in /home/glandrum/mambaforge/envs/rdkit_blog/bin/python
-32# 0x000055BEF1DB5BC7 in /home/glandrum/mambaforge/envs/rdkit_blog/bin/python
-33# 0x000055BEF1BF7A8E in /home/glandrum/mambaforge/envs/rdkit_blog/bin/python
-34# 0x000055BEF1D34E4C in /home/glandrum/mambaforge/envs/rdkit_blog/bin/python
-35# 0x000055BEF1D3492E in /home/glandrum/mambaforge/envs/rdkit_blog/bin/python
-36# _PyObject_Call in /home/glandrum/mambaforge/envs/rdkit_blog/bin/python
-37# 0x000055BEF1BF6F8F in /home/glandrum/mambaforge/envs/rdkit_blog/bin/python
-38# 0x000055BEF1DB490F in /home/glandrum/mambaforge/envs/rdkit_blog/bin/python
-39# 0x000073530CAA225C in /home/glandrum/mambaforge/envs/rdkit_blog/lib/python3.12/lib-dynload/_asyncio.cpython-312-x86_64-linux-gnu.so
-40# 0x000073530CAA29E5 in /home/glandrum/mambaforge/envs/rdkit_blog/lib/python3.12/lib-dynload/_asyncio.cpython-312-x86_64-linux-gnu.so
-41# 0x000055BEF1D0635C in /home/glandrum/mambaforge/envs/rdkit_blog/bin/python
-42# 0x000055BEF1E30D5C in /home/glandrum/mambaforge/envs/rdkit_blog/bin/python
-43# 0x000055BEF1CA7F90 in /home/glandrum/mambaforge/envs/rdkit_blog/bin/python
-44# 0x000055BEF1CFC86B in /home/glandrum/mambaforge/envs/rdkit_blog/bin/python
-45# 0x000055BEF1BF6F8F in /home/glandrum/mambaforge/envs/rdkit_blog/bin/python
-46# PyEval_EvalCode in /home/glandrum/mambaforge/envs/rdkit_blog/bin/python
-47# 0x000055BEF1DB9E2E in /home/glandrum/mambaforge/envs/rdkit_blog/bin/python
-48# 0x000055BEF1CFC86B in /home/glandrum/mambaforge/envs/rdkit_blog/bin/python
-49# PyObject_Vectorcall in /home/glandrum/mambaforge/envs/rdkit_blog/bin/python
-50# 0x000055BEF1BF62F7 in /home/glandrum/mambaforge/envs/rdkit_blog/bin/python
-51# 0x000055BEF1DCEE48 in /home/glandrum/mambaforge/envs/rdkit_blog/bin/python
-52# Py_RunMain in /home/glandrum/mambaforge/envs/rdkit_blog/bin/python
-53# Py_BytesMain in /home/glandrum/mambaforge/envs/rdkit_blog/bin/python
-54# 0x000073530D829D90 in /lib/x86_64-linux-gnu/libc.so.6
-55# __libc_start_main in /lib/x86_64-linux-gnu/libc.so.6
-56# 0x000055BEF1D87131 in /home/glandrum/mambaforge/envs/rdkit_blog/bin/python
-----------
-****
-</code></pre>
-</div>
-<div class="cell-output cell-output-error">
-<div class="ansi-escaped-output">
-<pre><span class="ansi-red-fg">---------------------------------------------------------------------------</span>
-<span class="ansi-red-fg">RuntimeError</span>                              Traceback (most recent call last)
-Cell <span class="ansi-green-fg">In[7], line 1</span>
-<span class="ansi-green-fg">----&gt; 1</span> <span class="ansi-yellow-bg">rwm</span><span style="color:rgb(98,98,98)" class="ansi-yellow-bg">.</span><span class="ansi-yellow-bg">RemoveAtom</span><span class="ansi-yellow-bg">(</span><span style="color:rgb(98,98,98)" class="ansi-yellow-bg">8</span><span class="ansi-yellow-bg">)</span>
-
-<span class="ansi-red-fg">RuntimeError</span>: Range Error
-    idx
-    Violation occurred on line 209 in file Code/GraphMol/ROMol.cpp
-    Failed Expression: 8 &lt; 8
-    RDKIT: 2024.09.4
-    BOOST: 
-</pre>
-</div>
-</div>
-</div>
-<div id="a8c055b4" class="cell" data-execution_count="8">
-<div class="sourceCode cell-code" id="cb10" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb10-1">rwm.RemoveBond(<span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">4</span>,<span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">5</span>)  <span class="co" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;"># nothing happens since there is no bond to remove</span></span>
-<span id="cb10-2">rwm</span></code></pre></div>
-<div class="cell-output cell-output-display" data-execution_count="8">
-<div>
-<figure class="figure">
-<p><img src="https://greglandrum.github.io/rdkit-blog/posts/2025-01-18-efficient-molecule-editing_files/figure-html/cell-9-output-1.png" class="img-fluid figure-img"></p>
-</figure>
-</div>
-</div>
-</div>
-<p>Since that’s all kind of a pain, a few years ago we added functionality to allow you to batch the removal of atoms and bonds. The atoms and bonds are not removed until the batch is finished:</p>
-<div id="8a2b4020" class="cell" data-execution_count="9">
-<div class="sourceCode cell-code" id="cb11" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb11-1">rwm <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> Chem.RWMol(m)</span>
-<span id="cb11-2">rwm.BeginBatchEdit() <span class="co" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;"># start a batch</span></span>
-<span id="cb11-3">rwm.RemoveAtom(<span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">2</span>)</span>
-<span id="cb11-4">rwm.RemoveAtom(<span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">8</span>)</span>
-<span id="cb11-5">rwm.RemoveBond(<span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">4</span>,<span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">5</span>)</span>
-<span id="cb11-6">rwm.CommitBatchEdit()  <span class="co" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;"># finish the batch</span></span>
-<span id="cb11-7">rwm</span></code></pre></div>
-<div class="cell-output cell-output-display" data-execution_count="9">
-<div>
-<figure class="figure">
-<p><img src="https://greglandrum.github.io/rdkit-blog/posts/2025-01-18-efficient-molecule-editing_files/figure-html/cell-10-output-1.png" class="img-fluid figure-img"></p>
-</figure>
-</div>
-</div>
-</div>
-<p>This has the added benefit of being a bit faster.</p>
-<p>Finally, when we are done modifying the molecule, we can easily convert back to standard RDKit molecule:</p>
-<div id="75fe9862" class="cell" data-execution_count="10">
-<div class="sourceCode cell-code" id="cb12" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb12-1">m2 <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> rwm.GetMol()</span>
-<span id="cb12-2">Chem.SanitizeMol(m2)</span>
-<span id="cb12-3">m2</span></code></pre></div>
-<div class="cell-output cell-output-display" data-execution_count="10">
-<div>
-<figure class="figure">
-<p><img src="https://greglandrum.github.io/rdkit-blog/posts/2025-01-18-efficient-molecule-editing_files/figure-html/cell-11-output-1.png" class="img-fluid figure-img"></p>
-</figure>
-</div>
-</div>
-</div>
-</section>
-<section id="adding-atoms-and-bonds" class="level2">
-<h2 class="anchored" data-anchor-id="adding-atoms-and-bonds">Adding atoms and bonds</h2>
-<p>Here’s there’s no equivalent of batch editing, but it’s less important</p>
-<div id="57f6549e" class="cell" data-execution_count="11">
-<div class="sourceCode cell-code" id="cb13" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb13-1">m <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> Chem.MolFromSmiles(<span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">'c1ccc(O)cc1'</span>)</span>
-<span id="cb13-2">m</span></code></pre></div>
-<div class="cell-output cell-output-display" data-execution_count="11">
-<div>
-<figure class="figure">
-<p><img src="https://greglandrum.github.io/rdkit-blog/posts/2025-01-18-efficient-molecule-editing_files/figure-html/cell-12-output-1.png" class="img-fluid figure-img"></p>
-</figure>
-</div>
-</div>
-</div>
-<div id="4346af3c" class="cell" data-execution_count="12">
-<div class="sourceCode cell-code" id="cb14" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb14-1">rwm <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> Chem.RWMol(m)</span>
-<span id="cb14-2"></span>
-<span id="cb14-3">rwm.AddAtom(Chem.Atom(<span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">6</span>))</span></code></pre></div>
-<div class="cell-output cell-output-display" data-execution_count="12">
-<pre><code>7</code></pre>
-</div>
-</div>
-<p>That’s the new atom index, which we can directly use:</p>
-<div id="2e200958" class="cell" data-execution_count="13">
-<div class="sourceCode cell-code" id="cb16" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb16-1">rwm.AddBond(<span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">4</span>,<span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">7</span>,Chem.BondType.SINGLE)</span>
-<span id="cb16-2">rwm</span></code></pre></div>
-<div class="cell-output cell-output-display" data-execution_count="13">
-<div>
-<figure class="figure">
-<p><img src="https://greglandrum.github.io/rdkit-blog/posts/2025-01-18-efficient-molecule-editing_files/figure-html/cell-14-output-1.png" class="img-fluid figure-img"></p>
-</figure>
-</div>
-</div>
-</div>
-<p>Notice that the chemistry is wrong here (it’s still showing an implicit H on the O), but sanitization will clear this up:</p>
-<div id="d5c0d57b" class="cell" data-execution_count="14">
-<div class="sourceCode cell-code" id="cb17" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb17-1">m2 <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> rwm.GetMol()</span>
-<span id="cb17-2">Chem.SanitizeMol(m2)</span>
-<span id="cb17-3">m2</span></code></pre></div>
-<div class="cell-output cell-output-display" data-execution_count="14">
-<div>
-<figure class="figure">
-<p><img src="https://greglandrum.github.io/rdkit-blog/posts/2025-01-18-efficient-molecule-editing_files/figure-html/cell-15-output-1.png" class="img-fluid figure-img"></p>
-</figure>
-</div>
-</div>
-</div>
-</section>
-<section id="replacing-atoms-and-bonds" class="level1">
-<h1>Replacing atoms and bonds</h1>
-<p>This is an easy onea</p>
-<div id="c7354cad" class="cell" data-execution_count="15">
-<div class="sourceCode cell-code" id="cb18" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb18-1">m <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> Chem.MolFromSmiles(<span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">'c1ccc(C(O)C)cc1'</span>)</span>
-<span id="cb18-2">m</span></code></pre></div>
-<div class="cell-output cell-output-display" data-execution_count="15">
-<div>
-<figure class="figure">
-<p><img src="https://greglandrum.github.io/rdkit-blog/posts/2025-01-18-efficient-molecule-editing_files/figure-html/cell-16-output-1.png" class="img-fluid figure-img"></p>
-</figure>
-</div>
-</div>
-</div>
-<div id="ae9b4197" class="cell" data-execution_count="16">
-<div class="sourceCode cell-code" id="cb19" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb19-1">rwm <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> Chem.RWMol(m)</span>
-<span id="cb19-2">rwm.ReplaceAtom(<span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">6</span>,Chem.Atom(<span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">8</span>))</span>
-<span id="cb19-3">rwm</span></code></pre></div>
-<div class="cell-output cell-output-display" data-execution_count="16">
-<div>
-<figure class="figure">
-<p><img src="https://greglandrum.github.io/rdkit-blog/posts/2025-01-18-efficient-molecule-editing_files/figure-html/cell-17-output-1.png" class="img-fluid figure-img"></p>
-</figure>
-</div>
-</div>
-</div>
-<p><code>ReplaceBond()</code> is marginally trickier since, for technical reasons, it’s not possible to directly construct a bond in Python:</p>
-<div id="150268e5" class="cell" data-execution_count="17">
-<div class="sourceCode cell-code" id="cb20" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb20-1">tempMol <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> Chem.MolFromSmiles(<span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">"C=C"</span>)</span>
-<span id="cb20-2">bnd <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> tempMol.GetBondWithIdx(<span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">0</span>)</span>
-<span id="cb20-3"></span>
-<span id="cb20-4">rwm.ReplaceBond(rwm.GetBondBetweenAtoms(<span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">4</span>,<span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">6</span>).GetIdx(),bnd)</span>
-<span id="cb20-5">rwm</span></code></pre></div>
-<div class="cell-output cell-output-display" data-execution_count="17">
-<div>
-<figure class="figure">
-<p><img src="https://greglandrum.github.io/rdkit-blog/posts/2025-01-18-efficient-molecule-editing_files/figure-html/cell-18-output-1.png" class="img-fluid figure-img"></p>
-</figure>
-</div>
-</div>
-</div>
-<section id="some-gotchas" class="level2">
-<h2 class="anchored" data-anchor-id="some-gotchas">Some gotchas</h2>
-<p>The most likely way to end up with molecules that are in an unhappy state, even though you’ve done (mostly) everything right, involve aromatic heteroatoms. This will come as no surprise if you’ve spent much time working with chemistry in the computer.</p>
-<p>Here’s an example:</p>
-<div id="7e980b20" class="cell" data-execution_count="18">
-<div class="sourceCode cell-code" id="cb21" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb21-1">m <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> Chem.MolFromSmiles(<span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">'c1cccn1C'</span>)</span>
-<span id="cb21-2">m</span></code></pre></div>
-<div class="cell-output cell-output-display" data-execution_count="18">
-<div>
-<figure class="figure">
-<p><img src="https://greglandrum.github.io/rdkit-blog/posts/2025-01-18-efficient-molecule-editing_files/figure-html/cell-19-output-1.png" class="img-fluid figure-img"></p>
-</figure>
-</div>
-</div>
-</div>
-<div id="d1a14d5c" class="cell" data-execution_count="19">
-<div class="sourceCode cell-code" id="cb22" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb22-1">rwm <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> Chem.RWMol(m)</span>
-<span id="cb22-2">rwm.BeginBatchEdit()</span>
-<span id="cb22-3">rwm.RemoveAtom(<span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">5</span>)</span>
-<span id="cb22-4">rwm.CommitBatchEdit()</span>
-<span id="cb22-5">rwm</span></code></pre></div>
-<div class="cell-output cell-output-display" data-execution_count="19">
-<div>
-<figure class="figure">
-<p><img src="https://greglandrum.github.io/rdkit-blog/posts/2025-01-18-efficient-molecule-editing_files/figure-html/cell-20-output-1.png" class="img-fluid figure-img"></p>
-</figure>
-</div>
-</div>
-</div>
-<p>That looks ok, but we can’t sanitize it:</p>
-<div id="09eb5f80" class="cell" data-execution_count="20">
-<div class="sourceCode cell-code" id="cb23" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb23-1">m2 <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> rwm.GetMol()</span>
-<span id="cb23-2">Chem.SanitizeMol(m2)</span></code></pre></div>
-<div class="cell-output cell-output-stderr">
-<pre><code>[05:24:37] Can't kekulize mol.  Unkekulized atoms: 0 1 2 3 4</code></pre>
-</div>
-<div class="cell-output cell-output-error">
-<div class="ansi-escaped-output">
-<pre><span class="ansi-red-fg">---------------------------------------------------------------------------</span>
-<span class="ansi-red-fg">KekulizeException</span>                         Traceback (most recent call last)
-Cell <span class="ansi-green-fg">In[20], line 2</span>
-<span class="ansi-green-fg ansi-bold">      1</span> m2 <span style="color:rgb(98,98,98)">=</span> rwm<span style="color:rgb(98,98,98)">.</span>GetMol()
-<span class="ansi-green-fg">----&gt; 2</span> <span class="ansi-yellow-bg">Chem</span><span style="color:rgb(98,98,98)" class="ansi-yellow-bg">.</span><span class="ansi-yellow-bg">SanitizeMol</span><span class="ansi-yellow-bg">(</span><span class="ansi-yellow-bg">m2</span><span class="ansi-yellow-bg">)</span>
-
-<span class="ansi-red-fg">KekulizeException</span>: Can't kekulize mol.  Unkekulized atoms: 0 1 2 3 4</pre>
-</div>
-</div>
-</div>
-<p>This fails because we removed a bond from the aromatic N without updating its implicit H count. We can fix that:</p>
-<div id="6d653d56" class="cell" data-execution_count="21">
-<div class="sourceCode cell-code" id="cb25" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb25-1">at <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> rwm.GetAtomWithIdx(<span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">4</span>) </span>
-<span id="cb25-2">at.SetNoImplicit(<span class="va" style="color: #111111;
-background-color: null;
-font-style: inherit;">True</span>)</span>
-<span id="cb25-3">at.SetNumExplicitHs(<span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">1</span>)</span>
-<span id="cb25-4"></span>
-<span id="cb25-5">m2 <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> rwm.GetMol()</span>
-<span id="cb25-6">Chem.SanitizeMol(m2)</span>
-<span id="cb25-7">m2</span></code></pre></div>
-<div class="cell-output cell-output-display" data-execution_count="21">
-<div>
-<figure class="figure">
-<p><img src="https://greglandrum.github.io/rdkit-blog/posts/2025-01-18-efficient-molecule-editing_files/figure-html/cell-22-output-1.png" class="img-fluid figure-img"></p>
-</figure>
-</div>
-</div>
-</div>
-<p>A similar problem happens when we add bonds to aromatic heteroatoms:</p>
-<div id="714dfb82" class="cell" data-execution_count="22">
-<div class="sourceCode cell-code" id="cb26" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb26-1">rwm <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> Chem.RWMol(m2)</span>
-<span id="cb26-2">aid <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> rwm.AddAtom(Chem.Atom(<span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">6</span>))</span>
-<span id="cb26-3">rwm.AddBond(<span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">4</span>,aid,Chem.BondType.SINGLE)</span>
-<span id="cb26-4">rwm</span></code></pre></div>
-<div class="cell-output cell-output-display" data-execution_count="22">
-<div>
-<figure class="figure">
-<p><img src="https://greglandrum.github.io/rdkit-blog/posts/2025-01-18-efficient-molecule-editing_files/figure-html/cell-23-output-1.png" class="img-fluid figure-img"></p>
-</figure>
-</div>
-</div>
-</div>
-<div id="ce4345ce" class="cell" data-execution_count="23">
-<div class="sourceCode cell-code" id="cb27" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb27-1">m3 <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> rwm.GetMol()</span>
-<span id="cb27-2">Chem.SanitizeMol(m3)</span></code></pre></div>
-<div class="cell-output cell-output-stderr">
-<pre><code>[05:24:38] Explicit valence for atom # 4 N, 5, is greater than permitted</code></pre>
-</div>
-<div class="cell-output cell-output-error">
-<div class="ansi-escaped-output">
-<pre><span class="ansi-red-fg">---------------------------------------------------------------------------</span>
-<span class="ansi-red-fg">AtomValenceException</span>                      Traceback (most recent call last)
-Cell <span class="ansi-green-fg">In[23], line 2</span>
-<span class="ansi-green-fg ansi-bold">      1</span> m3 <span style="color:rgb(98,98,98)">=</span> rwm<span style="color:rgb(98,98,98)">.</span>GetMol()
-<span class="ansi-green-fg">----&gt; 2</span> <span class="ansi-yellow-bg">Chem</span><span style="color:rgb(98,98,98)" class="ansi-yellow-bg">.</span><span class="ansi-yellow-bg">SanitizeMol</span><span class="ansi-yellow-bg">(</span><span class="ansi-yellow-bg">m3</span><span class="ansi-yellow-bg">)</span>
-
-<span class="ansi-red-fg">AtomValenceException</span>: Explicit valence for atom # 4 N, 5, is greater than permitted</pre>
-</div>
-</div>
-</div>
-<p>The fix, once again, is to update the implicit H parameters on the aromatic heteroatom:</p>
-<div id="e8036ec3" class="cell" data-execution_count="24">
-<div class="sourceCode cell-code" id="cb29" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb29-1">rwm <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> Chem.RWMol(m2)</span>
-<span id="cb29-2">aid <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> rwm.AddAtom(Chem.Atom(<span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">6</span>))</span>
-<span id="cb29-3">rwm.AddBond(<span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">4</span>,aid,Chem.BondType.SINGLE)</span>
-<span id="cb29-4">at <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> rwm.GetAtomWithIdx(<span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">4</span>)</span>
-<span id="cb29-5">at.SetNumExplicitHs(<span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">0</span>)</span>
-<span id="cb29-6">at.SetNoImplicit(<span class="va" style="color: #111111;
-background-color: null;
-font-style: inherit;">False</span>)</span>
-<span id="cb29-7">rwm</span></code></pre></div>
-<div class="cell-output cell-output-display" data-execution_count="24">
-<div>
-<figure class="figure">
-<p><img src="https://greglandrum.github.io/rdkit-blog/posts/2025-01-18-efficient-molecule-editing_files/figure-html/cell-25-output-1.png" class="img-fluid figure-img"></p>
-</figure>
-</div>
-</div>
-</div>
-<div id="ef501ce9" class="cell" data-execution_count="25">
-<div class="sourceCode cell-code" id="cb30" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb30-1">m3 <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> rwm.GetMol()</span>
-<span id="cb30-2">Chem.SanitizeMol(m3)</span>
-<span id="cb30-3">m3</span></code></pre></div>
-<div class="cell-output cell-output-display" data-execution_count="25">
-<div>
-<figure class="figure">
-<p><img src="https://greglandrum.github.io/rdkit-blog/posts/2025-01-18-efficient-molecule-editing_files/figure-html/cell-26-output-1.png" class="img-fluid figure-img"></p>
-</figure>
-</div>
-</div>
-</div>
-<p>As usual, I hope this was useful.</p>
-
-
-</section>
-</section>
-
- ]]></description>
-  <category>tutorial</category>
-  <guid>https://greglandrum.github.io/rdkit-blog/posts/2025-01-18-efficient-molecule-editing.html</guid>
-  <pubDate>Fri, 17 Jan 2025 23:00:00 GMT</pubDate>
 </item>
 </channel>
 </rss>
