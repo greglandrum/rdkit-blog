@@ -10,7 +10,375 @@
 <atom:link href="https://greglandrum.github.io/rdkit-blog/index.xml" rel="self" type="application/rss+xml"/>
 <description>RDKit experiments, tips, and tutorials</description>
 <generator>quarto-1.6.39</generator>
-<lastBuildDate>Thu, 05 Jun 2025 22:00:00 GMT</lastBuildDate>
+<lastBuildDate>Wed, 11 Jun 2025 22:00:00 GMT</lastBuildDate>
+<item>
+  <title>Connecting reaction products to the reacting molecules.</title>
+  <link>https://greglandrum.github.io/rdkit-blog/posts/2025-06-12-using-reaction-info.html</link>
+  <description><![CDATA[ 
+
+
+
+
+<p>We often get questions about how to relate atoms in the products of a chemical reaction to the corresponding atoms in the reactants which were provided to the reaction. The RDKit provides a couple of pieces of information that can help here; this post shows how to access that information and what it means.</p>
+<div id="45e6c132" class="cell" data-execution_count="1">
+<div class="sourceCode cell-code" id="cb1" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb1-1"><span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">from</span> rdkit <span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">import</span> Chem</span>
+<span id="cb1-2"><span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">from</span> rdkit.Chem <span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">import</span> rdChemReactions</span>
+<span id="cb1-3"><span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">from</span> rdkit.Chem <span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">import</span> Draw</span>
+<span id="cb1-4"><span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">from</span> rdkit.Chem <span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">import</span> rdDepictor</span>
+<span id="cb1-5"></span>
+<span id="cb1-6"><span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">from</span> rdkit.Chem.Draw <span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">import</span> IPythonConsole</span>
+<span id="cb1-7"><span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">import</span> rdkit</span>
+<span id="cb1-8"><span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">print</span>(rdkit.__version__)</span></code></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>2025.03.3</code></pre>
+</div>
+</div>
+<p>This is the reaction definition <code>Niementowski_quinazoline</code> from the SI of the paper “A Collection of Robust Organic Synthesis Reactions for In Silico Molecule Design” by <a href="http://pubs.acs.org/doi/abs/10.1021/ci200379p">Hartenfeller et al.&nbsp;</a>.</p>
+<div id="29266063" class="cell" data-execution_count="2">
+<div class="sourceCode cell-code" id="cb3" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb3-1">rxn <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> rdChemReactions.ReactionFromSmarts(<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'[c:1](-[C;$(C-c1ccccc1):2](=[OD1:3])-[OH1]):[c:4](-[NH2:5]).[N;!H0;!$(N-N);!$(N-C=N);!$(N(-C=O)-C=O):6]-[C;H1,$(C-[#6]):7]=[OD1]&gt;&gt;[c:4]2:[c:1]-[C:2](=[O:3])-[N:6]-[C:7]=[N:5]-2'</span>)</span>
+<span id="cb3-2">rxn</span></code></pre></div>
+<div class="cell-output cell-output-display" data-execution_count="2">
+<div>
+<figure class="figure">
+<p><img src="https://greglandrum.github.io/rdkit-blog/posts/2025-06-12-using-reaction-info_files/figure-html/cell-3-output-1.png" class="img-fluid figure-img"></p>
+</figure>
+</div>
+</div>
+</div>
+<div id="992273bd" class="cell" data-execution_count="3">
+<div class="sourceCode cell-code" id="cb4" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb4-1">reactants <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> [Chem.MolFromSmiles(x) <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">for</span> x <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">in</span> (<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'c1c(C(=O)O)c(N)cc(CC)c1'</span>, <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'C(=O)Nc1ccccc1'</span>)]</span>
+<span id="cb4-2">Draw.MolsToGridImage(reactants)</span></code></pre></div>
+<div class="cell-output cell-output-display" data-execution_count="3">
+<div>
+<figure class="figure">
+<p><img src="https://greglandrum.github.io/rdkit-blog/posts/2025-06-12-using-reaction-info_files/figure-html/cell-4-output-1.png" class="img-fluid figure-img"></p>
+</figure>
+</div>
+</div>
+</div>
+<div id="f1168c6c" class="cell" data-execution_count="4">
+<div class="sourceCode cell-code" id="cb5" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb5-1">prods <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> rxn.RunReactants(reactants)</span>
+<span id="cb5-2"><span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">len</span>(prods)</span></code></pre></div>
+<div class="cell-output cell-output-display" data-execution_count="4">
+<pre><code>1</code></pre>
+</div>
+</div>
+<div id="e6323cce" class="cell" data-execution_count="5">
+<div class="sourceCode cell-code" id="cb7" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb7-1">prods[<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">0</span>][<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">0</span>]</span></code></pre></div>
+<div class="cell-output cell-output-display" data-execution_count="5">
+<div>
+<figure class="figure">
+<p><img src="https://greglandrum.github.io/rdkit-blog/posts/2025-06-12-using-reaction-info_files/figure-html/cell-6-output-1.png" class="img-fluid figure-img"></p>
+</figure>
+</div>
+</div>
+</div>
+<div id="f8b1d6ba" class="cell" data-execution_count="6">
+<div class="sourceCode cell-code" id="cb8" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb8-1">prods[<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">0</span>][<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">0</span>].GetAtomWithIdx(<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">0</span>).GetPropsAsDict(includeComputed<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span><span class="va" style="color: #111111;
+background-color: null;
+font-style: inherit;">False</span>)</span></code></pre></div>
+<div class="cell-output cell-output-display" data-execution_count="6">
+<pre><code>{'old_mapno': 4, 'react_atom_idx': 5, 'react_idx': 0}</code></pre>
+</div>
+</div>
+<p><code>old_mapno</code> is the atom map number of the atom in the product template, <code>react_idx</code> is the index of the reactant that the atom came from (this was added in release 2024.09.6, so it won’t be there in older releases), and <code>react_atom_idx</code> is the index of the atom in that reactant.</p>
+<p>Here’s an atom that wasn’t in the product template, so it doesn’t have an atom map number:</p>
+<div id="534cd648" class="cell" data-scrolled="true" data-execution_count="7">
+<div class="sourceCode cell-code" id="cb10" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb10-1">prods[<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">0</span>][<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">0</span>].GetAtomWithIdx(<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">10</span>).GetPropsAsDict(includeComputed<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span><span class="va" style="color: #111111;
+background-color: null;
+font-style: inherit;">False</span>)</span></code></pre></div>
+<div class="cell-output cell-output-display" data-execution_count="7">
+<pre><code>{'react_atom_idx': 7, 'react_idx': 0}</code></pre>
+</div>
+</div>
+<p>Here’s a sample function that draws a product molecule and highlights atoms and bonds based upon which reactant they came from. It can also optionally include the original atom indices.</p>
+<div id="8d852f4c" class="cell" data-execution_count="8">
+<div class="sourceCode cell-code" id="cb12" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb12-1"><span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">from</span> IPython.display <span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">import</span> SVG</span>
+<span id="cb12-2"></span>
+<span id="cb12-3"><span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">def</span> draw_mol_highlighted_by_atom_origin(mol,</span>
+<span id="cb12-4">                                        includeOriginalAtomIndices<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span><span class="va" style="color: #111111;
+background-color: null;
+font-style: inherit;">True</span>,</span>
+<span id="cb12-5">                                        size<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span>(<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">450</span>,<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">450</span>),</span>
+<span id="cb12-6">                                        colors<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span>[(<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">1</span>,<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">1</span>,<span class="fl" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">0.67</span>),(<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">1</span>,<span class="fl" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">0.8</span>,<span class="fl" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">0.6</span>),(<span class="fl" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">1.</span>, <span class="fl" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">.71</span>, <span class="fl" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">.76</span>),(<span class="fl" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">.8</span>, <span class="fl" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">1.</span>, <span class="fl" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">.8</span>)],</span>
+<span id="cb12-7">                                       ):</span>
+<span id="cb12-8">    <span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># copy the molecule since we will modify it:</span></span>
+<span id="cb12-9">    mol <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> Chem.Mol(mol)</span>
+<span id="cb12-10">    <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">if</span> <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">not</span> mol.GetNumConformers():</span>
+<span id="cb12-11">        rdDepictor.Compute2DCoords(mol)</span>
+<span id="cb12-12">        rdDepictor.StraightenDepiction(mol)</span>
+<span id="cb12-13">    atom_highlights <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> {}</span>
+<span id="cb12-14">    bond_highlights <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> {}</span>
+<span id="cb12-15">    rads <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> {}</span>
+<span id="cb12-16">    mults <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> {}</span>
+<span id="cb12-17"></span>
+<span id="cb12-18">    <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">for</span> at <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">in</span> mol.GetAtoms():</span>
+<span id="cb12-19">        pd <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> at.GetPropsAsDict()</span>
+<span id="cb12-20">        <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">if</span> <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'react_idx'</span> <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">in</span> pd:</span>
+<span id="cb12-21">            atom_highlights[at.GetIdx()] <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> [colors[pd[<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'react_idx'</span>]]]</span>
+<span id="cb12-22">            rads[at.GetIdx()] <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> <span class="fl" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">0.4</span></span>
+<span id="cb12-23">            mults[at.GetIdx()] <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> <span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">1</span></span>
+<span id="cb12-24">        <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">if</span> includeOriginalAtomIndices <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">and</span> <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'react_atom_idx'</span> <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">in</span> pd:</span>
+<span id="cb12-25">            at.SetProp(<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'atomNote'</span>,<span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">str</span>(pd[<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'react_atom_idx'</span>]))</span>
+<span id="cb12-26">    <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">for</span> bnd <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">in</span> mol.GetBonds():</span>
+<span id="cb12-27">        bidx <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> bnd.GetBeginAtomIdx()</span>
+<span id="cb12-28">        eidx <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> bnd.GetEndAtomIdx()</span>
+<span id="cb12-29">        <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">if</span> bidx <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">in</span> atom_highlights <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">and</span> eidx <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">in</span> atom_highlights <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">and</span> atom_highlights[bidx] <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">==</span> atom_highlights[eidx]:</span>
+<span id="cb12-30">            bond_highlights[bnd.GetIdx()] <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> atom_highlights[bidx]</span>
+<span id="cb12-31">    d2d <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> Draw.MolDraw2DSVG(size[<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">0</span>],size[<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">1</span>])</span>
+<span id="cb12-32">    d2d.DrawMoleculeWithHighlights(mol,<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">''</span>,atom_highlights,bond_highlights,rads,mults)</span>
+<span id="cb12-33">    d2d.FinishDrawing()</span>
+<span id="cb12-34">    <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">return</span> d2d.GetDrawingText()</span></code></pre></div>
+</div>
+<div id="3aa95dbc" class="cell" data-execution_count="9">
+<div class="sourceCode cell-code" id="cb13" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb13-1">mol <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> prods[<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">0</span>][<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">0</span>]</span>
+<span id="cb13-2">SVG(draw_mol_highlighted_by_atom_origin(mol))</span></code></pre></div>
+<div class="cell-output cell-output-display" data-execution_count="9">
+<div>
+<figure class="figure">
+<p><img src="https://greglandrum.github.io/rdkit-blog/posts/2025-06-12-using-reaction-info_files/figure-html/cell-10-output-1.svg" class="img-fluid figure-img"></p>
+</figure>
+</div>
+</div>
+</div>
+<div id="e05ad196" class="cell" data-execution_count="10">
+<div class="sourceCode cell-code" id="cb14" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb14-1">SVG(draw_mol_highlighted_by_atom_origin(mol,includeOriginalAtomIndices<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span><span class="va" style="color: #111111;
+background-color: null;
+font-style: inherit;">False</span>))</span></code></pre></div>
+<div class="cell-output cell-output-display" data-execution_count="10">
+<div>
+<figure class="figure">
+<p><img src="https://greglandrum.github.io/rdkit-blog/posts/2025-06-12-using-reaction-info_files/figure-html/cell-11-output-1.svg" class="img-fluid figure-img"></p>
+</figure>
+</div>
+</div>
+</div>
+
+
+
+ ]]></description>
+  <category>tutorial</category>
+  <category>reactions</category>
+  <guid>https://greglandrum.github.io/rdkit-blog/posts/2025-06-12-using-reaction-info.html</guid>
+  <pubDate>Wed, 11 Jun 2025 22:00:00 GMT</pubDate>
+  <media:content url="https://greglandrum.github.io/rdkit-blog/posts/images/blog/using-reaction-info-1.png" medium="image" type="image/png" height="74" width="144"/>
+</item>
 <item>
   <title>Murcko Scaffolds Tutorial</title>
   <link>https://greglandrum.github.io/rdkit-blog/posts/2025-06-06-murcko-scaffolds.html</link>
@@ -401,6 +769,7 @@ font-style: inherit;">=</span>highlightAtomListsMatrix,</span>
 
 
 
+
 <p>This is an updated and revised version of an <a href="https://rdkit.blogspot.com/2019/06/doing-extended-hueckel-calculations.html">older post</a>.</p>
 <p>The RDKit has included an optional integration with a semi-empirical quantum mechanics package called YAeHMOP since the 2019.03 release. If you build the RDKit yourself, this is disabled by default, but it is part of the RDKit conda-forge and pypi builds, so it’s available to most RDKit users.</p>
 <p>There’s no documentation for this integration yet… thus this blog post.</p>
@@ -409,7 +778,7 @@ font-style: inherit;">=</span>highlightAtomListsMatrix,</span>
 <p>One of my major projects in grad school was to write a software package for performing extended Hueckel calculations and analyzing and visualizing the results. I released the source for YAeHMOP (“Yet Another extended Hueckel Molecular Orbital Package”) way back when using some weird license (the open-source landscape in chemistry was “a bit” different back in the mid-90s). After changing fields, I more or less forgot about YAeHMOP until a couple of years ago when Patrick Avery contacted me about integrating it <a href="https://pubs.acs.org/doi/abs/10.1021/acs.jchemed.7b00698">into Avogadro</a>. To make things easier, I put the source <a href="https://github.com/greglandrum/yaehmop">up on Github</a> and switched to a BSD license. Since that point we’ve done a bit of additional cleanup work on the eHT code (the visualization pieces are still there, but really only have historic interest) and made it useable as a library.</p>
 <p>There are a couple of applications where I think it might be interesting to have access to quick, interpretable QM results from the RDKit. These include getting partial charges and starting to think about quick and dirty descriptors for things like bond strengths and reactivity. So I decided to do an integration of YAeHMOP into the RDKit.</p>
 <p>There are a <em>bunch</em> of books and papers describing extended Hueckel theory and the various types of analysis that one can do with it; I’m not going to cite all of those here. There’s also no formal publication describing YAeHMOP (what a shock!), but there is a <a href="https://drive.google.com/file/d/0BzBynnwxNS0SanJzUkJYYWNFY0h1bzNFR0d0aVBCR0x5NmZV/view?usp=sharing&amp;resourcekey=0-o4HYaJEodQtVCZ54zZSi4g">chapter</a> in my PhD thesis that provides an fairly comprehensive tutorial overview of the theory.</p>
-<div class="cell" data-execution_count="45">
+<div id="cell-2" class="cell" data-execution_count="45">
 <div class="sourceCode cell-code" id="cb1" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb1-1"><span class="im" style="color: #00769E;
 background-color: null;
 font-style: inherit;">from</span> rdkit <span class="im" style="color: #00769E;
@@ -487,7 +856,7 @@ font-style: inherit;">print</span>(time.asctime())</span></code></pre></div>
 Tue May 27 06:32:31 2025</code></pre>
 </div>
 </div>
-<div class="cell" data-execution_count="25">
+<div id="cell-3" class="cell" data-execution_count="25">
 <div class="sourceCode cell-code" id="cb3" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb3-1"><span class="im" style="color: #00769E;
 background-color: null;
 font-style: inherit;">import</span> matplotlib.pyplot <span class="im" style="color: #00769E;
@@ -508,7 +877,7 @@ font-style: inherit;">%</span>matplotlib inline</span></code></pre></div>
 <section id="running-an-eht-calculation" class="level1">
 <h1>Running an eHT calculation</h1>
 <p>Start by showing how to run an eHT calculation:</p>
-<div class="cell" data-execution_count="5">
+<div id="cell-6" class="cell" data-execution_count="5">
 <div class="sourceCode cell-code" id="cb4" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb4-1"><span class="co" style="color: #5E5E5E;
 background-color: null;
 font-style: inherit;"># imatinib</span></span>
@@ -519,11 +888,15 @@ background-color: null;
 font-style: inherit;">'Cc1ccc(NC(=O)c2ccc(CN3CCN(C)CC3)cc2)cc1Nc1nccc(-c2cccnc2)n1'</span>)</span>
 <span id="cb4-3">m</span></code></pre></div>
 <div class="cell-output cell-output-display" data-execution_count="5">
-<p><img src="https://greglandrum.github.io/rdkit-blog/posts/2025-05-30-eHT-in-RDKit_files/figure-html/cell-4-output-1.png" class="img-fluid"></p>
+<div>
+<figure class="figure">
+<p><img src="https://greglandrum.github.io/rdkit-blog/posts/2025-05-30-eHT-in-RDKit_files/figure-html/cell-4-output-1.png" class="img-fluid figure-img"></p>
+</figure>
+</div>
 </div>
 </div>
 <p>We need to add Hs and generate a conformation:</p>
-<div class="cell" data-execution_count="6">
+<div id="cell-8" class="cell" data-execution_count="6">
 <div class="sourceCode cell-code" id="cb5" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb5-1">mh <span class="op" style="color: #5E5E5E;
 background-color: null;
 font-style: inherit;">=</span> Chem.AddHs(m)</span>
@@ -545,27 +918,27 @@ background-color: null;
 font-style: inherit;">;</span></span></code></pre></div>
 </div>
 <p>And now we can run the calculation, it’s quick:</p>
-<div class="cell" data-execution_count="7">
+<div id="cell-10" class="cell" data-execution_count="7">
 <div class="sourceCode cell-code" id="cb6" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb6-1">passed,res <span class="op" style="color: #5E5E5E;
 background-color: null;
 font-style: inherit;">=</span> rdEHTTools.RunMol(mh)</span></code></pre></div>
 </div>
 <p>The first return value lets us know if the calculation succeeded:</p>
-<div class="cell" data-execution_count="8">
+<div id="cell-12" class="cell" data-execution_count="8">
 <div class="sourceCode cell-code" id="cb7" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb7-1">passed</span></code></pre></div>
 <div class="cell-output cell-output-display" data-execution_count="8">
 <pre><code>True</code></pre>
 </div>
 </div>
 <p>The second contains the results of the calculation:</p>
-<div class="cell" data-execution_count="9">
+<div id="cell-14" class="cell" data-execution_count="9">
 <div class="sourceCode cell-code" id="cb9" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb9-1">res</span></code></pre></div>
 <div class="cell-output cell-output-display" data-execution_count="9">
 <pre><code>&lt;rdkit.Chem.rdEHTTools.EHTResults at 0x7134eb4fb990&gt;</code></pre>
 </div>
 </div>
 <p>We have access to the atomic charges:</p>
-<div class="cell" data-execution_count="10">
+<div id="cell-16" class="cell" data-execution_count="10">
 <div class="sourceCode cell-code" id="cb11" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb11-1">res.GetAtomicCharges()</span></code></pre></div>
 <div class="cell-output cell-output-display" data-execution_count="10">
 <pre><code>array([-5.73319770e-02, -1.56119578e-02, -4.62356988e-02, -1.18071986e-01,
@@ -588,7 +961,7 @@ font-style: inherit;">=</span> rdEHTTools.RunMol(mh)</span></code></pre></div>
 </div>
 </div>
 <p>The reduced overlap population matrix provides the Mulliken overlap population between atoms in the molecule. This tells us something about the strength of the interaction between the atoms. It’s returned as a vector representing a symmetric matrix:</p>
-<div class="cell" data-execution_count="12">
+<div id="cell-18" class="cell" data-execution_count="12">
 <div class="sourceCode cell-code" id="cb13" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb13-1">res.GetReducedOverlapPopulationMatrix()[:<span class="dv" style="color: #AD0000;
 background-color: null;
 font-style: inherit;">6</span>]</span></code></pre></div>
@@ -597,7 +970,7 @@ font-style: inherit;">6</span>]</span></code></pre></div>
         2.72952681])</code></pre>
 </div>
 </div>
-<div class="cell" data-execution_count="13">
+<div id="cell-19" class="cell" data-execution_count="13">
 <div class="sourceCode cell-code" id="cb15" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb15-1"><span class="co" style="color: #5E5E5E;
 background-color: null;
 font-style: inherit;"># convenience function to set a "MulilkenOverlapPopulation" property on bonds.</span></span>
@@ -672,11 +1045,11 @@ font-style: inherit;">+</span> i2</span>
 background-color: null;
 font-style: inherit;">"MullikenOverlapPopulation"</span>,rop[idx])</span></code></pre></div>
 </div>
-<div class="cell" data-execution_count="14">
+<div id="cell-20" class="cell" data-execution_count="14">
 <div class="sourceCode cell-code" id="cb16" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb16-1">set_overlap_populations(mh,res)</span></code></pre></div>
 </div>
 <p>Look at a few of the overlap populations:</p>
-<div class="cell" data-execution_count="15">
+<div id="cell-22" class="cell" data-execution_count="15">
 <div class="sourceCode cell-code" id="cb17" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb17-1"><span class="cf" style="color: #003B4F;
 background-color: null;
 font-weight: bold;
@@ -781,7 +1154,7 @@ font-style: inherit;">'</span>)</span></code></pre></div>
 <section id="application-look-at-variability-of-charges-between-conformers" class="level1">
 <h1>Application: Look at variability of charges between conformers</h1>
 <p>The rest of this blog post is going to show a straightforward analysis one can do with the eHT results: looking at the variability of the QM charges across the different conformers.</p>
-<div class="cell" data-execution_count="16">
+<div id="cell-25" class="cell" data-execution_count="16">
 <div class="sourceCode cell-code" id="cb19" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb19-1"><span class="kw" style="color: #003B4F;
 background-color: null;
 font-weight: bold;
@@ -884,12 +1257,12 @@ font-weight: bold;
 font-style: inherit;">return</span> (eres,charges)</span>
 <span id="cb19-22">    </span></code></pre></div>
 </div>
-<div class="cell" data-execution_count="17">
+<div id="cell-26" class="cell" data-execution_count="17">
 <div class="sourceCode cell-code" id="cb20" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb20-1">eres,charges <span class="op" style="color: #5E5E5E;
 background-color: null;
 font-style: inherit;">=</span> runEHT(mh)</span></code></pre></div>
 </div>
-<div class="cell" data-execution_count="26">
+<div id="cell-27" class="cell" data-execution_count="26">
 <div class="sourceCode cell-code" id="cb21" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb21-1">plt.figure(figsize<span class="op" style="color: #5E5E5E;
 background-color: null;
 font-style: inherit;">=</span>(<span class="dv" style="color: #AD0000;
@@ -916,11 +1289,15 @@ font-style: inherit;">"partial charge"</span>)<span class="op" style="color: #5E
 background-color: null;
 font-style: inherit;">;</span></span></code></pre></div>
 <div class="cell-output cell-output-display">
-<p><img src="https://greglandrum.github.io/rdkit-blog/posts/2025-05-30-eHT-in-RDKit_files/figure-html/cell-16-output-1.png" class="img-fluid"></p>
+<div>
+<figure class="figure">
+<p><img src="https://greglandrum.github.io/rdkit-blog/posts/2025-05-30-eHT-in-RDKit_files/figure-html/cell-16-output-1.png" class="img-fluid figure-img"></p>
+</figure>
+</div>
 </div>
 </div>
 <p>To make sense of that, draw the molecule with the atoms numbered:</p>
-<div class="cell" data-execution_count="23">
+<div id="cell-29" class="cell" data-execution_count="23">
 <div class="sourceCode cell-code" id="cb22" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb22-1">IPythonConsole.drawOptions.addAtomIndices <span class="op" style="color: #5E5E5E;
 background-color: null;
 font-style: inherit;">=</span> <span class="va" style="color: #111111;
@@ -935,11 +1312,15 @@ background-color: null;
 font-style: inherit;">300</span></span>
 <span id="cb22-3">m</span></code></pre></div>
 <div class="cell-output cell-output-display" data-execution_count="23">
-<p><img src="https://greglandrum.github.io/rdkit-blog/posts/2025-05-30-eHT-in-RDKit_files/figure-html/cell-17-output-1.png" class="img-fluid"></p>
+<div>
+<figure class="figure">
+<p><img src="https://greglandrum.github.io/rdkit-blog/posts/2025-05-30-eHT-in-RDKit_files/figure-html/cell-17-output-1.png" class="img-fluid figure-img"></p>
+</figure>
+</div>
 </div>
 </div>
 <p>Look at the results for a couple of the atoms that show the most variability</p>
-<div class="cell" data-execution_count="29">
+<div id="cell-31" class="cell" data-execution_count="29">
 <div class="sourceCode cell-code" id="cb23" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb23-1">chgRange <span class="op" style="color: #5E5E5E;
 background-color: null;
 font-style: inherit;">=</span> [<span class="bu" style="color: null;
@@ -979,7 +1360,7 @@ font-style: inherit;">2</span>]</span></code></pre></div>
 <pre><code>[(0.20875282639970938, 24), (0.11463855830843706, 5)]</code></pre>
 </div>
 </div>
-<div class="cell" data-execution_count="30">
+<div id="cell-32" class="cell" data-execution_count="30">
 <div class="sourceCode cell-code" id="cb25" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb25-1">tchgs <span class="op" style="color: #5E5E5E;
 background-color: null;
 font-style: inherit;">=</span> <span class="bu" style="color: null;
@@ -1007,7 +1388,7 @@ font-style: inherit;">2</span>:]</span></code></pre></div>
  [(-0.3297127630789536, 46), (-0.3257318399680058, 22)])</code></pre>
 </div>
 </div>
-<div class="cell" data-execution_count="31">
+<div id="cell-33" class="cell" data-execution_count="31">
 <div class="sourceCode cell-code" id="cb27" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb27-1">tchgs <span class="op" style="color: #5E5E5E;
 background-color: null;
 font-style: inherit;">=</span> <span class="bu" style="color: null;
@@ -1036,7 +1417,7 @@ font-style: inherit;">2</span>:]</span></code></pre></div>
 </div>
 </div>
 <p>Look at the two conformers where the charges on atom 24 differ the most:</p>
-<div class="cell" data-execution_count="34">
+<div id="cell-35" class="cell" data-execution_count="34">
 <div class="sourceCode cell-code" id="cb29" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb29-1">m.__sssAtoms <span class="op" style="color: #5E5E5E;
 background-color: null;
 font-style: inherit;">=</span> [<span class="dv" style="color: #AD0000;
@@ -1044,10 +1425,14 @@ background-color: null;
 font-style: inherit;">24</span>]</span>
 <span id="cb29-2">m</span></code></pre></div>
 <div class="cell-output cell-output-display" data-execution_count="34">
-<p><img src="https://greglandrum.github.io/rdkit-blog/posts/2025-05-30-eHT-in-RDKit_files/figure-html/cell-21-output-1.png" class="img-fluid"></p>
+<div>
+<figure class="figure">
+<p><img src="https://greglandrum.github.io/rdkit-blog/posts/2025-05-30-eHT-in-RDKit_files/figure-html/cell-21-output-1.png" class="img-fluid figure-img"></p>
+</figure>
 </div>
 </div>
-<div class="cell" data-execution_count="32">
+</div>
+<div id="cell-36" class="cell" data-execution_count="32">
 <div class="sourceCode cell-code" id="cb30" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb30-1">tm7 <span class="op" style="color: #5E5E5E;
 background-color: null;
 font-style: inherit;">=</span> Chem.MolFromMolBlock(Chem.MolToMolBlock(mh,confId<span class="op" style="color: #5E5E5E;
@@ -1110,7 +1495,7 @@ viewer_17483188092931037.render();
 
 </div>
 </div>
-<div class="cell" data-execution_count="33">
+<div id="cell-37" class="cell" data-execution_count="33">
 <div class="sourceCode cell-code" id="cb31" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb31-1">tm22 <span class="op" style="color: #5E5E5E;
 background-color: null;
 font-style: inherit;">=</span> Chem.MolFromMolBlock(Chem.MolToMolBlock(mh,confId<span class="op" style="color: #5E5E5E;
@@ -1175,7 +1560,7 @@ viewer_17483188364847312.render();
 </div>
 <p>The difference here is the relative orientations of the two aromatic rings that N24 is bonded to. In the first case (more negative N), the rings are perpendicular to each other. In the second (less negative N), they are parallel.</p>
 <p>What if we do an MMFF minimization of each conformer?</p>
-<div class="cell" data-execution_count="37">
+<div id="cell-40" class="cell" data-execution_count="37">
 <div class="sourceCode cell-code" id="cb32" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb32-1">mh_mmff <span class="op" style="color: #5E5E5E;
 background-color: null;
 font-style: inherit;">=</span> Chem.Mol(mh)</span>
@@ -1209,12 +1594,12 @@ font-style: inherit;">500</span>,confId<span class="op" style="color: #5E5E5E;
 background-color: null;
 font-style: inherit;">=</span>i)</span></code></pre></div>
 </div>
-<div class="cell" data-execution_count="38">
+<div id="cell-41" class="cell" data-execution_count="38">
 <div class="sourceCode cell-code" id="cb33" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb33-1">eres,mmff_charges <span class="op" style="color: #5E5E5E;
 background-color: null;
 font-style: inherit;">=</span> runEHT(mh_mmff)</span></code></pre></div>
 </div>
-<div class="cell" data-execution_count="39">
+<div id="cell-42" class="cell" data-execution_count="39">
 <div class="sourceCode cell-code" id="cb34" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb34-1">plt.figure(figsize<span class="op" style="color: #5E5E5E;
 background-color: null;
 font-style: inherit;">=</span>(<span class="dv" style="color: #AD0000;
@@ -1241,10 +1626,14 @@ font-style: inherit;">"partial charge"</span>)<span class="op" style="color: #5E
 background-color: null;
 font-style: inherit;">;</span></span></code></pre></div>
 <div class="cell-output cell-output-display">
-<p><img src="https://greglandrum.github.io/rdkit-blog/posts/2025-05-30-eHT-in-RDKit_files/figure-html/cell-26-output-1.png" class="img-fluid"></p>
+<div>
+<figure class="figure">
+<p><img src="https://greglandrum.github.io/rdkit-blog/posts/2025-05-30-eHT-in-RDKit_files/figure-html/cell-26-output-1.png" class="img-fluid figure-img"></p>
+</figure>
 </div>
 </div>
-<div class="cell" data-execution_count="40">
+</div>
+<div id="cell-43" class="cell" data-execution_count="40">
 <div class="sourceCode cell-code" id="cb35" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb35-1">chgRange <span class="op" style="color: #5E5E5E;
 background-color: null;
 font-style: inherit;">=</span> [<span class="bu" style="color: null;
@@ -1286,7 +1675,7 @@ font-style: inherit;">2</span>]</span></code></pre></div>
 </div>
 <p>Those are much smaller changes (as we saw in the distributions).</p>
 <p>What about the N24, the atom we looked at above?</p>
-<div class="cell" data-execution_count="41">
+<div id="cell-45" class="cell" data-execution_count="41">
 <div class="sourceCode cell-code" id="cb37" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb37-1">tchgs <span class="op" style="color: #5E5E5E;
 background-color: null;
 font-style: inherit;">=</span> <span class="bu" style="color: null;
@@ -1315,7 +1704,7 @@ font-style: inherit;">2</span>:]</span></code></pre></div>
 </div>
 </div>
 <p>Almost no difference at all there. Are the neighboring rings now consistently orented?</p>
-<div class="cell" data-execution_count="43">
+<div id="cell-47" class="cell" data-execution_count="43">
 <div class="sourceCode cell-code" id="cb39" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb39-1">tm7 <span class="op" style="color: #5E5E5E;
 background-color: null;
 font-style: inherit;">=</span> Chem.MolFromMolBlock(Chem.MolToMolBlock(mh,confId<span class="op" style="color: #5E5E5E;
@@ -1378,7 +1767,7 @@ viewer_1748319664848715.render();
 
 </div>
 </div>
-<div class="cell" data-execution_count="44">
+<div id="cell-48" class="cell" data-execution_count="44">
 <div class="sourceCode cell-code" id="cb40" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb40-1">tm9 <span class="op" style="color: #5E5E5E;
 background-color: null;
 font-style: inherit;">=</span> Chem.MolFromMolBlock(Chem.MolToMolBlock(mh,confId<span class="op" style="color: #5E5E5E;
@@ -1443,7 +1832,7 @@ viewer_17483196896326954.render();
 </div>
 <p>They are: the rings are more or less perpendicular in both conformers.</p>
 <p>The charge variability has dropped considerably, are the MMFF conformers actually different from each other?</p>
-<div class="cell" data-execution_count="49">
+<div id="cell-51" class="cell" data-execution_count="49">
 <div class="sourceCode cell-code" id="cb41" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb41-1">rmsds <span class="op" style="color: #5E5E5E;
 background-color: null;
 font-style: inherit;">=</span> []</span>
@@ -1500,14 +1889,18 @@ font-style: inherit;">'RMSD'</span>)<span class="op" style="color: #5E5E5E;
 background-color: null;
 font-style: inherit;">;</span></span></code></pre></div>
 <div class="cell-output cell-output-display">
-<p><img src="https://greglandrum.github.io/rdkit-blog/posts/2025-05-30-eHT-in-RDKit_files/figure-html/cell-31-output-1.png" class="img-fluid"></p>
+<div>
+<figure class="figure">
+<p><img src="https://greglandrum.github.io/rdkit-blog/posts/2025-05-30-eHT-in-RDKit_files/figure-html/cell-31-output-1.png" class="img-fluid figure-img"></p>
+</figure>
+</div>
 </div>
 </div>
 <p>So the conformers are still different from each other but the charge differences are now much smaller than they were previously.</p>
 </section>
 <section id="repeat-the-analysis-for-another-molecule" class="level1">
 <h1>Repeat the analysis for another molecule</h1>
-<div class="cell" data-execution_count="52">
+<div id="cell-54" class="cell" data-execution_count="52">
 <div class="sourceCode cell-code" id="cb42" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb42-1"><span class="co" style="color: #5E5E5E;
 background-color: null;
 font-style: inherit;"># rivaroxaban</span></span>
@@ -1518,10 +1911,14 @@ background-color: null;
 font-style: inherit;">'O=C(NC[C@H]1CN(c2ccc(N3CCOCC3=O)cc2)C(=O)O1)c1ccc(Cl)s1'</span>)</span>
 <span id="cb42-3">m2</span></code></pre></div>
 <div class="cell-output cell-output-display" data-execution_count="52">
-<p><img src="https://greglandrum.github.io/rdkit-blog/posts/2025-05-30-eHT-in-RDKit_files/figure-html/cell-32-output-1.png" class="img-fluid"></p>
+<div>
+<figure class="figure">
+<p><img src="https://greglandrum.github.io/rdkit-blog/posts/2025-05-30-eHT-in-RDKit_files/figure-html/cell-32-output-1.png" class="img-fluid figure-img"></p>
+</figure>
 </div>
 </div>
-<div class="cell" data-execution_count="55">
+</div>
+<div id="cell-55" class="cell" data-execution_count="55">
 <div class="sourceCode cell-code" id="cb43" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb43-1">mh2 <span class="op" style="color: #5E5E5E;
 background-color: null;
 font-style: inherit;">=</span> Chem.AddHs(m2)</span>
@@ -1561,7 +1958,7 @@ font-style: inherit;">500</span>,confId<span class="op" style="color: #5E5E5E;
 background-color: null;
 font-style: inherit;">=</span>i)</span></code></pre></div>
 </div>
-<div class="cell" data-execution_count="56">
+<div id="cell-56" class="cell" data-execution_count="56">
 <div class="sourceCode cell-code" id="cb44" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb44-1">eres,charges2 <span class="op" style="color: #5E5E5E;
 background-color: null;
 font-style: inherit;">=</span> runEHT(mh2)</span>
@@ -1569,7 +1966,7 @@ font-style: inherit;">=</span> runEHT(mh2)</span>
 background-color: null;
 font-style: inherit;">=</span> runEHT(mh2_mmff)</span></code></pre></div>
 </div>
-<div class="cell" data-execution_count="57">
+<div id="cell-57" class="cell" data-execution_count="57">
 <div class="sourceCode cell-code" id="cb45" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb45-1">plt.figure(figsize<span class="op" style="color: #5E5E5E;
 background-color: null;
 font-style: inherit;">=</span>(<span class="dv" style="color: #AD0000;
@@ -1596,11 +1993,15 @@ font-style: inherit;">"partial charge"</span>)<span class="op" style="color: #5E
 background-color: null;
 font-style: inherit;">;</span></span></code></pre></div>
 <div class="cell-output cell-output-display">
-<p><img src="https://greglandrum.github.io/rdkit-blog/posts/2025-05-30-eHT-in-RDKit_files/figure-html/cell-35-output-1.png" class="img-fluid"></p>
+<div>
+<figure class="figure">
+<p><img src="https://greglandrum.github.io/rdkit-blog/posts/2025-05-30-eHT-in-RDKit_files/figure-html/cell-35-output-1.png" class="img-fluid figure-img"></p>
+</figure>
+</div>
 </div>
 </div>
 <p>Less variability than we had with the ETKDG conformers of imatinib, but there is still some. This almost entirely vanishes when using the MMFF-optimized conformers:</p>
-<div class="cell" data-execution_count="58">
+<div id="cell-59" class="cell" data-execution_count="58">
 <div class="sourceCode cell-code" id="cb46" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb46-1">plt.figure(figsize<span class="op" style="color: #5E5E5E;
 background-color: null;
 font-style: inherit;">=</span>(<span class="dv" style="color: #AD0000;
@@ -1627,11 +2028,15 @@ font-style: inherit;">"partial charge"</span>)<span class="op" style="color: #5E
 background-color: null;
 font-style: inherit;">;</span></span></code></pre></div>
 <div class="cell-output cell-output-display">
-<p><img src="https://greglandrum.github.io/rdkit-blog/posts/2025-05-30-eHT-in-RDKit_files/figure-html/cell-36-output-1.png" class="img-fluid"></p>
+<div>
+<figure class="figure">
+<p><img src="https://greglandrum.github.io/rdkit-blog/posts/2025-05-30-eHT-in-RDKit_files/figure-html/cell-36-output-1.png" class="img-fluid figure-img"></p>
+</figure>
+</div>
 </div>
 </div>
 <p>Confirm again that the MMFF conformers actually different:</p>
-<div class="cell" data-execution_count="60">
+<div id="cell-61" class="cell" data-execution_count="60">
 <div class="sourceCode cell-code" id="cb47" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb47-1">rmsds <span class="op" style="color: #5E5E5E;
 background-color: null;
 font-style: inherit;">=</span> []</span>
@@ -1688,7 +2093,11 @@ font-style: inherit;">'RMSD'</span>)<span class="op" style="color: #5E5E5E;
 background-color: null;
 font-style: inherit;">;</span></span></code></pre></div>
 <div class="cell-output cell-output-display">
-<p><img src="https://greglandrum.github.io/rdkit-blog/posts/2025-05-30-eHT-in-RDKit_files/figure-html/cell-37-output-1.png" class="img-fluid"></p>
+<div>
+<figure class="figure">
+<p><img src="https://greglandrum.github.io/rdkit-blog/posts/2025-05-30-eHT-in-RDKit_files/figure-html/cell-37-output-1.png" class="img-fluid figure-img"></p>
+</figure>
+</div>
 </div>
 </div>
 <p>They are.</p>
@@ -1697,7 +2106,7 @@ font-style: inherit;">;</span></span></code></pre></div>
 <h1>Performance</h1>
 <p>How long does it take to do this analysis?</p>
 <p>Start by looking at the time required to generate a conformer:</p>
-<div class="cell" data-execution_count="62">
+<div id="cell-65" class="cell" data-execution_count="62">
 <div class="sourceCode cell-code" id="cb48" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb48-1">tempM <span class="op" style="color: #5E5E5E;
 background-color: null;
 font-style: inherit;">=</span> Chem.Mol(mh2)</span>
@@ -1711,7 +2120,7 @@ font-style: inherit;">=</span> rdDistGeom.EmbedMolecule(tempM,params)</span></co
 </div>
 </div>
 <p>Or to generate a conformer and MMFF minimize it:</p>
-<div class="cell" data-execution_count="63">
+<div id="cell-67" class="cell" data-execution_count="63">
 <div class="sourceCode cell-code" id="cb50" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb50-1"><span class="op" style="color: #5E5E5E;
 background-color: null;
 font-style: inherit;">%</span>timeit _ <span class="op" style="color: #5E5E5E;
@@ -1728,7 +2137,7 @@ font-style: inherit;">500</span>)</span></code></pre></div>
 </div>
 </div>
 <p>Do the eHT calculation:</p>
-<div class="cell" data-execution_count="64">
+<div id="cell-69" class="cell" data-execution_count="64">
 <div class="sourceCode cell-code" id="cb52" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb52-1"><span class="op" style="color: #5E5E5E;
 background-color: null;
 font-style: inherit;">%</span>timeit _ <span class="op" style="color: #5E5E5E;
@@ -20908,2324 +21317,6 @@ font-style: inherit;">=</span>dopts)</span></code></pre></div>
   <guid>https://greglandrum.github.io/rdkit-blog/posts/2025-02-08-more-on-generalized-substructure-search.html</guid>
   <pubDate>Fri, 07 Feb 2025 23:00:00 GMT</pubDate>
   <media:content url="https://greglandrum.github.io/rdkit-blog/posts/images/blog/more-on-generalized-substructure-search-1.png" medium="image" type="image/png" height="48" width="144"/>
-</item>
-<item>
-  <title>ChEMBL Document Similarity</title>
-  <link>https://greglandrum.github.io/rdkit-blog/posts/2025-02-02-chembl-document-similarity-1.html</link>
-  <description><![CDATA[ 
-
-
-
-
-<p>For a couple of other ideas I want to explore, I need some “clumpy” sets of compounds: a group of compounds with a number of separate clusters of different sizes and cohesiveness (I’m not sure what the right word here is, I mean how tightly packed the cluster is). As I almost always do, I’m going to do this using data from ChEMBL and I will use groups of compounds from individual med chem papers as my clumps. Since I want clumpiness at different similarity ranges, I want to be able to find groups of “related” papers: papers with similar compounds. This post is a first step towards finding those related papers.</p>
-<p>There’s an <a href="https://chembl.blogspot.com/2013/09/document-similarity-in-chembl.html">old ChEMBL blog post</a> about document similarity. Not too long after that, I did a <a href="https://rdkit.blogspot.com/2013/12/finding-related-documents-in-chembl.html">blog post</a> with a related approach. This time instead of looking at the number of highly similar compounds between papers, I’m going to look at the median similarity between the compounds the papers..</p>
-<p>I start by comparing at the distribution of similarities between compounds in med chem papers to those between papers in order to demonstrate that there is a significant difference there. To do this I pick a random sample of 20000 documents with between 20 and 100 compounds and use the usual Morgan fingerprint with radius 2 (there are plots below for radius 3 as well).</p>
-<p>Here are the distributions of the median compound similarities within the papers and the median similarities between 500K random pairs of papers:</p>
-<div class="quarto-figure quarto-figure-center">
-<figure class="figure">
-<p><img src="https://greglandrum.github.io/rdkit-blog/posts/2025-02-02-chembl-document-similarity-1_files/figure-html/dc5d46f9-2-image.png" class="img-fluid figure-img"></p>
-<figcaption>image.png</figcaption>
-</figure>
-</div>
-<p>The plot also contains lines showing the threshold values for similarity between random compounds and related compounds taken from <a href="https://greglandrum.github.io/rdkit-blog/posts/2021-05-21-similarity-search-thresholds.html">this blog post</a>. Unsurprisingly, the intra-paper similarity values tend to be significantly higher than the inter-paper similarity values. The intra-paper similarity values tend to be above the “related” threshold value while the inter-paper values are below the “random” threshold value.</p>
-<p>Moving on to finding related documents. One simple measure for document similarity is to count how many exact matches they have in common. This isn’t particularly interesting for my purposes, so I chose to focus on pairs of documents that have high ratios of compounds that have similarities above the “related” threshold. Here’s the overall distribution for fraction of exact matches, and fraction of pairs above the “random” and “related” thresholds for a set of 20 million random document pairs:</p>
-<div class="quarto-figure quarto-figure-center">
-<figure class="figure">
-<p><img src="https://greglandrum.github.io/rdkit-blog/posts/2025-02-02-chembl-document-similarity-1_files/figure-html/dc5d46f9-1-image-2.png" class="img-fluid figure-img"></p>
-<figcaption>image-2.png</figcaption>
-</figure>
-</div>
-<p>Looking through the papers with the highest “related” fraction shows that they contain peptides or other large molecules. This is less useful for me, so I’m going to come back to this in a follow-up post where I either limit the size of the compounds considered or use a count-based fingerprint to calculate similarity so that larger molecules don’t automatically have higher similarity scores.|</p>
-<div id="b46a1e68" class="cell" data-execution_count="1">
-<div class="sourceCode cell-code" id="cb1" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb1-1"><span class="im" style="color: #00769E;
-background-color: null;
-font-style: inherit;">from</span> rdkit <span class="im" style="color: #00769E;
-background-color: null;
-font-style: inherit;">import</span> Chem</span>
-<span id="cb1-2"><span class="im" style="color: #00769E;
-background-color: null;
-font-style: inherit;">from</span> rdkit.Chem <span class="im" style="color: #00769E;
-background-color: null;
-font-style: inherit;">import</span> rdFingerprintGenerator</span>
-<span id="cb1-3"><span class="im" style="color: #00769E;
-background-color: null;
-font-style: inherit;">from</span> rdkit.Chem.Draw <span class="im" style="color: #00769E;
-background-color: null;
-font-style: inherit;">import</span> IPythonConsole</span>
-<span id="cb1-4"><span class="im" style="color: #00769E;
-background-color: null;
-font-style: inherit;">from</span> rdkit.Chem <span class="im" style="color: #00769E;
-background-color: null;
-font-style: inherit;">import</span> Draw</span>
-<span id="cb1-5"><span class="im" style="color: #00769E;
-background-color: null;
-font-style: inherit;">from</span> rdkit.Chem <span class="im" style="color: #00769E;
-background-color: null;
-font-style: inherit;">import</span> rdDepictor</span>
-<span id="cb1-6">rdDepictor.SetPreferCoordGen(<span class="va" style="color: #111111;
-background-color: null;
-font-style: inherit;">True</span>)</span>
-<span id="cb1-7"></span>
-<span id="cb1-8"><span class="im" style="color: #00769E;
-background-color: null;
-font-style: inherit;">from</span> rdkit <span class="im" style="color: #00769E;
-background-color: null;
-font-style: inherit;">import</span> DataStructs</span>
-<span id="cb1-9"></span>
-<span id="cb1-10"><span class="im" style="color: #00769E;
-background-color: null;
-font-style: inherit;">import</span> numpy <span class="im" style="color: #00769E;
-background-color: null;
-font-style: inherit;">as</span> np</span>
-<span id="cb1-11"></span>
-<span id="cb1-12"><span class="im" style="color: #00769E;
-background-color: null;
-font-style: inherit;">from</span> matplotlib <span class="im" style="color: #00769E;
-background-color: null;
-font-style: inherit;">import</span> pyplot <span class="im" style="color: #00769E;
-background-color: null;
-font-style: inherit;">as</span> plt</span>
-<span id="cb1-13">plt.style.use(<span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">'tableau-colorblind10'</span>)</span>
-<span id="cb1-14"><span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">%</span>matplotlib inline</span>
-<span id="cb1-15"><span class="im" style="color: #00769E;
-background-color: null;
-font-style: inherit;">import</span> psycopg2</span>
-<span id="cb1-16"><span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">%</span>load_ext sql</span>
-<span id="cb1-17"></span>
-<span id="cb1-18"><span class="im" style="color: #00769E;
-background-color: null;
-font-style: inherit;">import</span> rdkit</span>
-<span id="cb1-19"><span class="bu" style="color: null;
-background-color: null;
-font-style: inherit;">print</span>(rdkit.__version__)</span></code></pre></div>
-<div class="cell-output cell-output-stdout">
-<pre><code>2024.09.4</code></pre>
-</div>
-</div>
-<div id="5233a402" class="cell" data-execution_count="2">
-<div class="sourceCode cell-code" id="cb3" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb3-1"><span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">%</span>config SqlMagic.feedback <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> <span class="va" style="color: #111111;
-background-color: null;
-font-style: inherit;">False</span></span></code></pre></div>
-</div>
-<section id="data-collection" class="level1">
-<h1>Data collection</h1>
-<p>Start by getting a collection of documents with between 20 and 100 compounds; this is my normal heuristic for trying to get med chem papers.</p>
-<div id="8759dc15" class="cell" data-execution_count="3">
-<div class="sourceCode cell-code" id="cb4" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb4-1"><span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">%</span>sql postgresql:<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">//</span>localhost<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">/</span>chembl_35 <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">\</span></span>
-<span id="cb4-2">    select doc_id,count(distinct molregno) cnt into temporary table doc_compound_counts <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">\</span></span>
-<span id="cb4-3">      <span class="im" style="color: #00769E;
-background-color: null;
-font-style: inherit;">from</span> docs join compound_records using (doc_id) join compound_structures using (molregno) <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">\</span></span>
-<span id="cb4-4">      group by (doc_id)<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">;</span></span></code></pre></div>
-<div class="cell-output cell-output-display" data-execution_count="3">
-<pre><code>[]</code></pre>
-</div>
-</div>
-<div id="9e90d2b5" class="cell" data-execution_count="4">
-<div class="sourceCode cell-code" id="cb6" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb6-1"><span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">%</span>sql <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">\</span></span>
-<span id="cb6-2">    select count(<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">*</span>) <span class="im" style="color: #00769E;
-background-color: null;
-font-style: inherit;">from</span> doc_compound_counts where cnt<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">&gt;=</span><span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">20</span> <span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">and</span> cnt<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">&lt;=</span><span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">100</span><span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">;</span></span></code></pre></div>
-<div class="cell-output cell-output-stdout">
-<pre><code> * postgresql://localhost/chembl_35</code></pre>
-</div>
-<div class="cell-output cell-output-display" data-execution_count="4">
-<table class="caption-top table table-sm table-striped small" data-quarto-postprocess="true">
-<thead>
-<tr class="header">
-<th data-quarto-table-cell-role="th">count</th>
-</tr>
-</thead>
-<tbody>
-<tr class="odd">
-<td>34821</td>
-</tr>
-</tbody>
-</table>
-</div>
-</div>
-<div id="f1877fd0" class="cell" data-execution_count="5">
-<div class="sourceCode cell-code" id="cb8" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb8-1">docs <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">%</span>sql <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">\</span></span>
-<span id="cb8-2">   select doc_id <span class="im" style="color: #00769E;
-background-color: null;
-font-style: inherit;">from</span> doc_compound_counts tablesample bernoulli(<span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">80</span>) repeatable (<span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">8723346</span>) <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">\</span></span>
-<span id="cb8-3">    where cnt<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">&gt;=</span><span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">20</span> <span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">and</span> cnt<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">&lt;=</span><span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">100</span> limit <span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">20000</span><span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">;</span></span>
-<span id="cb8-4"><span class="bu" style="color: null;
-background-color: null;
-font-style: inherit;">len</span>(docs)</span></code></pre></div>
-<div class="cell-output cell-output-stdout">
-<pre><code> * postgresql://localhost/chembl_35</code></pre>
-</div>
-<div class="cell-output cell-output-display" data-execution_count="5">
-<pre><code>20000</code></pre>
-</div>
-</div>
-<p>Generate fingerprints for the compounds from the papers</p>
-<div id="2e49fbf1" class="cell" data-execution_count="6">
-<div class="sourceCode cell-code" id="cb11" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb11-1">fpg2 <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> rdFingerprintGenerator.GetMorganGenerator(radius<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span><span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">2</span>)</span>
-<span id="cb11-2">fpg3 <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> rdFingerprintGenerator.GetMorganGenerator(radius<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span><span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">3</span>)</span>
-<span id="cb11-3"></span>
-<span id="cb11-4">fps2 <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> {}</span>
-<span id="cb11-5">fps3 <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> {}</span>
-<span id="cb11-6"><span class="cf" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">for</span> doc_id <span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">in</span> docs:</span>
-<span id="cb11-7">    doc_id <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> doc_id[<span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">0</span>]</span>
-<span id="cb11-8">    pkls <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">%</span>sql postgresql:<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">//</span>localhost<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">/</span>chembl_35 <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">\</span></span>
-<span id="cb11-9">        select molregno,mol_to_pkl(m) <span class="im" style="color: #00769E;
-background-color: null;
-font-style: inherit;">from</span> rdk.mols join compound_records using (molregno) <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">\</span></span>
-<span id="cb11-10">        where doc_id<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span>:doc_id</span>
-<span id="cb11-11">    ms <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> [Chem.Mol(x[<span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">1</span>].tobytes()) <span class="cf" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">for</span> x <span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">in</span> pkls]</span>
-<span id="cb11-12">    fps2[doc_id] <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> fpg2.GetFingerprints(ms)</span>
-<span id="cb11-13">    fps3[doc_id] <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> fpg3.GetFingerprints(ms)</span></code></pre></div>
-</div>
-</section>
-<section id="intra--and-inter-paper-similarity-distributions" class="level1">
-<h1>Intra- and inter-paper similarity distributions</h1>
-<p>Calculate intra-paper similarity distributions</p>
-<div id="81949f6b" class="cell" data-execution_count="7">
-<div class="sourceCode cell-code" id="cb12" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb12-1">sims2 <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> {}</span>
-<span id="cb12-2">sims3 <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> {}</span>
-<span id="cb12-3"><span class="cf" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">for</span> idx,doc_id <span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">in</span> <span class="bu" style="color: null;
-background-color: null;
-font-style: inherit;">enumerate</span>(docs):</span>
-<span id="cb12-4">    <span class="cf" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">if</span> <span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">not</span> idx<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">%</span><span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">1000</span>:</span>
-<span id="cb12-5">        <span class="bu" style="color: null;
-background-color: null;
-font-style: inherit;">print</span>(<span class="ss" style="color: #20794D;
-background-color: null;
-font-style: inherit;">f'Done </span><span class="sc" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">{</span>idx<span class="sc" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">}</span><span class="ss" style="color: #20794D;
-background-color: null;
-font-style: inherit;">'</span>)</span>
-<span id="cb12-6">    doc_id <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> doc_id[<span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">0</span>]</span>
-<span id="cb12-7">    a <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> []</span>
-<span id="cb12-8">    fps <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> fps2[doc_id]</span>
-<span id="cb12-9">    <span class="cf" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">for</span> i <span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">in</span> <span class="bu" style="color: null;
-background-color: null;
-font-style: inherit;">range</span>(<span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">1</span>,<span class="bu" style="color: null;
-background-color: null;
-font-style: inherit;">len</span>(fps)):</span>
-<span id="cb12-10">        a.extend(DataStructs.BulkTanimotoSimilarity(fps[i],fps[<span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">0</span>:i]))</span>
-<span id="cb12-11">    sims2[doc_id] <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> np.quantile(a,[<span class="fl" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">0.5</span>,<span class="fl" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">0.9</span>,<span class="fl" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">0.95</span>,<span class="fl" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">0.99</span>])</span>
-<span id="cb12-12">    a <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> []</span>
-<span id="cb12-13">    fps <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> fps3[doc_id]</span>
-<span id="cb12-14">    <span class="cf" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">for</span> i <span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">in</span> <span class="bu" style="color: null;
-background-color: null;
-font-style: inherit;">range</span>(<span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">1</span>,<span class="bu" style="color: null;
-background-color: null;
-font-style: inherit;">len</span>(fps)):</span>
-<span id="cb12-15">        a.extend(DataStructs.BulkTanimotoSimilarity(fps[i],fps[<span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">0</span>:i]))</span>
-<span id="cb12-16">    sims3[doc_id] <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> np.quantile(a,[<span class="fl" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">0.5</span>,<span class="fl" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">0.9</span>,<span class="fl" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">0.95</span>,<span class="fl" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">0.99</span>])</span>
-<span id="cb12-17">    </span></code></pre></div>
-<div class="cell-output cell-output-stdout">
-<pre><code>Done 0
-Done 1000
-Done 2000
-Done 3000
-Done 4000
-Done 5000
-Done 6000
-Done 7000
-Done 8000
-Done 9000
-Done 10000
-Done 11000
-Done 12000
-Done 13000
-Done 14000
-Done 15000
-Done 16000
-Done 17000
-Done 18000
-Done 19000</code></pre>
-</div>
-</div>
-<div id="3db19079" class="cell" data-execution_count="8">
-<div class="sourceCode cell-code" id="cb14" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb14-1">plt.figure(figsize<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span>(<span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">8</span>,<span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">8</span>))</span>
-<span id="cb14-2"></span>
-<span id="cb14-3">plt.subplot(<span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">2</span>,<span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">1</span>,<span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">1</span>)</span>
-<span id="cb14-4">plt.hist([[x[<span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">0</span>] <span class="cf" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">for</span> x <span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">in</span> sims2.values()],[x[<span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">0</span>] <span class="cf" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">for</span> x <span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">in</span> sims3.values()]],bins<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span><span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">20</span>,label<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span>([<span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">'mfp2'</span>,<span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">'mfp3'</span>]))<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">;</span></span>
-<span id="cb14-5">plt.xlabel(<span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">'median intra-doc similarity'</span>)<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">;</span></span>
-<span id="cb14-6">plt.legend()<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">;</span></span>
-<span id="cb14-7"></span>
-<span id="cb14-8">plt.subplot(<span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">2</span>,<span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">1</span>,<span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">2</span>)</span>
-<span id="cb14-9">plt.hist([[x[<span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">2</span>] <span class="cf" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">for</span> x <span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">in</span> sims2.values()],[x[<span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">2</span>] <span class="cf" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">for</span> x <span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">in</span> sims3.values()]],bins<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span><span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">20</span>,label<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span>([<span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">'mfp2'</span>,<span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">'mfp3'</span>]))<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">;</span></span>
-<span id="cb14-10">plt.xlabel(<span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">'95</span><span class="sc" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">% i</span><span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">ntra-doc similarity'</span>)<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">;</span></span>
-<span id="cb14-11">plt.legend()<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">;</span></span></code></pre></div>
-<div class="cell-output cell-output-display">
-<div>
-<figure class="figure">
-<p><img src="https://greglandrum.github.io/rdkit-blog/posts/2025-02-02-chembl-document-similarity-1_files/figure-html/cell-9-output-1.png" class="img-fluid figure-img"></p>
-</figure>
-</div>
-</div>
-</div>
-<p>Now calculate the inter-paper similarity distributions; I’ll choose 500,000 random pairs for this:</p>
-<div id="25ee9cdf" class="cell" data-execution_count="9">
-<div class="sourceCode cell-code" id="cb15" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb15-1">target <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> <span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">500000</span></span>
-<span id="cb15-2"></span>
-<span id="cb15-3"><span class="im" style="color: #00769E;
-background-color: null;
-font-style: inherit;">import</span> random</span>
-<span id="cb15-4"><span class="im" style="color: #00769E;
-background-color: null;
-font-style: inherit;">import</span> math</span>
-<span id="cb15-5"><span class="im" style="color: #00769E;
-background-color: null;
-font-style: inherit;">import</span> time</span>
-<span id="cb15-6"><span class="co" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;"># from: https://stackoverflow.com/a/55245866</span></span>
-<span id="cb15-7"><span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">def</span> decode(i):</span>
-<span id="cb15-8">    k <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> math.floor((<span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">1</span><span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">+</span>math.sqrt(<span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">1</span><span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">+</span><span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">8</span><span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">*</span>i))<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">/</span><span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">2</span>)</span>
-<span id="cb15-9">    <span class="cf" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">return</span> k,i<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">-</span>k<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">*</span>(k<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">-</span><span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">1</span>)<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">//</span><span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">2</span></span>
-<span id="cb15-10"></span>
-<span id="cb15-11"><span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">def</span> rand_pairs(n,m):</span>
-<span id="cb15-12">    <span class="cf" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">return</span> [decode(i) <span class="cf" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">for</span> i <span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">in</span> random.sample(<span class="bu" style="color: null;
-background-color: null;
-font-style: inherit;">range</span>(n<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">*</span>(n<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">-</span><span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">1</span>)<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">//</span><span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">2</span>),m)]</span>
-<span id="cb15-13"></span>
-<span id="cb15-14">pairs <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> rand_pairs(<span class="bu" style="color: null;
-background-color: null;
-font-style: inherit;">len</span>(docs),target)</span>
-<span id="cb15-15">pairs <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> [(docs[i][<span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">0</span>],docs[j][<span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">0</span>]) <span class="cf" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">for</span> i,j <span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">in</span> pairs]</span>
-<span id="cb15-16">       </span>
-<span id="cb15-17">        </span>
-<span id="cb15-18">inter_sims2 <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> {}</span>
-<span id="cb15-19">related_sims2 <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> {}</span>
-<span id="cb15-20">inter_sims3 <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> {}</span>
-<span id="cb15-21">related_sims3 <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> {}</span>
-<span id="cb15-22"><span class="cf" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">for</span> idx <span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">in</span> <span class="bu" style="color: null;
-background-color: null;
-font-style: inherit;">range</span>(target):</span>
-<span id="cb15-23">    <span class="cf" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">if</span> <span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">not</span> idx<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">%</span>(target<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">//</span><span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">20</span>):</span>
-<span id="cb15-24">        <span class="bu" style="color: null;
-background-color: null;
-font-style: inherit;">print</span>(<span class="ss" style="color: #20794D;
-background-color: null;
-font-style: inherit;">f'Done </span><span class="sc" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">{</span>idx<span class="sc" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">}</span><span class="ss" style="color: #20794D;
-background-color: null;
-font-style: inherit;">'</span>)</span>
-<span id="cb15-25">    di,dj <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> pairs[idx]</span>
-<span id="cb15-26">   </span>
-<span id="cb15-27">    a <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> []</span>
-<span id="cb15-28">    fpsi <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> fps2[di]</span>
-<span id="cb15-29">    fpsj <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> fps2[dj]</span>
-<span id="cb15-30">    <span class="cf" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">for</span> i <span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">in</span> <span class="bu" style="color: null;
-background-color: null;
-font-style: inherit;">range</span>(<span class="bu" style="color: null;
-background-color: null;
-font-style: inherit;">len</span>(fpsi)):</span>
-<span id="cb15-31">        a.extend(DataStructs.BulkTanimotoSimilarity(fpsi[i],fpsj))</span>
-<span id="cb15-32">    inter_sims2[(di,dj)] <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> np.quantile(a,[<span class="fl" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">0.5</span>,<span class="fl" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">0.9</span>,<span class="fl" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">0.95</span>,<span class="fl" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">0.99</span>])</span>
-<span id="cb15-33">    related_sims2[(di,dj)] <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> (<span class="bu" style="color: null;
-background-color: null;
-font-style: inherit;">len</span>([<span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">1</span> <span class="cf" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">for</span> x <span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">in</span> a <span class="cf" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">if</span> x<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">&gt;</span><span class="fl" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">0.27</span>]),<span class="bu" style="color: null;
-background-color: null;
-font-style: inherit;">len</span>([<span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">1</span> <span class="cf" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">for</span> x <span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">in</span> a <span class="cf" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">if</span> x<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">&gt;</span><span class="fl" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">0.4</span>]),<span class="bu" style="color: null;
-background-color: null;
-font-style: inherit;">len</span>(fpsi),<span class="bu" style="color: null;
-background-color: null;
-font-style: inherit;">len</span>(fpsj))</span>
-<span id="cb15-34"></span>
-<span id="cb15-35">    a <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> []</span>
-<span id="cb15-36">    fpsi <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> fps3[di]</span>
-<span id="cb15-37">    fpsj <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> fps3[dj]</span>
-<span id="cb15-38">    <span class="cf" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">for</span> i <span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">in</span> <span class="bu" style="color: null;
-background-color: null;
-font-style: inherit;">range</span>(<span class="bu" style="color: null;
-background-color: null;
-font-style: inherit;">len</span>(fpsi)):</span>
-<span id="cb15-39">        a.extend(DataStructs.BulkTanimotoSimilarity(fpsi[i],fpsj))</span>
-<span id="cb15-40">    inter_sims3[(di,dj)] <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> np.quantile(a,[<span class="fl" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">0.5</span>,<span class="fl" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">0.9</span>,<span class="fl" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">0.95</span>,<span class="fl" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">0.99</span>])</span>
-<span id="cb15-41">    related_sims3[(di,dj)] <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> (<span class="bu" style="color: null;
-background-color: null;
-font-style: inherit;">len</span>([<span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">1</span> <span class="cf" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">for</span> x <span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">in</span> a <span class="cf" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">if</span> x<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">&gt;</span><span class="fl" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">0.22</span>]),<span class="bu" style="color: null;
-background-color: null;
-font-style: inherit;">len</span>([<span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">1</span> <span class="cf" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">for</span> x <span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">in</span> a <span class="cf" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">if</span> x<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">&gt;</span><span class="fl" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">0.3</span>]),<span class="bu" style="color: null;
-background-color: null;
-font-style: inherit;">len</span>(fpsi),<span class="bu" style="color: null;
-background-color: null;
-font-style: inherit;">len</span>(fpsj) )</span></code></pre></div>
-<div class="cell-output cell-output-stdout">
-<pre><code>Done 0
-Done 25000
-Done 50000
-Done 75000
-Done 100000
-Done 125000
-Done 150000
-Done 175000
-Done 200000
-Done 225000
-Done 250000
-Done 275000
-Done 300000
-Done 325000
-Done 350000
-Done 375000
-Done 400000
-Done 425000
-Done 450000
-Done 475000</code></pre>
-</div>
-</div>
-<p>Compare the intra- and inter-paper distributions.</p>
-<p>The line labeled noise in the plot below is the “noise level” for the fingerprint - the 95% threshold for similarity between random compound. The dashed line labeled “related” is the threshold level for compounds which are related to each other. You can find more information about these definitions in <a href="https://greglandrum.github.io/rdkit-blog/posts/2021-05-21-similarity-search-thresholds.html">this blog post</a></p>
-<div id="818eccc8" class="cell" data-execution_count="63">
-<div class="sourceCode cell-code" id="cb17" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb17-1">plt.figure(figsize<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span>(<span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">8</span>,<span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">8</span>))</span>
-<span id="cb17-2"></span>
-<span id="cb17-3">plt.subplot(<span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">2</span>,<span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">1</span>,<span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">1</span>)</span>
-<span id="cb17-4">plt.hist([[x[<span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">0</span>] <span class="cf" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">for</span> x <span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">in</span> sims2.values()],[x[<span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">0</span>] <span class="cf" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">for</span> x <span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">in</span> inter_sims2.values()]],bins<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span><span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">20</span>,</span>
-<span id="cb17-5">         label<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span>([<span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">'intra-document'</span>,<span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">'inter-document'</span>]),density<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span><span class="va" style="color: #111111;
-background-color: null;
-font-style: inherit;">True</span>)<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">;</span></span>
-<span id="cb17-6">ymax <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> plt.ylim()[<span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">1</span>]</span>
-<span id="cb17-7">plt.plot([<span class="fl" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">0.27</span>,<span class="fl" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">0.27</span>],[<span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">0</span>,ymax],<span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">'k-'</span>,label<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span><span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">'noise'</span>)</span>
-<span id="cb17-8">plt.plot([<span class="fl" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">0.4</span>,<span class="fl" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">0.4</span>],[<span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">0</span>,ymax],<span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">'k--'</span>,label<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span><span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">'related'</span>)</span>
-<span id="cb17-9">plt.xlabel(<span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">'median mfp2 similarity'</span>)<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">;</span></span>
-<span id="cb17-10">plt.legend()<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">;</span></span>
-<span id="cb17-11"></span>
-<span id="cb17-12">plt.subplot(<span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">2</span>,<span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">1</span>,<span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">2</span>)</span>
-<span id="cb17-13">plt.hist([[x[<span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">2</span>] <span class="cf" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">for</span> x <span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">in</span> sims2.values()],[x[<span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">2</span>] <span class="cf" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">for</span> x <span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">in</span> inter_sims2.values()]],bins<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span><span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">20</span>,</span>
-<span id="cb17-14">         label<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span>([<span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">'intra-document'</span>,<span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">'inter-document'</span>]),density<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span><span class="va" style="color: #111111;
-background-color: null;
-font-style: inherit;">True</span>)<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">;</span></span>
-<span id="cb17-15">ymax <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> plt.ylim()[<span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">1</span>]</span>
-<span id="cb17-16">plt.plot([<span class="fl" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">0.22</span>,<span class="fl" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">0.22</span>],[<span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">0</span>,ymax],<span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">'k-'</span>,label<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span><span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">'noise'</span>)</span>
-<span id="cb17-17">plt.plot([<span class="fl" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">0.35</span>,<span class="fl" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">0.35</span>],[<span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">0</span>,ymax],<span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">'k--'</span>,label<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span><span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">'related'</span>)</span>
-<span id="cb17-18">plt.xlabel(<span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">'95% mfp2 similarity'</span>)<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">;</span></span>
-<span id="cb17-19">plt.legend()<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">;</span></span></code></pre></div>
-<div class="cell-output cell-output-display">
-<div>
-<figure class="figure">
-<p><img src="https://greglandrum.github.io/rdkit-blog/posts/2025-02-02-chembl-document-similarity-1_files/figure-html/cell-11-output-1.png" class="img-fluid figure-img"></p>
-</figure>
-</div>
-</div>
-</div>
-<p>Get just the first of those plots, because that’s what we’ll use in the summary above:</p>
-<div id="339896ff" class="cell" data-execution_count="64">
-<div class="sourceCode cell-code" id="cb18" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb18-1">plt.figure(figsize<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span>(<span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">8</span>,<span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">4</span>))</span>
-<span id="cb18-2"></span>
-<span id="cb18-3">plt.hist([[x[<span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">0</span>] <span class="cf" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">for</span> x <span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">in</span> sims2.values()],[x[<span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">0</span>] <span class="cf" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">for</span> x <span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">in</span> inter_sims2.values()]],bins<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span><span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">20</span>,</span>
-<span id="cb18-4">         label<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span>([<span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">'intra-document'</span>,<span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">'inter-document'</span>]),density<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span><span class="va" style="color: #111111;
-background-color: null;
-font-style: inherit;">True</span>)<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">;</span></span>
-<span id="cb18-5">ymax <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> plt.ylim()[<span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">1</span>]</span>
-<span id="cb18-6">plt.plot([<span class="fl" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">0.27</span>,<span class="fl" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">0.27</span>],[<span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">0</span>,ymax],<span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">'k-'</span>,label<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span><span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">'noise'</span>)</span>
-<span id="cb18-7">plt.plot([<span class="fl" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">0.4</span>,<span class="fl" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">0.4</span>],[<span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">0</span>,ymax],<span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">'k--'</span>,label<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span><span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">'related'</span>)</span>
-<span id="cb18-8">plt.xlabel(<span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">'median mfp2 similarity'</span>)<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">;</span></span>
-<span id="cb18-9">plt.legend()<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">;</span></span></code></pre></div>
-<div class="cell-output cell-output-display">
-<div>
-<figure class="figure">
-<p><img src="https://greglandrum.github.io/rdkit-blog/posts/2025-02-02-chembl-document-similarity-1_files/figure-html/cell-12-output-1.png" class="img-fluid figure-img"></p>
-</figure>
-</div>
-</div>
-</div>
-<div id="399ccbcf" class="cell" data-execution_count="68">
-<div class="sourceCode cell-code" id="cb19" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb19-1">np.quantile([x[<span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">0</span>] <span class="cf" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">for</span> x <span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">in</span> sims2.values()],[<span class="fl" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">0.5</span>,<span class="fl" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">0.9</span>,<span class="fl" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">0.95</span>,<span class="fl" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">0.99</span>])</span></code></pre></div>
-<div class="cell-output cell-output-display" data-execution_count="68">
-<pre><code>array([0.48979592, 0.65753425, 0.7       , 0.78703901])</code></pre>
-</div>
-</div>
-<div id="f1306f06" class="cell" data-execution_count="70">
-<div class="sourceCode cell-code" id="cb21" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb21-1">np.quantile([x[<span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">0</span>] <span class="cf" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">for</span> x <span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">in</span> inter_sims2.values()],[<span class="fl" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">0.5</span>,<span class="fl" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">0.9</span>,<span class="fl" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">0.95</span>,<span class="fl" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">0.99</span>])</span></code></pre></div>
-<div class="cell-output cell-output-display" data-execution_count="70">
-<pre><code>array([0.10227273, 0.14      , 0.15306122, 0.18390805])</code></pre>
-</div>
-</div>
-</section>
-<section id="finding-related-documents" class="level1">
-<h1>Finding related documents</h1>
-<p>Get the molregnos for the compounds in all the papers. We will use these to identify overlapping compounds and to retrieve the compounds themselves</p>
-<div id="9af2b3b6" class="cell" data-execution_count="13">
-<div class="sourceCode cell-code" id="cb23" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb23-1">mrns <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> {}</span>
-<span id="cb23-2"><span class="cf" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">for</span> doc_id <span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">in</span> docs:</span>
-<span id="cb23-3">    doc_id <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> doc_id[<span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">0</span>]</span>
-<span id="cb23-4">    pkls <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">%</span>sql postgresql:<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">//</span>localhost<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">/</span>chembl_35 <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">\</span></span>
-<span id="cb23-5">        select molregno <span class="im" style="color: #00769E;
-background-color: null;
-font-style: inherit;">from</span> rdk.mols join compound_records using (molregno) <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">\</span></span>
-<span id="cb23-6">        where doc_id<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span>:doc_id</span>
-<span id="cb23-7">    mrns[doc_id] <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> [x[<span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">0</span>] <span class="cf" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">for</span> x <span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">in</span> pkls]</span></code></pre></div>
-</div>
-<div id="6f97ab56" class="cell" data-execution_count="14">
-<div class="sourceCode cell-code" id="cb24" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb24-1">(<span class="bu" style="color: null;
-background-color: null;
-font-style: inherit;">len</span>(docs)<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">*</span>(<span class="bu" style="color: null;
-background-color: null;
-font-style: inherit;">len</span>(docs)<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">-</span><span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">1</span>))<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">//</span><span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">2</span></span></code></pre></div>
-<div class="cell-output cell-output-display" data-execution_count="14">
-<pre><code>199990000</code></pre>
-</div>
-</div>
-<p>I’ll look at 10,000,000 random pairs of documents:</p>
-<div id="c3fe1474" class="cell" data-execution_count="15">
-<div class="sourceCode cell-code" id="cb26" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb26-1">pairs2 <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> rand_pairs(<span class="bu" style="color: null;
-background-color: null;
-font-style: inherit;">len</span>(docs),<span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">10000000</span>)</span>
-<span id="cb26-2">pairs2 <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> [(docs[i][<span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">0</span>],docs[j][<span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">0</span>]) <span class="cf" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">for</span> i,j <span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">in</span> pairs2]</span></code></pre></div>
-</div>
-<p>For each pair calculate the number of compounds in common and the fractions of compound pairs with similarity values above the random and related thresholds.</p>
-<div id="855088d9" class="cell" data-execution_count="31">
-<div class="sourceCode cell-code" id="cb27" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb27-1">mrn_overlaps <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> []</span>
-<span id="cb27-2">noise_sim_overlaps <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> []</span>
-<span id="cb27-3">related_sim_overlaps <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> []</span>
-<span id="cb27-4"></span>
-<span id="cb27-5"><span class="cf" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">for</span> idx <span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">in</span> <span class="bu" style="color: null;
-background-color: null;
-font-style: inherit;">range</span>(<span class="bu" style="color: null;
-background-color: null;
-font-style: inherit;">len</span>(pairs2)):</span>
-<span id="cb27-6">    <span class="cf" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">if</span> <span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">not</span> idx<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">%</span>(<span class="bu" style="color: null;
-background-color: null;
-font-style: inherit;">len</span>(pairs2)<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">//</span><span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">20</span>):</span>
-<span id="cb27-7">        <span class="bu" style="color: null;
-background-color: null;
-font-style: inherit;">print</span>(<span class="ss" style="color: #20794D;
-background-color: null;
-font-style: inherit;">f'Done </span><span class="sc" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">{</span>idx<span class="sc" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">}</span><span class="ss" style="color: #20794D;
-background-color: null;
-font-style: inherit;">'</span>)</span>
-<span id="cb27-8">    di,dj <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> pairs2[idx]</span>
-<span id="cb27-9">   </span>
-<span id="cb27-10">    mrnsi <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> <span class="bu" style="color: null;
-background-color: null;
-font-style: inherit;">set</span>(mrns[di])</span>
-<span id="cb27-11">    mrnsj <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> <span class="bu" style="color: null;
-background-color: null;
-font-style: inherit;">set</span>(mrns[dj])</span>
-<span id="cb27-12">    mrn_overlaps.append(<span class="bu" style="color: null;
-background-color: null;
-font-style: inherit;">len</span>(mrnsi.intersection(mrnsj))<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">/</span>(<span class="bu" style="color: null;
-background-color: null;
-font-style: inherit;">len</span>(mrnsi)<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">+</span><span class="bu" style="color: null;
-background-color: null;
-font-style: inherit;">len</span>(mrnsj)<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">-</span><span class="bu" style="color: null;
-background-color: null;
-font-style: inherit;">len</span>(mrnsi.intersection(mrnsj))))</span>
-<span id="cb27-13">    </span>
-<span id="cb27-14">    <span class="cf" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">if</span> (di,dj) <span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">not</span> <span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">in</span> related_sims2:</span>
-<span id="cb27-15">        a <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> []</span>
-<span id="cb27-16">        fpsi <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> fps2[di]</span>
-<span id="cb27-17">        fpsj <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> fps2[dj]</span>
-<span id="cb27-18">        <span class="cf" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">for</span> i <span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">in</span> <span class="bu" style="color: null;
-background-color: null;
-font-style: inherit;">range</span>(<span class="bu" style="color: null;
-background-color: null;
-font-style: inherit;">len</span>(fpsi)):</span>
-<span id="cb27-19">            a.extend(DataStructs.BulkTanimotoSimilarity(fpsi[i],fpsj))</span>
-<span id="cb27-20">        inter_sims2[(di,dj)] <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> np.quantile(a,[<span class="fl" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">0.5</span>,<span class="fl" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">0.9</span>,<span class="fl" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">0.95</span>,<span class="fl" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">0.99</span>])</span>
-<span id="cb27-21">        related_sims2[(di,dj)] <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> (<span class="bu" style="color: null;
-background-color: null;
-font-style: inherit;">len</span>([<span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">1</span> <span class="cf" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">for</span> x <span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">in</span> a <span class="cf" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">if</span> x<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">&gt;</span><span class="fl" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">0.27</span>]),<span class="bu" style="color: null;
-background-color: null;
-font-style: inherit;">len</span>([<span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">1</span> <span class="cf" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">for</span> x <span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">in</span> a <span class="cf" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">if</span> x<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">&gt;</span><span class="fl" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">0.4</span>]),<span class="bu" style="color: null;
-background-color: null;
-font-style: inherit;">len</span>(fpsi),<span class="bu" style="color: null;
-background-color: null;
-font-style: inherit;">len</span>(fpsj))   </span>
-<span id="cb27-22">    </span>
-<span id="cb27-23">    noise,related,ni,nj <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> related_sims2[(di,dj)]</span>
-<span id="cb27-24">    denom <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> ni<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">*</span>nj</span>
-<span id="cb27-25">    noise_sim_overlaps.append(noise<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">/</span>denom)</span>
-<span id="cb27-26">    related_sim_overlaps.append(related<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">/</span>denom)</span>
-<span id="cb27-27">    </span></code></pre></div>
-<div class="cell-output cell-output-stdout">
-<pre><code>Done 0
-Done 500000
-Done 1000000
-Done 1500000
-Done 2000000
-Done 2500000
-Done 3000000
-Done 3500000
-Done 4000000
-Done 4500000
-Done 5000000
-Done 5500000
-Done 6000000
-Done 6500000
-Done 7000000
-Done 7500000
-Done 8000000
-Done 8500000
-Done 9000000
-Done 9500000</code></pre>
-</div>
-</div>
-<div id="bcfb3652" class="cell" data-execution_count="71">
-<div class="sourceCode cell-code" id="cb29" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb29-1"><span class="bu" style="color: null;
-background-color: null;
-font-style: inherit;">len</span>(inter_sims2),<span class="bu" style="color: null;
-background-color: null;
-font-style: inherit;">len</span>([<span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">1</span> <span class="cf" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">for</span> v <span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">in</span> inter_sims2.values() <span class="cf" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">if</span> v[<span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">0</span>]<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">&gt;</span><span class="fl" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">0.27</span>]),<span class="bu" style="color: null;
-background-color: null;
-font-style: inherit;">len</span>([<span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">1</span> <span class="cf" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">for</span> v <span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">in</span> inter_sims2.values() <span class="cf" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">if</span> v[<span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">0</span>]<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">&gt;</span><span class="fl" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">0.4</span>])</span></code></pre></div>
-<div class="cell-output cell-output-display" data-execution_count="71">
-<pre><code>(10474902, 6329, 707)</code></pre>
-</div>
-</div>
-<p>Look at the fraction of exact matches, the fraction of pairs of compounds with similarity above the random threshold, and the fraction of pairs of compounds with similarity above the related threshold:</p>
-<div id="91d8e0ef" class="cell" data-execution_count="32">
-<div class="sourceCode cell-code" id="cb31" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb31-1">plt.figure(figsize<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span>(<span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">8</span>,<span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">4</span>))</span>
-<span id="cb31-2"></span>
-<span id="cb31-3">plt.hist([mrn_overlaps,noise_sim_overlaps,related_sim_overlaps],bins<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span><span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">20</span>,log<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span><span class="va" style="color: #111111;
-background-color: null;
-font-style: inherit;">True</span>,</span>
-<span id="cb31-4">        label<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span>(<span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">'mrns'</span>,<span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">'mfp2-nonrandom'</span>,<span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">'mfp2-related'</span>))</span>
-<span id="cb31-5">plt.xlabel(<span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">'compound overlap'</span>)<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">;</span></span>
-<span id="cb31-6">plt.legend()<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">;</span></span></code></pre></div>
-<div class="cell-output cell-output-display">
-<div>
-<figure class="figure">
-<p><img src="https://greglandrum.github.io/rdkit-blog/posts/2025-02-02-chembl-document-similarity-1_files/figure-html/cell-21-output-1.png" class="img-fluid figure-img"></p>
-</figure>
-</div>
-</div>
-</div>
-<p>Let’s look at an example with a high fraction of compounds above the noise level but a low fraction above the related level:</p>
-<div id="69de3474" class="cell" data-execution_count="33">
-<div class="sourceCode cell-code" id="cb32" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb32-1">[(i,ovl,related_sim_overlaps[i]) <span class="cf" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">for</span> i,ovl <span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">in</span> <span class="bu" style="color: null;
-background-color: null;
-font-style: inherit;">enumerate</span>(noise_sim_overlaps) <span class="cf" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">if</span> ovl<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">&gt;</span><span class="fl" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">0.5</span>][:<span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">2</span>]</span></code></pre></div>
-<div class="cell-output cell-output-display" data-execution_count="33">
-<pre><code>[(1606, 0.5188034188034188, 0.09487179487179487),
- (5770, 0.5236270753512133, 0.14431673052362706)]</code></pre>
-</div>
-</div>
-<div id="32b04401" class="cell" data-execution_count="39">
-<div class="sourceCode cell-code" id="cb34" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb34-1">pairs2[<span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">1606</span>]</span></code></pre></div>
-<div class="cell-output cell-output-display" data-execution_count="39">
-<pre><code>(66679, 21372)</code></pre>
-</div>
-</div>
-<div id="1af8926f" class="cell" data-execution_count="72">
-<div class="sourceCode cell-code" id="cb36" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb36-1">didi,didj <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> pairs2[<span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">1606</span>]</span>
-<span id="cb36-2">pklsi <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">%</span>sql postgresql:<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">//</span>localhost<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">/</span>chembl_35 <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">\</span></span>
-<span id="cb36-3">   select chembl_id,mol_to_pkl(m) <span class="im" style="color: #00769E;
-background-color: null;
-font-style: inherit;">from</span> rdk.mols join compound_records using (molregno) <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">\</span></span>
-<span id="cb36-4">    join chembl_id_lookup on (molregno<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span>entity_id <span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">and</span> entity_type<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span><span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">'COMPOUND'</span>) <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">\</span></span>
-<span id="cb36-5">    where doc_id<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span>:didi</span>
-<span id="cb36-6">molsi <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> [(x,Chem.Mol(y.tobytes())) <span class="cf" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">for</span> x,y <span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">in</span> pklsi]</span>
-<span id="cb36-7">pklsj <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">%</span>sql postgresql:<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">//</span>localhost<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">/</span>chembl_35 <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">\</span></span>
-<span id="cb36-8">   select chembl_id,mol_to_pkl(m) <span class="im" style="color: #00769E;
-background-color: null;
-font-style: inherit;">from</span> rdk.mols join compound_records using (molregno) <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">\</span></span>
-<span id="cb36-9">    join chembl_id_lookup on (molregno<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span>entity_id <span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">and</span> entity_type<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span><span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">'COMPOUND'</span>) <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">\</span></span>
-<span id="cb36-10">    where doc_id<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span>:didj</span>
-<span id="cb36-11">molsj <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> [(x,Chem.Mol(y.tobytes())) <span class="cf" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">for</span> x,y <span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">in</span> pklsj]</span></code></pre></div>
-</div>
-<div id="abfcf92c" class="cell" data-execution_count="73">
-<div class="sourceCode cell-code" id="cb37" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb37-1"><span class="bu" style="color: null;
-background-color: null;
-font-style: inherit;">len</span>(molsi),<span class="bu" style="color: null;
-background-color: null;
-font-style: inherit;">len</span>(molsj)</span></code></pre></div>
-<div class="cell-output cell-output-display" data-execution_count="73">
-<pre><code>(45, 26)</code></pre>
-</div>
-</div>
-<div id="26874ab1" class="cell" data-execution_count="74">
-<div class="sourceCode cell-code" id="cb39" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb39-1">Draw.MolsToGridImage([y <span class="cf" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">for</span> x,y <span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">in</span> molsi][:<span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">12</span>],legends<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span>[x <span class="cf" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">for</span> x,y <span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">in</span> molsi],molsPerRow<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span><span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">4</span>)</span></code></pre></div>
-<div class="cell-output cell-output-display" data-execution_count="74">
-<div>
-<figure class="figure">
-<p><img src="https://greglandrum.github.io/rdkit-blog/posts/2025-02-02-chembl-document-similarity-1_files/figure-html/cell-26-output-1.png" class="img-fluid figure-img"></p>
-</figure>
-</div>
-</div>
-</div>
-<div id="84e2527a" class="cell" data-execution_count="75">
-<div class="sourceCode cell-code" id="cb40" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb40-1">Draw.MolsToGridImage([y <span class="cf" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">for</span> x,y <span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">in</span> molsj][:<span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">12</span>],legends<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span>[x <span class="cf" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">for</span> x,y <span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">in</span> molsj],molsPerRow<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span><span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">4</span>)</span></code></pre></div>
-<div class="cell-output cell-output-display" data-execution_count="75">
-<div>
-<figure class="figure">
-<p><img src="https://greglandrum.github.io/rdkit-blog/posts/2025-02-02-chembl-document-similarity-1_files/figure-html/cell-27-output-1.png" class="img-fluid figure-img"></p>
-</figure>
-</div>
-</div>
-</div>
-<p>Anb bibliographic info on those:</p>
-<div id="7c5a4df0" class="cell" data-execution_count="76">
-<div class="sourceCode cell-code" id="cb41" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb41-1"><span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">%</span>sql postgresql:<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">//</span>localhost<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">/</span>chembl_35 <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">\</span></span>
-<span id="cb41-2">    select doc_id,title,authors <span class="im" style="color: #00769E;
-background-color: null;
-font-style: inherit;">from</span> docs where doc_id <span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">in</span> (:didi,:didj)</span></code></pre></div>
-<div class="cell-output cell-output-display" data-execution_count="76">
-<table class="caption-top table table-sm table-striped small" data-quarto-postprocess="true">
-<thead>
-<tr class="header">
-<th data-quarto-table-cell-role="th">doc_id</th>
-<th data-quarto-table-cell-role="th">title</th>
-<th data-quarto-table-cell-role="th">authors</th>
-</tr>
-</thead>
-<tbody>
-<tr class="odd">
-<td>9752</td>
-<td>Synthesis and hypolipidemic activity of 2-substituted isobutyric acid derivatives.</td>
-<td>Morishita S, Saito T, Hirai Y, Shoji M, Mishima Y, Kawakami M.</td>
-</tr>
-<tr class="even">
-<td>15546</td>
-<td>Synthesis and immunosuppressive activity of 2-substituted 2-aminopropane-1,3-diols and 2-aminoethanols.</td>
-<td>Kiuchi M, Adachi K, Kohara T, Minoguchi M, Hanano T, Aoki Y, Mishina T, Arita M, Nakao N, Ohtsuki M, Hoshino Y, Teshima K, Chiba K, Sasaki S, Fujita T.</td>
-</tr>
-</tbody>
-</table>
-</div>
-</div>
-<p>Look about a pair with a high fraction of “related” structures but a small number of exact matches:</p>
-<div id="46239c91" class="cell" data-execution_count="46">
-<div class="sourceCode cell-code" id="cb42" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb42-1">[(i,ovl,noise_sim_overlaps[i],mrn_overlaps[i]) <span class="cf" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">for</span> i,ovl <span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">in</span> <span class="bu" style="color: null;
-background-color: null;
-font-style: inherit;">enumerate</span>(related_sim_overlaps) <span class="cf" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">if</span> ovl<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">&gt;</span><span class="fl" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">0.5</span>][:<span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">2</span>]</span></code></pre></div>
-<div class="cell-output cell-output-display" data-execution_count="46">
-<pre><code>[(6704, 0.7841269841269841, 0.9206349206349206, 0.0),
- (34215, 0.5823095823095823, 0.8341523341523341, 0.03508771929824561)]</code></pre>
-</div>
-</div>
-<div id="de53f47d" class="cell" data-execution_count="77">
-<div class="sourceCode cell-code" id="cb44" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb44-1">didi,didj <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> pairs2[<span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">6704</span>]</span>
-<span id="cb44-2">pklsi <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">%</span>sql postgresql:<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">//</span>localhost<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">/</span>chembl_35 <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">\</span></span>
-<span id="cb44-3">   select chembl_id,mol_to_pkl(m) <span class="im" style="color: #00769E;
-background-color: null;
-font-style: inherit;">from</span> rdk.mols join compound_records using (molregno) <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">\</span></span>
-<span id="cb44-4">    join chembl_id_lookup on (molregno<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span>entity_id <span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">and</span> entity_type<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span><span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">'COMPOUND'</span>) <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">\</span></span>
-<span id="cb44-5">    where doc_id<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span>:didi</span>
-<span id="cb44-6">molsi <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> [(x,Chem.Mol(y.tobytes())) <span class="cf" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">for</span> x,y <span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">in</span> pklsi]</span>
-<span id="cb44-7">pklsj <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">%</span>sql postgresql:<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">//</span>localhost<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">/</span>chembl_35 <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">\</span></span>
-<span id="cb44-8">   select chembl_id,mol_to_pkl(m) <span class="im" style="color: #00769E;
-background-color: null;
-font-style: inherit;">from</span> rdk.mols join compound_records using (molregno) <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">\</span></span>
-<span id="cb44-9">    join chembl_id_lookup on (molregno<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span>entity_id <span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">and</span> entity_type<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span><span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">'COMPOUND'</span>) <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">\</span></span>
-<span id="cb44-10">    where doc_id<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span>:didj</span>
-<span id="cb44-11">molsj <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> [(x,Chem.Mol(y.tobytes())) <span class="cf" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">for</span> x,y <span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">in</span> pklsj]</span>
-<span id="cb44-12"><span class="bu" style="color: null;
-background-color: null;
-font-style: inherit;">len</span>(molsi),<span class="bu" style="color: null;
-background-color: null;
-font-style: inherit;">len</span>(molsj)</span></code></pre></div>
-<div class="cell-output cell-output-display" data-execution_count="77">
-<pre><code>(21, 30)</code></pre>
-</div>
-</div>
-<div id="b696debe" class="cell" data-execution_count="82">
-<div class="sourceCode cell-code" id="cb46" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb46-1">Draw.MolsToGridImage([y <span class="cf" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">for</span> x,y <span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">in</span> molsi][<span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">1</span>:<span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">10</span>],legends<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span>[x <span class="cf" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">for</span> x,y <span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">in</span> molsi[<span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">1</span>:]],molsPerRow<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span><span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">3</span>,subImgSize<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span>(<span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">250</span>,<span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">200</span>))</span></code></pre></div>
-<div class="cell-output cell-output-display" data-execution_count="82">
-<div>
-<figure class="figure">
-<p><img src="https://greglandrum.github.io/rdkit-blog/posts/2025-02-02-chembl-document-similarity-1_files/figure-html/cell-31-output-1.png" class="img-fluid figure-img"></p>
-</figure>
-</div>
-</div>
-</div>
-<div id="1430fc5c" class="cell" data-execution_count="79">
-<div class="sourceCode cell-code" id="cb47" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb47-1">Draw.MolsToGridImage([y <span class="cf" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">for</span> x,y <span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">in</span> molsj][<span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">1</span>:<span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">10</span>],legends<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span>[x <span class="cf" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">for</span> x,y <span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">in</span> molsj[<span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">1</span>:]],molsPerRow<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span><span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">3</span>,subImgSize<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span>(<span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">250</span>,<span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">200</span>))</span></code></pre></div>
-<div class="cell-output cell-output-display" data-execution_count="79">
-<div>
-<figure class="figure">
-<p><img src="https://greglandrum.github.io/rdkit-blog/posts/2025-02-02-chembl-document-similarity-1_files/figure-html/cell-32-output-1.png" class="img-fluid figure-img"></p>
-</figure>
-</div>
-</div>
-</div>
-<div id="9800075d" class="cell" data-execution_count="80">
-<div class="sourceCode cell-code" id="cb48" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb48-1"><span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">%</span>sql postgresql:<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">//</span>localhost<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">/</span>chembl_35 <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">\</span></span>
-<span id="cb48-2">    select doc_id,title,authors <span class="im" style="color: #00769E;
-background-color: null;
-font-style: inherit;">from</span> docs where doc_id <span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">in</span> (:didi,:didj)</span></code></pre></div>
-<div class="cell-output cell-output-display" data-execution_count="80">
-<table class="caption-top table table-sm table-striped small" data-quarto-postprocess="true">
-<thead>
-<tr class="header">
-<th data-quarto-table-cell-role="th">doc_id</th>
-<th data-quarto-table-cell-role="th">title</th>
-<th data-quarto-table-cell-role="th">authors</th>
-</tr>
-</thead>
-<tbody>
-<tr class="odd">
-<td>5559</td>
-<td>Synthesis, stereochemical assignment and biological activity of a novel series of C-4" modified aza-macrolides.</td>
-<td>Bronk BS, Letavic MA, Bertsche CD, George DM, Hayashi SF, Kamicker BJ, Kolosko NL, Norcia LJ, Rushing MA, Santoro SL, Yang BV.</td>
-</tr>
-<tr class="even">
-<td>62283</td>
-<td>Design, synthesis, and in vitro activity of novel 2'-O-substituted 15-membered azalides.</td>
-<td>Pešić D, Starčević K, Toplak A, Herreros E, Vidal J, Almela MJ, Jelić D, Alihodžić S, Spaventi R, Perić M.</td>
-</tr>
-</tbody>
-</table>
-</div>
-</div>
-<p>Order the document pairs by the median inter-document similarity.</p>
-<div id="830cab89" class="cell" data-execution_count="87">
-<div class="sourceCode cell-code" id="cb49" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb49-1">ordered <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> <span class="bu" style="color: null;
-background-color: null;
-font-style: inherit;">sorted</span>((v[<span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">0</span>],k) <span class="cf" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">for</span> k,v <span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">in</span> inter_sims2.items())</span>
-<span id="cb49-2">ordered.reverse()</span></code></pre></div>
-</div>
-<div id="2d74865f" class="cell" data-execution_count="90">
-<div class="sourceCode cell-code" id="cb50" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb50-1">[(k,inter_sims2[k],related_sims2[k]) <span class="cf" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">for</span> _,k <span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">in</span> ordered[:<span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">10</span>]]</span></code></pre></div>
-<div class="cell-output cell-output-display" data-execution_count="90">
-<pre><code>[((12331, 7482),
-  array([0.83809524, 0.91428571, 0.96      , 1.        ]),
-  (594, 594, 27, 22)),
- ((93472, 15907),
-  array([0.76190476, 0.82279986, 0.85034014, 0.88860906]),
-  (1656, 1656, 46, 36)),
- ((14825, 9122),
-  array([0.73387097, 0.9380531 , 0.9826087 , 1.        ]),
-  (1817, 1817, 79, 23)),
- ((31412, 6280),
-  array([0.71590909, 0.77286602, 0.81410256, 0.87204231]),
-  (651, 651, 31, 22)),
- ((42121, 13617),
-  array([0.71551724, 0.8411215 , 0.86538462, 0.91116191]),
-  (1711, 1711, 59, 30)),
- ((2880, 923),
-  array([0.71028037, 0.7979798 , 0.82501752, 0.89473684]),
-  (2470, 2470, 26, 95)),
- ((65011, 5969),
-  array([0.70748299, 0.78516762, 0.82269504, 0.86639801]),
-  (1081, 1081, 24, 47)),
- ((46543, 4410),
-  array([0.703125  , 0.83928571, 0.85714286, 1.        ]),
-  (575, 575, 23, 25)),
- ((98553, 55691),
-  array([0.7029703 , 0.84946237, 0.88172043, 0.92391304]),
-  (716, 716, 36, 30)),
- ((10959, 923),
-  array([0.69194824, 0.83333333, 0.88282071, 1.        ]),
-  (4370, 4368, 46, 95))]</code></pre>
-</div>
-</div>
-<div id="0ea01f50" class="cell" data-execution_count="109">
-<div class="sourceCode cell-code" id="cb52" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb52-1">didi,didj <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> ordered[<span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">0</span>][<span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">1</span>]</span>
-<span id="cb52-2">pklsi <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">%</span>sql postgresql:<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">//</span>localhost<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">/</span>chembl_35 <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">\</span></span>
-<span id="cb52-3">   select chembl_id,mol_to_pkl(m) <span class="im" style="color: #00769E;
-background-color: null;
-font-style: inherit;">from</span> rdk.mols join compound_records using (molregno) <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">\</span></span>
-<span id="cb52-4">    join chembl_id_lookup on (molregno<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span>entity_id <span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">and</span> entity_type<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span><span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">'COMPOUND'</span>) <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">\</span></span>
-<span id="cb52-5">    where doc_id<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span>:didi</span>
-<span id="cb52-6">molsi <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> [(x,Chem.Mol(y.tobytes())) <span class="cf" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">for</span> x,y <span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">in</span> pklsi]</span>
-<span id="cb52-7">pklsj <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">%</span>sql postgresql:<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">//</span>localhost<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">/</span>chembl_35 <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">\</span></span>
-<span id="cb52-8">   select chembl_id,mol_to_pkl(m) <span class="im" style="color: #00769E;
-background-color: null;
-font-style: inherit;">from</span> rdk.mols join compound_records using (molregno) <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">\</span></span>
-<span id="cb52-9">    join chembl_id_lookup on (molregno<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span>entity_id <span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">and</span> entity_type<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span><span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">'COMPOUND'</span>) <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">\</span></span>
-<span id="cb52-10">    where doc_id<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span>:didj</span>
-<span id="cb52-11">molsj <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> [(x,Chem.Mol(y.tobytes())) <span class="cf" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">for</span> x,y <span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">in</span> pklsj]</span></code></pre></div>
-</div>
-<div id="cafe1852" class="cell" data-execution_count="110">
-<div class="sourceCode cell-code" id="cb53" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb53-1">Draw.MolsToGridImage([y <span class="cf" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">for</span> x,y <span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">in</span> molsi][<span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">1</span>:<span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">10</span>],legends<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span>[x <span class="cf" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">for</span> x,y <span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">in</span> molsi[<span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">1</span>:]],molsPerRow<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span><span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">3</span>,subImgSize<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span>(<span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">250</span>,<span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">200</span>))</span></code></pre></div>
-<div class="cell-output cell-output-display" data-execution_count="110">
-<div>
-<figure class="figure">
-<p><img src="https://greglandrum.github.io/rdkit-blog/posts/2025-02-02-chembl-document-similarity-1_files/figure-html/cell-37-output-1.png" class="img-fluid figure-img"></p>
-</figure>
-</div>
-</div>
-</div>
-<div id="8c90f488" class="cell" data-execution_count="111">
-<div class="sourceCode cell-code" id="cb54" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb54-1">Draw.MolsToGridImage([y <span class="cf" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">for</span> x,y <span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">in</span> molsj][<span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">1</span>:<span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">10</span>],legends<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span>[x <span class="cf" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">for</span> x,y <span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">in</span> molsj[<span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">1</span>:]],molsPerRow<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span><span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">3</span>,subImgSize<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span>(<span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">250</span>,<span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">200</span>))</span></code></pre></div>
-<div class="cell-output cell-output-display" data-execution_count="111">
-<div>
-<figure class="figure">
-<p><img src="https://greglandrum.github.io/rdkit-blog/posts/2025-02-02-chembl-document-similarity-1_files/figure-html/cell-38-output-1.png" class="img-fluid figure-img"></p>
-</figure>
-</div>
-</div>
-</div>
-<div id="a9a7adc6" class="cell" data-execution_count="112">
-<div class="sourceCode cell-code" id="cb55" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb55-1"><span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">%</span>sql postgresql:<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">//</span>localhost<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">/</span>chembl_35 <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">\</span></span>
-<span id="cb55-2">    select doc_id,title,authors <span class="im" style="color: #00769E;
-background-color: null;
-font-style: inherit;">from</span> docs where doc_id <span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">in</span> (:didi,:didj)</span></code></pre></div>
-<div class="cell-output cell-output-display" data-execution_count="112">
-<table class="caption-top table table-sm table-striped small" data-quarto-postprocess="true">
-<thead>
-<tr class="header">
-<th data-quarto-table-cell-role="th">doc_id</th>
-<th data-quarto-table-cell-role="th">title</th>
-<th data-quarto-table-cell-role="th">authors</th>
-</tr>
-</thead>
-<tbody>
-<tr class="odd">
-<td>7482</td>
-<td>Synthesis of peptides by the solid-phase method. 7. Substance P and analogues.</td>
-<td>Fournier A, Couture R, Regoli D, Gendreau M, St-Pierre S.</td>
-</tr>
-<tr class="even">
-<td>12331</td>
-<td>Design and synthesis of side-chain conformationally restricted phenylalanines and their use for structure-activity studies on tachykinin NK-1 receptor.</td>
-<td>Josien H, Lavielle S, Brunissen A, Saffroy M, Torrens Y, Beaujouan JC, Glowinski J, Chassaing G.</td>
-</tr>
-</tbody>
-</table>
-</div>
-</div>
-<p>I looked at a number of different highly ranked document pairs here and they all contain peptides or other fairly large molecules. This makes sense given that I am using a bit vector fingerprint for similarity, but isn’t ideal for what I am trying to do. In a followup post I will explore a bit deeper into the list of highly ranked documents and/or try using count-based fingerprints.</p>
-
-
-</section>
-
- ]]></description>
-  <category>exploration</category>
-  <category>similarity</category>
-  <guid>https://greglandrum.github.io/rdkit-blog/posts/2025-02-02-chembl-document-similarity-1.html</guid>
-  <pubDate>Sat, 01 Feb 2025 23:00:00 GMT</pubDate>
-  <media:content url="https://greglandrum.github.io/rdkit-blog/posts/images/blog/chembl-document-similarity-1-1.png" medium="image" type="image/png" height="80" width="144"/>
 </item>
 </channel>
 </rss>
