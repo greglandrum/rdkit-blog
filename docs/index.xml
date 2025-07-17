@@ -9,8 +9,189 @@
 <link>https://greglandrum.github.io/rdkit-blog/</link>
 <atom:link href="https://greglandrum.github.io/rdkit-blog/index.xml" rel="self" type="application/rss+xml"/>
 <description>RDKit experiments, tips, and tutorials</description>
-<generator>quarto-1.6.39</generator>
-<lastBuildDate>Wed, 09 Jul 2025 22:00:00 GMT</lastBuildDate>
+<generator>quarto-1.6.43</generator>
+<lastBuildDate>Wed, 16 Jul 2025 22:00:00 GMT</lastBuildDate>
+<item>
+  <title>Please stop saying “The Tanimoto similarity is”</title>
+  <link>https://greglandrum.github.io/rdkit-blog/posts/2025-07-17-naming-similarity-metrics.html</link>
+  <description><![CDATA[ 
+
+
+
+
+<p>At both ICCS and the CADD GRC this year I noticed multiple people, either in talks or on posters, reporting the “Tanimoto similarity” between two (or more) molecules. This is an unfortunate shorthand because it leaves out a critical piece of information: what fingerprint did you use when doing the Tanimoto calculation? Without knowing that, it’s really not possible to make sense of what the reported similarity values actually mean.</p>
+<p>This isn’t one of those examples of me being pedantic (or cranky); the Tanimoto similarities calculated using different fingerprints can be very, very different. I’ve written several blogs posts about this with more details, a couple of examples are <a href="https://greglandrum.github.io/rdkit-blog/posts/2021-05-18-fingerprint-thresholds1.html">this post looking at the “noise threshold” of various fingerprints</a> and <a href="https://greglandrum.github.io/rdkit-blog/posts/2021-05-21-similarity-search-thresholds.html">this one looking at what typical similarity values are between “closely related” compounds</a>.</p>
+<p>As a quick illustration of this, I calculated the similarities between esomeprazole and lansoprazole, two molecules that look (to me at least) pretty similar:</p>
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="https://greglandrum.github.io/rdkit-blog/posts/2025-07-17-naming-similarity-metrics_files/figure-html/49e4f7ab-1-image.png" class="img-fluid figure-img"></p>
+<figcaption>image.png</figcaption>
+</figure>
+</div>
+<p>The Tanimoto similarity between these two molecules using the RDKit fingerprint is 0.79, using the Morgan2 fingerprint it’s 0.43. That’s a huge difference. If I had just said that the similarity was 0.43 and you guessed that I was using the RDKit fingerprint, which has a noise threshold of 0.51, you would conclude that the molecules are really not similar at all. With the Morgan2 fingerprint, on the other hand, 0.43 indicates two closely related molecules.</p>
+<p>My concrete, and very easy to implement, suggestion: if you report a similarity value (in a talk, poster, paper, etc.) you should always mention the fingerprint used. So do something like “The Tanimoto similarity calculated using Morgan2 fingerprints was 0.43”. It’s not a lot of extra words, but it does allow your audience to understand what you actually did. And hopefully that’s a good thing.</p>
+<p>The rest of this post is just the code to produce the image above, generate fingerprints, and calculate similarities.</p>
+<div id="ef81c872" class="cell" data-execution_count="3">
+<div class="sourceCode cell-code" id="cb1" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb1-1"><span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">from</span> rdkit <span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">import</span> Chem</span>
+<span id="cb1-2"><span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">from</span> rdkit.Chem.Draw <span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">import</span> IPythonConsole</span>
+<span id="cb1-3"><span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">from</span> rdkit.Chem <span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">import</span> Draw</span>
+<span id="cb1-4"><span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">from</span> rdkit.Chem <span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">import</span> rdFingerprintGenerator</span>
+<span id="cb1-5"><span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">from</span> rdkit <span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">import</span> DataStructs</span>
+<span id="cb1-6"></span>
+<span id="cb1-7"><span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">import</span> rdkit</span>
+<span id="cb1-8"><span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">print</span>(rdkit.__version__)</span></code></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>2025.03.4</code></pre>
+</div>
+</div>
+<div id="e06ac98c" class="cell" data-execution_count="9">
+<div class="sourceCode cell-code" id="cb3" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb3-1">esomeprazole <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> Chem.MolFromSmiles(<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'COc1ccc2nc([nH]c2c1)[S@](=O)Cc1ncc(C)c(OC)c1C'</span>)</span>
+<span id="cb3-2">lansoprazole <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> Chem.MolFromSmiles(<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'FC(F)(F)COc1ccnc(c1C)CS(=O)c2[nH]c3ccccc3n2'</span>)</span>
+<span id="cb3-3">Draw.MolsToGridImage([esomeprazole, lansoprazole], </span>
+<span id="cb3-4">    legends<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span>[<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'esomeprazole'</span>,<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'lansoprazole'</span>], molsPerRow<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span><span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">2</span>, subImgSize<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span>(<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">300</span>, <span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">250</span>))</span></code></pre></div>
+<div class="cell-output cell-output-display" data-execution_count="9">
+<div>
+<figure class="figure">
+<p><img src="https://greglandrum.github.io/rdkit-blog/posts/2025-07-17-naming-similarity-metrics_files/figure-html/cell-3-output-1.png" class="img-fluid figure-img"></p>
+</figure>
+</div>
+</div>
+</div>
+<div id="f115df66" class="cell" data-execution_count="5">
+<div class="sourceCode cell-code" id="cb4" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb4-1">rdk_fpg <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> rdFingerprintGenerator.GetRDKitFPGenerator()</span>
+<span id="cb4-2">mfp_fpg <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> rdFingerprintGenerator.GetMorganGenerator(radius<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span><span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">2</span>)</span>
+<span id="cb4-3">rdk_fps <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> [rdk_fpg.GetFingerprint(mol) <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">for</span> mol <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">in</span> [esomeprazole, lansoprazole]]</span>
+<span id="cb4-4">mfp_fps <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> [mfp_fpg.GetFingerprint(mol) <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">for</span> mol <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">in</span> [esomeprazole, lansoprazole]]</span>
+<span id="cb4-5"><span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">print</span>(<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'RDKit fingerprint similarity:'</span>, DataStructs.TanimotoSimilarity(rdk_fps[<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">0</span>], rdk_fps[<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">1</span>]))</span>
+<span id="cb4-6"><span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">print</span>(<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'Morgan fingerprint similarity:'</span>, DataStructs.TanimotoSimilarity(mfp_fps[<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">0</span>], mfp_fps[<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">1</span>]))</span></code></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>RDKit fingerprint similarity: 0.7943722943722944
+Morgan fingerprint similarity: 0.4264705882352941</code></pre>
+</div>
+</div>
+<p>Out of curiousity, what are the Dice similarities between those fingerprints?</p>
+<div id="3ef5bdff" class="cell" data-execution_count="6">
+<div class="sourceCode cell-code" id="cb6" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb6-1"><span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">print</span>(<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'RDKit fingerprint similarity:'</span>, DataStructs.DiceSimilarity(rdk_fps[<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">0</span>], rdk_fps[<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">1</span>]))</span>
+<span id="cb6-2"><span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">print</span>(<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'Morgan fingerprint similarity:'</span>, DataStructs.DiceSimilarity(mfp_fps[<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">0</span>], mfp_fps[<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">1</span>]))</span></code></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>RDKit fingerprint similarity: 0.8854041013268998
+Morgan fingerprint similarity: 0.5979381443298969</code></pre>
+</div>
+</div>
+
+
+
+ ]]></description>
+  <category>similarity</category>
+  <category>fingerprints</category>
+  <category>rants</category>
+  <guid>https://greglandrum.github.io/rdkit-blog/posts/2025-07-17-naming-similarity-metrics.html</guid>
+  <pubDate>Wed, 16 Jul 2025 22:00:00 GMT</pubDate>
+</item>
 <item>
   <title>Picking a small set of diverse molecules from a large set</title>
   <link>https://greglandrum.github.io/rdkit-blog/posts/2025-07-10-diversity-picking-methods.html</link>
@@ -6525,6 +6706,7 @@ font-style: inherit;">=</span>highlightAtomListsMatrix,</span>
 
 
 
+
 <p>This is an updated and revised version of an <a href="https://rdkit.blogspot.com/2019/06/doing-extended-hueckel-calculations.html">older post</a>.</p>
 <p>The RDKit has included an optional integration with a semi-empirical quantum mechanics package called YAeHMOP since the 2019.03 release. If you build the RDKit yourself, this is disabled by default, but it is part of the RDKit conda-forge and pypi builds, so it’s available to most RDKit users.</p>
 <p>There’s no documentation for this integration yet… thus this blog post.</p>
@@ -6533,7 +6715,7 @@ font-style: inherit;">=</span>highlightAtomListsMatrix,</span>
 <p>One of my major projects in grad school was to write a software package for performing extended Hueckel calculations and analyzing and visualizing the results. I released the source for YAeHMOP (“Yet Another extended Hueckel Molecular Orbital Package”) way back when using some weird license (the open-source landscape in chemistry was “a bit” different back in the mid-90s). After changing fields, I more or less forgot about YAeHMOP until a couple of years ago when Patrick Avery contacted me about integrating it <a href="https://pubs.acs.org/doi/abs/10.1021/acs.jchemed.7b00698">into Avogadro</a>. To make things easier, I put the source <a href="https://github.com/greglandrum/yaehmop">up on Github</a> and switched to a BSD license. Since that point we’ve done a bit of additional cleanup work on the eHT code (the visualization pieces are still there, but really only have historic interest) and made it useable as a library.</p>
 <p>There are a couple of applications where I think it might be interesting to have access to quick, interpretable QM results from the RDKit. These include getting partial charges and starting to think about quick and dirty descriptors for things like bond strengths and reactivity. So I decided to do an integration of YAeHMOP into the RDKit.</p>
 <p>There are a <em>bunch</em> of books and papers describing extended Hueckel theory and the various types of analysis that one can do with it; I’m not going to cite all of those here. There’s also no formal publication describing YAeHMOP (what a shock!), but there is a <a href="https://drive.google.com/file/d/0BzBynnwxNS0SanJzUkJYYWNFY0h1bzNFR0d0aVBCR0x5NmZV/view?usp=sharing&amp;resourcekey=0-o4HYaJEodQtVCZ54zZSi4g">chapter</a> in my PhD thesis that provides an fairly comprehensive tutorial overview of the theory.</p>
-<div class="cell" data-execution_count="45">
+<div id="cell-2" class="cell" data-execution_count="45">
 <div class="sourceCode cell-code" id="cb1" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb1-1"><span class="im" style="color: #00769E;
 background-color: null;
 font-style: inherit;">from</span> rdkit <span class="im" style="color: #00769E;
@@ -6611,7 +6793,7 @@ font-style: inherit;">print</span>(time.asctime())</span></code></pre></div>
 Tue May 27 06:32:31 2025</code></pre>
 </div>
 </div>
-<div class="cell" data-execution_count="25">
+<div id="cell-3" class="cell" data-execution_count="25">
 <div class="sourceCode cell-code" id="cb3" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb3-1"><span class="im" style="color: #00769E;
 background-color: null;
 font-style: inherit;">import</span> matplotlib.pyplot <span class="im" style="color: #00769E;
@@ -6632,7 +6814,7 @@ font-style: inherit;">%</span>matplotlib inline</span></code></pre></div>
 <section id="running-an-eht-calculation" class="level1">
 <h1>Running an eHT calculation</h1>
 <p>Start by showing how to run an eHT calculation:</p>
-<div class="cell" data-execution_count="5">
+<div id="cell-6" class="cell" data-execution_count="5">
 <div class="sourceCode cell-code" id="cb4" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb4-1"><span class="co" style="color: #5E5E5E;
 background-color: null;
 font-style: inherit;"># imatinib</span></span>
@@ -6643,11 +6825,15 @@ background-color: null;
 font-style: inherit;">'Cc1ccc(NC(=O)c2ccc(CN3CCN(C)CC3)cc2)cc1Nc1nccc(-c2cccnc2)n1'</span>)</span>
 <span id="cb4-3">m</span></code></pre></div>
 <div class="cell-output cell-output-display" data-execution_count="5">
-<p><img src="https://greglandrum.github.io/rdkit-blog/posts/2025-05-30-eHT-in-RDKit_files/figure-html/cell-4-output-1.png" class="img-fluid"></p>
+<div>
+<figure class="figure">
+<p><img src="https://greglandrum.github.io/rdkit-blog/posts/2025-05-30-eHT-in-RDKit_files/figure-html/cell-4-output-1.png" class="img-fluid figure-img"></p>
+</figure>
+</div>
 </div>
 </div>
 <p>We need to add Hs and generate a conformation:</p>
-<div class="cell" data-execution_count="6">
+<div id="cell-8" class="cell" data-execution_count="6">
 <div class="sourceCode cell-code" id="cb5" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb5-1">mh <span class="op" style="color: #5E5E5E;
 background-color: null;
 font-style: inherit;">=</span> Chem.AddHs(m)</span>
@@ -6669,27 +6855,27 @@ background-color: null;
 font-style: inherit;">;</span></span></code></pre></div>
 </div>
 <p>And now we can run the calculation, it’s quick:</p>
-<div class="cell" data-execution_count="7">
+<div id="cell-10" class="cell" data-execution_count="7">
 <div class="sourceCode cell-code" id="cb6" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb6-1">passed,res <span class="op" style="color: #5E5E5E;
 background-color: null;
 font-style: inherit;">=</span> rdEHTTools.RunMol(mh)</span></code></pre></div>
 </div>
 <p>The first return value lets us know if the calculation succeeded:</p>
-<div class="cell" data-execution_count="8">
+<div id="cell-12" class="cell" data-execution_count="8">
 <div class="sourceCode cell-code" id="cb7" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb7-1">passed</span></code></pre></div>
 <div class="cell-output cell-output-display" data-execution_count="8">
 <pre><code>True</code></pre>
 </div>
 </div>
 <p>The second contains the results of the calculation:</p>
-<div class="cell" data-execution_count="9">
+<div id="cell-14" class="cell" data-execution_count="9">
 <div class="sourceCode cell-code" id="cb9" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb9-1">res</span></code></pre></div>
 <div class="cell-output cell-output-display" data-execution_count="9">
 <pre><code>&lt;rdkit.Chem.rdEHTTools.EHTResults at 0x7134eb4fb990&gt;</code></pre>
 </div>
 </div>
 <p>We have access to the atomic charges:</p>
-<div class="cell" data-execution_count="10">
+<div id="cell-16" class="cell" data-execution_count="10">
 <div class="sourceCode cell-code" id="cb11" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb11-1">res.GetAtomicCharges()</span></code></pre></div>
 <div class="cell-output cell-output-display" data-execution_count="10">
 <pre><code>array([-5.73319770e-02, -1.56119578e-02, -4.62356988e-02, -1.18071986e-01,
@@ -6712,7 +6898,7 @@ font-style: inherit;">=</span> rdEHTTools.RunMol(mh)</span></code></pre></div>
 </div>
 </div>
 <p>The reduced overlap population matrix provides the Mulliken overlap population between atoms in the molecule. This tells us something about the strength of the interaction between the atoms. It’s returned as a vector representing a symmetric matrix:</p>
-<div class="cell" data-execution_count="12">
+<div id="cell-18" class="cell" data-execution_count="12">
 <div class="sourceCode cell-code" id="cb13" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb13-1">res.GetReducedOverlapPopulationMatrix()[:<span class="dv" style="color: #AD0000;
 background-color: null;
 font-style: inherit;">6</span>]</span></code></pre></div>
@@ -6721,7 +6907,7 @@ font-style: inherit;">6</span>]</span></code></pre></div>
         2.72952681])</code></pre>
 </div>
 </div>
-<div class="cell" data-execution_count="13">
+<div id="cell-19" class="cell" data-execution_count="13">
 <div class="sourceCode cell-code" id="cb15" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb15-1"><span class="co" style="color: #5E5E5E;
 background-color: null;
 font-style: inherit;"># convenience function to set a "MulilkenOverlapPopulation" property on bonds.</span></span>
@@ -6796,11 +6982,11 @@ font-style: inherit;">+</span> i2</span>
 background-color: null;
 font-style: inherit;">"MullikenOverlapPopulation"</span>,rop[idx])</span></code></pre></div>
 </div>
-<div class="cell" data-execution_count="14">
+<div id="cell-20" class="cell" data-execution_count="14">
 <div class="sourceCode cell-code" id="cb16" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb16-1">set_overlap_populations(mh,res)</span></code></pre></div>
 </div>
 <p>Look at a few of the overlap populations:</p>
-<div class="cell" data-execution_count="15">
+<div id="cell-22" class="cell" data-execution_count="15">
 <div class="sourceCode cell-code" id="cb17" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb17-1"><span class="cf" style="color: #003B4F;
 background-color: null;
 font-weight: bold;
@@ -6905,7 +7091,7 @@ font-style: inherit;">'</span>)</span></code></pre></div>
 <section id="application-look-at-variability-of-charges-between-conformers" class="level1">
 <h1>Application: Look at variability of charges between conformers</h1>
 <p>The rest of this blog post is going to show a straightforward analysis one can do with the eHT results: looking at the variability of the QM charges across the different conformers.</p>
-<div class="cell" data-execution_count="16">
+<div id="cell-25" class="cell" data-execution_count="16">
 <div class="sourceCode cell-code" id="cb19" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb19-1"><span class="kw" style="color: #003B4F;
 background-color: null;
 font-weight: bold;
@@ -7008,12 +7194,12 @@ font-weight: bold;
 font-style: inherit;">return</span> (eres,charges)</span>
 <span id="cb19-22">    </span></code></pre></div>
 </div>
-<div class="cell" data-execution_count="17">
+<div id="cell-26" class="cell" data-execution_count="17">
 <div class="sourceCode cell-code" id="cb20" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb20-1">eres,charges <span class="op" style="color: #5E5E5E;
 background-color: null;
 font-style: inherit;">=</span> runEHT(mh)</span></code></pre></div>
 </div>
-<div class="cell" data-execution_count="26">
+<div id="cell-27" class="cell" data-execution_count="26">
 <div class="sourceCode cell-code" id="cb21" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb21-1">plt.figure(figsize<span class="op" style="color: #5E5E5E;
 background-color: null;
 font-style: inherit;">=</span>(<span class="dv" style="color: #AD0000;
@@ -7040,11 +7226,15 @@ font-style: inherit;">"partial charge"</span>)<span class="op" style="color: #5E
 background-color: null;
 font-style: inherit;">;</span></span></code></pre></div>
 <div class="cell-output cell-output-display">
-<p><img src="https://greglandrum.github.io/rdkit-blog/posts/2025-05-30-eHT-in-RDKit_files/figure-html/cell-16-output-1.png" class="img-fluid"></p>
+<div>
+<figure class="figure">
+<p><img src="https://greglandrum.github.io/rdkit-blog/posts/2025-05-30-eHT-in-RDKit_files/figure-html/cell-16-output-1.png" class="img-fluid figure-img"></p>
+</figure>
+</div>
 </div>
 </div>
 <p>To make sense of that, draw the molecule with the atoms numbered:</p>
-<div class="cell" data-execution_count="23">
+<div id="cell-29" class="cell" data-execution_count="23">
 <div class="sourceCode cell-code" id="cb22" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb22-1">IPythonConsole.drawOptions.addAtomIndices <span class="op" style="color: #5E5E5E;
 background-color: null;
 font-style: inherit;">=</span> <span class="va" style="color: #111111;
@@ -7059,11 +7249,15 @@ background-color: null;
 font-style: inherit;">300</span></span>
 <span id="cb22-3">m</span></code></pre></div>
 <div class="cell-output cell-output-display" data-execution_count="23">
-<p><img src="https://greglandrum.github.io/rdkit-blog/posts/2025-05-30-eHT-in-RDKit_files/figure-html/cell-17-output-1.png" class="img-fluid"></p>
+<div>
+<figure class="figure">
+<p><img src="https://greglandrum.github.io/rdkit-blog/posts/2025-05-30-eHT-in-RDKit_files/figure-html/cell-17-output-1.png" class="img-fluid figure-img"></p>
+</figure>
+</div>
 </div>
 </div>
 <p>Look at the results for a couple of the atoms that show the most variability</p>
-<div class="cell" data-execution_count="29">
+<div id="cell-31" class="cell" data-execution_count="29">
 <div class="sourceCode cell-code" id="cb23" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb23-1">chgRange <span class="op" style="color: #5E5E5E;
 background-color: null;
 font-style: inherit;">=</span> [<span class="bu" style="color: null;
@@ -7103,7 +7297,7 @@ font-style: inherit;">2</span>]</span></code></pre></div>
 <pre><code>[(0.20875282639970938, 24), (0.11463855830843706, 5)]</code></pre>
 </div>
 </div>
-<div class="cell" data-execution_count="30">
+<div id="cell-32" class="cell" data-execution_count="30">
 <div class="sourceCode cell-code" id="cb25" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb25-1">tchgs <span class="op" style="color: #5E5E5E;
 background-color: null;
 font-style: inherit;">=</span> <span class="bu" style="color: null;
@@ -7131,7 +7325,7 @@ font-style: inherit;">2</span>:]</span></code></pre></div>
  [(-0.3297127630789536, 46), (-0.3257318399680058, 22)])</code></pre>
 </div>
 </div>
-<div class="cell" data-execution_count="31">
+<div id="cell-33" class="cell" data-execution_count="31">
 <div class="sourceCode cell-code" id="cb27" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb27-1">tchgs <span class="op" style="color: #5E5E5E;
 background-color: null;
 font-style: inherit;">=</span> <span class="bu" style="color: null;
@@ -7160,7 +7354,7 @@ font-style: inherit;">2</span>:]</span></code></pre></div>
 </div>
 </div>
 <p>Look at the two conformers where the charges on atom 24 differ the most:</p>
-<div class="cell" data-execution_count="34">
+<div id="cell-35" class="cell" data-execution_count="34">
 <div class="sourceCode cell-code" id="cb29" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb29-1">m.__sssAtoms <span class="op" style="color: #5E5E5E;
 background-color: null;
 font-style: inherit;">=</span> [<span class="dv" style="color: #AD0000;
@@ -7168,10 +7362,14 @@ background-color: null;
 font-style: inherit;">24</span>]</span>
 <span id="cb29-2">m</span></code></pre></div>
 <div class="cell-output cell-output-display" data-execution_count="34">
-<p><img src="https://greglandrum.github.io/rdkit-blog/posts/2025-05-30-eHT-in-RDKit_files/figure-html/cell-21-output-1.png" class="img-fluid"></p>
+<div>
+<figure class="figure">
+<p><img src="https://greglandrum.github.io/rdkit-blog/posts/2025-05-30-eHT-in-RDKit_files/figure-html/cell-21-output-1.png" class="img-fluid figure-img"></p>
+</figure>
 </div>
 </div>
-<div class="cell" data-execution_count="32">
+</div>
+<div id="cell-36" class="cell" data-execution_count="32">
 <div class="sourceCode cell-code" id="cb30" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb30-1">tm7 <span class="op" style="color: #5E5E5E;
 background-color: null;
 font-style: inherit;">=</span> Chem.MolFromMolBlock(Chem.MolToMolBlock(mh,confId<span class="op" style="color: #5E5E5E;
@@ -7234,7 +7432,7 @@ viewer_17483188092931037.render();
 
 </div>
 </div>
-<div class="cell" data-execution_count="33">
+<div id="cell-37" class="cell" data-execution_count="33">
 <div class="sourceCode cell-code" id="cb31" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb31-1">tm22 <span class="op" style="color: #5E5E5E;
 background-color: null;
 font-style: inherit;">=</span> Chem.MolFromMolBlock(Chem.MolToMolBlock(mh,confId<span class="op" style="color: #5E5E5E;
@@ -7299,7 +7497,7 @@ viewer_17483188364847312.render();
 </div>
 <p>The difference here is the relative orientations of the two aromatic rings that N24 is bonded to. In the first case (more negative N), the rings are perpendicular to each other. In the second (less negative N), they are parallel.</p>
 <p>What if we do an MMFF minimization of each conformer?</p>
-<div class="cell" data-execution_count="37">
+<div id="cell-40" class="cell" data-execution_count="37">
 <div class="sourceCode cell-code" id="cb32" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb32-1">mh_mmff <span class="op" style="color: #5E5E5E;
 background-color: null;
 font-style: inherit;">=</span> Chem.Mol(mh)</span>
@@ -7333,12 +7531,12 @@ font-style: inherit;">500</span>,confId<span class="op" style="color: #5E5E5E;
 background-color: null;
 font-style: inherit;">=</span>i)</span></code></pre></div>
 </div>
-<div class="cell" data-execution_count="38">
+<div id="cell-41" class="cell" data-execution_count="38">
 <div class="sourceCode cell-code" id="cb33" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb33-1">eres,mmff_charges <span class="op" style="color: #5E5E5E;
 background-color: null;
 font-style: inherit;">=</span> runEHT(mh_mmff)</span></code></pre></div>
 </div>
-<div class="cell" data-execution_count="39">
+<div id="cell-42" class="cell" data-execution_count="39">
 <div class="sourceCode cell-code" id="cb34" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb34-1">plt.figure(figsize<span class="op" style="color: #5E5E5E;
 background-color: null;
 font-style: inherit;">=</span>(<span class="dv" style="color: #AD0000;
@@ -7365,10 +7563,14 @@ font-style: inherit;">"partial charge"</span>)<span class="op" style="color: #5E
 background-color: null;
 font-style: inherit;">;</span></span></code></pre></div>
 <div class="cell-output cell-output-display">
-<p><img src="https://greglandrum.github.io/rdkit-blog/posts/2025-05-30-eHT-in-RDKit_files/figure-html/cell-26-output-1.png" class="img-fluid"></p>
+<div>
+<figure class="figure">
+<p><img src="https://greglandrum.github.io/rdkit-blog/posts/2025-05-30-eHT-in-RDKit_files/figure-html/cell-26-output-1.png" class="img-fluid figure-img"></p>
+</figure>
 </div>
 </div>
-<div class="cell" data-execution_count="40">
+</div>
+<div id="cell-43" class="cell" data-execution_count="40">
 <div class="sourceCode cell-code" id="cb35" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb35-1">chgRange <span class="op" style="color: #5E5E5E;
 background-color: null;
 font-style: inherit;">=</span> [<span class="bu" style="color: null;
@@ -7410,7 +7612,7 @@ font-style: inherit;">2</span>]</span></code></pre></div>
 </div>
 <p>Those are much smaller changes (as we saw in the distributions).</p>
 <p>What about the N24, the atom we looked at above?</p>
-<div class="cell" data-execution_count="41">
+<div id="cell-45" class="cell" data-execution_count="41">
 <div class="sourceCode cell-code" id="cb37" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb37-1">tchgs <span class="op" style="color: #5E5E5E;
 background-color: null;
 font-style: inherit;">=</span> <span class="bu" style="color: null;
@@ -7439,7 +7641,7 @@ font-style: inherit;">2</span>:]</span></code></pre></div>
 </div>
 </div>
 <p>Almost no difference at all there. Are the neighboring rings now consistently orented?</p>
-<div class="cell" data-execution_count="43">
+<div id="cell-47" class="cell" data-execution_count="43">
 <div class="sourceCode cell-code" id="cb39" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb39-1">tm7 <span class="op" style="color: #5E5E5E;
 background-color: null;
 font-style: inherit;">=</span> Chem.MolFromMolBlock(Chem.MolToMolBlock(mh,confId<span class="op" style="color: #5E5E5E;
@@ -7502,7 +7704,7 @@ viewer_1748319664848715.render();
 
 </div>
 </div>
-<div class="cell" data-execution_count="44">
+<div id="cell-48" class="cell" data-execution_count="44">
 <div class="sourceCode cell-code" id="cb40" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb40-1">tm9 <span class="op" style="color: #5E5E5E;
 background-color: null;
 font-style: inherit;">=</span> Chem.MolFromMolBlock(Chem.MolToMolBlock(mh,confId<span class="op" style="color: #5E5E5E;
@@ -7567,7 +7769,7 @@ viewer_17483196896326954.render();
 </div>
 <p>They are: the rings are more or less perpendicular in both conformers.</p>
 <p>The charge variability has dropped considerably, are the MMFF conformers actually different from each other?</p>
-<div class="cell" data-execution_count="49">
+<div id="cell-51" class="cell" data-execution_count="49">
 <div class="sourceCode cell-code" id="cb41" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb41-1">rmsds <span class="op" style="color: #5E5E5E;
 background-color: null;
 font-style: inherit;">=</span> []</span>
@@ -7624,14 +7826,18 @@ font-style: inherit;">'RMSD'</span>)<span class="op" style="color: #5E5E5E;
 background-color: null;
 font-style: inherit;">;</span></span></code></pre></div>
 <div class="cell-output cell-output-display">
-<p><img src="https://greglandrum.github.io/rdkit-blog/posts/2025-05-30-eHT-in-RDKit_files/figure-html/cell-31-output-1.png" class="img-fluid"></p>
+<div>
+<figure class="figure">
+<p><img src="https://greglandrum.github.io/rdkit-blog/posts/2025-05-30-eHT-in-RDKit_files/figure-html/cell-31-output-1.png" class="img-fluid figure-img"></p>
+</figure>
+</div>
 </div>
 </div>
 <p>So the conformers are still different from each other but the charge differences are now much smaller than they were previously.</p>
 </section>
 <section id="repeat-the-analysis-for-another-molecule" class="level1">
 <h1>Repeat the analysis for another molecule</h1>
-<div class="cell" data-execution_count="52">
+<div id="cell-54" class="cell" data-execution_count="52">
 <div class="sourceCode cell-code" id="cb42" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb42-1"><span class="co" style="color: #5E5E5E;
 background-color: null;
 font-style: inherit;"># rivaroxaban</span></span>
@@ -7642,10 +7848,14 @@ background-color: null;
 font-style: inherit;">'O=C(NC[C@H]1CN(c2ccc(N3CCOCC3=O)cc2)C(=O)O1)c1ccc(Cl)s1'</span>)</span>
 <span id="cb42-3">m2</span></code></pre></div>
 <div class="cell-output cell-output-display" data-execution_count="52">
-<p><img src="https://greglandrum.github.io/rdkit-blog/posts/2025-05-30-eHT-in-RDKit_files/figure-html/cell-32-output-1.png" class="img-fluid"></p>
+<div>
+<figure class="figure">
+<p><img src="https://greglandrum.github.io/rdkit-blog/posts/2025-05-30-eHT-in-RDKit_files/figure-html/cell-32-output-1.png" class="img-fluid figure-img"></p>
+</figure>
 </div>
 </div>
-<div class="cell" data-execution_count="55">
+</div>
+<div id="cell-55" class="cell" data-execution_count="55">
 <div class="sourceCode cell-code" id="cb43" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb43-1">mh2 <span class="op" style="color: #5E5E5E;
 background-color: null;
 font-style: inherit;">=</span> Chem.AddHs(m2)</span>
@@ -7685,7 +7895,7 @@ font-style: inherit;">500</span>,confId<span class="op" style="color: #5E5E5E;
 background-color: null;
 font-style: inherit;">=</span>i)</span></code></pre></div>
 </div>
-<div class="cell" data-execution_count="56">
+<div id="cell-56" class="cell" data-execution_count="56">
 <div class="sourceCode cell-code" id="cb44" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb44-1">eres,charges2 <span class="op" style="color: #5E5E5E;
 background-color: null;
 font-style: inherit;">=</span> runEHT(mh2)</span>
@@ -7693,7 +7903,7 @@ font-style: inherit;">=</span> runEHT(mh2)</span>
 background-color: null;
 font-style: inherit;">=</span> runEHT(mh2_mmff)</span></code></pre></div>
 </div>
-<div class="cell" data-execution_count="57">
+<div id="cell-57" class="cell" data-execution_count="57">
 <div class="sourceCode cell-code" id="cb45" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb45-1">plt.figure(figsize<span class="op" style="color: #5E5E5E;
 background-color: null;
 font-style: inherit;">=</span>(<span class="dv" style="color: #AD0000;
@@ -7720,11 +7930,15 @@ font-style: inherit;">"partial charge"</span>)<span class="op" style="color: #5E
 background-color: null;
 font-style: inherit;">;</span></span></code></pre></div>
 <div class="cell-output cell-output-display">
-<p><img src="https://greglandrum.github.io/rdkit-blog/posts/2025-05-30-eHT-in-RDKit_files/figure-html/cell-35-output-1.png" class="img-fluid"></p>
+<div>
+<figure class="figure">
+<p><img src="https://greglandrum.github.io/rdkit-blog/posts/2025-05-30-eHT-in-RDKit_files/figure-html/cell-35-output-1.png" class="img-fluid figure-img"></p>
+</figure>
+</div>
 </div>
 </div>
 <p>Less variability than we had with the ETKDG conformers of imatinib, but there is still some. This almost entirely vanishes when using the MMFF-optimized conformers:</p>
-<div class="cell" data-execution_count="58">
+<div id="cell-59" class="cell" data-execution_count="58">
 <div class="sourceCode cell-code" id="cb46" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb46-1">plt.figure(figsize<span class="op" style="color: #5E5E5E;
 background-color: null;
 font-style: inherit;">=</span>(<span class="dv" style="color: #AD0000;
@@ -7751,11 +7965,15 @@ font-style: inherit;">"partial charge"</span>)<span class="op" style="color: #5E
 background-color: null;
 font-style: inherit;">;</span></span></code></pre></div>
 <div class="cell-output cell-output-display">
-<p><img src="https://greglandrum.github.io/rdkit-blog/posts/2025-05-30-eHT-in-RDKit_files/figure-html/cell-36-output-1.png" class="img-fluid"></p>
+<div>
+<figure class="figure">
+<p><img src="https://greglandrum.github.io/rdkit-blog/posts/2025-05-30-eHT-in-RDKit_files/figure-html/cell-36-output-1.png" class="img-fluid figure-img"></p>
+</figure>
+</div>
 </div>
 </div>
 <p>Confirm again that the MMFF conformers actually different:</p>
-<div class="cell" data-execution_count="60">
+<div id="cell-61" class="cell" data-execution_count="60">
 <div class="sourceCode cell-code" id="cb47" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb47-1">rmsds <span class="op" style="color: #5E5E5E;
 background-color: null;
 font-style: inherit;">=</span> []</span>
@@ -7812,7 +8030,11 @@ font-style: inherit;">'RMSD'</span>)<span class="op" style="color: #5E5E5E;
 background-color: null;
 font-style: inherit;">;</span></span></code></pre></div>
 <div class="cell-output cell-output-display">
-<p><img src="https://greglandrum.github.io/rdkit-blog/posts/2025-05-30-eHT-in-RDKit_files/figure-html/cell-37-output-1.png" class="img-fluid"></p>
+<div>
+<figure class="figure">
+<p><img src="https://greglandrum.github.io/rdkit-blog/posts/2025-05-30-eHT-in-RDKit_files/figure-html/cell-37-output-1.png" class="img-fluid figure-img"></p>
+</figure>
+</div>
 </div>
 </div>
 <p>They are.</p>
@@ -7821,7 +8043,7 @@ font-style: inherit;">;</span></span></code></pre></div>
 <h1>Performance</h1>
 <p>How long does it take to do this analysis?</p>
 <p>Start by looking at the time required to generate a conformer:</p>
-<div class="cell" data-execution_count="62">
+<div id="cell-65" class="cell" data-execution_count="62">
 <div class="sourceCode cell-code" id="cb48" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb48-1">tempM <span class="op" style="color: #5E5E5E;
 background-color: null;
 font-style: inherit;">=</span> Chem.Mol(mh2)</span>
@@ -7835,7 +8057,7 @@ font-style: inherit;">=</span> rdDistGeom.EmbedMolecule(tempM,params)</span></co
 </div>
 </div>
 <p>Or to generate a conformer and MMFF minimize it:</p>
-<div class="cell" data-execution_count="63">
+<div id="cell-67" class="cell" data-execution_count="63">
 <div class="sourceCode cell-code" id="cb50" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb50-1"><span class="op" style="color: #5E5E5E;
 background-color: null;
 font-style: inherit;">%</span>timeit _ <span class="op" style="color: #5E5E5E;
@@ -7852,7 +8074,7 @@ font-style: inherit;">500</span>)</span></code></pre></div>
 </div>
 </div>
 <p>Do the eHT calculation:</p>
-<div class="cell" data-execution_count="64">
+<div id="cell-69" class="cell" data-execution_count="64">
 <div class="sourceCode cell-code" id="cb52" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb52-1"><span class="op" style="color: #5E5E5E;
 background-color: null;
 font-style: inherit;">%</span>timeit _ <span class="op" style="color: #5E5E5E;
@@ -20270,1119 +20492,6 @@ font-style: inherit;">5</span>)</span>
   <guid>https://greglandrum.github.io/rdkit-blog/posts/2025-03-15-constructing-SAR-tables.html</guid>
   <pubDate>Fri, 14 Mar 2025 23:00:00 GMT</pubDate>
   <media:content url="https://greglandrum.github.io/rdkit-blog/posts/images/blog/constructing-sar-tables-1.png" medium="image" type="image/png" height="92" width="144"/>
-</item>
-<item>
-  <title>Drawing on drawings</title>
-  <link>https://greglandrum.github.io/rdkit-blog/posts/2025-03-07-drawing-on-drawings.html</link>
-  <description><![CDATA[ 
-
-
-
-
-<p>In addition to the expected functions to draw one more more molecules, the RDKit <code>MolDraw2D</code> objects lets you add annotations (text, lines, arrows, shapes, etc) to your drawings. This post shows how to use that to layout the molecules and data from some free-energy calculations.</p>
-<p>The data here and the overall figure layout is from <a href="https://link.springer.com/article/10.1007/s10822-021-00436-z/figures/8">Figure 8</a> of <a href="https://link.springer.com/article/10.1007/s10822-021-00436-z">this open-access paper</a> from our group.</p>
-<div id="933592b3" class="cell" data-scrolled="true" data-execution_count="1">
-<div class="sourceCode cell-code" id="cb1" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb1-1"><span class="im" style="color: #00769E;
-background-color: null;
-font-style: inherit;">from</span> rdkit <span class="im" style="color: #00769E;
-background-color: null;
-font-style: inherit;">import</span> Chem</span>
-<span id="cb1-2"><span class="im" style="color: #00769E;
-background-color: null;
-font-style: inherit;">from</span> rdkit.Chem <span class="im" style="color: #00769E;
-background-color: null;
-font-style: inherit;">import</span> Draw</span>
-<span id="cb1-3"><span class="im" style="color: #00769E;
-background-color: null;
-font-style: inherit;">from</span> rdkit.Chem <span class="im" style="color: #00769E;
-background-color: null;
-font-style: inherit;">import</span> rdDepictor</span>
-<span id="cb1-4">rdDepictor.SetPreferCoordGen(<span class="va" style="color: #111111;
-background-color: null;
-font-style: inherit;">True</span>)</span>
-<span id="cb1-5"><span class="im" style="color: #00769E;
-background-color: null;
-font-style: inherit;">from</span> rdkit.Chem.Draw <span class="im" style="color: #00769E;
-background-color: null;
-font-style: inherit;">import</span> IPythonConsole</span>
-<span id="cb1-6">IPythonConsole.molSize <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> <span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">350</span>,<span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">300</span></span>
-<span id="cb1-7"><span class="im" style="color: #00769E;
-background-color: null;
-font-style: inherit;">import</span> rdkit</span>
-<span id="cb1-8"><span class="bu" style="color: null;
-background-color: null;
-font-style: inherit;">print</span>(rdkit.__version__)</span></code></pre></div>
-<div class="cell-output cell-output-stdout">
-<pre><code>2024.09.6</code></pre>
-</div>
-</div>
-<p>Start with the scaffold for the molecules:</p>
-<div id="64244b6f" class="cell" data-execution_count="2">
-<div class="sourceCode cell-code" id="cb3" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb3-1">core <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> Chem.MolFromMolBlock(<span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">'''</span></span>
-<span id="cb3-2"><span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">  Mrv2401 03062519142D          </span></span>
-<span id="cb3-3"></span>
-<span id="cb3-4"><span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">  0  0  0     0  0            999 V3000</span></span>
-<span id="cb3-5"><span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">M  V30 BEGIN CTAB</span></span>
-<span id="cb3-6"><span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">M  V30 COUNTS 21 23 0 0 0</span></span>
-<span id="cb3-7"><span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">M  V30 BEGIN ATOM</span></span>
-<span id="cb3-8"><span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">M  V30 1 C -1.8519 5.7623 0 0</span></span>
-<span id="cb3-9"><span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">M  V30 2 C -3.1855 4.9922 0 0</span></span>
-<span id="cb3-10"><span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">M  V30 3 C -3.1855 3.4522 0 0</span></span>
-<span id="cb3-11"><span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">M  V30 4 C -1.8519 2.6822 0 0</span></span>
-<span id="cb3-12"><span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">M  V30 5 C -0.5182 3.4522 0 0</span></span>
-<span id="cb3-13"><span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">M  V30 6 C -0.5182 4.9922 0 0</span></span>
-<span id="cb3-14"><span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">M  V30 7 N -1.8519 1.1422 0 0</span></span>
-<span id="cb3-15"><span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">M  V30 8 C -3.1855 0.3722 0 0</span></span>
-<span id="cb3-16"><span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">M  V30 9 C -3.1855 -1.1679 0 0</span></span>
-<span id="cb3-17"><span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">M  V30 10 N -1.8519 -1.9379 0 0</span></span>
-<span id="cb3-18"><span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">M  V30 11 C -0.5182 -1.1679 0 0</span></span>
-<span id="cb3-19"><span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">M  V30 12 C -0.5182 0.3722 0 0</span></span>
-<span id="cb3-20"><span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">M  V30 13 N -4.5192 2.6822 0 0</span></span>
-<span id="cb3-21"><span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">M  V30 14 C -5.8529 3.4522 0 0</span></span>
-<span id="cb3-22"><span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">M  V30 15 C -7.1866 2.6822 0 0</span></span>
-<span id="cb3-23"><span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">M  V30 16 O -5.8529 4.9922 0 0</span></span>
-<span id="cb3-24"><span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">M  V30 17 N -8.5934 3.3086 0 0</span></span>
-<span id="cb3-25"><span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">M  V30 18 C -9.6238 2.1642 0 0</span></span>
-<span id="cb3-26"><span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">M  V30 19 S -8.8538 0.8305 0 0</span></span>
-<span id="cb3-27"><span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">M  V30 20 C -7.3476 1.1507 0 0</span></span>
-<span id="cb3-28"><span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">M  V30 21 A -11.1554 2.3252 0 1</span></span>
-<span id="cb3-29"><span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">M  V30 END ATOM</span></span>
-<span id="cb3-30"><span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">M  V30 BEGIN BOND</span></span>
-<span id="cb3-31"><span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">M  V30 1 1 1 2</span></span>
-<span id="cb3-32"><span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">M  V30 2 2 2 3</span></span>
-<span id="cb3-33"><span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">M  V30 3 1 3 4</span></span>
-<span id="cb3-34"><span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">M  V30 4 2 4 5</span></span>
-<span id="cb3-35"><span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">M  V30 5 1 5 6</span></span>
-<span id="cb3-36"><span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">M  V30 6 2 1 6</span></span>
-<span id="cb3-37"><span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">M  V30 7 1 4 7</span></span>
-<span id="cb3-38"><span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">M  V30 8 1 8 9</span></span>
-<span id="cb3-39"><span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">M  V30 9 1 9 10</span></span>
-<span id="cb3-40"><span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">M  V30 10 1 10 11</span></span>
-<span id="cb3-41"><span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">M  V30 11 1 11 12</span></span>
-<span id="cb3-42"><span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">M  V30 12 1 7 8</span></span>
-<span id="cb3-43"><span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">M  V30 13 1 7 12</span></span>
-<span id="cb3-44"><span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">M  V30 14 1 3 13</span></span>
-<span id="cb3-45"><span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">M  V30 15 1 13 14</span></span>
-<span id="cb3-46"><span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">M  V30 16 1 14 15</span></span>
-<span id="cb3-47"><span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">M  V30 17 2 14 16</span></span>
-<span id="cb3-48"><span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">M  V30 18 1 18 19</span></span>
-<span id="cb3-49"><span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">M  V30 19 1 19 20</span></span>
-<span id="cb3-50"><span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">M  V30 20 1 15 17</span></span>
-<span id="cb3-51"><span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">M  V30 21 2 15 20</span></span>
-<span id="cb3-52"><span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">M  V30 22 2 17 18</span></span>
-<span id="cb3-53"><span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">M  V30 23 1 18 21</span></span>
-<span id="cb3-54"><span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">M  V30 END BOND</span></span>
-<span id="cb3-55"><span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">M  V30 END CTAB</span></span>
-<span id="cb3-56"><span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">M  END</span></span>
-<span id="cb3-57"><span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">'''</span>)</span>
-<span id="cb3-58">core</span></code></pre></div>
-<div class="cell-output cell-output-display" data-execution_count="2">
-<div>
-<figure class="figure">
-<p><img src="https://greglandrum.github.io/rdkit-blog/posts/2025-03-07-drawing-on-drawings_files/figure-html/cell-3-output-1.png" class="img-fluid figure-img"></p>
-</figure>
-</div>
-</div>
-</div>
-<p>Now define the side chains:</p>
-<div id="4226a0fc" class="cell" data-execution_count="3">
-<div class="sourceCode cell-code" id="cb4" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb4-1">chains <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> ((<span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">'L20'</span>,<span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">'[*:1]C1=CC2=C(OCO2)C=C1'</span>),</span>
-<span id="cb4-2">          (<span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">'L1'</span>,<span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">'[*:1]C1=CC2=C(OCC2)C=C1'</span>),</span>
-<span id="cb4-3">          (<span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">'L21'</span>,<span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">'[*:1]C1=CC2=C(OCCO2)C=C1'</span>),</span>
-<span id="cb4-4">          (<span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">'L17'</span>, <span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">'[*:1]c1ccc(OC)cc1'</span>),</span>
-<span id="cb4-5">          (<span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">'L19'</span>, <span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">'[*:1]c1ccc(OC)c(OC)c1'</span>),</span>
-<span id="cb4-6">         )</span>
-<span id="cb4-7"></span>
-<span id="cb4-8">chainmols <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> [Chem.MolFromSmiles(y) <span class="cf" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">for</span> x,y <span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">in</span> chains]</span>
-<span id="cb4-9">Draw.MolsToGridImage(chainmols,legends<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span>[x <span class="cf" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">for</span> x,y <span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">in</span> chains])</span></code></pre></div>
-<div class="cell-output cell-output-display" data-execution_count="3">
-<div>
-<figure class="figure">
-<p><img src="https://greglandrum.github.io/rdkit-blog/posts/2025-03-07-drawing-on-drawings_files/figure-html/cell-4-output-1.png" class="img-fluid figure-img"></p>
-</figure>
-</div>
-</div>
-</div>
-<p>I’d like the side chains to all be oriented consistently, so I’m going to construct the full molecules, lay them out, and then remove the core from each of those.</p>
-<p>Here’s the easy way to construct the full molecules, using <code>Chem.molzip()</code></p>
-<div id="5eea12f3" class="cell" data-execution_count="4">
-<div class="sourceCode cell-code" id="cb5" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb5-1">mols <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> []</span>
-<span id="cb5-2"><span class="cf" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">for</span> lbl,smi <span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">in</span> chains:</span>
-<span id="cb5-3">    nm <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> Chem.molzip(core,Chem.MolFromSmiles(smi))</span>
-<span id="cb5-4">    rdDepictor.Compute2DCoords(nm)</span>
-<span id="cb5-5">    mols.append(nm)</span>
-<span id="cb5-6">    </span>
-<span id="cb5-7">Draw.MolsToGridImage(mols,legends <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> [x <span class="cf" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">for</span> x,y <span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">in</span> chains])</span></code></pre></div>
-<div class="cell-output cell-output-display" data-execution_count="4">
-<div>
-<figure class="figure">
-<p><img src="https://greglandrum.github.io/rdkit-blog/posts/2025-03-07-drawing-on-drawings_files/figure-html/cell-5-output-1.png" class="img-fluid figure-img"></p>
-</figure>
-</div>
-</div>
-</div>
-<p>Now use <code>Chem.ReplaceCore()</code> to remove the core atoms from each molecule, leaving us with just the sidechains in a consistent orientation:</p>
-<div id="671abb35" class="cell" data-execution_count="5">
-<div class="sourceCode cell-code" id="cb6" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb6-1">justcore <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> Chem.RWMol(core)</span>
-<span id="cb6-2"><span class="co" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;"># We need to remove the dummy atom:</span></span>
-<span id="cb6-3">justcore.RemoveAtom(<span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">20</span>)</span>
-<span id="cb6-4"></span>
-<span id="cb6-5">newchains <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> {}</span>
-<span id="cb6-6"><span class="cf" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">for</span> (lbl,smi),mol <span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">in</span> <span class="bu" style="color: null;
-background-color: null;
-font-style: inherit;">zip</span>(chains,mols):</span>
-<span id="cb6-7">    tmol <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> Chem.ReplaceCore(mol,justcore)</span>
-<span id="cb6-8">    <span class="co" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;"># label the dummy atom:</span></span>
-<span id="cb6-9">    <span class="cf" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">for</span> atom <span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">in</span> tmol.GetAtoms():</span>
-<span id="cb6-10">        <span class="cf" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">if</span> <span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">not</span> atom.GetAtomicNum():</span>
-<span id="cb6-11">            atom.SetProp(<span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">'atomLabel'</span>,<span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">"R"</span>)</span>
-<span id="cb6-12">    newchains[lbl] <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> tmol</span>
-<span id="cb6-13"></span>
-<span id="cb6-14">Draw.MolsToGridImage(newchains.values(), legends<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span>newchains.keys())</span></code></pre></div>
-<div class="cell-output cell-output-display" data-execution_count="5">
-<div>
-<figure class="figure">
-<p><img src="https://greglandrum.github.io/rdkit-blog/posts/2025-03-07-drawing-on-drawings_files/figure-html/cell-6-output-1.png" class="img-fluid figure-img"></p>
-</figure>
-</div>
-</div>
-</div>
-<p>The easiest way to reproduce the target figure is by laying the molecules out on a 3x3 grid with some empty spaces:</p>
-<div id="052960a3" class="cell" data-execution_count="6">
-<div class="sourceCode cell-code" id="cb7" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb7-1">lbls <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> [<span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">'L20'</span>,<span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">''</span>,<span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">'L21'</span>,</span>
-<span id="cb7-2">        <span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">''</span>,<span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">'L17'</span>,<span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">''</span>,</span>
-<span id="cb7-3">        <span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">'L1'</span>,<span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">''</span>,<span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">'L19'</span>]</span>
-<span id="cb7-4">grid <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> [newchains[l] <span class="cf" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">if</span> l <span class="cf" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">else</span> <span class="va" style="color: #111111;
-background-color: null;
-font-style: inherit;">None</span> <span class="cf" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">for</span> l <span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">in</span> lbls]</span>
-<span id="cb7-5">Draw.MolsToGridImage(grid,legends<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span>lbls)</span></code></pre></div>
-<div class="cell-output cell-output-display" data-execution_count="6">
-<div>
-<figure class="figure">
-<p><img src="https://greglandrum.github.io/rdkit-blog/posts/2025-03-07-drawing-on-drawings_files/figure-html/cell-7-output-1.png" class="img-fluid figure-img"></p>
-</figure>
-</div>
-</div>
-</div>
-<div id="6dc5b3bd" class="cell" data-execution_count="7">
-<div class="sourceCode cell-code" id="cb8" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb8-1"><span class="im" style="color: #00769E;
-background-color: null;
-font-style: inherit;">from</span> IPython.display <span class="im" style="color: #00769E;
-background-color: null;
-font-style: inherit;">import</span> SVG</span>
-<span id="cb8-2"><span class="im" style="color: #00769E;
-background-color: null;
-font-style: inherit;">from</span> rdkit <span class="im" style="color: #00769E;
-background-color: null;
-font-style: inherit;">import</span> Geometry</span>
-<span id="cb8-3"></span>
-<span id="cb8-4"><span class="co" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;"># set up the drawing object:</span></span>
-<span id="cb8-5">nRows <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> <span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">3</span></span>
-<span id="cb8-6">nCols <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> <span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">3</span></span>
-<span id="cb8-7">panelx <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> <span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">250</span></span>
-<span id="cb8-8">panely <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> <span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">250</span></span>
-<span id="cb8-9">d2d <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> Draw.MolDraw2DSVG(panelx<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">*</span>nCols,panely<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">*</span>nRows,panelx,panely)</span>
-<span id="cb8-10">dopts <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> d2d.drawOptions()</span>
-<span id="cb8-11">dopts.legendFontSize <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> <span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">20</span></span>
-<span id="cb8-12"></span>
-<span id="cb8-13"><span class="co" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;"># draw the sidechains</span></span>
-<span id="cb8-14">d2d.DrawMolecules(grid,legends<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span>lbls)</span>
-<span id="cb8-15"></span>
-<span id="cb8-16"><span class="co" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;"># Now draw all the arrows and add the free-energy values</span></span>
-<span id="cb8-17">d2d.SetLineWidth(<span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">4</span>)</span>
-<span id="cb8-18">d2d.SetFontSize(<span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">20</span>)</span>
-<span id="cb8-19"></span>
-<span id="cb8-20"><span class="co" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;"># use gray arrows so that they don't stand out quite so much</span></span>
-<span id="cb8-21"><span class="co" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">#   (the original figure has solid black, but I find this nicer)</span></span>
-<span id="cb8-22">arrowColor <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> (<span class="fl" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">.4</span>,<span class="fl" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">.4</span>,<span class="fl" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">.4</span>)</span>
-<span id="cb8-23"></span>
-<span id="cb8-24">p1 <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> Geometry.Point2D(panelx,panely<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">/</span><span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">2</span>)</span>
-<span id="cb8-25">p2 <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> Geometry.Point2D(<span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">2</span><span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">*</span>panelx,panely<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">/</span><span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">2</span>)</span>
-<span id="cb8-26">d2d.DrawArrow(p2,p1,color<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span>arrowColor,rawCoords<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span><span class="va" style="color: #111111;
-background-color: null;
-font-style: inherit;">True</span>, asPolygon<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span><span class="va" style="color: #111111;
-background-color: null;
-font-style: inherit;">True</span>)</span>
-<span id="cb8-27"></span>
-<span id="cb8-28"><span class="co" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;"># draw the free-energy value slightly offset along the y axis</span></span>
-<span id="cb8-29"><span class="co" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;"># (this is a horizontal arrow) from the mid-point of the arrow:</span></span>
-<span id="cb8-30">midp <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> p2 <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">+</span> (p1<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">-</span>p2)<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">/</span><span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">2</span></span>
-<span id="cb8-31">midp.y <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">+=</span> <span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">20</span></span>
-<span id="cb8-32">d2d.DrawString(<span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">"-0.3"</span>,midp,rawCoords<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span><span class="va" style="color: #111111;
-background-color: null;
-font-style: inherit;">True</span>)</span>
-<span id="cb8-33"></span>
-<span id="cb8-34"></span>
-<span id="cb8-35">p1 <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> Geometry.Point2D(panelx<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">/</span><span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">2</span>,panely)</span>
-<span id="cb8-36">p2 <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> Geometry.Point2D(panelx<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">/</span><span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">2</span>,<span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">2</span><span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">*</span>panely)</span>
-<span id="cb8-37">d2d.DrawArrow(p2,p1,color<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span>arrowColor,rawCoords<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span><span class="va" style="color: #111111;
-background-color: null;
-font-style: inherit;">True</span>, asPolygon<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span><span class="va" style="color: #111111;
-background-color: null;
-font-style: inherit;">True</span>)</span>
-<span id="cb8-38">midp <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> p2 <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">+</span> (p1<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">-</span>p2)<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">/</span><span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">2</span></span>
-<span id="cb8-39">midp.x <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">+=</span> <span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">20</span></span>
-<span id="cb8-40">d2d.DrawString(<span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">"2.0"</span>,midp,rawCoords<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span><span class="va" style="color: #111111;
-background-color: null;
-font-style: inherit;">True</span>, align<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span><span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">1</span>)</span>
-<span id="cb8-41"></span>
-<span id="cb8-42">p1 <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> Geometry.Point2D(panelx,<span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">2</span><span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">*</span>panely<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">+</span>panely<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">/</span><span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">2</span>)</span>
-<span id="cb8-43">p2 <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> Geometry.Point2D(<span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">2</span><span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">*</span>panelx,<span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">2</span><span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">*</span>panely<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">+</span>panely<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">/</span><span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">2</span>)</span>
-<span id="cb8-44">d2d.DrawArrow(p1,p2,color<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span>arrowColor,rawCoords<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span><span class="va" style="color: #111111;
-background-color: null;
-font-style: inherit;">True</span>, asPolygon<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span><span class="va" style="color: #111111;
-background-color: null;
-font-style: inherit;">True</span>)</span>
-<span id="cb8-45">midp <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> p2 <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">+</span> (p1<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">-</span>p2)<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">/</span><span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">2</span></span>
-<span id="cb8-46">midp.y <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">+=</span> <span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">20</span></span>
-<span id="cb8-47">d2d.DrawString(<span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">"4.8"</span>,midp,rawCoords<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span><span class="va" style="color: #111111;
-background-color: null;
-font-style: inherit;">True</span>)</span>
-<span id="cb8-48"></span>
-<span id="cb8-49">p1 <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> Geometry.Point2D(<span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">2</span><span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">*</span>panelx <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">+</span> panelx<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">/</span><span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">2</span>,panely)</span>
-<span id="cb8-50">p2 <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> Geometry.Point2D(<span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">2</span><span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">*</span>panelx <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">+</span> panelx<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">/</span><span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">2</span>,<span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">2</span><span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">*</span>panely)</span>
-<span id="cb8-51">d2d.DrawArrow(p1,p2,color<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span>arrowColor,rawCoords<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span><span class="va" style="color: #111111;
-background-color: null;
-font-style: inherit;">True</span>, asPolygon<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span><span class="va" style="color: #111111;
-background-color: null;
-font-style: inherit;">True</span>)</span>
-<span id="cb8-52">midp <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> p2 <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">+</span> (p1<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">-</span>p2)<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">/</span><span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">2</span></span>
-<span id="cb8-53">midp.x <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">+=</span> <span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">20</span></span>
-<span id="cb8-54">d2d.DrawString(<span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">"2.5"</span>,midp,rawCoords<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span><span class="va" style="color: #111111;
-background-color: null;
-font-style: inherit;">True</span>, align<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span><span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">1</span>)</span>
-<span id="cb8-55"></span>
-<span id="cb8-56"><span class="co" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;"># do the diagonals... these are trickier</span></span>
-<span id="cb8-57"></span>
-<span id="cb8-58"><span class="co" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;"># this is the fraction of the side length of the grid boxes that the arrows</span></span>
-<span id="cb8-59"><span class="co" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;"># will extend into each box.</span></span>
-<span id="cb8-60">frac <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> <span class="fl" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">0.2</span></span>
-<span id="cb8-61"></span>
-<span id="cb8-62">p1 <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> Geometry.Point2D((<span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">1</span><span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">-</span>frac)<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">*</span>panelx,(<span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">1</span><span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">-</span>frac)<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">*</span>panely)</span>
-<span id="cb8-63">p2 <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> Geometry.Point2D((<span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">1</span><span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">+</span>frac)<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">*</span>panelx,(<span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">1</span><span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">+</span>frac)<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">*</span>panely)</span>
-<span id="cb8-64">d2d.DrawArrow(p2,p1,color<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span>arrowColor,rawCoords<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span><span class="va" style="color: #111111;
-background-color: null;
-font-style: inherit;">True</span>, asPolygon<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span><span class="va" style="color: #111111;
-background-color: null;
-font-style: inherit;">True</span>,frac <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> <span class="fl" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">0.1</span>)</span>
-<span id="cb8-65">midp <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> p2 <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">+</span> (p1<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">-</span>p2)<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">/</span><span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">2</span></span>
-<span id="cb8-66">midp.x <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">+=</span> <span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">25</span></span>
-<span id="cb8-67">d2d.DrawString(<span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">"2.1"</span>,midp,rawCoords<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span><span class="va" style="color: #111111;
-background-color: null;
-font-style: inherit;">True</span>, align<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span><span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">1</span>)</span>
-<span id="cb8-68"></span>
-<span id="cb8-69">p1 <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> Geometry.Point2D((<span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">2</span><span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">+</span>frac)<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">*</span>panelx,(<span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">1</span><span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">-</span>frac)<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">*</span>panely)</span>
-<span id="cb8-70">p2 <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> Geometry.Point2D((<span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">2</span><span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">-</span>frac)<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">*</span>panelx,(<span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">1</span><span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">+</span>frac)<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">*</span>panely)</span>
-<span id="cb8-71">d2d.DrawArrow(p2,p1,color<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span>arrowColor,rawCoords<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span><span class="va" style="color: #111111;
-background-color: null;
-font-style: inherit;">True</span>, asPolygon<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span><span class="va" style="color: #111111;
-background-color: null;
-font-style: inherit;">True</span>,frac <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> <span class="fl" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">0.1</span>)</span>
-<span id="cb8-72">midp <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> p2 <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">+</span> (p1<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">-</span>p2)<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">/</span><span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">2</span></span>
-<span id="cb8-73">midp.x <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">-=</span> <span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">25</span></span>
-<span id="cb8-74">d2d.DrawString(<span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">"2.4"</span>,midp,rawCoords<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span><span class="va" style="color: #111111;
-background-color: null;
-font-style: inherit;">True</span>, align<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span><span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">2</span>)</span>
-<span id="cb8-75"></span>
-<span id="cb8-76">p1 <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> Geometry.Point2D((<span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">2</span><span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">+</span>frac)<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">*</span>panelx,(<span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">2</span><span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">+</span>frac)<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">*</span>panely)</span>
-<span id="cb8-77">p2 <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> Geometry.Point2D((<span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">2</span><span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">-</span>frac)<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">*</span>panelx,(<span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">2</span><span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">-</span>frac)<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">*</span>panely)</span>
-<span id="cb8-78">d2d.DrawArrow(p2,p1,color<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span>arrowColor,rawCoords<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span><span class="va" style="color: #111111;
-background-color: null;
-font-style: inherit;">True</span>, asPolygon<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span><span class="va" style="color: #111111;
-background-color: null;
-font-style: inherit;">True</span>,frac <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> <span class="fl" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">0.1</span>)</span>
-<span id="cb8-79">midp <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> p2 <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">+</span> (p1<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">-</span>p2)<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">/</span><span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">2</span></span>
-<span id="cb8-80">midp.x <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">-=</span> <span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">25</span></span>
-<span id="cb8-81">d2d.DrawString(<span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">"4.9"</span>,midp,rawCoords<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span><span class="va" style="color: #111111;
-background-color: null;
-font-style: inherit;">True</span>, align<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span><span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">2</span>)</span>
-<span id="cb8-82"></span>
-<span id="cb8-83">p1 <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> Geometry.Point2D((<span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">1</span><span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">-</span>frac)<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">*</span>panelx,(<span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">2</span><span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">+</span>frac)<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">*</span>panely)</span>
-<span id="cb8-84">p2 <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> Geometry.Point2D((<span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">1</span><span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">+</span>frac)<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">*</span>panelx,(<span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">2</span><span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">-</span>frac)<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">*</span>panely)</span>
-<span id="cb8-85">d2d.DrawArrow(p2,p1,color<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span>arrowColor,rawCoords<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span><span class="va" style="color: #111111;
-background-color: null;
-font-style: inherit;">True</span>, asPolygon<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span><span class="va" style="color: #111111;
-background-color: null;
-font-style: inherit;">True</span>,frac <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> <span class="fl" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">0.1</span>)</span>
-<span id="cb8-86">midp <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> p2 <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">+</span> (p1<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">-</span>p2)<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">/</span><span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">2</span></span>
-<span id="cb8-87">midp.x <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">+=</span> <span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">25</span></span>
-<span id="cb8-88">d2d.DrawString(<span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">"0.1"</span>,midp,rawCoords<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span><span class="va" style="color: #111111;
-background-color: null;
-font-style: inherit;">True</span>, align<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span><span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">1</span>)</span>
-<span id="cb8-89"></span>
-<span id="cb8-90"></span>
-<span id="cb8-91">d2d.FinishDrawing()</span>
-<span id="cb8-92">svg <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> d2d.GetDrawingText()</span>
-<span id="cb8-93">SVG(svg)</span></code></pre></div>
-<div class="cell-output cell-output-display" data-execution_count="7">
-<div>
-<figure class="figure">
-<p><img src="https://greglandrum.github.io/rdkit-blog/posts/2025-03-07-drawing-on-drawings_files/figure-html/cell-8-output-1.svg" class="img-fluid figure-img"></p>
-</figure>
-</div>
-</div>
-</div>
-<p>At the moment it’s not possible to change the font colour used for <code>DrawText()</code>, so I can’t sensibly add the predicted free energy values to the plot. I will fix that for the next RDKit release and update this post at some point in the future once that has been done.</p>
-<p>If you’re doing a figure for a paper and you want to so some fine tuning of the result, it’s almost definitely faster (and likely better) to save the SVG to a file and then use your favorite drawing package that can open SVG files (inkscape, Adobe Illustrator, whatever) to do the final polishing.</p>
-
-
-
- ]]></description>
-  <category>tutorial</category>
-  <category>drawing</category>
-  <guid>https://greglandrum.github.io/rdkit-blog/posts/2025-03-07-drawing-on-drawings.html</guid>
-  <pubDate>Thu, 06 Mar 2025 23:00:00 GMT</pubDate>
-  <media:content url="https://greglandrum.github.io/rdkit-blog/posts/images/blog/drawing-on-drawings-1.png" medium="image" type="image/png" height="137" width="144"/>
 </item>
 </channel>
 </rss>
