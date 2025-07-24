@@ -6,10 +6,10 @@
 
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
 
-<meta name="dcterms.date" content="2025-07-17">
-<meta name="description" content="A simple tip to explain what you actually did">
+<meta name="dcterms.date" content="2025-07-24">
+<meta name="description" content="No really, we don’t need mol2 files any more.">
 
-<title>Please stop saying “The Tanimoto similarity is” – RDKit blog</title>
+<title>Storing partial charges in SD files – RDKit blog</title>
 <style>
 code{white-space: pre-wrap;}
 span.smallcaps{font-variant: small-caps;}
@@ -171,17 +171,16 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 
 <header id="title-block-header" class="quarto-title-block default">
 <div class="quarto-title">
-<h1 class="title">Please stop saying “The Tanimoto similarity is”</h1>
+<h1 class="title">Storing partial charges in SD files</h1>
   <div class="quarto-categories">
-    <div class="quarto-category">similarity</div>
-    <div class="quarto-category">fingerprints</div>
-    <div class="quarto-category">rants</div>
+    <div class="quarto-category">tutorial</div>
+    <div class="quarto-category">3d</div>
   </div>
   </div>
 
 <div>
   <div class="description">
-    A simple tip to explain what you actually did
+    No really, we don’t need mol2 files any more.
   </div>
 </div>
 
@@ -192,7 +191,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
     <div>
     <div class="quarto-title-meta-heading">Published</div>
     <div class="quarto-title-meta-contents">
-      <p class="date">July 17, 2025</p>
+      <p class="date">July 24, 2025</p>
     </div>
   </div>
   
@@ -204,65 +203,168 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 </header>
 
 
-<p>At both ICCS and the CADD GRC this year I noticed multiple people, either in talks or on posters, reporting the “Tanimoto similarity” between two (or more) molecules. This is an unfortunate shorthand because it leaves out a critical piece of information: what fingerprint did you use when doing the Tanimoto calculation? Without knowing that, it’s really not possible to make sense of what the reported similarity values actually mean.</p>
-<p>This isn’t one of those examples of me being pedantic (or cranky); the Tanimoto similarities calculated using different fingerprints can be very, very different. I’ve written several blogs posts about this with more details, a couple of examples are <a href="https://greglandrum.github.io/rdkit-blog/posts/2021-05-18-fingerprint-thresholds1.html">this post looking at the “noise threshold” of various fingerprints</a> and <a href="https://greglandrum.github.io/rdkit-blog/posts/2021-05-21-similarity-search-thresholds.html">this one looking at what typical similarity values are between “closely related” compounds</a>.</p>
-<p>As a quick illustration of this, I calculated the similarities between esomeprazole and lansoprazole, two molecules that look (to me at least) pretty similar:</p>
-<div class="quarto-figure quarto-figure-center">
-<figure class="figure">
-<p><img src="2025-07-17-naming-similarity-metrics_files/figure-html/49e4f7ab-1-image.png" class="img-fluid figure-img"></p>
-<figcaption>image.png</figcaption>
-</figure>
-</div>
-<p>The Tanimoto similarity between these two molecules using the RDKit fingerprint is 0.79, using the Morgan2 fingerprint it’s 0.43. That’s a huge difference. If I had just said that the similarity was 0.43 and you guessed that I was using the RDKit fingerprint, which has a noise threshold of 0.51, you would conclude that the molecules are really not similar at all. With the Morgan2 fingerprint, on the other hand, 0.43 indicates two closely related molecules.</p>
-<p>My concrete, and very easy to implement, suggestion: if you report a similarity value (in a talk, poster, paper, etc.) you should always mention the fingerprint used. So do something like “The Tanimoto similarity calculated using Morgan2 fingerprints was 0.43”. It’s not a lot of extra words, but it does allow your audience to understand what you actually did. And hopefully that’s a good thing.</p>
-<p>The rest of this post is just the code to produce the image above, generate fingerprints, and calculate similarities.</p>
-<div id="ef81c872" class="cell" data-execution_count="3">
-<div class="sourceCode cell-code" id="cb1"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> rdkit <span class="im">import</span> Chem</span>
-<span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> rdkit.Chem.Draw <span class="im">import</span> IPythonConsole</span>
-<span id="cb1-3"><a href="#cb1-3" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> rdkit.Chem <span class="im">import</span> Draw</span>
-<span id="cb1-4"><a href="#cb1-4" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> rdkit.Chem <span class="im">import</span> rdFingerprintGenerator</span>
-<span id="cb1-5"><a href="#cb1-5" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> rdkit <span class="im">import</span> DataStructs</span>
-<span id="cb1-6"><a href="#cb1-6" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb1-7"><a href="#cb1-7" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> rdkit</span>
-<span id="cb1-8"><a href="#cb1-8" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(rdkit.__version__)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<p>I was chatting with Pat Walters at the CADD GRC and he brought up point 7 from his famous <a href="https://www.linkedin.com/posts/wpwalters_i-thoroughly-enjoyed-the-first-day-of-the-activity-7316447084209991682-Yuki">14 points LinkedIn post</a>. The usual justification given for using mol2 files is that they are the only file format we have that allows including partial charges. This is a widely held opinion, but it’s not really true. It’s actually quite easy to store arbitrary atom (or bond) properties in SD files and the RDKit has a simple mechanism for doing this. This post is a short tutorial on how to use this functionality.</p>
+<p>The handling of atomic and bond properties in SD files is described in more detail in <a href="https://www.rdkit.org/docs/RDKit_Book.html#atom-properties-and-sdf-files">the docs</a>.</p>
+<p>Rather than doing the usual thing and generating Gasteiger-Marsilli charges, here I’m going to use the DASH-props tree that we developed in the Riniker lab to rapidly generate approximate AM1BCC charges. DASH uses a hierarchical tree of substructures to compute high-quality estimates of AM1BCC charges for a molecule. Because it’s based on substructures, the method is fast and conformation independent. If want to learn more about the algorithm, take a look at <a href="https://pubs.aip.org/aip/jcp/article/161/7/074103/3308079/DASH-properties-Estimating-atomic-and-molecular">the open-access paper</a>.</p>
+<p>If you want to run the code in this notebook, you’ll need to install DASH props. This requires adding some packages to your conda environment. There’s an <a href="https://github.com/rinikerlab/DASH-tree/blob/main/tree_only_env.yml">environment file</a> in the DASH-tree repo that you can use, but if you already have a working RDKit environment, I think this is sufficient:</p>
+<pre><code>% conda install -c conda-forge pytables tqdm</code></pre>
+<p>and then pip installing the DASH tree package:</p>
+<pre><code>% python -m pip install git+https://github.com/rinikerlab/DASH-tree</code></pre>
+<blockquote class="blockquote">
+<p>An aside: the way these properties are stored in the SD file is very easy to parse (The format is actually the result of some discussions I had with a couple of cheminformatics software vendors back in 2019; I think I ended up being the only one to implement what we had discussed), so adding support for this format to other software or toolkits that can already read SD files wouldn’t be much of a lift. If you’re a developer and have questions, please just ask.</p>
+</blockquote>
+<div id="51317896" class="cell" data-execution_count="1">
+<div class="sourceCode cell-code" id="cb3"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> rdkit <span class="im">import</span> Chem</span>
+<span id="cb3-2"><a href="#cb3-2" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> rdkit.Chem <span class="im">import</span> Draw</span>
+<span id="cb3-3"><a href="#cb3-3" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> rdkit</span>
+<span id="cb3-4"><a href="#cb3-4" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(rdkit.__version__)</span>
+<span id="cb3-5"><a href="#cb3-5" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb3-6"><a href="#cb3-6" aria-hidden="true" tabindex="-1"></a><span class="co"># import the required stuff from DASH:</span></span>
+<span id="cb3-7"><a href="#cb3-7" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> serenityff.charge.tree.dash_tree <span class="im">import</span> DASHTree, TreeType</span>
+<span id="cb3-8"><a href="#cb3-8" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> serenityff.charge.data <span class="im">import</span> dash_props_tree_path</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 <div class="cell-output cell-output-stdout">
 <pre><code>2025.03.4</code></pre>
 </div>
 </div>
-<div id="e06ac98c" class="cell" data-execution_count="9">
-<div class="sourceCode cell-code" id="cb3"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a>esomeprazole <span class="op">=</span> Chem.MolFromSmiles(<span class="st">'COc1ccc2nc([nH]c2c1)[S@](=O)Cc1ncc(C)c(OC)c1C'</span>)</span>
-<span id="cb3-2"><a href="#cb3-2" aria-hidden="true" tabindex="-1"></a>lansoprazole <span class="op">=</span> Chem.MolFromSmiles(<span class="st">'FC(F)(F)COc1ccnc(c1C)CS(=O)c2[nH]c3ccccc3n2'</span>)</span>
-<span id="cb3-3"><a href="#cb3-3" aria-hidden="true" tabindex="-1"></a>Draw.MolsToGridImage([esomeprazole, lansoprazole], </span>
-<span id="cb3-4"><a href="#cb3-4" aria-hidden="true" tabindex="-1"></a>    legends<span class="op">=</span>[<span class="st">'esomeprazole'</span>,<span class="st">'lansoprazole'</span>], molsPerRow<span class="op">=</span><span class="dv">2</span>, subImgSize<span class="op">=</span>(<span class="dv">300</span>, <span class="dv">250</span>))</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
-<div class="cell-output cell-output-display" data-execution_count="9">
-<div>
-<figure class="figure">
-<p><img src="2025-07-17-naming-similarity-metrics_files/figure-html/cell-3-output-1.png" class="img-fluid figure-img"></p>
-</figure>
-</div>
-</div>
-</div>
-<div id="f115df66" class="cell" data-execution_count="5">
-<div class="sourceCode cell-code" id="cb4"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a>rdk_fpg <span class="op">=</span> rdFingerprintGenerator.GetRDKitFPGenerator()</span>
-<span id="cb4-2"><a href="#cb4-2" aria-hidden="true" tabindex="-1"></a>mfp_fpg <span class="op">=</span> rdFingerprintGenerator.GetMorganGenerator(radius<span class="op">=</span><span class="dv">2</span>)</span>
-<span id="cb4-3"><a href="#cb4-3" aria-hidden="true" tabindex="-1"></a>rdk_fps <span class="op">=</span> [rdk_fpg.GetFingerprint(mol) <span class="cf">for</span> mol <span class="kw">in</span> [esomeprazole, lansoprazole]]</span>
-<span id="cb4-4"><a href="#cb4-4" aria-hidden="true" tabindex="-1"></a>mfp_fps <span class="op">=</span> [mfp_fpg.GetFingerprint(mol) <span class="cf">for</span> mol <span class="kw">in</span> [esomeprazole, lansoprazole]]</span>
-<span id="cb4-5"><a href="#cb4-5" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="st">'RDKit fingerprint similarity:'</span>, DataStructs.TanimotoSimilarity(rdk_fps[<span class="dv">0</span>], rdk_fps[<span class="dv">1</span>]))</span>
-<span id="cb4-6"><a href="#cb4-6" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="st">'Morgan fingerprint similarity:'</span>, DataStructs.TanimotoSimilarity(mfp_fps[<span class="dv">0</span>], mfp_fps[<span class="dv">1</span>]))</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div id="9fe0e6db" class="cell" data-execution_count="2">
+<div class="sourceCode cell-code" id="cb5"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Load the property tree.</span></span>
+<span id="cb5-2"><a href="#cb5-2" aria-hidden="true" tabindex="-1"></a><span class="co"># Note, that the files will be automatically downloaded the first time the tree is loaded from the ETHZ Research Collection.</span></span>
+<span id="cb5-3"><a href="#cb5-3" aria-hidden="true" tabindex="-1"></a>tree <span class="op">=</span> DASHTree(tree_folder_path<span class="op">=</span>dash_props_tree_path, tree_type<span class="op">=</span>TreeType.FULL)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 <div class="cell-output cell-output-stdout">
-<pre><code>RDKit fingerprint similarity: 0.7943722943722944
-Morgan fingerprint similarity: 0.4264705882352941</code></pre>
+<pre><code>Loading DASH tree data
+Loaded 122 trees and data</code></pre>
 </div>
 </div>
-<p>Out of curiousity, what are the Dice similarities between those fingerprints?</p>
-<div id="3ef5bdff" class="cell" data-execution_count="6">
-<div class="sourceCode cell-code" id="cb6"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb6-1"><a href="#cb6-1" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="st">'RDKit fingerprint similarity:'</span>, DataStructs.DiceSimilarity(rdk_fps[<span class="dv">0</span>], rdk_fps[<span class="dv">1</span>]))</span>
-<span id="cb6-2"><a href="#cb6-2" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="st">'Morgan fingerprint similarity:'</span>, DataStructs.DiceSimilarity(mfp_fps[<span class="dv">0</span>], mfp_fps[<span class="dv">1</span>]))</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<p>Construct a sample molecule and compute the charges:</p>
+<div id="a98ba683" class="cell" data-execution_count="3">
+<div class="sourceCode cell-code" id="cb7"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb7-1"><a href="#cb7-1" aria-hidden="true" tabindex="-1"></a>esomeprazole <span class="op">=</span> Chem.MolFromSmiles(<span class="st">'CC1=C(C(=C(C=C1)N)C(=O)N)C(=O)N'</span>)</span>
+<span id="cb7-2"><a href="#cb7-2" aria-hidden="true" tabindex="-1"></a>esomep_h <span class="op">=</span> Chem.AddHs(esomeprazole)</span>
+<span id="cb7-3"><a href="#cb7-3" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb7-4"><a href="#cb7-4" aria-hidden="true" tabindex="-1"></a>charges <span class="op">=</span> tree.get_molecules_partial_charges(esomep_h, chg_key<span class="op">=</span><span class="st">"AM1BCC"</span>, chg_std_key<span class="op">=</span><span class="st">"AM1BCC_std"</span>)[<span class="st">"charges"</span>]</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+<p>Set the charges as atomic properties:</p>
+<div id="40ba7fcf" class="cell" data-execution_count="4">
+<div class="sourceCode cell-code" id="cb8"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb8-1"><a href="#cb8-1" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> atom <span class="kw">in</span> esomep_h.GetAtoms():</span>
+<span id="cb8-2"><a href="#cb8-2" aria-hidden="true" tabindex="-1"></a>    atom.SetDoubleProp(<span class="st">"AM1BCC_charge"</span>, charges[atom.GetIdx()])</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+<div id="77259b55" class="cell" data-execution_count="5">
+<div class="sourceCode cell-code" id="cb9"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb9-1"><a href="#cb9-1" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-2"><a href="#cb9-2" aria-hidden="true" tabindex="-1"></a><span class="co"># this is the one extra call you have to make in order to </span></span>
+<span id="cb9-3"><a href="#cb9-3" aria-hidden="true" tabindex="-1"></a><span class="co"># convert the atom properties to a molecule property which will </span></span>
+<span id="cb9-4"><a href="#cb9-4" aria-hidden="true" tabindex="-1"></a><span class="co"># be written to the SD file:</span></span>
+<span id="cb9-5"><a href="#cb9-5" aria-hidden="true" tabindex="-1"></a>Chem.CreateAtomDoublePropertyList(esomep_h,<span class="st">'AM1BCC_charge'</span>)</span>
+<span id="cb9-6"><a href="#cb9-6" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-7"><a href="#cb9-7" aria-hidden="true" tabindex="-1"></a><span class="co"># write the SD data to a string so that we can look at it:</span></span>
+<span id="cb9-8"><a href="#cb9-8" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> io <span class="im">import</span> StringIO</span>
+<span id="cb9-9"><a href="#cb9-9" aria-hidden="true" tabindex="-1"></a>sio <span class="op">=</span> StringIO()</span>
+<span id="cb9-10"><a href="#cb9-10" aria-hidden="true" tabindex="-1"></a><span class="cf">with</span> Chem.SDWriter(sio) <span class="im">as</span> w:</span>
+<span id="cb9-11"><a href="#cb9-11" aria-hidden="true" tabindex="-1"></a>    w.write(esomep_h)</span>
+<span id="cb9-12"><a href="#cb9-12" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-13"><a href="#cb9-13" aria-hidden="true" tabindex="-1"></a>sdf <span class="op">=</span> sio.getvalue()</span>
+<span id="cb9-14"><a href="#cb9-14" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(sdf)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 <div class="cell-output cell-output-stdout">
-<pre><code>RDKit fingerprint similarity: 0.8854041013268998
-Morgan fingerprint similarity: 0.5979381443298969</code></pre>
+<pre><code>
+     RDKit          2D
+
+ 25 25  0  0  0  0  0  0  0  0999 V2000
+    3.0000    0.0000    0.0000 C   0  0  0  0  0  0  0  0  0  0  0  0
+    1.5000    0.0000    0.0000 C   0  0  0  0  0  0  0  0  0  0  0  0
+    0.7500   -1.2990    0.0000 C   0  0  0  0  0  0  0  0  0  0  0  0
+   -0.7500   -1.2990    0.0000 C   0  0  0  0  0  0  0  0  0  0  0  0
+   -1.5000    0.0000    0.0000 C   0  0  0  0  0  0  0  0  0  0  0  0
+   -0.7500    1.2990    0.0000 C   0  0  0  0  0  0  0  0  0  0  0  0
+    0.7500    1.2990    0.0000 C   0  0  0  0  0  0  0  0  0  0  0  0
+   -3.0000    0.0000    0.0000 N   0  0  0  0  0  0  0  0  0  0  0  0
+   -1.5000   -2.5981    0.0000 C   0  0  0  0  0  0  0  0  0  0  0  0
+   -1.1155   -3.5040    0.0000 O   0  0  0  0  0  0  0  0  0  0  0  0
+   -3.0000   -2.5981    0.0000 N   0  0  0  0  0  0  0  0  0  0  0  0
+    1.5000   -2.5981    0.0000 C   0  0  0  0  0  0  0  0  0  0  0  0
+    3.0000   -2.5981    0.0000 O   0  0  0  0  0  0  0  0  0  0  0  0
+    0.7500   -3.8971    0.0000 N   0  0  0  0  0  0  0  0  0  0  0  0
+    4.5000    0.0000    0.0000 H   0  0  0  0  0  0  0  0  0  0  0  0
+    3.0000   -1.5000    0.0000 H   0  0  0  0  0  0  0  0  0  0  0  0
+    3.0000    1.5000    0.0000 H   0  0  0  0  0  0  0  0  0  0  0  0
+   -1.5000    2.5981    0.0000 H   0  0  0  0  0  0  0  0  0  0  0  0
+    1.5000    2.5981    0.0000 H   0  0  0  0  0  0  0  0  0  0  0  0
+   -3.7500    1.2990    0.0000 H   0  0  0  0  0  0  0  0  0  0  0  0
+   -3.5923   -0.7860    0.0000 H   0  0  0  0  0  0  0  0  0  0  0  0
+   -3.7500   -3.8971    0.0000 H   0  0  0  0  0  0  0  0  0  0  0  0
+   -3.5923   -1.8121    0.0000 H   0  0  0  0  0  0  0  0  0  0  0  0
+    1.5000   -5.1962    0.0000 H   0  0  0  0  0  0  0  0  0  0  0  0
+   -0.2268   -4.0171    0.0000 H   0  0  0  0  0  0  0  0  0  0  0  0
+  1  2  1  0
+  2  3  2  0
+  3  4  1  0
+  4  5  2  0
+  5  6  1  0
+  6  7  2  0
+  5  8  1  0
+  4  9  1  0
+  9 10  2  0
+  9 11  1  0
+  3 12  1  0
+ 12 13  2  0
+ 12 14  1  0
+  7  2  1  0
+  1 15  1  0
+  1 16  1  0
+  1 17  1  0
+  6 18  1  0
+  7 19  1  0
+  8 20  1  0
+  8 21  1  0
+ 11 22  1  0
+ 11 23  1  0
+ 14 24  1  0
+ 14 25  1  0
+M  END
+&gt;  &lt;atom.dprop.AM1BCC_charge&gt;  (1) 
+-0.057020346264131966 -0.05498106388730991 -0.1417576117737365 -0.24649839652124084 0.19183992335343653 -0.14084077400735293 -0.13325346021838766 -0.85373148869180315 0.69066109221699112
+-0.61948158338060078 -0.63810034626413192 0.6751982937456793 -0.58508759253159914 -0.67224362594143339 0.054944129070337355 0.054944129070337355 0.054944129070337355 0.1595973470895479
+0.1595973470895479 0.41622965373586801 0.41622965373586801 0.31563710234748005 0.31563710234748005 0.31876819330440859 0.31876819330440859
+
+$$$$
+</code></pre>
 </div>
 </div>
+<p>You can see that the property <code>atom.dprop.AM1BCC_charge</code> has been added to the SD string. Also that we’re writing way too many sig figs… it’s probably worth adding an option to control that.</p>
+<p>When that SD string is parsed, the atom properties are extracted automatically and assigned to the atoms:</p>
+<div id="89ae23e1" class="cell" data-execution_count="6">
+<div class="sourceCode cell-code" id="cb11"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb11-1"><a href="#cb11-1" aria-hidden="true" tabindex="-1"></a>suppl <span class="op">=</span> Chem.SDMolSupplier()</span>
+<span id="cb11-2"><a href="#cb11-2" aria-hidden="true" tabindex="-1"></a>suppl.SetData(sdf,removeHs<span class="op">=</span><span class="va">False</span>)</span>
+<span id="cb11-3"><a href="#cb11-3" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb11-4"><a href="#cb11-4" aria-hidden="true" tabindex="-1"></a>m <span class="op">=</span> <span class="bu">next</span>(suppl)</span>
+<span id="cb11-5"><a href="#cb11-5" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> atom <span class="kw">in</span> m.GetAtoms():</span>
+<span id="cb11-6"><a href="#cb11-6" aria-hidden="true" tabindex="-1"></a>    <span class="bu">print</span>(atom.GetIdx(), atom.GetDoubleProp(<span class="st">"AM1BCC_charge"</span>))</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>0 -0.057020346264131966
+1 -0.05498106388730991
+2 -0.1417576117737365
+3 -0.24649839652124084
+4 0.19183992335343653
+5 -0.14084077400735293
+6 -0.13325346021838766
+7 -0.8537314886918032
+8 0.6906610922169911
+9 -0.6194815833806008
+10 -0.6381003462641319
+11 0.6751982937456793
+12 -0.5850875925315991
+13 -0.6722436259414334
+14 0.054944129070337355
+15 0.054944129070337355
+16 0.054944129070337355
+17 0.1595973470895479
+18 0.1595973470895479
+19 0.416229653735868
+20 0.416229653735868
+21 0.31563710234748005
+22 0.31563710234748005
+23 0.3187681933044086
+24 0.3187681933044086</code></pre>
+</div>
+</div>
+<p>That’s it… hopefully it is useful</p>
 
 
 
