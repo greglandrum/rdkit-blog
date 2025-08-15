@@ -10,7 +10,591 @@
 <atom:link href="https://greglandrum.github.io/rdkit-blog/index.xml" rel="self" type="application/rss+xml"/>
 <description>RDKit experiments, tips, and tutorials</description>
 <generator>quarto-1.6.43</generator>
-<lastBuildDate>Sat, 09 Aug 2025 22:00:00 GMT</lastBuildDate>
+<lastBuildDate>Thu, 14 Aug 2025 22:00:00 GMT</lastBuildDate>
+<item>
+  <title>A BRICS tutorial</title>
+  <link>https://greglandrum.github.io/rdkit-blog/posts/2025-08-15-BRICS-tutorial.html</link>
+  <description><![CDATA[ 
+
+
+
+
+<p>This post is a short tutorial on using the RDKit’s BRICS implementation, expanding a bit on <a href="https://www.rdkit.org/docs/GettingStartedInPython.html#brics-implementation">what’s in the documentation</a>.</p>
+<p>BRICS is a method for fragmenting molecules into smaller pieces along bonds which are likely to be synthetically accessible. The original paper describing the method is:</p>
+<blockquote class="blockquote">
+<p>Degen, J.; Wegscheid-Gerlach, C.; Zaliani, A.; Rarey, M. On the Art of Compiling and Using “Drug-Like” Chemical Fragment Spaces. ChemMedChem 2008, 3 (10), 1503–1507. https://chemistry-europe.onlinelibrary.wiley.com/doi/full/10.1002/cmdc.200800178</p>
+</blockquote>
+<div id="e84077fe" class="cell" data-execution_count="1">
+<div class="sourceCode cell-code" id="cb1" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb1-1"><span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">from</span> rdkit <span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">import</span> Chem</span>
+<span id="cb1-2"><span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">from</span> rdkit.Chem <span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">import</span> rdDepictor</span>
+<span id="cb1-3">rdDepictor.SetPreferCoordGen(<span class="va" style="color: #111111;
+background-color: null;
+font-style: inherit;">True</span>)</span>
+<span id="cb1-4"><span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">from</span> rdkit.Chem.Draw <span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">import</span> IPythonConsole</span>
+<span id="cb1-5"><span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">from</span> rdkit.Chem <span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">import</span> Draw</span>
+<span id="cb1-6"><span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">from</span> rdkit.Chem <span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">import</span> BRICS</span>
+<span id="cb1-7"><span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">import</span> rdkit</span>
+<span id="cb1-8"><span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">print</span>(rdkit.__version__)</span></code></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>2025.03.5</code></pre>
+</div>
+</div>
+<section id="brics-basics" class="level1">
+<h1>BRICS basics</h1>
+<div id="3c89a385" class="cell" data-execution_count="2">
+<div class="sourceCode cell-code" id="cb3" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb3-1">esomeprazole <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> Chem.MolFromSmiles(<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'COc1ccc2[nH]c([S+]([O-])Cc3ncc(C)c(OC)c3C)nc2c1'</span>)</span>
+<span id="cb3-2">rdDepictor.Compute2DCoords(esomeprazole)</span>
+<span id="cb3-3">esomeprazole</span></code></pre></div>
+<div class="cell-output cell-output-display" data-execution_count="2">
+<div>
+<figure class="figure">
+<p><img src="https://greglandrum.github.io/rdkit-blog/posts/2025-08-15-BRICS-tutorial_files/figure-html/cell-3-output-1.png" class="img-fluid figure-img"></p>
+</figure>
+</div>
+</div>
+</div>
+<div id="0aa07efd" class="cell" data-execution_count="3">
+<div class="sourceCode cell-code" id="cb4" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb4-1">pieces <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> BRICS.BRICSDecompose(esomeprazole)</span>
+<span id="cb4-2">pieces</span></code></pre></div>
+<div class="cell-output cell-output-display" data-execution_count="3">
+<pre><code>{'[14*]c1ncc(C)c([16*])c1C',
+ '[3*]OC',
+ '[8*]C[S+]([O-])c1nc2cc([16*])ccc2[nH]1'}</code></pre>
+</div>
+</div>
+<div id="2a2071ea" class="cell" data-execution_count="4">
+<div class="sourceCode cell-code" id="cb6" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb6-1">Draw.MolsToGridImage([Chem.MolFromSmiles(x) <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">for</span> x <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">in</span> pieces])</span></code></pre></div>
+<div class="cell-output cell-output-display" data-execution_count="4">
+<div>
+<figure class="figure">
+<p><img src="https://greglandrum.github.io/rdkit-blog/posts/2025-08-15-BRICS-tutorial_files/figure-html/cell-5-output-1.png" class="img-fluid figure-img"></p>
+</figure>
+</div>
+</div>
+</div>
+<p>The atom environments and connection rules can be found in Scheme 2 of the BRICS paper:</p>
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="https://chemistry-europe.onlinelibrary.wiley.com/cms/asset/797b1262-e8d9-42ad-b6b1-ba85878a35de/msch002.gif" class="img-fluid figure-img"></p>
+<figcaption>BRICS connection rules</figcaption>
+</figure>
+</div>
+<p>Note that the RDKit BRICS implementation does not contain a definition of L2, a three connected N with a lone pair. We incorporated that with L5 in a more general definition of amine. In the RDKit implementation L5 can connect with L1, L4, L12, L13, L14, L15, and L16. We also added a few additional connection definitions. The actual SMARTS used in the RDKit can be found in <a href="https://github.com/rdkit/rdkit-orig/blob/57058c886a49cc597b0c40641a28697ee3a57aee/Code/GraphMol/ChemTransforms/MolFragmenter.cpp#L104">MolFragmenter.cpp</a> along with the and the <a href="https://github.com/rdkit/rdkit-orig/blob/57058c886a49cc597b0c40641a28697ee3a57aee/Code/GraphMol/ChemTransforms/MolFragmenter.cpp#L205">connection rules</a>. There is also a Python version of the definitions in <a href="https://github.com/rdkit/rdkit-orig/blob/master/rdkit/Chem/BRICS.py">BRICS.py</a>, but this is no longer used and may not exactly the match the C++ implementation.</p>
+<p>The RDKit’s BRICS implementation includes the ability to create new molecules by stitching fragments together according to the connection rules above. Here’s an illustration of that showing all the molecules that can be formed by combining the three fragments from esomeprazole using the BRICS connection rules with a maximum enumeration depth of 2:</p>
+<div id="d872b9b6" class="cell" data-execution_count="5">
+<div class="sourceCode cell-code" id="cb7" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb7-1">piecems <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> [Chem.MolFromSmiles(smi) <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">for</span> smi <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">in</span> pieces]</span>
+<span id="cb7-2">builder <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> BRICS.BRICSBuild(piecems, maxDepth<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span><span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">2</span>, scrambleReagents<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span><span class="va" style="color: #111111;
+background-color: null;
+font-style: inherit;">False</span>)</span>
+<span id="cb7-3">ms <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> <span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">list</span>(builder)</span>
+<span id="cb7-4">Draw.MolsToGridImage(ms)</span></code></pre></div>
+<div class="cell-output cell-output-display" data-execution_count="5">
+<div>
+<figure class="figure">
+<p><img src="https://greglandrum.github.io/rdkit-blog/posts/2025-08-15-BRICS-tutorial_files/figure-html/cell-6-output-1.png" class="img-fluid figure-img"></p>
+</figure>
+</div>
+</div>
+</div>
+</section>
+<section id="enumerating-a-larger-set-of-molecules" class="level1">
+<h1>Enumerating a larger set of molecules</h1>
+<p>Here I grab the ChEMBL molecules that were most similar to esomeprazole, fragment them together with esomeprazole, and then explore some of the resulting molecules.</p>
+<section id="aside-grabbing-similar-molecules-from-chembl" class="level2">
+<h2 class="anchored" data-anchor-id="aside-grabbing-similar-molecules-from-chembl">Aside: grabbing similar molecules from ChEMBL</h2>
+<p>Here’s the query I executed and the results returned:</p>
+<pre><code>chembl_35=# select chembl_id,m,similarity from get_mfp2_neighbors('COc1ccc2[nH]c([S+]([O-])Cc3ncc(C)c(OC)c3C)nc2c1') join chembl_id_lookup on (molregno=entity_id and entity_type='COMPOUND') join molecule_hierarchy using (molregno) where molregno=parent_molregno and similarity&lt;1 order by similarity desc limit 20;
+   chembl_id   |                              m                              |     similarity     
+---------------+-------------------------------------------------------------+--------------------
+ CHEMBL9890    | COc1c(C)cnc(C[S+]([O-])c2nc3cc(OC(F)F)ccc3[nH]2)c1C         | 0.8333333333333334
+ CHEMBL5089043 | COc1c(C)cnc(C[S@@+]([O-])c2nc3cc(OC(F)F)ccc3[nH]2)c1C       | 0.8333333333333334
+ CHEMBL5076667 | COc1c(C)cnc(C[S@+]([O-])c2nc3cc(OC(F)F)ccc3[nH]2)c1C        | 0.8333333333333334
+ CHEMBL3527071 | COc1ccc2[nH]c([S+]([O-])Cc3ncc(CO)c(OC)c3C)nc2c1            | 0.8148148148148148
+ CHEMBL4525760 | COc1ccc2[nH]c([S+]([O-])Cc3ncc(C(=O)O)c(OC)c3C)nc2c1        |                0.8
+ CHEMBL10184   | COc1c(C)cnc(C[S+]([O-])c2nc3ccccc3[nH]2)c1C                 | 0.7692307692307693
+ CHEMBL9430    | COc1cnc(C[S+]([O-])c2nc3cc(OC(F)F)ccc3[nH]2)c(C)c1OC        | 0.7288135593220338
+ CHEMBL59068   | COc1ccc2[nH]c([S+]([O-])Cc3ncc(C)c(N(C)C)c3Cl)nc2c1         | 0.7192982456140351
+ CHEMBL138250  | COc1c(C)cnc(C[S+]([O-])c2nc3cscc3[nH]2)c1C                  | 0.7169811320754716
+ CHEMBL5070031 | COc1ccc2[nH]c([S@@+]([O-])Cc3nccc(OC)c3C)nc2c1              | 0.7090909090909091
+ CHEMBL10061   | COc1cnc(C[S+]([O-])c2nc3cc(OC(F)(F)C(F)F)ccc3[nH]2)c(C)c1OC | 0.6935483870967742
+ CHEMBL1475252 | COc1ccc2[nH]c([S+]([O-])Cc3ncc(C)c(OC)c3C)nc2n1             | 0.6909090909090909
+ CHEMBL9992    | COc1cnc(C[S+]([O-])c2nc3cc(OCC(F)(F)F)ccc3[nH]2)c(C)c1OC    | 0.6885245901639344
+ CHEMBL440676  | COc1ccc2[nH]c([S+]([O-])Cc3ncc(C)c(N4CCCC4)c3Cl)nc2c1       | 0.6721311475409836
+ CHEMBL20315   | COc1ccc2[nH]c([S+]([O-])Cc3c(N)cc(C)c(OC)c3C)nc2c1          | 0.6666666666666666
+ CHEMBL59784   | COc1ccc2[nH]c([S+]([O-])Cc3ncc(C)c(N4CCCCC4)c3Cl)nc2c1      | 0.6612903225806451
+ CHEMBL144285  | COc1ccc2[nH]c([S+]([O-])Cc3nccc(OC(C)C)c3C)nc2c1            |               0.65
+ CHEMBL341550  | COc1ccc(-c2scc3[nH]c([S+]([O-])Cc4ncc(C)c(OC)c4C)nc23)cc1   |               0.65
+ CHEMBL1796802 | COc1cc2nc([S+]([O-])Cc3ncc(C)c(OC)c3C)[nH]c2cc1NC(C)=O      | 0.6451612903225806
+ CHEMBL58833   | COc1ccc2[nH]c([S+]([O-])Cc3ncc(C)c(N4CCOCC4)c3Cl)nc2c1      |           0.640625
+(20 rows)
+</code></pre>
+<p>the very useful <code>get_mfp2_neighbors()</code> function is from <a href="https://www.rdkit.org/docs/Cartridge.html#loading-chembl">the cartridge documentation</a>.</p>
+<p>Here’s the set of molecules we’ll use:</p>
+<div id="cb134904" class="cell" data-execution_count="6">
+<div class="sourceCode cell-code" id="cb9" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb9-1">smis <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'''COc1ccc2[nH]c([S+]([O-])Cc3ncc(C)c(OC)c3C)nc2c1</span></span>
+<span id="cb9-2"><span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">COc1c(C)cnc(C[S+]([O-])c2nc3cc(OC(F)F)ccc3[nH]2)c1C</span></span>
+<span id="cb9-3"><span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">COc1ccc2[nH]c([S+]([O-])Cc3ncc(CO)c(OC)c3C)nc2c1</span></span>
+<span id="cb9-4"><span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">COc1ccc2[nH]c([S+]([O-])Cc3ncc(C(=O)O)c(OC)c3C)nc2c1</span></span>
+<span id="cb9-5"><span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">COc1c(C)cnc(C[S+]([O-])c2nc3ccccc3[nH]2)c1C</span></span>
+<span id="cb9-6"><span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">COc1cnc(C[S+]([O-])c2nc3cc(OC(F)F)ccc3[nH]2)c(C)c1OC</span></span>
+<span id="cb9-7"><span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">COc1ccc2[nH]c([S+]([O-])Cc3ncc(C)c(N(C)C)c3Cl)nc2c1</span></span>
+<span id="cb9-8"><span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">COc1c(C)cnc(C[S+]([O-])c2nc3cscc3[nH]2)c1C</span></span>
+<span id="cb9-9"><span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">COc1ccc2[nH]c([S+]([O-])Cc3nccc(OC)c3C)nc2c1</span></span>
+<span id="cb9-10"><span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">COc1cnc(C[S+]([O-])c2nc3cc(OC(F)(F)C(F)F)ccc3[nH]2)c(C)c1OC</span></span>
+<span id="cb9-11"><span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">COc1ccc2[nH]c([S+]([O-])Cc3ncc(C)c(OC)c3C)nc2n1</span></span>
+<span id="cb9-12"><span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">COc1cnc(C[S+]([O-])c2nc3cc(OCC(F)(F)F)ccc3[nH]2)c(C)c1OC</span></span>
+<span id="cb9-13"><span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">COc1ccc2[nH]c([S+]([O-])Cc3ncc(C)c(N4CCCC4)c3Cl)nc2c1</span></span>
+<span id="cb9-14"><span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">COc1ccc2[nH]c([S+]([O-])Cc3c(N)cc(C)c(OC)c3C)nc2c1</span></span>
+<span id="cb9-15"><span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">COc1ccc2[nH]c([S+]([O-])Cc3ncc(C)c(N4CCCCC4)c3Cl)nc2c1</span></span>
+<span id="cb9-16"><span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">COc1ccc2[nH]c([S+]([O-])Cc3nccc(OC(C)C)c3C)nc2c1</span></span>
+<span id="cb9-17"><span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">COc1ccc(-c2scc3[nH]c([S+]([O-])Cc4ncc(C)c(OC)c4C)nc23)cc1</span></span>
+<span id="cb9-18"><span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">COc1cc2nc([S+]([O-])Cc3ncc(C)c(OC)c3C)[nH]c2cc1NC(C)=O</span></span>
+<span id="cb9-19"><span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">COc1ccc2[nH]c([S+]([O-])Cc3ncc(C)c(N4CCOCC4)c3Cl)nc2c1'''</span>.split(<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'</span><span class="ch" style="color: #20794D;
+background-color: null;
+font-style: inherit;">\n</span><span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'</span>)</span>
+<span id="cb9-20">mols <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> [Chem.MolFromSmiles(smi) <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">for</span> smi <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">in</span> smis]</span>
+<span id="cb9-21">Draw.MolsToGridImage(mols,molsPerRow<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span><span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">4</span>)</span></code></pre></div>
+<div class="cell-output cell-output-display" data-execution_count="6">
+<div>
+<figure class="figure">
+<p><img src="https://greglandrum.github.io/rdkit-blog/posts/2025-08-15-BRICS-tutorial_files/figure-html/cell-7-output-1.png" class="img-fluid figure-img"></p>
+</figure>
+</div>
+</div>
+</div>
+<p>Fragment all the molecules and keep the unique fragments:</p>
+<div id="dd009376" class="cell" data-execution_count="7">
+<div class="sourceCode cell-code" id="cb10" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb10-1">allfrags<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span><span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">set</span>()</span>
+<span id="cb10-2"><span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">for</span> m <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">in</span> mols:</span>
+<span id="cb10-3">    pieces <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> BRICS.BRICSDecompose(m)</span>
+<span id="cb10-4">    allfrags.update(pieces)</span>
+<span id="cb10-5">allfrags</span></code></pre></div>
+<div class="cell-output cell-output-display" data-execution_count="7">
+<pre><code>{'[1*]C(C)=O',
+ '[14*]c1ncc(C)c([16*])c1C',
+ '[14*]c1ncc(C)c([16*])c1Cl',
+ '[14*]c1ncc([16*])c([16*])c1C',
+ '[14*]c1nccc([16*])c1C',
+ '[16*]c1c(C)cc(N)c([16*])c1C',
+ '[16*]c1ccc([16*])cc1',
+ '[3*]OC',
+ '[3*]OC(F)F',
+ '[3*]O[3*]',
+ '[4*]C(C)C',
+ '[4*]C(F)(F)C(F)F',
+ '[4*]CC(F)(F)F',
+ '[5*]N(C)C',
+ '[5*]N1CCCC1',
+ '[5*]N1CCCCC1',
+ '[5*]N1CCOCC1',
+ '[5*]N[5*]',
+ '[6*]C(=O)O',
+ '[8*]CO',
+ '[8*]C[S+]([O-])c1nc2c([14*])scc2[nH]1',
+ '[8*]C[S+]([O-])c1nc2cc([16*])c([16*])cc2[nH]1',
+ '[8*]C[S+]([O-])c1nc2cc([16*])ccc2[nH]1',
+ '[8*]C[S+]([O-])c1nc2ccccc2[nH]1',
+ '[8*]C[S+]([O-])c1nc2cscc2[nH]1',
+ '[8*]C[S+]([O-])c1nc2nc([14*])ccc2[nH]1'}</code></pre>
+</div>
+</div>
+<p>We can then recombine fragments to produce new molecules using <code>BRICS.BRICSBuild</code>:</p>
+<div id="477d859f" class="cell" data-execution_count="19">
+<div class="sourceCode cell-code" id="cb12" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb12-1"><span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">import</span> random</span>
+<span id="cb12-2">random.seed(<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">27</span>)</span>
+<span id="cb12-3"></span>
+<span id="cb12-4">fragms <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> [Chem.MolFromSmiles(x) <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">for</span> x <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">in</span> allfrags]</span>
+<span id="cb12-5">builder <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> BRICS.BRICSBuild(fragms)</span></code></pre></div>
+</div>
+<p>The result is a generator:</p>
+<div id="0d3da57a" class="cell" data-scrolled="true" data-execution_count="20">
+<div class="sourceCode cell-code" id="cb13" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb13-1">builder</span></code></pre></div>
+<div class="cell-output cell-output-display" data-execution_count="20">
+<pre><code>&lt;generator object BRICSBuild at 0x785401fb8040&gt;</code></pre>
+</div>
+</div>
+<p>Here’s what the first 16 results look like:</p>
+<div id="0edec122" class="cell" data-execution_count="21">
+<div class="sourceCode cell-code" id="cb15" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb15-1">newMols <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> [<span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">next</span>(builder) <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">for</span> i <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">in</span> <span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">range</span>(<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">16</span>)]</span>
+<span id="cb15-2">Draw.MolsToGridImage(newMols,molsPerRow<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span><span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">4</span>)</span></code></pre></div>
+<div class="cell-output cell-output-display" data-execution_count="21">
+<div>
+<figure class="figure">
+<p><img src="https://greglandrum.github.io/rdkit-blog/posts/2025-08-15-BRICS-tutorial_files/figure-html/cell-11-output-1.png" class="img-fluid figure-img"></p>
+</figure>
+</div>
+</div>
+</div>
+<p>Let’s filter out the everything that doesn’t have exactly one sulfoxide:</p>
+<div id="73db0750" class="cell" data-execution_count="23">
+<div class="sourceCode cell-code" id="cb16" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb16-1">qry <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> Chem.MolFromSmarts(<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'S-O'</span>)</span>
+<span id="cb16-2"><span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">def</span> <span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">filter</span>(gen):</span>
+<span id="cb16-3">    <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">for</span> res <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">in</span> gen:</span>
+<span id="cb16-4">        <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">if</span> <span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">len</span>(res.GetSubstructMatches(qry)) <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">==</span><span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">1</span>:</span>
+<span id="cb16-5">            <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">yield</span> res</span>
+<span id="cb16-6"></span>
+<span id="cb16-7">random.seed(<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">27</span>)</span>
+<span id="cb16-8">builder <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> BRICS.BRICSBuild(fragms)</span>
+<span id="cb16-9">newMols <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> [<span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">next</span>(<span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">filter</span>(builder)) <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">for</span> i <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">in</span> <span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">range</span>(<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">16</span>)]</span>
+<span id="cb16-10">Draw.MolsToGridImage(newMols,molsPerRow<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span><span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">4</span>)    </span></code></pre></div>
+<div class="cell-output cell-output-display" data-execution_count="23">
+<div>
+<figure class="figure">
+<p><img src="https://greglandrum.github.io/rdkit-blog/posts/2025-08-15-BRICS-tutorial_files/figure-html/cell-12-output-1.png" class="img-fluid figure-img"></p>
+</figure>
+</div>
+</div>
+</div>
+<div id="ef9652c3" class="cell" data-execution_count="24">
+<div class="sourceCode cell-code" id="cb17" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb17-1">random.seed(<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">42</span>)</span>
+<span id="cb17-2">builder <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> BRICS.BRICSBuild(fragms)</span>
+<span id="cb17-3">newMols <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> [<span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">next</span>(<span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">filter</span>(builder)) <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">for</span> i <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">in</span> <span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">range</span>(<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">100</span>)]</span>
+<span id="cb17-4"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># order by number of atoms;</span></span>
+<span id="cb17-5">newMols <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> [newMols[y] <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">for</span> (x,y) <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">in</span> <span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">sorted</span>([(m.GetNumAtoms(),i) <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">for</span> i,m <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">in</span> <span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">enumerate</span>(newMols)])]</span>
+<span id="cb17-6">Draw.MolsToGridImage(newMols[:<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">16</span>],molsPerRow<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span><span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">4</span>)    </span></code></pre></div>
+<div class="cell-output cell-output-display" data-execution_count="24">
+<div>
+<figure class="figure">
+<p><img src="https://greglandrum.github.io/rdkit-blog/posts/2025-08-15-BRICS-tutorial_files/figure-html/cell-13-output-1.png" class="img-fluid figure-img"></p>
+</figure>
+</div>
+</div>
+</div>
+</section>
+<section id="providing-a-seed-to-the-enumeration" class="level2">
+<h2 class="anchored" data-anchor-id="providing-a-seed-to-the-enumeration">Providing a seed to the enumeration</h2>
+<p>Another option in the BRICS builder is to provide one or more seeds that must be present in every output molecule. Here’s an example of how to do that using the scaffold of esomeprazole along with a version of the scaffold where the N in the second ring is replaced by a C:</p>
+<div id="cf14da7f" class="cell" data-execution_count="14">
+<div class="sourceCode cell-code" id="cb18" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb18-1">seeds <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> [Chem.MolFromSmiles(x) <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">for</span> x <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">in</span> (<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'c19ncc(C)c([16*])c1C.C9[S+]([O-])c1nc2cc([16*])ccc2[nH]1'</span>,</span>
+<span id="cb18-2">                                         <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'c19ccc(C)c([16*])c1C.C9[S+]([O-])c1nc2cc([16*])ccc2[nH]1'</span>,)]</span>
+<span id="cb18-3"></span>
+<span id="cb18-4">Draw.MolsToGridImage(seeds)</span></code></pre></div>
+<div class="cell-output cell-output-display" data-execution_count="14">
+<div>
+<figure class="figure">
+<p><img src="https://greglandrum.github.io/rdkit-blog/posts/2025-08-15-BRICS-tutorial_files/figure-html/cell-14-output-1.png" class="img-fluid figure-img"></p>
+</figure>
+</div>
+</div>
+</div>
+<p>Now do the enumeration using those seeds:</p>
+<div id="0f9a5128" class="cell" data-execution_count="15">
+<div class="sourceCode cell-code" id="cb19" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb19-1">random.seed(<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">127</span>)</span>
+<span id="cb19-2">builder <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> BRICS.BRICSBuild(fragms,seeds<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span>seeds)</span>
+<span id="cb19-3">newMols <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> [<span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">next</span>(<span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">filter</span>(builder)) <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">for</span> i <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">in</span> <span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">range</span>(<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">16</span>)]</span>
+<span id="cb19-4">Draw.MolsToGridImage(newMols,molsPerRow<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span><span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">4</span>)    </span></code></pre></div>
+<div class="cell-output cell-output-display" data-execution_count="15">
+<div>
+<figure class="figure">
+<p><img src="https://greglandrum.github.io/rdkit-blog/posts/2025-08-15-BRICS-tutorial_files/figure-html/cell-15-output-1.png" class="img-fluid figure-img"></p>
+</figure>
+</div>
+</div>
+</div>
+<p>Doing enumeration providing seeds that are this specific is similar in ways to doing enumeration using the <a href="https://greglandrum.github.io/rdkit-blog/posts/2022-03-14-rgd-and-molzip.html">results of R-group decomposition</a></p>
+
+
+</section>
+</section>
+
+ ]]></description>
+  <category>documentation</category>
+  <category>tutorial</category>
+  <guid>https://greglandrum.github.io/rdkit-blog/posts/2025-08-15-BRICS-tutorial.html</guid>
+  <pubDate>Thu, 14 Aug 2025 22:00:00 GMT</pubDate>
+  <media:content url="https://greglandrum.github.io/rdkit-blog/posts/images/blog/brics-tutorial-1.png" medium="image" type="image/png" height="115" width="144"/>
+</item>
 <item>
   <title>Controlling the RDKit’s logging behavior</title>
   <link>https://greglandrum.github.io/rdkit-blog/posts/2025-08-10-controlling-logging.html</link>
@@ -27330,335 +27914,6 @@ Cell <span class="ansi-green-fg">In[16], line 6</span>
   <category>technical</category>
   <guid>https://greglandrum.github.io/rdkit-blog/posts/2025-04-06-interrupting-calculations.html</guid>
   <pubDate>Sat, 05 Apr 2025 22:00:00 GMT</pubDate>
-</item>
-<item>
-  <title>Rendering fingerprint bits</title>
-  <link>https://greglandrum.github.io/rdkit-blog/posts/2025-03-29-updated-bit-rendering.html</link>
-  <description><![CDATA[ 
-
-
-
-
-<p>This is an updated version of an <a href="https://rdkit.blogspot.com/2018/10/using-new-fingerprint-bit-rendering-code.html">older post</a>.</p>
-<section id="motivation" class="level1">
-<h1>Motivation</h1>
-<p>A frequent desire when working with chemical fingerprints is to see what the indvidual bits actually “mean”. For most of the fingerprinting algorithms in the RDKit this question only means something in the context of a molecule, so there have been a number of code samples floating around (including in the RDKit documentation) allowing the user to show the atoms/bonds in a molecule that are responsible for setting a particular bit. In the 2018.09 release we made this easier and added a few functions to the <code>rdkit.Chem.Draw</code> package that allow direct visualization of the atoms and bonds from a molecule that set bits from Morgan and RDKit fingerprints.</p>
-<p>This notebook shows how to use this functionality. Note that since this is new code, it will only work in RDKit versions 2018.09 and later.</p>
-<p>The code that is used for this is derived from the bit rendering code that Nadine Schneider wrote for <a href="https://github.com/rdkit/CheTo">CheTo</a>.</p>
-<p>Start by importing the required packages:</p>
-<div id="cell-3" class="cell" data-execution_count="1">
-<div class="sourceCode cell-code" id="cb1" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb1-1"><span class="im" style="color: #00769E;
-background-color: null;
-font-style: inherit;">from</span> rdkit <span class="im" style="color: #00769E;
-background-color: null;
-font-style: inherit;">import</span> Chem</span>
-<span id="cb1-2"><span class="im" style="color: #00769E;
-background-color: null;
-font-style: inherit;">from</span> rdkit.Chem <span class="im" style="color: #00769E;
-background-color: null;
-font-style: inherit;">import</span> rdFingerprintGenerator</span>
-<span id="cb1-3"><span class="im" style="color: #00769E;
-background-color: null;
-font-style: inherit;">from</span> rdkit.Chem.Draw <span class="im" style="color: #00769E;
-background-color: null;
-font-style: inherit;">import</span> IPythonConsole</span>
-<span id="cb1-4"><span class="im" style="color: #00769E;
-background-color: null;
-font-style: inherit;">from</span> rdkit.Chem <span class="im" style="color: #00769E;
-background-color: null;
-font-style: inherit;">import</span> Draw</span></code></pre></div>
-</div>
-<p>We’ll use epinephrine as the demo molecule:</p>
-<div id="cell-5" class="cell" data-execution_count="2">
-<div class="sourceCode cell-code" id="cb2" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb2-1">epinephrine <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> Chem.MolFromSmiles(<span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">'CNC[C@H](O)c1ccc(O)c(O)c1'</span>)</span>
-<span id="cb2-2">epinephrine</span></code></pre></div>
-<div class="cell-output cell-output-display" data-execution_count="2">
-<div>
-<figure class="figure">
-<p><img src="https://greglandrum.github.io/rdkit-blog/posts/2025-03-29-updated-bit-rendering_files/figure-html/cell-3-output-1.png" class="img-fluid figure-img"></p>
-</figure>
-</div>
-</div>
-</div>
-<section id="looking-at-morgan-bits" class="level2">
-<h2 class="anchored" data-anchor-id="looking-at-morgan-bits">Looking at Morgan bits</h2>
-<p>Generate a Morgan fingerprint and save information about the bits that are set using the <code>bitInfo</code> argument:</p>
-<div id="cell-8" class="cell" data-execution_count="4">
-<div class="sourceCode cell-code" id="cb3" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb3-1">fpg <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> rdFingerprintGenerator.GetMorganGenerator(radius<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span><span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">2</span>)</span>
-<span id="cb3-2">ao <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> rdFingerprintGenerator.AdditionalOutput()</span>
-<span id="cb3-3">ao.AllocateBitInfoMap()</span>
-<span id="cb3-4"></span>
-<span id="cb3-5">fp <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> fpg.GetFingerprint(epinephrine,additionalOutput<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span>ao)</span>
-<span id="cb3-6"><span class="co" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;"># show 10 of the set bits:</span></span>
-<span id="cb3-7"><span class="bu" style="color: null;
-background-color: null;
-font-style: inherit;">list</span>(fp.GetOnBits())[:<span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">10</span>]</span></code></pre></div>
-<div class="cell-output cell-output-display" data-execution_count="4">
-<pre><code>[1, 80, 227, 315, 589, 606, 632, 807, 875, 1057]</code></pre>
-</div>
-</div>
-<p>In its simplest form, the new code lets you display the atomic environment that sets a particular bit. Here we will look at bit 589:</p>
-<div id="cell-10" class="cell" data-execution_count="5">
-<div class="sourceCode cell-code" id="cb5" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb5-1">Draw.DrawMorganBit(epinephrine,<span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">589</span>,ao.GetBitInfoMap())</span></code></pre></div>
-<div class="cell-output cell-output-display" data-execution_count="5">
-<div>
-<figure class="figure">
-<p><img src="https://greglandrum.github.io/rdkit-blog/posts/2025-03-29-updated-bit-rendering_files/figure-html/cell-5-output-1.png" class="img-fluid figure-img"></p>
-</figure>
-</div>
-</div>
-</div>
-<p>There’s also a function, <code>DrawMorganBits()</code>, for drawing multiple bits at once (thanks to Pat Walters for suggesting this one):</p>
-<div id="cell-12" class="cell" data-execution_count="6">
-<div class="sourceCode cell-code" id="cb6" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb6-1">tpls <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> [(epinephrine,x,ao.GetBitInfoMap()) <span class="cf" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">for</span> x <span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">in</span> fp.GetOnBits()]</span>
-<span id="cb6-2">Draw.DrawMorganBits(tpls[:<span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">12</span>],molsPerRow<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span><span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">4</span>,legends<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span>[<span class="bu" style="color: null;
-background-color: null;
-font-style: inherit;">str</span>(x) <span class="cf" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">for</span> x <span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">in</span> fp.GetOnBits()][:<span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">12</span>])</span></code></pre></div>
-<div class="cell-output cell-output-display" data-execution_count="6">
-<div>
-<figure class="figure">
-<p><img src="https://greglandrum.github.io/rdkit-blog/posts/2025-03-29-updated-bit-rendering_files/figure-html/cell-6-output-1.png" class="img-fluid figure-img"></p>
-</figure>
-</div>
-</div>
-</div>
-<p>Some notes about the rendering here:</p>
-<ul>
-<li>The molecule fragment is drawn with the atoms in the same positions as in the original molecule.</li>
-<li>The central atom is highlighted in blue.</li>
-<li>Aromatic atoms are highlighted in yellow</li>
-<li>Aliphatic ring atoms (none present here) are highlighted in dark gray</li>
-<li>Atoms/bonds that are drawn in light gray indicate pieces of the structure that influence the atoms’ connectivity invariants but that are not directly part of the fingerprint.</li>
-</ul>
-<p>We can also take advantage of the interactivity features of the Jupyter notebook and create a widget allowing is to browse through the bits. Note that this does not work in the blog post or the github view of the notebook; you will need to download the notebook and try it yourself to see this interactivity.</p>
-<div id="cell-15" class="cell" data-execution_count="7">
-<div class="sourceCode cell-code" id="cb7" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb7-1"><span class="im" style="color: #00769E;
-background-color: null;
-font-style: inherit;">from</span> ipywidgets <span class="im" style="color: #00769E;
-background-color: null;
-font-style: inherit;">import</span> interact,fixed,IntSlider</span>
-<span id="cb7-2"><span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">def</span> renderFpBit(mol,bitIdx,bitInfo,fn):</span>
-<span id="cb7-3">    bid <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> bitIdx</span>
-<span id="cb7-4">    <span class="cf" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">return</span>(display(fn(mol,bid,bitInfo)))</span></code></pre></div>
-</div>
-<div id="cell-16" class="cell">
-<div class="sourceCode cell-code" id="cb8" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb8-1">bi <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> ao.GetBitInfoMap()</span>
-<span id="cb8-2">interact(renderFpBit, bitIdx<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span><span class="bu" style="color: null;
-background-color: null;
-font-style: inherit;">list</span>(bi.keys()),mol<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span>fixed(epinephrine),bitInfo<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span>fixed(bi),fn<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span>fixed(Draw.DrawMorganBit))<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">;</span></span></code></pre></div>
-</div>
-<p>Here’s a GIF showing what the output of the above cell looks like:</p>
-<div class="quarto-figure quarto-figure-center">
-<figure class="figure">
-<p><img src="https://greglandrum.github.io/rdkit-blog/posts/images/blog/updated-bit-rendering-movie1.gif" class="img-fluid figure-img"></p>
-<figcaption>animation showng interaction</figcaption>
-</figure>
-</div>
-</section>
-<section id="looking-at-rdkit-bits" class="level2">
-<h2 class="anchored" data-anchor-id="looking-at-rdkit-bits">Looking at RDKit bits</h2>
-<p>We can do the same thing with RDKit bits:</p>
-<div id="cell-19" class="cell" data-execution_count="9">
-<div class="sourceCode cell-code" id="cb9" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb9-1">fpg <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> rdFingerprintGenerator.GetRDKitFPGenerator(maxPath<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span><span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">5</span>)</span>
-<span id="cb9-2">ao <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> rdFingerprintGenerator.AdditionalOutput()</span>
-<span id="cb9-3">ao.AllocateBitPaths()</span>
-<span id="cb9-4"></span>
-<span id="cb9-5">rdkfp <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> fpg.GetFingerprint(epinephrine,additionalOutput<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span>ao)</span>
-<span id="cb9-6"></span>
-<span id="cb9-7"><span class="co" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;"># show 10 of the set bits:</span></span>
-<span id="cb9-8"><span class="bu" style="color: null;
-background-color: null;
-font-style: inherit;">list</span>(rdkfp.GetOnBits())[:<span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">10</span>]</span></code></pre></div>
-<div class="cell-output cell-output-display" data-execution_count="9">
-<pre><code>[93, 103, 112, 122, 148, 149, 161, 166, 194, 208]</code></pre>
-</div>
-</div>
-<div id="cell-20" class="cell" data-execution_count="11">
-<div class="sourceCode cell-code" id="cb11" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb11-1"><span class="bu" style="color: null;
-background-color: null;
-font-style: inherit;">print</span>(rdkfp.GetNumOnBits(),<span class="bu" style="color: null;
-background-color: null;
-font-style: inherit;">len</span>(ao.GetBitPaths()))</span></code></pre></div>
-<div class="cell-output cell-output-stdout">
-<pre><code>128 128</code></pre>
-</div>
-</div>
-<div id="cell-21" class="cell" data-execution_count="10">
-<div class="sourceCode cell-code" id="cb13" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb13-1">Draw.DrawRDKitBit(epinephrine,<span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">103</span>,ao.GetBitPaths())</span></code></pre></div>
-<div class="cell-output cell-output-display" data-execution_count="10">
-<div>
-<figure class="figure">
-<p><img src="https://greglandrum.github.io/rdkit-blog/posts/2025-03-29-updated-bit-rendering_files/figure-html/cell-11-output-1.png" class="img-fluid figure-img"></p>
-</figure>
-</div>
-</div>
-</div>
-<div id="cell-22" class="cell" data-execution_count="12">
-<div class="sourceCode cell-code" id="cb14" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb14-1">rdkbi <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> ao.GetBitPaths()</span>
-<span id="cb14-2">tpls <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> [(epinephrine,x,rdkbi) <span class="cf" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">for</span> x <span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">in</span> rdkbi]</span>
-<span id="cb14-3">Draw.DrawRDKitBits(tpls[:<span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">12</span>],molsPerRow<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span><span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">4</span>,legends<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span>[<span class="bu" style="color: null;
-background-color: null;
-font-style: inherit;">str</span>(x) <span class="cf" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">for</span> x <span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">in</span> rdkbi][:<span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">12</span>])</span></code></pre></div>
-<div class="cell-output cell-output-display" data-execution_count="12">
-<div>
-<figure class="figure">
-<p><img src="https://greglandrum.github.io/rdkit-blog/posts/2025-03-29-updated-bit-rendering_files/figure-html/cell-12-output-1.png" class="img-fluid figure-img"></p>
-</figure>
-</div>
-</div>
-</div>
-<p>Some notes about the rendering here:</p>
-<ul>
-<li>The molecule fragment is drawn with the atoms in the same positions as in the original molecule.</li>
-<li>All bonds that are drawn are part of the bit.</li>
-<li>Aromatic atoms are highlighted in yellow</li>
-<li>By default there is no additional highlighting for aliphatic ring atoms, but this can be changed using the <code>nonAromaticColor</code> optional argument.</li>
-</ul>
-<p>We can, of course, use the same jupyter interactivity features here as we did for the Morgan fingerprint:</p>
-<div id="cell-25" class="cell">
-<div class="sourceCode cell-code" id="cb15" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb15-1">interact(renderFpBit, bitIdx<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span><span class="bu" style="color: null;
-background-color: null;
-font-style: inherit;">list</span>(rdkbi.keys()),mol<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span>fixed(epinephrine),bitInfo<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span>fixed(rdkbi),fn<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span>fixed(Draw.DrawRDKitBit))<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">;</span></span></code></pre></div>
-</div>
-<p>Here’s a GIF showing what the output of the above cell looks like:</p>
-<div class="quarto-figure quarto-figure-center">
-<figure class="figure">
-<p><img src="https://greglandrum.github.io/rdkit-blog/posts/images/blog/updated-bit-rendering-movie2.gif" class="img-fluid figure-img"></p>
-<figcaption>animation showng interaction</figcaption>
-</figure>
-</div>
-
-
-</section>
-</section>
-
- ]]></description>
-  <category>tutorial</category>
-  <category>drawing</category>
-  <category>fingerprints</category>
-  <guid>https://greglandrum.github.io/rdkit-blog/posts/2025-03-29-updated-bit-rendering.html</guid>
-  <pubDate>Fri, 28 Mar 2025 23:00:00 GMT</pubDate>
-  <media:content url="https://greglandrum.github.io/rdkit-blog/posts/images/blog/updated-bit-rendering-movie2.gif" medium="image" type="image/gif"/>
 </item>
 </channel>
 </rss>
