@@ -10,7 +10,135 @@
 <atom:link href="https://greglandrum.github.io/rdkit-blog/index.xml" rel="self" type="application/rss+xml"/>
 <description>RDKit experiments, tips, and tutorials</description>
 <generator>quarto-1.6.43</generator>
-<lastBuildDate>Thu, 14 Aug 2025 22:00:00 GMT</lastBuildDate>
+<lastBuildDate>Thu, 21 Aug 2025 22:00:00 GMT</lastBuildDate>
+<item>
+  <title>How the 2D/3D flag in Mol blocks is used</title>
+  <link>https://greglandrum.github.io/rdkit-blog/posts/2025-08-22-interpreting-the-2d3d-flag.html</link>
+  <description><![CDATA[ 
+
+
+
+
+<p>[This is an expanded version of a section which will be added to the RDKit documentation to clarify an important detail about the way Mol and SD files are parsed.]</p>
+<section id="background" class="level1">
+<h1>Background</h1>
+<p>Mol blocks, Mol files, and SD files can describe 2D or 3D molecules and include a flag (called “dimensional code” in the spec) to indicate whether the coordinates are 2D or 3D. The flag shows up in the second line of the Mol block, and is present in both V2000:</p>
+<pre><code>nitrogen
+     RDKit          2D
+
+  2  1  0  0  0  0  0  0  0  0999 V2000
+    0.0000    0.0000    0.0000 N   0  0  0  0  0  0  0  0  0  0  0  0
+   -0.0000   -1.5000    0.0000 N   0  0  0  0  0  0  0  0  0  0  0  0
+  1  2  3  0
+M  END</code></pre>
+<p>and V3000 mol blocks:</p>
+<pre><code>nitrogen
+     RDKit          2D
+
+  0  0  0  0  0  0  0  0  0  0999 V3000
+M  V30 BEGIN CTAB
+M  V30 COUNTS 2 1 0 0 0
+M  V30 BEGIN ATOM
+M  V30 1 N 0.000000 0.000000 0.000000 0
+M  V30 2 N -0.000000 -1.500000 0.000000 0
+M  V30 END ATOM
+M  V30 BEGIN BOND
+M  V30 1 3 1 2
+M  V30 END BOND
+M  V30 END CTAB
+M  END</code></pre>
+<p>The CTFile specification says the following about this flag: &gt; The “dimensional code” is maintained explicitly. Thus “3D” really means 3D, &gt; although “2D” will be interpreted as 3D if any non-zero Z-coordinates are &gt; found</p>
+<p>That’s simple (and logical) enough, but of course in the real world things are more complicated. Files found “in the wild” include every possible combination of 2D/3D flag and 2D/3D coordinates, so we need to decide how to interpret these combinations. Things are made more complicated by the possible presence of wedged bonds in the Mol block. Wedged bonds are typically a signal that something is known about the stereochemistry of the molecule; how do we combine this information with the coordinates?</p>
+<blockquote class="blockquote">
+<p><em>Aside on 2D vs 3D coordinates</em>: in Mol blocks X, Y, and Z coordinates are always provided (if any of them are missing, they are set to zero). It’s also possible to have 3D coordinates for planar molecules. For the purposes of this discussion, “2D” coordinates means that all Z coordinates are zero, and a “2D” RDKit molecule is one where the (default) conformer is marked as being 2D (i.e.&nbsp;the conformer’s <code>Is3D()</code> method returns <code>False</code>).</p>
+</blockquote>
+</section>
+<section id="what-the-rdkit-does" class="level1">
+<h1>What the RDKit does</h1>
+<p>The following table describes how the RDKit interprets all possible combinations of dimensionality flag, coordinate dimensionality, and the presence or absence of wedged bonds:</p>
+<table class="caption-top table">
+<thead>
+<tr class="header">
+<th>flag</th>
+<th>coords</th>
+<th>wedging</th>
+<th>result</th>
+<th>notes</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>2D</td>
+<td>2D</td>
+<td>no</td>
+<td>2D</td>
+<td>no chirality</td>
+</tr>
+<tr class="even">
+<td>3D</td>
+<td>2D</td>
+<td>no</td>
+<td>3D</td>
+<td>no chirality</td>
+</tr>
+<tr class="odd">
+<td>3D</td>
+<td>3D</td>
+<td>no</td>
+<td>3D</td>
+<td>chirality from coords</td>
+</tr>
+<tr class="even">
+<td>2D</td>
+<td>3D</td>
+<td>no</td>
+<td>3D</td>
+<td>chirality from coords</td>
+</tr>
+<tr class="odd">
+<td>2D</td>
+<td>2D</td>
+<td>yes</td>
+<td>2D</td>
+<td>chirality from wedging</td>
+</tr>
+<tr class="even">
+<td>3D</td>
+<td>2D</td>
+<td>yes</td>
+<td>2D</td>
+<td>chirality from wedging</td>
+</tr>
+<tr class="odd">
+<td>3D</td>
+<td>3D</td>
+<td>yes</td>
+<td>3D</td>
+<td>chirality from coords</td>
+</tr>
+<tr class="even">
+<td>2D</td>
+<td>3D</td>
+<td>yes</td>
+<td>3D</td>
+<td>chirality from coords</td>
+</tr>
+</tbody>
+</table>
+<p>This is consistent with what the specification says except for the case where the 3D flag is set for 2D coordinates and a wedge is present, in which case we ignore the 3D flag, mark the conformer as 2D, and set the stereochemistry based on the wedging.</p>
+<p>In cases where no 2D/3D flag is provided, the default value of the flag is 2D.</p>
+<p>In a 2D structure, wedging is interpreted as a signal to indicate that stereochemistry is present and to indicate what the stereochemistry is (i.e.&nbsp;the stereochemistry is determined based on the 2D coordinates and the direction of the wedge).</p>
+<p>When 3D coordinates are provided, stereochemistry is perceived from the coordinates themselves. If wedging is also present it will be ignored; the 3D signal is “stronger” than the wedging signal. The exception to this rule is <a href="https://www.rdkit.org/docs/RDKit_Book.html#atropisomeric-bonds">atropisomeric bonds</a>, where the wedged bond indicates that atropisomerism should be perceived, but the direction of the wedge is ignored.</p>
+
+
+</section>
+
+ ]]></description>
+  <category>documentation</category>
+  <category>technical</category>
+  <guid>https://greglandrum.github.io/rdkit-blog/posts/2025-08-22-interpreting-the-2d3d-flag.html</guid>
+  <pubDate>Thu, 21 Aug 2025 22:00:00 GMT</pubDate>
+</item>
 <item>
   <title>A BRICS tutorial</title>
   <link>https://greglandrum.github.io/rdkit-blog/posts/2025-08-15-BRICS-tutorial.html</link>
@@ -27370,550 +27498,6 @@ font-style: inherit;">'mfp3-b'</span>)))</span></code></pre></div>
   <guid>https://greglandrum.github.io/rdkit-blog/posts/2025-04-13-similarity-hitset-overlap-2.html</guid>
   <pubDate>Sat, 12 Apr 2025 22:00:00 GMT</pubDate>
   <media:content url="https://greglandrum.github.io/rdkit-blog/posts/images/blog/similarity-hitset-overlap-2.png" medium="image" type="image/png" height="121" width="144"/>
-</item>
-<item>
-  <title>Interrupting calculations</title>
-  <link>https://greglandrum.github.io/rdkit-blog/posts/2025-04-06-interrupting-calculations.html</link>
-  <description><![CDATA[ 
-
-
-
-
-<p>This is a short post to introduce a couple of features to make working with some of the longer-running calculations in the RDKit a bit easier:</p>
-<ul>
-<li>timeouts for some functions</li>
-<li>cancelling calculations, a feature that we have started to support in the 2025.03.1 RDKit release</li>
-</ul>
-<div id="439fda68" class="cell" data-execution_count="1">
-<div class="sourceCode cell-code" id="cb1" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb1-1"><span class="im" style="color: #00769E;
-background-color: null;
-font-style: inherit;">from</span> rdkit <span class="im" style="color: #00769E;
-background-color: null;
-font-style: inherit;">import</span> Chem</span>
-<span id="cb1-2"><span class="im" style="color: #00769E;
-background-color: null;
-font-style: inherit;">from</span> rdkit.Chem <span class="im" style="color: #00769E;
-background-color: null;
-font-style: inherit;">import</span> rdDistGeom</span>
-<span id="cb1-3"><span class="im" style="color: #00769E;
-background-color: null;
-font-style: inherit;">from</span> rdkit.Chem <span class="im" style="color: #00769E;
-background-color: null;
-font-style: inherit;">import</span> rdSynthonSpaceSearch</span>
-<span id="cb1-4"><span class="im" style="color: #00769E;
-background-color: null;
-font-style: inherit;">from</span> rdkit.Chem <span class="im" style="color: #00769E;
-background-color: null;
-font-style: inherit;">import</span> rdFingerprintGenerator</span>
-<span id="cb1-5"></span>
-<span id="cb1-6"><span class="im" style="color: #00769E;
-background-color: null;
-font-style: inherit;">import</span> time</span>
-<span id="cb1-7"></span>
-<span id="cb1-8"><span class="im" style="color: #00769E;
-background-color: null;
-font-style: inherit;">import</span> rdkit</span>
-<span id="cb1-9"><span class="bu" style="color: null;
-background-color: null;
-font-style: inherit;">print</span>(rdkit.__version__)</span></code></pre></div>
-<div class="cell-output cell-output-stdout">
-<pre><code>2025.03.1</code></pre>
-</div>
-</div>
-<section id="conformer-generation" class="level1">
-<h1>Conformer generation</h1>
-<div id="f1b0d8de" class="cell" data-execution_count="2">
-<div class="sourceCode cell-code" id="cb3" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb3-1">m <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> Chem.AddHs(Chem.MolFromSmiles(<span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">'CCCCCCCCCCCCCCCC'</span>))</span></code></pre></div>
-</div>
-<div id="23d6819f" class="cell" data-execution_count="3">
-<div class="sourceCode cell-code" id="cb4" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb4-1">params <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> rdDistGeom.ETKDGv3()</span>
-<span id="cb4-2">params.randomSeed <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> <span class="bn" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">0xbad5eed</span></span>
-<span id="cb4-3"></span>
-<span id="cb4-4">t1 <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> time.time()</span>
-<span id="cb4-5">cids <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> rdDistGeom.EmbedMultipleConfs(m,<span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">1000</span>,params)</span>
-<span id="cb4-6">t2 <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> time.time()</span>
-<span id="cb4-7"><span class="bu" style="color: null;
-background-color: null;
-font-style: inherit;">print</span>(<span class="ss" style="color: #20794D;
-background-color: null;
-font-style: inherit;">f'</span><span class="sc" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">{</span><span class="bu" style="color: null;
-background-color: null;
-font-style: inherit;">len</span>(cids)<span class="sc" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">}</span><span class="ss" style="color: #20794D;
-background-color: null;
-font-style: inherit;"> conformers in </span><span class="sc" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">{</span>t2<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">-</span>t1<span class="sc" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">:.2f}</span><span class="ss" style="color: #20794D;
-background-color: null;
-font-style: inherit;">s'</span>)</span></code></pre></div>
-<div class="cell-output cell-output-stdout">
-<pre><code>1000 conformers in 11.72s</code></pre>
-</div>
-</div>
-<p>What’s new is that you can stop the calculation by pressing the “interrupt the kernel” button in the notebook or by hitting <code>^C</code> if you are running on the command line:</p>
-<div id="9ce10417" class="cell" data-execution_count="4">
-<div class="sourceCode cell-code" id="cb6" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb6-1">params <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> rdDistGeom.ETKDGv3()</span>
-<span id="cb6-2">params.randomSeed <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> <span class="bn" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">0xbad5eed</span></span>
-<span id="cb6-3"></span>
-<span id="cb6-4">cids <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> rdDistGeom.EmbedMultipleConfs(m,<span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">1000</span>,params)</span></code></pre></div>
-<div class="cell-output cell-output-stderr">
-<pre><code>[16:34:13] Interrupted, cancelling conformer generation</code></pre>
-</div>
-<div class="cell-output cell-output-error">
-<div class="ansi-escaped-output">
-<pre><span class="ansi-red-fg">---------------------------------------------------------------------------</span>
-<span class="ansi-red-fg">KeyboardInterrupt</span>                         Traceback (most recent call last)
-Cell <span class="ansi-green-fg">In[4], line 4</span>
-<span class="ansi-green-fg ansi-bold">      1</span> params <span style="color:rgb(98,98,98)">=</span> rdDistGeom<span style="color:rgb(98,98,98)">.</span>ETKDGv3()
-<span class="ansi-green-fg ansi-bold">      2</span> params<span style="color:rgb(98,98,98)">.</span>randomSeed <span style="color:rgb(98,98,98)">=</span> <span style="color:rgb(98,98,98)">0xbad5eed</span>
-<span class="ansi-green-fg">----&gt; 4</span> cids <span style="color:rgb(98,98,98)">=</span> <span class="ansi-yellow-bg">rdDistGeom</span><span style="color:rgb(98,98,98)" class="ansi-yellow-bg">.</span><span class="ansi-yellow-bg">EmbedMultipleConfs</span><span class="ansi-yellow-bg">(</span><span class="ansi-yellow-bg">m</span><span class="ansi-yellow-bg">,</span><span style="color:rgb(98,98,98)" class="ansi-yellow-bg">1000</span><span class="ansi-yellow-bg">,</span><span class="ansi-yellow-bg">params</span><span class="ansi-yellow-bg">)</span>
-
-<span class="ansi-red-fg">KeyboardInterrupt</span>: Embedding cancelled</pre>
-</div>
-</div>
-</div>
-<p>Obviously in this case it doesn’t make that big of a difference, but for a molecule which takes longer to embed, for example one with a lot of chiral centers and/or a complex fused-ring system, it’s nice to be able to stop things without having to completely restart the kernel.</p>
-<p>It’s now also possible to specify a time out for the conformer generation. If you provide a timeout, the conformer generation will be gracefully cancelled if it runs for longer than the specified value.</p>
-<p>Thanks to Nikitas Rontsis, Akvilė Žemgulytė, and Charlie Beattie at Google Deepmind for contributing the timeout support.</p>
-<div id="23eadc9c" class="cell" data-execution_count="5">
-<div class="sourceCode cell-code" id="cb8" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb8-1">params.timeout <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> <span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">3</span></span>
-<span id="cb8-2">t1 <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> time.time()</span>
-<span id="cb8-3">cids <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> rdDistGeom.EmbedMultipleConfs(m,<span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">1000</span>,params)</span>
-<span id="cb8-4">t2 <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> time.time()</span>
-<span id="cb8-5"><span class="bu" style="color: null;
-background-color: null;
-font-style: inherit;">print</span>(<span class="ss" style="color: #20794D;
-background-color: null;
-font-style: inherit;">f'</span><span class="sc" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">{</span><span class="bu" style="color: null;
-background-color: null;
-font-style: inherit;">len</span>(cids)<span class="sc" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">}</span><span class="ss" style="color: #20794D;
-background-color: null;
-font-style: inherit;"> conformers in </span><span class="sc" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">{</span>t2<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">-</span>t1<span class="sc" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">:.2f}</span><span class="ss" style="color: #20794D;
-background-color: null;
-font-style: inherit;">s'</span>)</span></code></pre></div>
-<div class="cell-output cell-output-stdout">
-<pre><code>1 conformers in 3.01s</code></pre>
-</div>
-</div>
-<p>The one conformer ID we get is -1, to indicate that the calculation failed:</p>
-<div id="8626b6fa" class="cell" data-execution_count="6">
-<div class="sourceCode cell-code" id="cb10" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb10-1">cids[<span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">0</span>]</span></code></pre></div>
-<div class="cell-output cell-output-display" data-execution_count="6">
-<pre><code>-1</code></pre>
-</div>
-</div>
-</section>
-<section id="synthon-searches" class="level1">
-<h1>Synthon searches</h1>
-<p>Inspired by the changes to the conformer generator, Dave Cosgrove added support for both timeouts and interrupting calculations to the code for doing <a href="https://greglandrum.github.io/rdkit-blog/posts/2024-12-03-introducing-synthon-search.html">synthon space searches</a>.</p>
-<p>Demonstrate this using synthon search in Chemspace’s FreedomSpace</p>
-<div id="3261ef95" class="cell" data-execution_count="7">
-<div class="sourceCode cell-code" id="cb12" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb12-1">spc <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> rdSynthonSpaceSearch.SynthonSpace()</span>
-<span id="cb12-2">spc.ReadDBFile(<span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">'/scratch/RDKit_git/Data/2023-05_Freedom_synthons.spc'</span>)</span></code></pre></div>
-</div>
-<div id="3fd82389" class="cell" data-execution_count="8">
-<div class="sourceCode cell-code" id="cb13" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb13-1">spc.GetNumProducts()</span></code></pre></div>
-<div class="cell-output cell-output-display" data-execution_count="8">
-<pre><code>9360696185</code></pre>
-</div>
-</div>
-<div id="7d17a975" class="cell" data-execution_count="9">
-<div class="sourceCode cell-code" id="cb15" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb15-1">qry <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> Chem.MolFromSmiles(<span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">'FC1=CC=CC2=C1NN=C2'</span>)</span></code></pre></div>
-</div>
-<div id="80d11779" class="cell" data-scrolled="true" data-execution_count="10">
-<div class="sourceCode cell-code" id="cb16" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb16-1">ps <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> rdSynthonSpaceSearch.SynthonSpaceSearchParams()</span>
-<span id="cb16-2">ps.maxHits <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> <span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">5000</span></span>
-<span id="cb16-3"></span>
-<span id="cb16-4">t1 <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> time.time()</span>
-<span id="cb16-5">res <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> spc.SubstructureSearch(qry,params<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span>ps)</span>
-<span id="cb16-6">t2 <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> time.time()</span>
-<span id="cb16-7"><span class="bu" style="color: null;
-background-color: null;
-font-style: inherit;">print</span>(<span class="ss" style="color: #20794D;
-background-color: null;
-font-style: inherit;">f'</span><span class="sc" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">{</span><span class="bu" style="color: null;
-background-color: null;
-font-style: inherit;">len</span>(res.GetHitMolecules())<span class="sc" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">}</span><span class="ss" style="color: #20794D;
-background-color: null;
-font-style: inherit;"> results in </span><span class="sc" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">{</span>t2<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">-</span>t1<span class="sc" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">:.2f}</span><span class="ss" style="color: #20794D;
-background-color: null;
-font-style: inherit;">s'</span>)</span></code></pre></div>
-<div class="cell-output cell-output-stdout">
-<pre><code>5000 results in 1.84s</code></pre>
-</div>
-</div>
-<div id="4f099e85" class="cell" data-execution_count="11">
-<div class="sourceCode cell-code" id="cb18" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb18-1">ps <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> rdSynthonSpaceSearch.SynthonSpaceSearchParams()</span>
-<span id="cb18-2">ps.maxHits <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> <span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">5000</span></span>
-<span id="cb18-3"></span>
-<span id="cb18-4">t1 <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> time.time()</span>
-<span id="cb18-5">res <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> spc.SubstructureSearch(qry,params<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span>ps)</span>
-<span id="cb18-6">t2 <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> time.time()</span></code></pre></div>
-<div class="cell-output cell-output-error">
-<div class="ansi-escaped-output">
-<pre><span class="ansi-red-fg">---------------------------------------------------------------------------</span>
-<span class="ansi-red-fg">RuntimeError</span>                              Traceback (most recent call last)
-Cell <span class="ansi-green-fg">In[11], line 5</span>
-<span class="ansi-green-fg ansi-bold">      2</span> ps<span style="color:rgb(98,98,98)">.</span>maxHits <span style="color:rgb(98,98,98)">=</span> <span style="color:rgb(98,98,98)">5000</span>
-<span class="ansi-green-fg ansi-bold">      4</span> t1 <span style="color:rgb(98,98,98)">=</span> time<span style="color:rgb(98,98,98)">.</span>time()
-<span class="ansi-green-fg">----&gt; 5</span> res <span style="color:rgb(98,98,98)">=</span> <span class="ansi-yellow-bg">spc</span><span style="color:rgb(98,98,98)" class="ansi-yellow-bg">.</span><span class="ansi-yellow-bg">SubstructureSearch</span><span class="ansi-yellow-bg">(</span><span class="ansi-yellow-bg">qry</span><span class="ansi-yellow-bg">,</span><span class="ansi-yellow-bg">params</span><span style="color:rgb(98,98,98)" class="ansi-yellow-bg">=</span><span class="ansi-yellow-bg">ps</span><span class="ansi-yellow-bg">)</span>
-<span class="ansi-green-fg ansi-bold">      6</span> t2 <span style="color:rgb(98,98,98)">=</span> time<span style="color:rgb(98,98,98)">.</span>time()
-
-<span class="ansi-red-fg">RuntimeError</span>: SubstructureSearch cancelled</pre>
-</div>
-</div>
-</div>
-<p>Substructure searching is really too fast to sensibly demonstrate the timeout, so let’s do a similarity search.</p>
-<div id="0d8c3ca6" class="cell" data-execution_count="12">
-<div class="sourceCode cell-code" id="cb19" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb19-1">vemurafenib <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> Chem.MolFromSmiles(<span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">'CCCS(=O)(=O)Nc1ccc(F)c(c1F)C(=O)c2c[nH]c3c2cc(cn3)c4ccc(Cl)cc4'</span>)</span></code></pre></div>
-</div>
-<div id="c99dcf6c" class="cell" data-execution_count="13">
-<div class="sourceCode cell-code" id="cb20" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb20-1">ps <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> rdSynthonSpaceSearch.SynthonSpaceSearchParams()</span>
-<span id="cb20-2">ps.maxHits <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> <span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">5000</span></span>
-<span id="cb20-3">ps.numThreads <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> <span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">8</span> </span>
-<span id="cb20-4"></span>
-<span id="cb20-5">fpg <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> rdFingerprintGenerator.GetMorganGenerator()</span>
-<span id="cb20-6"></span>
-<span id="cb20-7">t1 <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> time.time()</span>
-<span id="cb20-8">res <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> spc.FingerprintSearch(vemurafenib,fpg,params<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span>ps)</span>
-<span id="cb20-9">t2 <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> time.time()</span>
-<span id="cb20-10"><span class="bu" style="color: null;
-background-color: null;
-font-style: inherit;">print</span>(<span class="ss" style="color: #20794D;
-background-color: null;
-font-style: inherit;">f'</span><span class="sc" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">{</span><span class="bu" style="color: null;
-background-color: null;
-font-style: inherit;">len</span>(res.GetHitMolecules())<span class="sc" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">}</span><span class="ss" style="color: #20794D;
-background-color: null;
-font-style: inherit;"> results in </span><span class="sc" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">{</span>t2<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">-</span>t1<span class="sc" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">:.2f}</span><span class="ss" style="color: #20794D;
-background-color: null;
-font-style: inherit;">s'</span>)</span></code></pre></div>
-<div class="cell-output cell-output-stderr">
-<pre><code>[16:34:46] Building the fingerprints may take some time.</code></pre>
-</div>
-<div class="cell-output cell-output-stdout">
-<pre><code>0 results in 33.32s</code></pre>
-</div>
-</div>
-<div id="d01b60e9" class="cell" data-execution_count="14">
-<div class="sourceCode cell-code" id="cb23" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb23-1">ps <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> rdSynthonSpaceSearch.SynthonSpaceSearchParams()</span>
-<span id="cb23-2">ps.maxHits <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> <span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">5000</span></span>
-<span id="cb23-3">ps.similarityCutoff <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> <span class="fl" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">0.4</span></span>
-<span id="cb23-4"></span>
-<span id="cb23-5">t1 <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> time.time()</span>
-<span id="cb23-6">res <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> spc.FingerprintSearch(vemurafenib,fpg,params<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span>ps)</span>
-<span id="cb23-7">t2 <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> time.time()</span>
-<span id="cb23-8"><span class="bu" style="color: null;
-background-color: null;
-font-style: inherit;">print</span>(<span class="ss" style="color: #20794D;
-background-color: null;
-font-style: inherit;">f'</span><span class="sc" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">{</span><span class="bu" style="color: null;
-background-color: null;
-font-style: inherit;">len</span>(res.GetHitMolecules())<span class="sc" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">}</span><span class="ss" style="color: #20794D;
-background-color: null;
-font-style: inherit;"> results in </span><span class="sc" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">{</span>t2<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">-</span>t1<span class="sc" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">:.2f}</span><span class="ss" style="color: #20794D;
-background-color: null;
-font-style: inherit;">s'</span>)</span></code></pre></div>
-<div class="cell-output cell-output-stdout">
-<pre><code>448 results in 4.88s</code></pre>
-</div>
-</div>
-<div id="a302edc6" class="cell" data-execution_count="15">
-<div class="sourceCode cell-code" id="cb25" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb25-1">ps.timeOut <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> <span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">1</span></span>
-<span id="cb25-2">t1 <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> time.time()</span>
-<span id="cb25-3">res <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> spc.FingerprintSearch(vemurafenib,fpg,params<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span>ps)</span>
-<span id="cb25-4">t2 <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> time.time()</span>
-<span id="cb25-5"><span class="bu" style="color: null;
-background-color: null;
-font-style: inherit;">print</span>(<span class="ss" style="color: #20794D;
-background-color: null;
-font-style: inherit;">f'</span><span class="sc" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">{</span><span class="bu" style="color: null;
-background-color: null;
-font-style: inherit;">len</span>(res.GetHitMolecules())<span class="sc" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">}</span><span class="ss" style="color: #20794D;
-background-color: null;
-font-style: inherit;"> results in </span><span class="sc" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">{</span>t2<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">-</span>t1<span class="sc" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">:.2f}</span><span class="ss" style="color: #20794D;
-background-color: null;
-font-style: inherit;">s'</span>)</span></code></pre></div>
-<div class="cell-output cell-output-stdout">
-<pre><code>0 results in 1.03s</code></pre>
-</div>
-<div class="cell-output cell-output-stderr">
-<pre><code>[16:35:27] Timed out.
-[16:35:27] Timed out.
-[16:35:27] Timed out.</code></pre>
-</div>
-</div>
-<p>We can also cancel the calculation with the “interrupt the kernel” button in the notebook or <code>^C</code> in the terminal:</p>
-<div id="b60f0cc0" class="cell" data-execution_count="16">
-<div class="sourceCode cell-code" id="cb28" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb28-1">ps <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> rdSynthonSpaceSearch.SynthonSpaceSearchParams()</span>
-<span id="cb28-2">ps.maxHits <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> <span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">5000</span></span>
-<span id="cb28-3">ps.similarityCutoff <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> <span class="fl" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">0.4</span></span>
-<span id="cb28-4"></span>
-<span id="cb28-5">t1 <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> time.time()</span>
-<span id="cb28-6">res <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> spc.FingerprintSearch(vemurafenib,fpg,params<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span>ps)</span>
-<span id="cb28-7">t2 <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> time.time()</span>
-<span id="cb28-8"><span class="bu" style="color: null;
-background-color: null;
-font-style: inherit;">print</span>(<span class="ss" style="color: #20794D;
-background-color: null;
-font-style: inherit;">f'</span><span class="sc" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">{</span><span class="bu" style="color: null;
-background-color: null;
-font-style: inherit;">len</span>(res.GetHitMolecules())<span class="sc" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">}</span><span class="ss" style="color: #20794D;
-background-color: null;
-font-style: inherit;"> results in </span><span class="sc" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">{</span>t2<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">-</span>t1<span class="sc" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">:.2f}</span><span class="ss" style="color: #20794D;
-background-color: null;
-font-style: inherit;">s'</span>)</span></code></pre></div>
-<div class="cell-output cell-output-error">
-<div class="ansi-escaped-output">
-<pre><span class="ansi-red-fg">---------------------------------------------------------------------------</span>
-<span class="ansi-red-fg">RuntimeError</span>                              Traceback (most recent call last)
-Cell <span class="ansi-green-fg">In[16], line 6</span>
-<span class="ansi-green-fg ansi-bold">      3</span> ps<span style="color:rgb(98,98,98)">.</span>similarityCutoff <span style="color:rgb(98,98,98)">=</span> <span style="color:rgb(98,98,98)">0.4</span>
-<span class="ansi-green-fg ansi-bold">      5</span> t1 <span style="color:rgb(98,98,98)">=</span> time<span style="color:rgb(98,98,98)">.</span>time()
-<span class="ansi-green-fg">----&gt; 6</span> res <span style="color:rgb(98,98,98)">=</span> <span class="ansi-yellow-bg">spc</span><span style="color:rgb(98,98,98)" class="ansi-yellow-bg">.</span><span class="ansi-yellow-bg">FingerprintSearch</span><span class="ansi-yellow-bg">(</span><span class="ansi-yellow-bg">vemurafenib</span><span class="ansi-yellow-bg">,</span><span class="ansi-yellow-bg">fpg</span><span class="ansi-yellow-bg">,</span><span class="ansi-yellow-bg">params</span><span style="color:rgb(98,98,98)" class="ansi-yellow-bg">=</span><span class="ansi-yellow-bg">ps</span><span class="ansi-yellow-bg">)</span>
-<span class="ansi-green-fg ansi-bold">      7</span> t2 <span style="color:rgb(98,98,98)">=</span> time<span style="color:rgb(98,98,98)">.</span>time()
-<span class="ansi-green-fg ansi-bold">      8</span> <span style="color:rgb(0,135,0)">print</span>(<span style="color:rgb(175,0,0)">f</span><span style="color:rgb(175,0,0)">'</span><span style="font-weight:bold;color:rgb(175,95,135)">{</span><span style="color:rgb(0,135,0)">len</span>(res<span style="color:rgb(98,98,98)">.</span>GetHitMolecules())<span style="font-weight:bold;color:rgb(175,95,135)">}</span><span style="color:rgb(175,0,0)"> results in </span><span style="font-weight:bold;color:rgb(175,95,135)">{</span>t2<span style="color:rgb(98,98,98)">-</span>t1<span style="font-weight:bold;color:rgb(175,95,135)">:</span><span style="color:rgb(175,0,0)">.2f</span><span style="font-weight:bold;color:rgb(175,95,135)">}</span><span style="color:rgb(175,0,0)">s</span><span style="color:rgb(175,0,0)">'</span>)
-
-<span class="ansi-red-fg">RuntimeError</span>: FingerprintSearch cancelled</pre>
-</div>
-</div>
-</div>
-</section>
-<section id="other-rdkit-functions-supporting-a-timeout" class="level1">
-<h1>Other RDKit functions supporting a timeout</h1>
-<p>Some other RDKit functions have supported providing a timeout for a while:</p>
-<ul>
-<li><code>rdFMCS.FindMCS()</code> via <code>rdFMCS.MCSParameters.Timeout</code></li>
-<li>The code in <code>rdRascalMCES</code> via <code>rdRascalMCES.RascalOptions.timeout</code></li>
-<li>The code in <code>rdRGroupDecompositoin</code> via <code>rdRGroupDecomposition.RGroupDecompositionParameters.timeout</code></li>
-</ul>
-<p>If you have ideas for other long-running functions which should support a timeout and/or being interruptable, please leave a comment or open an RDKit feature request in github.</p>
-
-
-</section>
-
- ]]></description>
-  <category>tutorial</category>
-  <category>technical</category>
-  <guid>https://greglandrum.github.io/rdkit-blog/posts/2025-04-06-interrupting-calculations.html</guid>
-  <pubDate>Sat, 05 Apr 2025 22:00:00 GMT</pubDate>
 </item>
 </channel>
 </rss>
