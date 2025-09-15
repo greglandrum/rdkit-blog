@@ -1,7 +1,6 @@
 ---
 categories:
-- process
-- questions
+- general
 date: '2025-09-07'
 layout: post
 title: The 2025 RDKit UGM is next week
