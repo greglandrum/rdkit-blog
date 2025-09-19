@@ -11,10 +11,11 @@ title: Using the RDKit in a C++ program
 toc: true
 
 ---
+Updated: 2025-09-19 to modernize this and get it working again.
 
-*Note:* the instructions in this blog post currently only work on linux systems.
-There's a configuration problem with the way we use cmake on the Mac and Windows
-that needs to be cleared up. I will update the post after that's done.
+
+*Note:* the instructions in this blog post currently only work on linux and Mac systems.
+I haven't tried it out on Windows yet, but I will update the post if I can make that work.
 
 Last week I (re)discoverered that it's pretty easy to use the RDKit in other C++
 projects. This is obviously somthing that's possible, but I thought of it as
@@ -22,29 +23,35 @@ being something of a pain. It turns out that it's not, as I hope to show you in
 this post.
 
 I started by setting up a fresh conda environment and grabbing an RDKit build
-from conda-forge, this is a bit heavyweight since you end up with a bunch of
-python packages as well as the RDKit itself (I'm going to look into making this
-more minimal), but it's much easier than doing your own build.
+from conda-forge, this is much easier than doing your own build. I'm not
+installing the entire RDKit (there are no python packages), just the libraries
+and headers needed to build C++ programs that use the RDKit.
 
-The first thing is to set up a conda environment:
+The first thing is to create and activate a new conda environment that has the
+required dependencies installed:
 ```
-conda create -n rdkit_dev
+mamba create -n rdkit_dev cmake librdkit-dev eigen libboost-devel compilers
 conda activate rdkit_dev
-conda install -c conda-forge mamba
-mamba install -c conda-forge cmake rdkit eigen
 ```
-Note: I start by installing [mamba](https://github.com/mamba-org/mamba) here
-because it makes doing conda installs much, much faster.
+Note: I'm doing tihs with [mamba](https://github.com/mamba-org/mamba) here
+because it makes doing conda installs much faster. I've also installed the
+conda-forge compiler package since that makes sure I have a recent enough
+compiler and c++ libraries to work with the up-to-date version of boost we get
+with the RDKit from conda-forge.
+
 
 Here's a simple demo program which reads in a set of molecules from an input
 file and generates tautomer hashes for them. It uses the `boost::timer` library
 in order to separately time how long it takes to read the molecules and generate
 the hashes. I called this file `tautomer_hash.cpp`:
 ```
+//
+//  Copyright (C) 2021-2025 Greg Landrum
+//
+
 #include <GraphMol/FileParsers/MolSupplier.h>
 #include <GraphMol/MolHash/MolHash.h>
 #include <GraphMol/RDKitBase.h>
-#include <RDGeneral/RDLog.h>
 #include <algorithm>
 #include <boost/timer/timer.hpp>
 #include <iostream>
@@ -53,13 +60,17 @@ the hashes. I called this file `tautomer_hash.cpp`:
 using namespace RDKit;
 
 void readmols(std::string pathName, unsigned int maxToDo,
-              std::vector<RWMOL_SPTR> &mols) {
+              std::vector<std::unique_ptr<RWMol>> &mols) {
   boost::timer::auto_cpu_timer t;
   // using a supplier without sanitizing the molecules...
-  RDKit::SmilesMolSupplier suppl(pathName, " \t", 1, 0, true, false);
+  v2::FileParsers::SmilesMolSupplierParams params;
+  params.parseParameters.sanitize = false;
+  params.smilesColumn = 1;
+  params.nameColumn = 0;
+  v2::FileParsers::SmilesMolSupplier suppl(pathName, params);
   unsigned int nDone = 0;
   while (!suppl.atEnd() && (maxToDo <= 0 || nDone < maxToDo)) {
-    RDKit::ROMol *m = suppl.next();
+    auto m = suppl.next();
     if (!m) {
       continue;
     }
@@ -67,28 +78,25 @@ void readmols(std::string pathName, unsigned int maxToDo,
     // the tautomer hash code uses conjugation info
     MolOps::setConjugation(*m);
     nDone += 1;
-    mols.push_back(RWMOL_SPTR((RWMol *)m));
+    mols.push_back(std::move(m));
   }
-  std::cerr << "read: " << nDone << " mols." << std::endl;
+  std::cerr << "  read: " << nDone << " mols." << std::endl;
 }
 
-void generatehashes(const std::vector<RWMOL_SPTR> &mols) {
+void generatehashes(const std::vector<std::unique_ptr<RWMol>> &mols) {
   boost::timer::auto_cpu_timer t;
-  for (auto &mol : mols) {
+  for (const auto &mol : mols) {
     auto hash =
         MolHash::MolHash(mol.get(), MolHash::HashFunction::HetAtomTautomer);
   }
 }
 int main(int argc, char *argv[]) {
-  RDLog::InitLogs();
-  std::vector<RWMOL_SPTR> mols;
-  BOOST_LOG(rdInfoLog) << "read mols" << std::endl;
-
+  std::vector<std::unique_ptr<RWMol>> mols;
+  std::cerr << "reading molecules" << std::endl;
   readmols(argv[1], 10000, mols);
-  BOOST_LOG(rdInfoLog) << "generate hashes" << std::endl;
+  std::cerr << "generating hashes" << std::endl;
   generatehashes(mols);
-
-  BOOST_LOG(rdInfoLog) << "done " << std::endl;
+  std::cerr << "done" << std::endl;
 }
 ```
 This is a pretty crappy program since it doesn't do much error checking, but the
@@ -98,23 +106,23 @@ how to write nice C++ programs. :-)
 The way to make the build easy is to use cmake to set everything up, so I need a
 `CMakeLists.txt` file that defines my executable and its RDKit dependencies:
 ```
-cmake_minimum_required(VERSION 3.18)
+cmake_minimum_required(VERSION 3.20)
 
 project(simple_cxx_example)
-set(CMAKE_CXX_STANDARD 14)
+set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED True)
 
 
 find_package(RDKit REQUIRED)
-find_package(Boost COMPONENTS timer system REQUIRED)
+find_package(Boost CONFIG COMPONENTS timer system REQUIRED)
 add_executable(tautomer_hash tautomer_hash.cpp)
-target_link_libraries(tautomer_hash RDKit::SmilesParse RDKit::MolHash
+target_link_libraries(tautomer_hash  RDKit::MolHash RDKit::FileParsers RDKit::SmilesParse
    Boost::timer)
 ```
-This tells cmake to find the RDKit and boost installs (which "just works" since
-cmake, boost, and the RDKit were all installed from conda), defines the
-executable I want to create, and then lists the RDKit and boost libraries I use.
-And that is pretty much that.
+This tells cmake to find the RDKit and boost builds we have installed (which
+"just works" since cmake, boost, and the RDKit were all installed from conda),
+defines the executable I want to create, and then lists the RDKit and boost
+libraries I use. And that is pretty much that.
 
 Now I create a build dir, run `cmake` to setup the build, and run `make` to actually
 build my program:
