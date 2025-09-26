@@ -10,7 +10,461 @@
 <atom:link href="https://greglandrum.github.io/rdkit-blog/index.xml" rel="self" type="application/rss+xml"/>
 <description>RDKit experiments, tips, and tutorials</description>
 <generator>quarto-1.6.43</generator>
-<lastBuildDate>Sat, 13 Sep 2025 22:00:00 GMT</lastBuildDate>
+<lastBuildDate>Thu, 25 Sep 2025 22:00:00 GMT</lastBuildDate>
+<item>
+  <title>Drawing simple protein–ligand interaction diagrams with the RDKit</title>
+  <link>https://greglandrum.github.io/rdkit-blog/posts/2025-09-26-drawing-interactions-1.html</link>
+  <description><![CDATA[ 
+
+
+
+
+<p>I’m a big fan of 2D protein–ligand interaction diagrams; when well done these plots can provide an information-dense view of the structure that is still easy to understand.</p>
+<p>A really nice example of this is the work on <a href="https://doi.org/10.1021/ml100164p">PoseView</a> from Matthias Rarey’s group in Hamburg. Here’s an example from that publication:</p>
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="https://pubs.acs.org/cms/10.1021/ml100164p/asset/images/medium/ml-2010-00164p_0005.gif" class="img-fluid figure-img"></p>
+<figcaption>image</figcaption>
+</figure>
+</div>
+<p>Though I would love to have an RDKit implementation of PoseView, actually implementing something like that is deeply nontrivial, so I’ve never really done anything in that direction. This week I had a random idea for a way to provide basic protein–ligand interaction diagrams using existing RDKit functionality. This post is an exploration of that.</p>
+<p>Here’s an example of what you get with this:</p>
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="https://greglandrum.github.io/rdkit-blog/posts/2025-09-26-drawing-interactions-1_files/figure-html/121dfaf4-1-image-2.png" class="img-fluid figure-img"></p>
+<figcaption>image-2.png</figcaption>
+</figure>
+</div>
+<p>To be clear: I am fully aware that this is not nearly as good as what PoseView and similar tools can do, but I think it’s still quite useful. I have a few ideas for straightforward changes to the backend code to improve the plots that I’m also going to take a look at.</p>
+<div id="9bb879a5-1a40-40b3-b679-56f84618d0b8" class="cell" data-execution_count="1">
+<div class="sourceCode cell-code" id="cb1" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb1-1"><span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">from</span> rdkit <span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">import</span> Chem</span>
+<span id="cb1-2"><span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">from</span> rdkit.Chem <span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">import</span> rdDepictor</span>
+<span id="cb1-3"><span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">from</span> rdkit.Chem <span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">import</span> Draw</span>
+<span id="cb1-4"><span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">from</span> IPython.display <span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">import</span> SVG</span>
+<span id="cb1-5"><span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">from</span> rdkit.Chem.Draw <span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">import</span> IPythonConsole</span>
+<span id="cb1-6">IPythonConsole.molSize <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> <span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">400</span>,<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">400</span></span>
+<span id="cb1-7"><span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">import</span> rdkit</span>
+<span id="cb1-8"><span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">print</span>(rdkit.__version__)</span></code></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>2025.03.6</code></pre>
+</div>
+</div>
+<section id="initial-exploration" class="level1">
+<h1>Initial exploration</h1>
+<p>Start with the ligand for a recent PDB structure, 8yqe:</p>
+<div id="12f226e6-d0bc-4b2f-a807-30922590055d" class="cell" data-execution_count="2">
+<div class="sourceCode cell-code" id="cb3" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb3-1"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># from https://www.ebi.ac.uk/pdbe/entry/pdb/8yqe?activeTab=ligands</span></span>
+<span id="cb3-2">lig <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> Chem.MolFromSmiles(<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'CCS(=O)(=O)N1CCC(CC1)NC(=O)c2c(cn[nH]2)NC(=O)c3c(ccc(c3F)C4CCOCC4)F'</span>)</span>
+<span id="cb3-3">IPythonConsole.drawOptions.addAtomIndices <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> <span class="va" style="color: #111111;
+background-color: null;
+font-style: inherit;">True</span></span>
+<span id="cb3-4">lig</span></code></pre></div>
+<div class="cell-output cell-output-display" data-execution_count="2">
+<div>
+<figure class="figure">
+<p><img src="https://greglandrum.github.io/rdkit-blog/posts/2025-09-26-drawing-interactions-1_files/figure-html/cell-3-output-1.png" class="img-fluid figure-img"></p>
+</figure>
+</div>
+</div>
+</div>
+<p>The strategy to draw the interaction diagrams is to add a new dummy atom to the ligand molecule for each residue it’s interacting with and then connect that to the interacting ligand atom with a zero-order bond. The standard RDKit 2D coordinate generation code will then do something sensible with this.</p>
+<p>I include <code>hbond</code> interactions that are around 3.0<img src="https://latex.codecogs.com/png.latex?%5CAA"> or less from the list of interactions on the <a href="https://www.ebi.ac.uk/pdbe/entry/pdb/8yqe?activeTab=ligands">ligand page</a></p>
+<div id="a620928d-d684-4115-b786-6f934b2c4840" class="cell" data-execution_count="3">
+<div class="sourceCode cell-code" id="cb4" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb4-1">lig_with_interactions <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> Chem.RWMol(lig)</span>
+<span id="cb4-2">leu83 <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> Chem.Atom(<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">0</span>)</span>
+<span id="cb4-3">leu83.SetProp(<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'atomLabel'</span>,<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'Leu 83'</span>)</span>
+<span id="cb4-4">aid <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> lig_with_interactions.AddAtom(leu83)</span>
+<span id="cb4-5">lig_with_interactions.AddBond(<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">18</span>,aid,Chem.BondType.ZERO)</span>
+<span id="cb4-6">lig_with_interactions.AddBond(<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">11</span>,aid,Chem.BondType.ZERO)</span>
+<span id="cb4-7"></span>
+<span id="cb4-8">hoh407 <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> Chem.Atom(<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">0</span>)</span>
+<span id="cb4-9">hoh407.SetProp(<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'atomLabel'</span>,<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'H2O 407'</span>)</span>
+<span id="cb4-10">aid <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> lig_with_interactions.AddAtom(hoh407)</span>
+<span id="cb4-11">lig_with_interactions.AddBond(<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">21</span>,aid,Chem.BondType.ZERO)</span>
+<span id="cb4-12"></span>
+<span id="cb4-13">hoh441 <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> Chem.Atom(<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">0</span>)</span>
+<span id="cb4-14">hoh441.SetProp(<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'atomLabel'</span>,<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'H2O 441'</span>)</span>
+<span id="cb4-15">aid <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> lig_with_interactions.AddAtom(hoh441)</span>
+<span id="cb4-16">lig_with_interactions.AddBond(<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">13</span>,aid,Chem.BondType.ZERO)</span>
+<span id="cb4-17"></span>
+<span id="cb4-18"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># this doesn't work because the ring centroid doesn't get put in the middle of the ring</span></span>
+<span id="cb4-19"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># ring_center = Chem.Atom(0)</span></span>
+<span id="cb4-20"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># aid = lig_with_interactions.AddAtom(ring_center)</span></span>
+<span id="cb4-21"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># for rid in (22,23,24,25,26,27):</span></span>
+<span id="cb4-22"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">#     lig_with_interactions.AddBond(rid,aid,Chem.BondType.ZERO)</span></span>
+<span id="cb4-23"></span>
+<span id="cb4-24">lig_with_interactions</span></code></pre></div>
+<div class="cell-output cell-output-display" data-execution_count="3">
+<div>
+<figure class="figure">
+<p><img src="https://greglandrum.github.io/rdkit-blog/posts/2025-09-26-drawing-interactions-1_files/figure-html/cell-4-output-1.png" class="img-fluid figure-img"></p>
+</figure>
+</div>
+</div>
+</div>
+</section>
+<section id="making-it-easier-to-use" class="level1">
+<h1>Making it easier to use</h1>
+<p>That doesn’t look terrible. Write a function to automate the process and include highlights around the residue pseudo-atoms:</p>
+<div id="4b76011f-6f90-41c9-8bb9-dbaeda91e53a" class="cell" data-execution_count="4">
+<div class="sourceCode cell-code" id="cb5" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb5-1"><span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">def</span> draw_ligand_with_interactions(lig,lig_name,interactions,size<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span>(<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">400</span>,<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">400</span>)):   </span>
+<span id="cb5-2">    lig_with_interactions <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> Chem.RWMol(lig)</span>
+<span id="cb5-3">    </span>
+<span id="cb5-4">    <span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># add pseudo-atoms (and bonds to them) for the interacting residues:</span></span>
+<span id="cb5-5">    pts <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> []</span>
+<span id="cb5-6">    clrs <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> {}</span>
+<span id="cb5-7">    <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">for</span> (aname,oaids) <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">in</span> interactions:</span>
+<span id="cb5-8">        res <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> Chem.Atom(<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">0</span>)</span>
+<span id="cb5-9">        res.SetProp(<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'atomLabel'</span>,aname)</span>
+<span id="cb5-10">        aid <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> lig_with_interactions.AddAtom(res)</span>
+<span id="cb5-11">        pts.append(aid)</span>
+<span id="cb5-12">        clrs[aid] <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> (<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">1</span>,<span class="fl" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">.2</span>,<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">1</span>,<span class="fl" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">.3</span>)</span>
+<span id="cb5-13">        <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">for</span> oaid <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">in</span> oaids:</span>
+<span id="cb5-14">            lig_with_interactions.AddBond(aid,oaid,Chem.BondType.ZERO)</span>
+<span id="cb5-15">   </span>
+<span id="cb5-16">    d2d <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> Draw.MolDraw2DSVG(size[<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">0</span>],size[<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">1</span>])</span>
+<span id="cb5-17">    </span>
+<span id="cb5-18">    <span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># set the draw options so that we end up with circles under the pseudo-atoms:</span></span>
+<span id="cb5-19">    d2d.drawOptions().circleAtoms <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> <span class="va" style="color: #111111;
+background-color: null;
+font-style: inherit;">True</span></span>
+<span id="cb5-20">    d2d.drawOptions().fillHighlights <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> <span class="va" style="color: #111111;
+background-color: null;
+font-style: inherit;">True</span></span>
+<span id="cb5-21">    d2d.drawOptions().continuousHighlight <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> <span class="va" style="color: #111111;
+background-color: null;
+font-style: inherit;">False</span></span>
+<span id="cb5-22">    d2d.drawOptions().highlightRadius <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> <span class="fl" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">0.5</span></span>
+<span id="cb5-23">    </span>
+<span id="cb5-24">    <span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># now draw and return the result</span></span>
+<span id="cb5-25">    d2d.DrawMolecule(lig_with_interactions,legend<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span>lig_name,</span>
+<span id="cb5-26">                     highlightAtoms<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span>pts,highlightAtomColors<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span>clrs)</span>
+<span id="cb5-27">    d2d.FinishDrawing()</span>
+<span id="cb5-28">    <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">return</span> SVG(d2d.GetDrawingText())</span>
+<span id="cb5-29"></span>
+<span id="cb5-30"></span></code></pre></div>
+</div>
+<div id="3ef3c749-22a9-4e5d-a9a8-a7175a3513cd" class="cell" data-execution_count="5">
+<div class="sourceCode cell-code" id="cb6" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb6-1"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># from https://www.ebi.ac.uk/pdbe/entry/pdb/8yqe?activeTab=ligands</span></span>
+<span id="cb6-2">lig <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> Chem.MolFromSmiles(<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'CCS(=O)(=O)N1CCC(CC1)NC(=O)c2c(cn[nH]2)NC(=O)c3c(ccc(c3F)C4CCOCC4)F'</span>)</span>
+<span id="cb6-3">interactions <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> (</span>
+<span id="cb6-4">    (<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'LYS 89'</span>,(<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">3</span>,)),</span>
+<span id="cb6-5">    (<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'ASP 86'</span>,(<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">4</span>,)),</span>
+<span id="cb6-6">    (<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'HOH 444'</span>,(<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">3</span>,)),</span>
+<span id="cb6-7">    (<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'HOH 441'</span>,(<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">13</span>,)),</span>
+<span id="cb6-8">        (<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'HOH 407'</span>,(<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">21</span>,)),</span>
+<span id="cb6-9">        (<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'LEU 83'</span>,(<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">18</span>,<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">11</span>)),</span>
+<span id="cb6-10">)</span>
+<span id="cb6-11">draw_ligand_with_interactions(lig,<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'A1D60 from 8yqe'</span>,interactions)</span></code></pre></div>
+<div class="cell-output cell-output-display" data-execution_count="5">
+<div>
+<figure class="figure">
+<p><img src="https://greglandrum.github.io/rdkit-blog/posts/2025-09-26-drawing-interactions-1_files/figure-html/cell-6-output-1.svg" class="img-fluid figure-img"></p>
+</figure>
+</div>
+</div>
+</div>
+<p>Do a couple more examples using other recent PDB structures:</p>
+<div id="88709c52" class="cell" data-execution_count="6">
+<div class="sourceCode cell-code" id="cb7" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb7-1"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># from: https://www.ebi.ac.uk/pdbe/entry/pdb/9uhc?activeTab=ligands</span></span>
+<span id="cb7-2">lig <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> Chem.MolFromSmiles(<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'CCC(=O)Nc1ccc2c(c1)n(cc2c3c[nH]c4c3nc(cn4)c5cnn(c5)CCN6CCOCC6)C'</span>)</span>
+<span id="cb7-3">interactions <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> (</span>
+<span id="cb7-4">    (<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'ALA 564'</span>,(<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">22</span>,)),</span>
+<span id="cb7-5">    (<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'GLU 562'</span>,(<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">16</span>,)),</span>
+<span id="cb7-6">    (<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'ASP 641'</span>,(<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">4</span>,)),</span>
+<span id="cb7-7">    (<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'CYS 488'</span>,(<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">3</span>,)),</span>
+<span id="cb7-8">)</span>
+<span id="cb7-9">draw_ligand_with_interactions(lig,<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'A1EPE from 9uhc'</span>,interactions)</span></code></pre></div>
+<div class="cell-output cell-output-display" data-execution_count="6">
+<div>
+<figure class="figure">
+<p><img src="https://greglandrum.github.io/rdkit-blog/posts/2025-09-26-drawing-interactions-1_files/figure-html/cell-7-output-1.svg" class="img-fluid figure-img"></p>
+</figure>
+</div>
+</div>
+</div>
+<div id="8bc287f8" class="cell" data-execution_count="7">
+<div class="sourceCode cell-code" id="cb8" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb8-1"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># from https://www.ebi.ac.uk/pdbe/entry/pdb/9vci?activeTab=ligands</span></span>
+<span id="cb8-2">lig <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> Chem.MolFromSmiles(<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'CC(=O)NCc1cc(c(cc1F)O)Oc2ccc(cc2)N3c4c(ncnc4N(C3=O)C5CCNCC5)N'</span>)</span>
+<span id="cb8-3">interactions <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> (</span>
+<span id="cb8-4">        (<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'GLY 9'</span>,(<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">2</span>,)),</span>
+<span id="cb8-5">        (<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'ASP 135'</span>,(<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">12</span>,)),</span>
+<span id="cb8-6">        (<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'THR 48'</span>,(<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">23</span>,)),</span>
+<span id="cb8-7">        (<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'HOH 637'</span>,(<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">29</span>,)),</span>
+<span id="cb8-8">)</span>
+<span id="cb8-9">draw_ligand_with_interactions(lig,<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'A1ERR from 9vci'</span>,interactions)</span></code></pre></div>
+<div class="cell-output cell-output-display" data-execution_count="7">
+<div>
+<figure class="figure">
+<p><img src="https://greglandrum.github.io/rdkit-blog/posts/2025-09-26-drawing-interactions-1_files/figure-html/cell-8-output-1.svg" class="img-fluid figure-img"></p>
+</figure>
+</div>
+</div>
+</div>
+<p>There’s clearly room for improvement here (and I have a couple of ideas already), but I think this is already useful as-is.</p>
+
+
+</section>
+
+ ]]></description>
+  <category>drawing</category>
+  <category>exploration</category>
+  <guid>https://greglandrum.github.io/rdkit-blog/posts/2025-09-26-drawing-interactions-1.html</guid>
+  <pubDate>Thu, 25 Sep 2025 22:00:00 GMT</pubDate>
+  <media:content url="https://greglandrum.github.io/rdkit-blog/posts/images/blog/drawing-interactions-1.png" medium="image" type="image/png" height="123" width="144"/>
+</item>
 <item>
   <title>2025 RDKit UGM Recap</title>
   <link>https://greglandrum.github.io/rdkit-blog/posts/2025-09-14-UGM-recap.html</link>
@@ -25050,523 +25504,6 @@ font-style: inherit;">4</span>)</span></code></pre></div>
   <guid>https://greglandrum.github.io/rdkit-blog/posts/2025-05-09-common-chemical-words-1.html</guid>
   <pubDate>Thu, 08 May 2025 22:00:00 GMT</pubDate>
   <media:content url="https://greglandrum.github.io/rdkit-blog/posts/images/blog/common-chemical-words-1.png" medium="image" type="image/png" height="72" width="144"/>
-</item>
-<item>
-  <title>Constructing molecules more quickly</title>
-  <link>https://greglandrum.github.io/rdkit-blog/posts/2025-05-01-constructing-molecules-more-quickly.html</link>
-  <description><![CDATA[ 
-
-
-
-
-<p>This is an updated and lightly revised version of a <a href="https://rdkit.blogspot.com/2016/09/avoiding-unnecessary-work-and.html">quite old post</a>.</p>
-<p>I have previously talked/posted about ways to construct RDKit molecules more quickly. This post revisits that topic.</p>
-<p>By default the RDKit does a lot of work when constructing a molecule. The idea here is to set things up so that we only have to do that work once for a set of molecules that we’re going to work with repeatedly.</p>
-<p>There’s also a diversion into thinking about what chemistry information is actually needed for things like substructure searching and tuning the molecule construction to only perceive that information.</p>
-<blockquote class="blockquote">
-<p>Aside 1: the timing information shown below was all generated on my laptop, a 2.5 year old Lenovo X1 Carbon (2.1GHz Intel Core i7) running Windows. I am, as usual, using the conda-forge RDKit builds.</p>
-</blockquote>
-<blockquote class="blockquote">
-<p>Aside 2: there’s another blog post looking in more detail at <a href="https://greglandrum.github.io/rdkit-blog/posts/2022-12-09-timing-text-methods-for-serializing-mols.html">how long it takes to serialize/deserialize molecules with the RDKit</a></p>
-</blockquote>
-<div id="cell-2" class="cell" data-execution_count="1">
-<div class="sourceCode cell-code" id="cb1" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb1-1"><span class="im" style="color: #00769E;
-background-color: null;
-font-style: inherit;">from</span> rdkit <span class="im" style="color: #00769E;
-background-color: null;
-font-style: inherit;">import</span> Chem</span>
-<span id="cb1-2"><span class="im" style="color: #00769E;
-background-color: null;
-font-style: inherit;">from</span> rdkit <span class="im" style="color: #00769E;
-background-color: null;
-font-style: inherit;">import</span> RDConfig</span>
-<span id="cb1-3"><span class="im" style="color: #00769E;
-background-color: null;
-font-style: inherit;">import</span> os,gzip</span>
-<span id="cb1-4"><span class="im" style="color: #00769E;
-background-color: null;
-font-style: inherit;">from</span> rdkit <span class="im" style="color: #00769E;
-background-color: null;
-font-style: inherit;">import</span> rdBase</span>
-<span id="cb1-5">rdBase.rdkitVersion</span></code></pre></div>
-<div class="cell-output cell-output-display" data-execution_count="1">
-<pre><code>'2025.03.1'</code></pre>
-</div>
-</div>
-<section id="setup" class="level2">
-<h2 class="anchored" data-anchor-id="setup">Setup</h2>
-<p>Start by reading in a set of ChEMBL molecules that we’ve used before and then reducing that to 50K examples.</p>
-<div id="cell-4" class="cell" data-execution_count="2">
-<div class="sourceCode cell-code" id="cb3" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb3-1">ind <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> [x.strip().split() <span class="cf" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">for</span> x <span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">in</span> <span class="bu" style="color: null;
-background-color: null;
-font-style: inherit;">open</span>(<span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">'../data/chembl16_2010-2012.smi'</span>)]</span>
-<span id="cb3-2"><span class="bu" style="color: null;
-background-color: null;
-font-style: inherit;">len</span>(ind)</span></code></pre></div>
-<div class="cell-output cell-output-display" data-execution_count="2">
-<pre><code>234681</code></pre>
-</div>
-</div>
-<div id="cell-5" class="cell" data-execution_count="3">
-<div class="sourceCode cell-code" id="cb5" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb5-1"><span class="im" style="color: #00769E;
-background-color: null;
-font-style: inherit;">import</span> random</span>
-<span id="cb5-2">random.seed(<span class="bn" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">0xf00d</span>)</span>
-<span id="cb5-3">random.shuffle(ind)</span>
-<span id="cb5-4">ind <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> ind[:<span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">55000</span>]</span></code></pre></div>
-</div>
-<div id="cell-6" class="cell" data-execution_count="4">
-<div class="sourceCode cell-code" id="cb6" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb6-1">ms <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> []</span>
-<span id="cb6-2"><span class="cf" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">for</span> x <span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">in</span> ind:</span>
-<span id="cb6-3">    m <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> Chem.MolFromSmiles(x[<span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">0</span>])</span>
-<span id="cb6-4">    <span class="cf" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">if</span> m <span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">is</span> <span class="va" style="color: #111111;
-background-color: null;
-font-style: inherit;">None</span>:</span>
-<span id="cb6-5">        <span class="cf" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">continue</span></span>
-<span id="cb6-6">    ms.append(m)</span>
-<span id="cb6-7">    <span class="cf" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">if</span> <span class="bu" style="color: null;
-background-color: null;
-font-style: inherit;">len</span>(ms)<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">==</span><span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">50000</span>:</span>
-<span id="cb6-8">        <span class="cf" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">break</span></span></code></pre></div>
-<div class="cell-output cell-output-stderr">
-<pre><code>[09:46:30] Explicit valence for atom # 34 Cl, 4, is greater than permitted
-[09:46:41] Explicit valence for atom # 29 Cl, 4, is greater than permitted</code></pre>
-</div>
-</div>
-<p>Let’s get RDKit-generated representations of the molecules: - A molecule’s <code>ToBinary()</code> method returns a serialized form of the molecule that can be saved and then later efficiently converted back into a molecule. I typically call this the “pickled” form of the molecule because it’s what python’s <code>pickle</code> machinery uses (though if you actually pickle molecules they are a big larger and take a bit longer to restore). - RDKit SMILES - The RDKit’s JSON format. This is derived from Matt Swain’s <a href="https://github.com/CommonChem/CommonChem">commonchem</a>.</p>
-<div id="cell-8" class="cell" data-execution_count="5">
-<div class="sourceCode cell-code" id="cb8" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb8-1">pkls <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> [x.ToBinary() <span class="cf" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">for</span> x <span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">in</span> ms]</span></code></pre></div>
-</div>
-<div id="cell-9" class="cell" data-execution_count="6">
-<div class="sourceCode cell-code" id="cb9" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb9-1">smis <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> [Chem.MolToSmiles(x) <span class="cf" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">for</span> x <span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">in</span> ms]</span></code></pre></div>
-</div>
-<div id="cell-10" class="cell" data-execution_count="7">
-<div class="sourceCode cell-code" id="cb10" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb10-1">jsons <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> [Chem.MolToJSON(x) <span class="cf" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">for</span> x <span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">in</span> ms]</span></code></pre></div>
-</div>
-</section>
-<section id="timing-of-standard-parsing" class="level2">
-<h2 class="anchored" data-anchor-id="timing-of-standard-parsing">Timing of standard parsing</h2>
-<p>How long does it take to generate the molecules from SMILES?</p>
-<div id="cell-12" class="cell" data-execution_count="8">
-<div class="sourceCode cell-code" id="cb11" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb11-1"><span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">%</span>timeit [Chem.MolFromSmiles(x) <span class="cf" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">for</span> x <span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">in</span> smis]</span></code></pre></div>
-<div class="cell-output cell-output-stdout">
-<pre><code>14.6 s ± 316 ms per loop (mean ± std. dev. of 7 runs, 1 loop each)</code></pre>
-</div>
-</div>
-<p>And from the binary format?</p>
-<div id="cell-14" class="cell" data-execution_count="9">
-<div class="sourceCode cell-code" id="cb13" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb13-1"><span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">%</span>timeit [Chem.Mol(x) <span class="cf" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">for</span> x <span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">in</span> pkls]</span></code></pre></div>
-<div class="cell-output cell-output-stdout">
-<pre><code>2.14 s ± 116 ms per loop (mean ± std. dev. of 7 runs, 1 loop each)</code></pre>
-</div>
-</div>
-<div id="cell-15" class="cell" data-execution_count="10">
-<div class="sourceCode cell-code" id="cb15" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb15-1"><span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">%</span>timeit [Chem.JSONToMols(x)[<span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">0</span>] <span class="cf" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">for</span> x <span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">in</span> jsons]</span></code></pre></div>
-<div class="cell-output cell-output-stdout">
-<pre><code>4.69 s ± 334 ms per loop (mean ± std. dev. of 7 runs, 1 loop each)</code></pre>
-</div>
-</div>
-<p>That dramatic difference between SMILES and pickles isn’t really that surprising given that the binary format was designed to be easy to read in and that no chemistry perception needs to be done. The JSON format also avoids chemistry perception (all computed properties we need are stored in the JSON), but it does require some work to parse.</p>
-<p>So the binary format is really efficient, but it’s not human readable and it’s only useable with the RDKit. It would be cool to be able to take advantage of the portability and readability of SMILES but to have the processing not take quite so long.</p>
-<p>As an aside: another benefit of using SMILES, for at least some applications, is that they are an order of magnitude smaller than the binary format. The JSON format is even bigger, more than three times as big as the pickles:</p>
-<div id="cell-18" class="cell" data-execution_count="11">
-<div class="sourceCode cell-code" id="cb17" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb17-1"><span class="bu" style="color: null;
-background-color: null;
-font-style: inherit;">print</span>(<span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">"binary:"</span>,<span class="bu" style="color: null;
-background-color: null;
-font-style: inherit;">sum</span>(<span class="bu" style="color: null;
-background-color: null;
-font-style: inherit;">len</span>(x) <span class="cf" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">for</span> x <span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">in</span> pkls))</span>
-<span id="cb17-2"><span class="bu" style="color: null;
-background-color: null;
-font-style: inherit;">print</span>(<span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">"smiles:"</span>,<span class="bu" style="color: null;
-background-color: null;
-font-style: inherit;">sum</span>(<span class="bu" style="color: null;
-background-color: null;
-font-style: inherit;">len</span>(x) <span class="cf" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">for</span> x <span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">in</span> smis))</span>
-<span id="cb17-3"><span class="bu" style="color: null;
-background-color: null;
-font-style: inherit;">print</span>(<span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">"JSON:"</span>,<span class="bu" style="color: null;
-background-color: null;
-font-style: inherit;">sum</span>(<span class="bu" style="color: null;
-background-color: null;
-font-style: inherit;">len</span>(x) <span class="cf" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">for</span> x <span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">in</span> jsons))</span></code></pre></div>
-<div class="cell-output cell-output-stdout">
-<pre><code>binary: 22808200
-smiles: 3029652
-JSON: 78812598</code></pre>
-</div>
-</div>
-<p>Turning off the sanitization and chemistry perception when parsing from the SMILES makes a dramatic difference in processing time:</p>
-<div id="cell-20" class="cell" data-execution_count="12">
-<div class="sourceCode cell-code" id="cb19" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb19-1"><span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">%</span>timeit [Chem.MolFromSmiles(x,sanitize<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span><span class="va" style="color: #111111;
-background-color: null;
-font-style: inherit;">False</span>) <span class="cf" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">for</span> x <span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">in</span> smis]</span></code></pre></div>
-<div class="cell-output cell-output-stdout">
-<pre><code>3.04 s ± 108 ms per loop (mean ± std. dev. of 7 runs, 1 loop each)</code></pre>
-</div>
-</div>
-<p>Unfortunately, with no sanitization at all done, these molecules aren’t that useful in many of the RDKit algorithms.</p>
-</section>
-<section id="partial-sanitization" class="level2">
-<h2 class="anchored" data-anchor-id="partial-sanitization">Partial sanitization</h2>
-<p>One of the standard operations done on reading molecules from SMILES is a call to the stereochemistry assignment code, which also removes redundant or extraneous stereochemistry specifications. This can be computationally expensive and most likely not needed when reading from an RDKit-generated canonical SMILES since that already has had incorrect or redundant specifications removed.</p>
-<p>Let’s see how long it takes if we skip that part (which is part of the call to <code>MolFromSmiles()</code>). We’ll make one other change here and also skip the various cleanup operations the RDKit does by default to fix problematic substructures during sanitization:</p>
-<div id="cell-24" class="cell" data-execution_count="13">
-<div class="sourceCode cell-code" id="cb21" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb21-1"><span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">def</span> partialSanit1(smi):</span>
-<span id="cb21-2">    m <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> Chem.MolFromSmiles(smi,sanitize<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span><span class="va" style="color: #111111;
-background-color: null;
-font-style: inherit;">False</span>)</span>
-<span id="cb21-3">    Chem.SanitizeMol(m,sanitizeOps<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span>Chem.SANITIZE_ALL<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">^</span>Chem.SANITIZE_CLEANUP<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">^\</span></span>
-<span id="cb21-4">                     Chem.SANITIZE_CLEANUPCHIRALITY<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">^</span>Chem.SANITIZE_CLEANUPATROPISOMERS<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">^</span>Chem.SANITIZE_CLEANUP_ORGANOMETALLICS)</span>
-<span id="cb21-5">    <span class="cf" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">return</span> m</span></code></pre></div>
-</div>
-<div id="cell-25" class="cell" data-execution_count="14">
-<div class="sourceCode cell-code" id="cb22" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb22-1"><span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">%</span>timeit [partialSanit1(x) <span class="cf" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">for</span> x <span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">in</span> smis]</span></code></pre></div>
-<div class="cell-output cell-output-stdout">
-<pre><code>9.91 s ± 259 ms per loop (mean ± std. dev. of 7 runs, 1 loop each)</code></pre>
-</div>
-</div>
-<p>That’s a solid reduction over the 14.6 seconds originally required, but is still a long way off the 3.0 seconds for the completely unsanitized version.</p>
-<p>Since the RDKit SMILES contains information about aromaticity, we can also skip the kekulization and aromatization steps of the sanitization:</p>
-<div id="cell-27" class="cell" data-execution_count="15">
-<div class="sourceCode cell-code" id="cb24" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb24-1"><span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">def</span> partialSanit2(smi):</span>
-<span id="cb24-2">    m <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> Chem.MolFromSmiles(smi,sanitize<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span><span class="va" style="color: #111111;
-background-color: null;
-font-style: inherit;">False</span>)</span>
-<span id="cb24-3">    Chem.SanitizeMol(m,sanitizeOps<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span>Chem.SANITIZE_ALL<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">^</span>Chem.SANITIZE_CLEANUP<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">^\</span></span>
-<span id="cb24-4">                     Chem.SANITIZE_CLEANUPCHIRALITY<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">^</span>Chem.SANITIZE_CLEANUPATROPISOMERS<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">^</span>Chem.SANITIZE_CLEANUP_ORGANOMETALLICS<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">^\</span></span>
-<span id="cb24-5">                     Chem.SANITIZE_KEKULIZE<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">^</span>Chem.SANITIZE_SETAROMATICITY)</span>
-<span id="cb24-6">    <span class="cf" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">return</span> m</span></code></pre></div>
-</div>
-<div id="cell-28" class="cell" data-execution_count="16">
-<div class="sourceCode cell-code" id="cb25" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb25-1"><span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">%</span>timeit [partialSanit2(x) <span class="cf" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">for</span> x <span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">in</span> smis]</span></code></pre></div>
-<div class="cell-output cell-output-stdout">
-<pre><code>7.66 s ± 154 ms per loop (mean ± std. dev. of 7 runs, 1 loop each)</code></pre>
-</div>
-</div>
-<p>Even better.</p>
-<p>We are still calling the ring-finding code, and sometimes we don’t need information about rings (for example, all substructure queries from SMILES and many queries from SMILES), so what if we skip that?</p>
-<div id="cell-30" class="cell" data-execution_count="17">
-<div class="sourceCode cell-code" id="cb27" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb27-1"><span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">def</span> partialSanit3(smi):</span>
-<span id="cb27-2">    m <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> Chem.MolFromSmiles(smi,sanitize<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span><span class="va" style="color: #111111;
-background-color: null;
-font-style: inherit;">False</span>)</span>
-<span id="cb27-3">    Chem.SanitizeMol(m,sanitizeOps<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span>Chem.SANITIZE_ALL<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">^</span>Chem.SANITIZE_CLEANUP<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">^\</span></span>
-<span id="cb27-4">                     Chem.SANITIZE_CLEANUPCHIRALITY<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">^</span>Chem.SANITIZE_CLEANUPATROPISOMERS<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">^</span>Chem.SANITIZE_CLEANUP_ORGANOMETALLICS<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">^\</span></span>
-<span id="cb27-5">                     Chem.SANITIZE_KEKULIZE<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">^</span>Chem.SANITIZE_SETAROMATICITY<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">^\</span></span>
-<span id="cb27-6">                     Chem.SANITIZE_SYMMRINGS)</span>
-<span id="cb27-7">    <span class="cf" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">return</span> m</span></code></pre></div>
-</div>
-<div id="cell-31" class="cell" data-execution_count="18">
-<div class="sourceCode cell-code" id="cb28" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb28-1"><span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">%</span>timeit [partialSanit3(x) <span class="cf" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">for</span> x <span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">in</span> smis]</span></code></pre></div>
-<div class="cell-output cell-output-stdout">
-<pre><code>5.11 s ± 233 ms per loop (mean ± std. dev. of 7 runs, 1 loop each)</code></pre>
-</div>
-</div>
-<p>If we’re just concerned about doing substructure searches or generating RDKit fingerprints, this is still doing some extra work. Let’s go to the bare minimum of sanitization: only updating the explicit and implicit valences of the atoms. Here it’s less typing to just call the one function we need:</p>
-<div id="cell-33" class="cell" data-execution_count="19">
-<div class="sourceCode cell-code" id="cb30" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb30-1"><span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">def</span> partialSanit4(smi):</span>
-<span id="cb30-2">    m <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> Chem.MolFromSmiles(smi,sanitize<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span><span class="va" style="color: #111111;
-background-color: null;
-font-style: inherit;">False</span>)</span>
-<span id="cb30-3">    m.UpdatePropertyCache()</span>
-<span id="cb30-4">    <span class="cf" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">return</span> m</span></code></pre></div>
-</div>
-<div id="cell-34" class="cell" data-execution_count="20">
-<div class="sourceCode cell-code" id="cb31" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb31-1"><span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">%</span>timeit [partialSanit4(x) <span class="cf" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">for</span> x <span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">in</span> smis]</span></code></pre></div>
-<div class="cell-output cell-output-stdout">
-<pre><code>3.34 s ± 133 ms per loop (mean ± std. dev. of 7 runs, 1 loop each)</code></pre>
-</div>
-</div>
-<p>That’s pretty fast, and those molecules are actually useful for many, many calculations.</p>
-<p>We can add some ring information by calling <code>FastFindRings()</code>. This algorithm provides reliable information about whether or not atoms or bonds are in rings - and so can help with basic ring-membership queries on atoms and bonds in SMARTS or for generating Pattern fingerprints or standard Morgan fingerprints- but doesn’t help with the number of smallest rings that an atom/bond is in.</p>
-<div id="cell-36" class="cell" data-execution_count="21">
-<div class="sourceCode cell-code" id="cb33" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb33-1"><span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">def</span> partialSanit5(smi):</span>
-<span id="cb33-2">    m <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> Chem.MolFromSmiles(smi,sanitize<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span><span class="va" style="color: #111111;
-background-color: null;
-font-style: inherit;">False</span>)</span>
-<span id="cb33-3">    m.UpdatePropertyCache()</span>
-<span id="cb33-4">    Chem.FastFindRings(m)</span>
-<span id="cb33-5">    <span class="cf" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">return</span> m</span></code></pre></div>
-</div>
-<div id="cell-37" class="cell" data-execution_count="22">
-<div class="sourceCode cell-code" id="cb34" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb34-1"><span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">%</span>timeit [partialSanit5(x) <span class="cf" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">for</span> x <span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">in</span> smis]</span></code></pre></div>
-<div class="cell-output cell-output-stdout">
-<pre><code>4.08 s ± 86.7 ms per loop (mean ± std. dev. of 7 runs, 1 loop each)</code></pre>
-</div>
-</div>
-<p>I think those last two are pretty good. By thinking about the information we need and starting from a reliable SMILES (I often call these “trusted SMILES”) we can get molecules that are useful for many RDKit operations much more quickly than the default.</p>
-
-
-</section>
-
- ]]></description>
-  <category>tutorial</category>
-  <category>optimization</category>
-  <guid>https://greglandrum.github.io/rdkit-blog/posts/2025-05-01-constructing-molecules-more-quickly.html</guid>
-  <pubDate>Wed, 30 Apr 2025 22:00:00 GMT</pubDate>
 </item>
 </channel>
 </rss>
