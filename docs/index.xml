@@ -10,7 +10,302 @@
 <atom:link href="https://greglandrum.github.io/rdkit-blog/index.xml" rel="self" type="application/rss+xml"/>
 <description>RDKit experiments, tips, and tutorials</description>
 <generator>quarto-1.6.43</generator>
-<lastBuildDate>Thu, 25 Sep 2025 22:00:00 GMT</lastBuildDate>
+<lastBuildDate>Fri, 03 Oct 2025 22:00:00 GMT</lastBuildDate>
+<item>
+  <title>Rendering intramolecular H bonds in 2D</title>
+  <link>https://greglandrum.github.io/rdkit-blog/posts/2025-10-04-rendering-intramolecular-h-bonds.html</link>
+  <description><![CDATA[ 
+
+
+
+
+<p>I had the idea for this short post while working on last week’s post about <a href="https://greglandrum.github.io/rdkit-blog/posts/2025-09-26-drawing-interactions-1.html">drawing simple protein–ligand interaction diagrams</a>. It shows a quick way to force the RDKit’s 2D coordinate generator to put non-bonded atoms close to each other in a drawing. I use the examples of rendering intramolecular H bonds and chelators.</p>
+<div id="c54c234f-5563-49a7-afca-db59ed7ade39" class="cell" data-execution_count="1">
+<div class="sourceCode cell-code" id="cb1" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb1-1"><span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">from</span> rdkit <span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">import</span> Chem</span>
+<span id="cb1-2"><span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">from</span> rdkit.Chem.Draw <span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">import</span> IPythonConsole</span>
+<span id="cb1-3"><span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">from</span> rdkit.Chem <span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">import</span> Draw</span>
+<span id="cb1-4"><span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">from</span> rdkit.Chem <span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">import</span> rdDepictor</span></code></pre></div>
+</div>
+<div id="070c2de1-feaf-4ac6-a63e-4d54108555be" class="cell" data-execution_count="2">
+<div class="sourceCode cell-code" id="cb2" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb2-1">IPythonConsole.drawOptions.addAtomIndices <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> <span class="va" style="color: #111111;
+background-color: null;
+font-style: inherit;">True</span></span>
+<span id="cb2-2">IPythonConsole.molSize <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> <span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">350</span>,<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">300</span></span></code></pre></div>
+</div>
+<p>Let’s start with a simple molecule that forms intramolecular hydrogen bonds, malonaldehyde (I also used this as the example in the blog post on <a href="https://greglandrum.github.io/rdkit-blog/posts/2024-07-28-confgen-and-intramolecular-hbonds.html">generating 3D conformers which include intramolecular H bonds</a>).</p>
+<p>The 2D coordinate generation code generates an extended 2D conformer for malonaldehyde:</p>
+<div id="5b8b871e-2201-492e-9e90-08c08f7bb7d8" class="cell" data-execution_count="3">
+<div class="sourceCode cell-code" id="cb3" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb3-1">m <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> Chem.MolFromSmiles(<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'O=CCCO'</span>)</span>
+<span id="cb3-2">m</span></code></pre></div>
+<div class="cell-output cell-output-display" data-execution_count="3">
+<div>
+<figure class="figure">
+<p><img src="https://greglandrum.github.io/rdkit-blog/posts/2025-10-04-rendering-intramolecular-h-bonds_files/figure-html/cell-4-output-1.png" class="img-fluid figure-img"></p>
+</figure>
+</div>
+</div>
+</div>
+<p>This type of extended conformer looks completely reasonable and is, for most molecules, almost certainly the right way to draw chains, but in this case I want to actually show the H bond.</p>
+<p>To do so, I start by adding the H which will be involved in the H bond to the molecule:</p>
+<div id="8a40158a-4ba9-442f-b477-3145bddb9926" class="cell" data-execution_count="18">
+<div class="sourceCode cell-code" id="cb4" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb4-1">m2 <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> Chem.RWMol(m)</span>
+<span id="cb4-2">aid <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> m2.AddAtom(Chem.Atom(<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">1</span>))</span>
+<span id="cb4-3">m2.AddBond(<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">4</span>,aid,Chem.BondType.SINGLE)</span>
+<span id="cb4-4">m2</span></code></pre></div>
+<div class="cell-output cell-output-display" data-execution_count="18">
+<div>
+<figure class="figure">
+<p><img src="https://greglandrum.github.io/rdkit-blog/posts/2025-10-04-rendering-intramolecular-h-bonds_files/figure-html/cell-5-output-1.png" class="img-fluid figure-img"></p>
+</figure>
+</div>
+</div>
+</div>
+<p>We still have an extended conformer. I can force this to change by doing something non-physical and adding a single bond between the H and O0:</p>
+<div id="2bfbe7c9" class="cell" data-execution_count="19">
+<div class="sourceCode cell-code" id="cb5" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb5-1">bid1 <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> m2.AddBond(<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">0</span>,aid,Chem.BondType.SINGLE)</span>
+<span id="cb5-2">m2</span></code></pre></div>
+<div class="cell-output cell-output-display" data-execution_count="19">
+<div>
+<figure class="figure">
+<p><img src="https://greglandrum.github.io/rdkit-blog/posts/2025-10-04-rendering-intramolecular-h-bonds_files/figure-html/cell-6-output-1.png" class="img-fluid figure-img"></p>
+</figure>
+</div>
+</div>
+</div>
+<p>That has the coordinates I wanted, but having the H bond drawn as a single bond is definitely not desirable.</p>
+<p>To solve this I’m going to explicitly generate the coordinates for the molecule with the single bond present (instead of relying up on the notebook code to generate a temporary set of coordinates), then remove the single bond and render the molecule:</p>
+<div id="9fdad754" class="cell" data-execution_count="20">
+<div class="sourceCode cell-code" id="cb6" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb6-1">rdDepictor.Compute2DCoords(m2)</span>
+<span id="cb6-2">m2.RemoveBond(<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">0</span>,aid)</span>
+<span id="cb6-3">m2</span></code></pre></div>
+<div class="cell-output cell-output-display" data-execution_count="20">
+<div>
+<figure class="figure">
+<p><img src="https://greglandrum.github.io/rdkit-blog/posts/2025-10-04-rendering-intramolecular-h-bonds_files/figure-html/cell-7-output-1.png" class="img-fluid figure-img"></p>
+</figure>
+</div>
+</div>
+</div>
+<p>That’s what I was looking for.</p>
+<p>If I want to actually include the H bond in the drawing in a way that won’t make chemists cringe, I can add a hydrogen bond:</p>
+<div id="d83d7b9a-b770-45b4-b365-8c1efd4cc325" class="cell" data-scrolled="true" data-execution_count="21">
+<div class="sourceCode cell-code" id="cb7" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb7-1">bid1 <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> m2.AddBond(<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">0</span>,aid,Chem.BondType.HYDROGEN)</span>
+<span id="cb7-2">m2</span></code></pre></div>
+<div class="cell-output cell-output-display" data-execution_count="21">
+<div>
+<figure class="figure">
+<p><img src="https://greglandrum.github.io/rdkit-blog/posts/2025-10-04-rendering-intramolecular-h-bonds_files/figure-html/cell-8-output-1.png" class="img-fluid figure-img"></p>
+</figure>
+</div>
+</div>
+</div>
+<p>Note that simply adding the hydrogen bond to start with would not have worked since zero-order bonds are not included in the RDKit’s ring-finding code by default:</p>
+<div id="91026155-f773-48ab-ad0e-2445247e0659" class="cell" data-execution_count="22">
+<div class="sourceCode cell-code" id="cb8" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb8-1">m3 <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> Chem.RWMol(m)</span>
+<span id="cb8-2">aid <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> m3.AddAtom(Chem.Atom(<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">1</span>))</span>
+<span id="cb8-3">m3.AddBond(<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">4</span>,aid,Chem.BondType.SINGLE)</span>
+<span id="cb8-4">m3.AddBond(<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">0</span>,aid,Chem.BondType.HYDROGEN)</span>
+<span id="cb8-5">m3</span></code></pre></div>
+<div class="cell-output cell-output-display" data-execution_count="22">
+<div>
+<figure class="figure">
+<p><img src="https://greglandrum.github.io/rdkit-blog/posts/2025-10-04-rendering-intramolecular-h-bonds_files/figure-html/cell-9-output-1.png" class="img-fluid figure-img"></p>
+</figure>
+</div>
+</div>
+</div>
+<p>Here’s a more complex molecule where I want to show two intramolecular H bonds:</p>
+<div id="91fe8bef-5c53-47de-809b-d5287d498519" class="cell" data-execution_count="23">
+<div class="sourceCode cell-code" id="cb9" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb9-1">m <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> Chem.MolFromSmiles(<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'c1cccc(C(=O)OC)c1NC(=O)C1CCCCC1(=O)'</span>)</span>
+<span id="cb9-2">m</span></code></pre></div>
+<div class="cell-output cell-output-display" data-execution_count="23">
+<div>
+<figure class="figure">
+<p><img src="https://greglandrum.github.io/rdkit-blog/posts/2025-10-04-rendering-intramolecular-h-bonds_files/figure-html/cell-10-output-1.png" class="img-fluid figure-img"></p>
+</figure>
+</div>
+</div>
+</div>
+<p>In this case I would like to indicate H bonds between the H on N10 and O6 as well as the H on C0 and O12.</p>
+<div id="4e1d8519-acef-4610-ab26-b882036cffc1" class="cell" data-execution_count="26">
+<div class="sourceCode cell-code" id="cb10" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb10-1"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># Add the Hs:</span></span>
+<span id="cb10-2">m2 <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> Chem.RWMol(m)</span>
+<span id="cb10-3">aid1 <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> m2.AddAtom(Chem.Atom(<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">1</span>))</span>
+<span id="cb10-4">m2.AddBond(<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">0</span>,aid1,Chem.BondType.SINGLE)</span>
+<span id="cb10-5">aid2 <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> m2.AddAtom(Chem.Atom(<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">1</span>))</span>
+<span id="cb10-6">m2.AddBond(<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">10</span>,aid2,Chem.BondType.SINGLE)</span>
+<span id="cb10-7"></span>
+<span id="cb10-8"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># Add single bonds for the intramolecular H bonds:</span></span>
+<span id="cb10-9">bid1 <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> m2.AddBond(aid1,<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">12</span>,Chem.BondType.SINGLE)</span>
+<span id="cb10-10">bid2 <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> m2.AddBond(aid2,<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">6</span>,Chem.BondType.SINGLE)</span>
+<span id="cb10-11"></span>
+<span id="cb10-12"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># generate coordinates:</span></span>
+<span id="cb10-13">rdDepictor.Compute2DCoords(m2)</span>
+<span id="cb10-14"></span>
+<span id="cb10-15"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># convert to H bonds:</span></span>
+<span id="cb10-16">m2.GetBondWithIdx(bid1<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">-</span><span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">1</span>).SetBondType(Chem.BondType.HYDROGEN)</span>
+<span id="cb10-17">m2.GetBondWithIdx(bid2<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">-</span><span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">1</span>).SetBondType(Chem.BondType.HYDROGEN)</span>
+<span id="cb10-18"></span>
+<span id="cb10-19">m2</span></code></pre></div>
+<div class="cell-output cell-output-display" data-execution_count="26">
+<div>
+<figure class="figure">
+<p><img src="https://greglandrum.github.io/rdkit-blog/posts/2025-10-04-rendering-intramolecular-h-bonds_files/figure-html/cell-11-output-1.png" class="img-fluid figure-img"></p>
+</figure>
+</div>
+</div>
+</div>
+<p>We can use a similar trick to get conformers of chelators that have the chelating atoms in the expected geometry.</p>
+<div id="5ebae17a" class="cell" data-execution_count="35">
+<div class="sourceCode cell-code" id="cb11" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb11-1">m <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> Chem.MolFromSmiles(<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'NCCN'</span>)</span>
+<span id="cb11-2">m</span></code></pre></div>
+<div class="cell-output cell-output-display" data-execution_count="35">
+<div>
+<figure class="figure">
+<p><img src="https://greglandrum.github.io/rdkit-blog/posts/2025-10-04-rendering-intramolecular-h-bonds_files/figure-html/cell-12-output-1.png" class="img-fluid figure-img"></p>
+</figure>
+</div>
+</div>
+</div>
+<p>This time I’m going to add an extra atom (to stand in for the atom which will eventually be chelated), form bonds to that, and then remove that atom after generating 2D coordinates:</p>
+<div id="506c1ba0" class="cell" data-execution_count="36">
+<div class="sourceCode cell-code" id="cb12" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb12-1">m2 <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> Chem.RWMol(m)</span>
+<span id="cb12-2">aid <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> m2.AddAtom(Chem.Atom(<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">0</span>))</span>
+<span id="cb12-3">m2.AddBond(<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">0</span>,aid,Chem.BondType.SINGLE)</span>
+<span id="cb12-4">m2.AddBond(<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">3</span>,aid,Chem.BondType.SINGLE)</span>
+<span id="cb12-5">rdDepictor.Compute2DCoords(m2)</span>
+<span id="cb12-6">m2.RemoveAtom(aid)</span>
+<span id="cb12-7">m2</span></code></pre></div>
+<div class="cell-output cell-output-display" data-execution_count="36">
+<div>
+<figure class="figure">
+<p><img src="https://greglandrum.github.io/rdkit-blog/posts/2025-10-04-rendering-intramolecular-h-bonds_files/figure-html/cell-13-output-1.png" class="img-fluid figure-img"></p>
+</figure>
+</div>
+</div>
+</div>
+
+
+
+ ]]></description>
+  <category>drawing</category>
+  <category>exploration</category>
+  <guid>https://greglandrum.github.io/rdkit-blog/posts/2025-10-04-rendering-intramolecular-h-bonds.html</guid>
+  <pubDate>Fri, 03 Oct 2025 22:00:00 GMT</pubDate>
+  <media:content url="https://greglandrum.github.io/rdkit-blog/posts/images/blog/rendering-intramolecular-h-bonds.png" medium="image" type="image/png" height="123" width="144"/>
+</item>
 <item>
   <title>Drawing simple protein–ligand interaction diagrams with the RDKit</title>
   <link>https://greglandrum.github.io/rdkit-blog/posts/2025-09-26-drawing-interactions-1.html</link>
@@ -24140,1370 +24435,6 @@ font-style: inherit;">10</span>]</span></code></pre></div>
   <category>tutorial</category>
   <guid>https://greglandrum.github.io/rdkit-blog/posts/2025-05-17-custom-fingerprints-in-postgresql.html</guid>
   <pubDate>Fri, 16 May 2025 22:00:00 GMT</pubDate>
-</item>
-<item>
-  <title>Common chemical words</title>
-  <link>https://greglandrum.github.io/rdkit-blog/posts/2025-05-09-common-chemical-words-1.html</link>
-  <description><![CDATA[ 
-
-
-
-
-<section id="common-chemical-fragments-1-building-the-dataset" class="level1">
-<h1>Common Chemical Fragments 1: building the dataset</h1>
-<p><strong>Note</strong> this is an extensively revised and updated version of an <a href="https://rdkit.blogspot.com/2016/04/common-chemical-words-1.html">older post</a>.</p>
-<p>I got a copy of <a href="http://www.amazon.com/Thing-Explainer-Complicated-Stuff-Simple/dp/0544668251">Thing Explainer</a> a while ago and I think it’s pure genius (not that surprising from Randall Munroe). With my thinking infected by reading the book, the other day I wondered what the ten hundred most common “chemical words” are.</p>
-<p>After a bit of extremely deep thinking I decided that I would be willing to accept that a “chemical word” is the kind of fragment that comes out of something like BRICS (or RECAP) decomposition of a molecule.</p>
-<p>This post takes that simple idea and applies it to a big database of molecules: the almost 120 million molecules that are in <a href="https://pubchem.ncbi.nlm.nih.gov/docs/compounds">PubChem Compound</a></p>
-<div id="cell-2" class="cell" data-executetime="{&quot;end_time&quot;:&quot;2025-05-09T06:29:01.006773Z&quot;,&quot;start_time&quot;:&quot;2025-05-09T06:29:01.003719Z&quot;}" data-execution_count="75">
-<div class="sourceCode cell-code" id="cb1" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb1-1"><span class="im" style="color: #00769E;
-background-color: null;
-font-style: inherit;">from</span> rdkit <span class="im" style="color: #00769E;
-background-color: null;
-font-style: inherit;">import</span> Chem</span>
-<span id="cb1-2"><span class="im" style="color: #00769E;
-background-color: null;
-font-style: inherit;">from</span> rdkit.Chem <span class="im" style="color: #00769E;
-background-color: null;
-font-style: inherit;">import</span> BRICS</span>
-<span id="cb1-3"><span class="im" style="color: #00769E;
-background-color: null;
-font-style: inherit;">from</span> rdkit.Chem <span class="im" style="color: #00769E;
-background-color: null;
-font-style: inherit;">import</span> Draw</span>
-<span id="cb1-4"><span class="im" style="color: #00769E;
-background-color: null;
-font-style: inherit;">from</span> rdkit.Chem.Draw <span class="im" style="color: #00769E;
-background-color: null;
-font-style: inherit;">import</span> IPythonConsole</span>
-<span id="cb1-5"><span class="im" style="color: #00769E;
-background-color: null;
-font-style: inherit;">import</span> rdkit</span>
-<span id="cb1-6"></span>
-<span id="cb1-7"><span class="im" style="color: #00769E;
-background-color: null;
-font-style: inherit;">from</span> collections <span class="im" style="color: #00769E;
-background-color: null;
-font-style: inherit;">import</span> Counter</span>
-<span id="cb1-8"></span>
-<span id="cb1-9"><span class="im" style="color: #00769E;
-background-color: null;
-font-style: inherit;">from</span> matplotlib <span class="im" style="color: #00769E;
-background-color: null;
-font-style: inherit;">import</span> pyplot <span class="im" style="color: #00769E;
-background-color: null;
-font-style: inherit;">as</span> plt</span>
-<span id="cb1-10"><span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">%</span>matplotlib inline</span>
-<span id="cb1-11"><span class="bu" style="color: null;
-background-color: null;
-font-style: inherit;">print</span>(rdkit.__version__)</span>
-<span id="cb1-12"><span class="im" style="color: #00769E;
-background-color: null;
-font-style: inherit;">import</span> os,time,glob</span>
-<span id="cb1-13"><span class="bu" style="color: null;
-background-color: null;
-font-style: inherit;">print</span>( time.asctime())</span></code></pre></div>
-<div class="cell-output cell-output-stdout">
-<pre><code>2025.03.2
-Fri May  9 15:38:37 2025</code></pre>
-</div>
-</div>
-</section>
-<section id="background-on-brics" class="level1">
-<h1>Background on BRICS</h1>
-<p>Before diving into the analysis, a bit of explanation about BRICS.</p>
-<p>Let’s start with the reference: Degen, J., Wegscheid-Gerlach, C., Zaliani, A. &amp; Rarey, M. “On the Art of Compiling and Using ‘Drug-Like’ Chemical Fragment Spaces”. <em>ChemMedChem</em> <strong>3</strong>:1503–07 (2008).</p>
-<p>The idea is to fragment molecules based on synthetically accessible bonds. Here’s an example starting from a random ZINC molecule, ZINC00002139:</p>
-<div id="cell-4" class="cell" data-execution_count="2">
-<div class="sourceCode cell-code" id="cb3" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb3-1">m <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> Chem.MolFromSmiles(<span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">'CC[NH+](CC)CCOc1ccc(cc1)Cc2ccccc2'</span>)</span>
-<span id="cb3-2">m</span></code></pre></div>
-<div class="cell-output cell-output-display" data-execution_count="2">
-<div>
-<figure class="figure">
-<p><img src="https://greglandrum.github.io/rdkit-blog/posts/2025-05-09-common-chemical-words-1_files/figure-html/cell-3-output-1.png" class="img-fluid figure-img"></p>
-</figure>
-</div>
-</div>
-</div>
-<p>And here are the fragments from doing a BRICS analysis:</p>
-<div id="cell-6" class="cell" data-execution_count="3">
-<div class="sourceCode cell-code" id="cb4" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb4-1">pieces <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> [Chem.MolFromSmiles(x) <span class="cf" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">for</span> x <span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">in</span> BRICS.BRICSDecompose(m)]</span>
-<span id="cb4-2">Draw.MolsToGridImage(pieces,molsPerRow<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span><span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">4</span>)</span></code></pre></div>
-<div class="cell-output cell-output-display" data-execution_count="3">
-<div>
-<figure class="figure">
-<p><img src="https://greglandrum.github.io/rdkit-blog/posts/2025-05-09-common-chemical-words-1_files/figure-html/cell-4-output-1.png" class="img-fluid figure-img"></p>
-</figure>
-</div>
-</div>
-</div>
-<p>The isotope labels on the molecules provide information about the type of bond that was broken and can be used later (using <code>BRICS.BRICSBuild()</code>) to build new molecules. For example, the rules allow a bond to be formed between an atom connected to a <code>[4*]</code> and an atom connected to a <code>[5*]</code>.</p>
-<p>One important characteristic (I hesitate to use “feature” in this context) of the current RDKit BRICS implementation that impacts this analysis is that only unique fragments are returned. So we only get one <code>[4*]CC</code> fragment for that molecule above, even though it appears in the molecule twice.</p>
-<p>So the analysis below is of the most common chemical words, but we only count frequency based on the number of molecules they appear in, not <em>how often</em> they appear in those molecules.</p>
-</section>
-<section id="the-computation" class="level1">
-<h1>The computation</h1>
-<p>Dealing with 120 million molecules takes a long time, so I ran this on the compute cluster at the ETH.</p>
-<p>The script I ran was:</p>
-<pre><code>from rdkit import Chem
-import gzip
-from collections import Counter
-import dbm.sqlite3
-import pickle
-from rdkit.Chem import BRICS
-from rdkit.Chem import rdFingerprintGenerator
-from rdkit import RDLogger
-import traceback
-
-RDLogger.DisableLog('rdApp.*')
-
-
-def process_filename(filename):
-    outname = filename.replace('.sdf.gz', '.pkl.gz')
-    with gzip.open(filename, 'rb') as inf:
-        suppl = Chem.ForwardSDMolSupplier(inf)
-
-        brics_cntr = Counter()
-        fp_cntr = Counter()
-        fpg = rdFingerprintGenerator.GetMorganGenerator(
-            radius=3, includeRedundantEnvironments=True)
-        ao = rdFingerprintGenerator.AdditionalOutput()
-        ao.AllocateBitInfoMap()
-        for m in suppl:
-            if m is None or m.GetNumHeavyAtoms() &gt; 60:
-                continue
-            try:
-                brics_cntr.update(BRICS.BRICSDecompose(m))
-            except:
-                traceback.print_exc()
-            try:
-                fp = fpg.GetSparseCountFingerprint(m, additionalOutput=ao)
-                for k, itms in ao.GetBitInfoMap().items():
-                    for aid, rad in itms:
-                        anum = m.GetAtomWithIdx(aid).GetAtomicNum()
-                        fp_cntr[(k, anum, rad)] += 1
-            except:
-                traceback.print_exc()
-    with gzip.open(outname, 'wb+') as outf:
-        pickle.dump((brics_cntr, fp_cntr), outf)
-
-
-if __name__ == '__main__':
-    import sys
-    if len(sys.argv) != 2:
-        print("Usage: python common_words.py &lt;filename&gt;")
-        sys.exit(1)
-    filename = sys.argv[1]
-    process_filename(filename)</code></pre>
-<p>I downloaded all of the files on the <a href="https://ftp.ncbi.nlm.nih.gov/pubchem/Compound/CURRENT-Full/SDF/">PubChem Compound FTP site</a> and ran this script over all of them. I did the download in the beginning of March 2025.</p>
-</section>
-<section id="initial-workup-of-the-results" class="level1">
-<h1>Initial workup of the results</h1>
-<section id="how-many-unique-fragments-are-there" class="level2">
-<h2 class="anchored" data-anchor-id="how-many-unique-fragments-are-there">How many unique fragments are there?</h2>
-<p>Here we look at the BRICS results. To get this we need to process each of the pickle files and create one giant dictionary:</p>
-<div id="cell-10" class="cell" data-execution_count="11">
-<div class="sourceCode cell-code" id="cb6" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb6-1"><span class="im" style="color: #00769E;
-background-color: null;
-font-style: inherit;">import</span> pickle, gzip</span>
-<span id="cb6-2"></span>
-<span id="cb6-3">infs <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> glob.glob(<span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">'/fileserver/pine/pine1/glandrum/pubchem/Compound/Compound*.pkl.gz'</span>)</span>
-<span id="cb6-4">all_counts <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> Counter()</span>
-<span id="cb6-5"><span class="cf" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">for</span> i,fname <span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">in</span> <span class="bu" style="color: null;
-background-color: null;
-font-style: inherit;">enumerate</span>(infs):</span>
-<span id="cb6-6">    <span class="bu" style="color: null;
-background-color: null;
-font-style: inherit;">print</span>(i<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">+</span><span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">1</span>,fname,<span class="bu" style="color: null;
-background-color: null;
-font-style: inherit;">len</span>(all_counts.keys()))</span>
-<span id="cb6-7">    <span class="cf" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">with</span> gzip.<span class="bu" style="color: null;
-background-color: null;
-font-style: inherit;">open</span>(fname,<span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">'rb'</span>) <span class="im" style="color: #00769E;
-background-color: null;
-font-style: inherit;">as</span> inf:</span>
-<span id="cb6-8">        brics,fps <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> pickle.load(inf)</span>
-<span id="cb6-9">    <span class="cf" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">for</span> key,val <span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">in</span> brics.items():</span>
-<span id="cb6-10">        all_counts[key]<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">+=</span>val</span></code></pre></div>
-<div class="cell-output cell-output-stdout">
-<pre><code>1 /fileserver/pine/pine1/glandrum/pubchem/Compound/Compound_099000001_099500000.pkl.gz 0
-2 /fileserver/pine/pine1/glandrum/pubchem/Compound/Compound_016000001_016500000.pkl.gz 3251
-3 /fileserver/pine/pine1/glandrum/pubchem/Compound/Compound_000000001_000500000.pkl.gz 64482
-4 /fileserver/pine/pine1/glandrum/pubchem/Compound/Compound_016500001_017000000.pkl.gz 239405
-5 /fileserver/pine/pine1/glandrum/pubchem/Compound/Compound_000500001_001000000.pkl.gz 268616
-&lt;snip&gt;
-342 /fileserver/pine/pine1/glandrum/pubchem/Compound/Compound_169000001_169500000.pkl.gz 12495796
-343 /fileserver/pine/pine1/glandrum/pubchem/Compound/Compound_169500001_170000000.pkl.gz 12558993
-344 /fileserver/pine/pine1/glandrum/pubchem/Compound/Compound_170000001_170500000.pkl.gz 12654835
-345 /fileserver/pine/pine1/glandrum/pubchem/Compound/Compound_170500001_171000000.pkl.gz 12737600
-346 /fileserver/pine/pine1/glandrum/pubchem/Compound/Compound_171000001_171500000.pkl.gz 12802580</code></pre>
-</div>
-</div>
-<p>Save that so that we don’t have to repeat the work if we need to use the data again;</p>
-<div id="cell-12" class="cell" data-execution_count="12">
-<div class="sourceCode cell-code" id="cb8" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb8-1"><span class="cf" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">with</span> gzip.<span class="bu" style="color: null;
-background-color: null;
-font-style: inherit;">open</span>(<span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">'../data/chemical_words_pubchem_counts.pkl.gz'</span>,<span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">'wb+'</span>) <span class="im" style="color: #00769E;
-background-color: null;
-font-style: inherit;">as</span> outf:</span>
-<span id="cb8-2">    pickle.dump(all_counts,outf)</span></code></pre></div>
-</div>
-<div id="cell-13" class="cell" data-execution_count="13">
-<div class="sourceCode cell-code" id="cb9" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb9-1">itms <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> <span class="bu" style="color: null;
-background-color: null;
-font-style: inherit;">sorted</span>(((y,x) <span class="cf" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">for</span> x,y <span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">in</span> all_counts.items()),reverse<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span><span class="va" style="color: #111111;
-background-color: null;
-font-style: inherit;">True</span>)</span>
-<span id="cb9-2"><span class="bu" style="color: null;
-background-color: null;
-font-style: inherit;">len</span>(itms)</span></code></pre></div>
-<div class="cell-output cell-output-display" data-execution_count="13">
-<pre><code>12844456</code></pre>
-</div>
-</div>
-<p>So we got 12.8 million unique fragments from the dataset.</p>
-<p>Let’s look at the most and least frequent fragments:</p>
-<div id="cell-15" class="cell" data-execution_count="14">
-<div class="sourceCode cell-code" id="cb11" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb11-1">itms[:<span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">10</span>]</span></code></pre></div>
-<div class="cell-output cell-output-display" data-execution_count="14">
-<pre><code>[(43898772, '[5*]N[5*]'),
- (28006855, '[3*]O[3*]'),
- (23939213, '[1*]C([6*])=O'),
- (22712171, '[4*]C[8*]'),
- (20245516, '[3*]OC'),
- (15796593, '[16*]c1ccccc1'),
- (12147606, '[16*]c1ccc([16*])cc1'),
- (10425580, '[4*]CC'),
- (6985560, '[1*]C([1*])=O'),
- (6860503, '[5*]N([5*])[5*]')]</code></pre>
-</div>
-</div>
-<div id="cell-16" class="cell" data-execution_count="15">
-<div class="sourceCode cell-code" id="cb13" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb13-1">itms[<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">-</span><span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">10</span>:]</span></code></pre></div>
-<div class="cell-output cell-output-display" data-execution_count="15">
-<pre><code>[(1, 'B#C.CC1CCCCC1C'),
- (1, 'B#C.CC.Cc1ccc(C)c(C)c1'),
- (1, 'B#C.CC.CC.CC#CC#CCCC.CCC(C)(C)C'),
- (1, 'B#C'),
- (1, 'B#B.[Ti]'),
- (1, 'B#B.CSC'),
- (1, 'B#B.C1CCOC1'),
- (1, 'B#B.B#B.[Ho]'),
- (1, 'B#B'),
- (1, 'B')]</code></pre>
-</div>
-</div>
-<p>It’s nicer to actually look at the molecules:</p>
-<div id="cell-18" class="cell" data-execution_count="17">
-<div class="sourceCode cell-code" id="cb15" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb15-1">tc,ts <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> <span class="bu" style="color: null;
-background-color: null;
-font-style: inherit;">zip</span>(<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">*</span>itms[:<span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">10</span>])</span>
-<span id="cb15-2">Draw.MolsToGridImage([Chem.MolFromSmiles(x) <span class="cf" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">for</span> x <span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">in</span> ts],molsPerRow<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span><span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">4</span>,legends<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span>[<span class="bu" style="color: null;
-background-color: null;
-font-style: inherit;">str</span>(x) <span class="cf" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">for</span> x <span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">in</span> tc])</span></code></pre></div>
-<div class="cell-output cell-output-display" data-execution_count="17">
-<div>
-<figure class="figure">
-<p><img src="https://greglandrum.github.io/rdkit-blog/posts/2025-05-09-common-chemical-words-1_files/figure-html/cell-10-output-1.png" class="img-fluid figure-img"></p>
-</figure>
-</div>
-</div>
-</div>
-<div id="cell-19" class="cell" data-execution_count="18">
-<div class="sourceCode cell-code" id="cb16" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb16-1">tc,ts <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> <span class="bu" style="color: null;
-background-color: null;
-font-style: inherit;">zip</span>(<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">*</span>itms[<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">-</span><span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">10</span>:])</span>
-<span id="cb16-2">Draw.MolsToGridImage([Chem.MolFromSmiles(x) <span class="cf" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">for</span> x <span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">in</span> ts],molsPerRow<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span><span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">4</span>,legends<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span>[<span class="bu" style="color: null;
-background-color: null;
-font-style: inherit;">str</span>(x) <span class="cf" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">for</span> x <span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">in</span> tc])</span></code></pre></div>
-<div class="cell-output cell-output-display" data-execution_count="18">
-<div>
-<figure class="figure">
-<p><img src="https://greglandrum.github.io/rdkit-blog/posts/2025-05-09-common-chemical-words-1_files/figure-html/cell-11-output-1.png" class="img-fluid figure-img"></p>
-</figure>
-</div>
-</div>
-</div>
-<p>Ew… those aren’t particularly nice. Good thing we won’t be doing much with them.</p>
-<p>Look at the number of times each frequency appears:</p>
-<div id="cell-22" class="cell" data-execution_count="20">
-<div class="sourceCode cell-code" id="cb17" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb17-1"><span class="im" style="color: #00769E;
-background-color: null;
-font-style: inherit;">import</span> math</span>
-<span id="cb17-2"><span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">def</span> summarize(pts,maxCount<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span><span class="fl" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">1e7</span>):</span>
-<span id="cb17-3">    bins<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span>[<span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">0</span>]<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">*</span><span class="bu" style="color: null;
-background-color: null;
-font-style: inherit;">int</span>(math.ceil(math.log10(maxCount)))</span>
-<span id="cb17-4">    <span class="cf" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">for</span> cnt,smi <span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">in</span> itms:</span>
-<span id="cb17-5">        <span class="cf" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">if</span> cnt<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">&gt;</span>maxCount:</span>
-<span id="cb17-6">            bins[<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">-</span><span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">1</span>]<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">+=</span><span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">1</span></span>
-<span id="cb17-7">        <span class="cf" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">else</span>:</span>
-<span id="cb17-8">            bins[<span class="bu" style="color: null;
-background-color: null;
-font-style: inherit;">int</span>(math.floor(math.log10(cnt)))]<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">+=</span><span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">1</span></span>
-<span id="cb17-9">    <span class="cf" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">return</span> bins</span>
-<span id="cb17-10">bins<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span>summarize(itms)</span></code></pre></div>
-</div>
-<div id="cell-23" class="cell" data-execution_count="22">
-<div class="sourceCode cell-code" id="cb18" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb18-1">plt.figure(figsize<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span>(<span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">6</span>,<span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">6</span>))</span>
-<span id="cb18-2">plt.scatter(<span class="bu" style="color: null;
-background-color: null;
-font-style: inherit;">list</span>(<span class="bu" style="color: null;
-background-color: null;
-font-style: inherit;">range</span>(<span class="bu" style="color: null;
-background-color: null;
-font-style: inherit;">len</span>(bins))),bins,lw<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span><span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">0</span>)</span>
-<span id="cb18-3">plt.yscale(<span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">'log'</span>)</span>
-<span id="cb18-4">plt.xlabel(<span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">'log10(freq)'</span>)</span>
-<span id="cb18-5">plt.ylabel(<span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">'count'</span>)<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">;</span></span></code></pre></div>
-<div class="cell-output cell-output-display">
-<div>
-<figure class="figure">
-<p><img src="https://greglandrum.github.io/rdkit-blog/posts/2025-05-09-common-chemical-words-1_files/figure-html/cell-13-output-1.png" class="img-fluid figure-img"></p>
-</figure>
-</div>
-</div>
-</div>
-<p><a href="https://en.wikipedia.org/wiki/Log%E2%80%93log_plot">The wikipedia says</a> I’m not supposed to call that a power-law distribution, so I’ll go with “power-law-like”. Is that a thing?</p>
-<p>Let’s clean up the data a little bit: remove molecules without attachment points and then get rid of the isomeric markers that describe what type of bond was broken:</p>
-<div id="cell-25" class="cell" data-execution_count="24">
-<div class="sourceCode cell-code" id="cb19" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb19-1"><span class="im" style="color: #00769E;
-background-color: null;
-font-style: inherit;">import</span> re</span>
-<span id="cb19-2">expr <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> re.<span class="bu" style="color: null;
-background-color: null;
-font-style: inherit;">compile</span>(<span class="vs" style="color: #20794D;
-background-color: null;
-font-style: inherit;">r'[0-9]+\*'</span>)</span>
-<span id="cb19-3">clean_counts <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> Counter()</span>
-<span id="cb19-4">nRejected<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span><span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">0</span></span>
-<span id="cb19-5"><span class="cf" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">for</span> k,v <span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">in</span> all_counts.items():</span>
-<span id="cb19-6">    <span class="cf" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">if</span> k.find(<span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">'*'</span>)<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">&lt;</span><span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">0</span>:</span>
-<span id="cb19-7">        nRejected <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">+=</span><span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">1</span></span>
-<span id="cb19-8">        <span class="cf" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">continue</span></span>
-<span id="cb19-9">    k <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> expr.sub(<span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">'*'</span>,k)</span>
-<span id="cb19-10">    clean_counts[k]<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">+=</span>v</span></code></pre></div>
-</div>
-<div id="cell-26" class="cell" data-execution_count="25">
-<div class="sourceCode cell-code" id="cb20" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb20-1">clean_itms <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> <span class="bu" style="color: null;
-background-color: null;
-font-style: inherit;">sorted</span>([(v,k) <span class="cf" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">for</span> k,v <span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">in</span> clean_counts.items()],reverse<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span><span class="va" style="color: #111111;
-background-color: null;
-font-style: inherit;">True</span>)</span>
-<span id="cb20-2"><span class="bu" style="color: null;
-background-color: null;
-font-style: inherit;">print</span>(<span class="bu" style="color: null;
-background-color: null;
-font-style: inherit;">len</span>(clean_itms))</span>
-<span id="cb20-3">clean_itms[:<span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">10</span>]</span></code></pre></div>
-<div class="cell-output cell-output-stdout">
-<pre><code>7489755</code></pre>
-</div>
-<div class="cell-output cell-output-display" data-execution_count="25">
-<pre><code>[(43898772, '[*]N[*]'),
- (32071817, '[*]C[*]'),
- (31711137, '[*]C([*])=O'),
- (28006855, '[*]O[*]'),
- (20245516, '[*]OC'),
- (15883682, '[*]CC'),
- (15796593, '[*]c1ccccc1'),
- (12147606, '[*]c1ccc([*])cc1'),
- (11640436, '[*]C(=O)C[*]'),
- (9657106, '[*]CC[*]')]</code></pre>
-</div>
-</div>
-<p>Most frequent fragments:</p>
-<div id="cell-28" class="cell" data-execution_count="26">
-<div class="sourceCode cell-code" id="cb23" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb23-1">tc,ts <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> <span class="bu" style="color: null;
-background-color: null;
-font-style: inherit;">zip</span>(<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">*</span>clean_itms[:<span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">10</span>])</span>
-<span id="cb23-2">Draw.MolsToGridImage([Chem.MolFromSmiles(x) <span class="cf" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">for</span> x <span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">in</span> ts],molsPerRow<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span><span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">4</span>,legends<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span>[<span class="bu" style="color: null;
-background-color: null;
-font-style: inherit;">str</span>(x) <span class="cf" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">for</span> x <span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">in</span> tc])</span></code></pre></div>
-<div class="cell-output cell-output-display" data-execution_count="26">
-<div>
-<figure class="figure">
-<p><img src="https://greglandrum.github.io/rdkit-blog/posts/2025-05-09-common-chemical-words-1_files/figure-html/cell-16-output-1.png" class="img-fluid figure-img"></p>
-</figure>
-</div>
-</div>
-</div>
-<p>Least frequent:</p>
-<div id="cell-30" class="cell" data-execution_count="27">
-<div class="sourceCode cell-code" id="cb24" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb24-1">clean_itms[<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">-</span><span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">10</span>:]</span></code></pre></div>
-<div class="cell-output cell-output-display" data-execution_count="27">
-<pre><code>[(1, '[*]/C(=[O+]/[H])C(C)CCC([*])=O'),
- (1, '[*]/C(=[O+]/[H])C(C)CC(C)C'),
- (1, '[*]/C(=[O+]/[H])C(C)CC(C)(C)C'),
- (1, '[*]/C(=[O+]/[H])C(C)C/C([*])=[O+]/[H]'),
- (1, '[*]/C(=[O+]/[H])C(C)C(C)C'),
- (1, '[*]/C(=[O+]/[H])C(C)/C([*])=[O+]/[H]'),
- (1, '[*]/C(=[O+]/[H])C(C)(CC(C)(C)C)C(C)(C)C'),
- (1, '[*]/C(=[O+]/[H])C(C)(C)C(C)(N)N'),
- (1, '[*]/C(=[O+]/[H])C(C(C)=O)C(F)F'),
- (1, '[*]/C(=[O+]/[H])C(=C)C(F)(F)F')]</code></pre>
-</div>
-</div>
-<div id="cell-31" class="cell" data-execution_count="28">
-<div class="sourceCode cell-code" id="cb26" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb26-1">tc,ts <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> <span class="bu" style="color: null;
-background-color: null;
-font-style: inherit;">zip</span>(<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">*</span>clean_itms[<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">-</span><span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">10</span>:])</span>
-<span id="cb26-2">Draw.MolsToGridImage([Chem.MolFromSmiles(x) <span class="cf" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">for</span> x <span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">in</span> ts],molsPerRow<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span><span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">4</span>,legends<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span>[<span class="bu" style="color: null;
-background-color: null;
-font-style: inherit;">str</span>(x) <span class="cf" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">for</span> x <span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">in</span> tc])</span></code></pre></div>
-<div class="cell-output cell-output-display" data-execution_count="28">
-<div>
-<figure class="figure">
-<p><img src="https://greglandrum.github.io/rdkit-blog/posts/2025-05-09-common-chemical-words-1_files/figure-html/cell-18-output-1.png" class="img-fluid figure-img"></p>
-</figure>
-</div>
-</div>
-</div>
-<p>Ok, so what about the 1000 most common BRICS fragments?</p>
-<div id="cell-33" class="cell" data-execution_count="66">
-<div class="sourceCode cell-code" id="cb27" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb27-1">thousand <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> clean_itms[:<span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">1000</span>]</span></code></pre></div>
-</div>
-<div id="cell-34" class="cell" data-execution_count="67">
-<div class="sourceCode cell-code" id="cb28" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb28-1">plt.figure(figsize<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span>(<span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">6</span>,<span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">6</span>))</span>
-<span id="cb28-2"></span>
-<span id="cb28-3">plt.scatter(<span class="bu" style="color: null;
-background-color: null;
-font-style: inherit;">range</span>(<span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">1000</span>),[x[<span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">0</span>] <span class="cf" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">for</span> x <span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">in</span> thousand],lw<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span><span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">0</span>)</span>
-<span id="cb28-4">plt.yscale(<span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">'log'</span>)</span>
-<span id="cb28-5">plt.ylabel(<span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">'freq'</span>)<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">;</span></span></code></pre></div>
-<div class="cell-output cell-output-display">
-<div>
-<figure class="figure">
-<p><img src="https://greglandrum.github.io/rdkit-blog/posts/2025-05-09-common-chemical-words-1_files/figure-html/cell-20-output-1.png" class="img-fluid figure-img"></p>
-</figure>
-</div>
-</div>
-</div>
-<p>That’s a steep drop off, but even the least common “word” appears &gt;30000 times in our dataset:</p>
-<div id="cell-36" class="cell" data-execution_count="68">
-<div class="sourceCode cell-code" id="cb29" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb29-1">thousand[<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">-</span><span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">1</span>]</span></code></pre></div>
-<div class="cell-output cell-output-display" data-execution_count="68">
-<pre><code>(30196, '[*]c1cc(Br)c([*])c(Br)c1')</code></pre>
-</div>
-</div>
-<p>How many attachment points do those fragments have?</p>
-<div id="cell-38" class="cell" data-execution_count="69">
-<div class="sourceCode cell-code" id="cb31" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb31-1">plt.figure(figsize<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span>(<span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">6</span>,<span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">6</span>))</span>
-<span id="cb31-2">plt.hist([y.count(<span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">'*'</span>) <span class="cf" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">for</span> x,y <span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">in</span> thousand])<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">;</span></span></code></pre></div>
-<div class="cell-output cell-output-display">
-<div>
-<figure class="figure">
-<p><img src="https://greglandrum.github.io/rdkit-blog/posts/2025-05-09-common-chemical-words-1_files/figure-html/cell-22-output-1.png" class="img-fluid figure-img"></p>
-</figure>
-</div>
-</div>
-</div>
-<p>Who’s got 4?</p>
-<div id="cell-40" class="cell" data-execution_count="70">
-<div class="sourceCode cell-code" id="cb32" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb32-1">tmp <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> [x <span class="cf" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">for</span> x <span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">in</span> thousand <span class="cf" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">if</span> x[<span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">1</span>].count(<span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">'*'</span>)<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">==</span><span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">4</span>]</span>
-<span id="cb32-2">tc,ts <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> <span class="bu" style="color: null;
-background-color: null;
-font-style: inherit;">zip</span>(<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">*</span>tmp)</span>
-<span id="cb32-3">Draw.MolsToGridImage([Chem.MolFromSmiles(x) <span class="cf" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">for</span> x <span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">in</span> ts],molsPerRow<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span><span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">4</span>,legends<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span>[<span class="bu" style="color: null;
-background-color: null;
-font-style: inherit;">str</span>(x) <span class="cf" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">for</span> x <span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">in</span> tc])</span></code></pre></div>
-<div class="cell-output cell-output-display" data-execution_count="70">
-<div>
-<figure class="figure">
-<p><img src="https://greglandrum.github.io/rdkit-blog/posts/2025-05-09-common-chemical-words-1_files/figure-html/cell-23-output-1.png" class="img-fluid figure-img"></p>
-</figure>
-</div>
-</div>
-</div>
-<p>What about 3?</p>
-<div id="cell-42" class="cell" data-execution_count="72">
-<div class="sourceCode cell-code" id="cb33" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb33-1">tmp <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> [x <span class="cf" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">for</span> x <span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">in</span> thousand <span class="cf" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">if</span> x[<span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">1</span>].count(<span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">'*'</span>)<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">==</span><span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">3</span>]</span>
-<span id="cb33-2"><span class="bu" style="color: null;
-background-color: null;
-font-style: inherit;">print</span>(<span class="ss" style="color: #20794D;
-background-color: null;
-font-style: inherit;">f'</span><span class="sc" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">{</span><span class="bu" style="color: null;
-background-color: null;
-font-style: inherit;">len</span>(tmp)<span class="sc" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">}</span><span class="ss" style="color: #20794D;
-background-color: null;
-font-style: inherit;"> examples'</span>)</span>
-<span id="cb33-3">tc,ts <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> <span class="bu" style="color: null;
-background-color: null;
-font-style: inherit;">zip</span>(<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">*</span>tmp)</span>
-<span id="cb33-4">Draw.MolsToGridImage([Chem.MolFromSmiles(x) <span class="cf" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">for</span> x <span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">in</span> ts][:<span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">16</span>],molsPerRow<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span><span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">4</span>,legends<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span>[<span class="bu" style="color: null;
-background-color: null;
-font-style: inherit;">str</span>(x) <span class="cf" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">for</span> x <span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">in</span> tc])</span></code></pre></div>
-<div class="cell-output cell-output-stdout">
-<pre><code>78 examples</code></pre>
-</div>
-<div class="cell-output cell-output-display" data-execution_count="72">
-<div>
-<figure class="figure">
-<p><img src="https://greglandrum.github.io/rdkit-blog/posts/2025-05-09-common-chemical-words-1_files/figure-html/cell-24-output-2.png" class="img-fluid figure-img"></p>
-</figure>
-</div>
-</div>
-</div>
-<p>There are some examples in there that look like duplicates. That’s just happening because the removal of the isotopic labels has made some stereocenters look like they are no longer stereocenters when the SMILES is processed:</p>
-<div id="cell-44" class="cell" data-execution_count="37">
-<div class="sourceCode cell-code" id="cb35" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb35-1">[[x <span class="cf" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">for</span> x <span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">in</span> thousand <span class="cf" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">if</span> x[<span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">1</span>].count(<span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">'*'</span>)<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">==</span><span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">3</span>][i] <span class="cf" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">for</span> i <span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">in</span> (<span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">4</span>,<span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">14</span>)]</span></code></pre></div>
-<div class="cell-output cell-output-display" data-execution_count="37">
-<pre><code>[(480049, '[*]CC([*])[*]'), (232632, '[*]C([*])C[*]')]</code></pre>
-</div>
-</div>
-<p>This is an inherent problem with the simple string-manipulation approach to removing the isotopes from the fragments. Let’s fix that problem by actually re-building the molecules. This will remove stereochemistry that is no longer present when the isotope labels are removed from the dummies.</p>
-<p>We’ve got more than 7 million of these, so this next cell takes a while to run:</p>
-<div id="cell-46" class="cell" data-execution_count="62">
-<div class="sourceCode cell-code" id="cb37" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb37-1"><span class="im" style="color: #00769E;
-background-color: null;
-font-style: inherit;">from</span> rdkit <span class="im" style="color: #00769E;
-background-color: null;
-font-style: inherit;">import</span> RDLogger</span>
-<span id="cb37-2">RDLogger.DisableLog(<span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">'rdApp.*'</span>)</span>
-<span id="cb37-3"></span>
-<span id="cb37-4">clean_counts2 <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> Counter()</span>
-<span id="cb37-5">nRejected<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span><span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">0</span></span>
-<span id="cb37-6">fails <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> []</span>
-<span id="cb37-7"><span class="cf" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">for</span> k,v <span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">in</span> all_counts.items():</span>
-<span id="cb37-8">    <span class="cf" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">if</span> k.find(<span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">'*'</span>)<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">&lt;</span><span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">0</span>:</span>
-<span id="cb37-9">        nRejected <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">+=</span><span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">1</span></span>
-<span id="cb37-10">        <span class="cf" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">continue</span></span>
-<span id="cb37-11">    tmol <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> Chem.MolFromSmiles(expr.sub(<span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">'*'</span>,k))</span>
-<span id="cb37-12">    <span class="cf" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">if</span> tmol <span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">is</span> <span class="va" style="color: #111111;
-background-color: null;
-font-style: inherit;">None</span>:</span>
-<span id="cb37-13">        fails.append((k,v))</span>
-<span id="cb37-14">        <span class="cf" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">continue</span></span>
-<span id="cb37-15">    k <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> Chem.MolToSmiles(tmol)</span>
-<span id="cb37-16">    clean_counts2[k]<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">+=</span>v</span></code></pre></div>
-</div>
-<div id="cell-47" class="cell" data-execution_count="63">
-<div class="sourceCode cell-code" id="cb38" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb38-1"><span class="im" style="color: #00769E;
-background-color: null;
-font-style: inherit;">import</span> pickle,gzip</span>
-<span id="cb38-2"><span class="cf" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">with</span> gzip.<span class="bu" style="color: null;
-background-color: null;
-font-style: inherit;">open</span>(<span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">'../data/chemical_words_clean_pubchem_counts2.pkl'</span>,<span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">'wb+'</span>) <span class="im" style="color: #00769E;
-background-color: null;
-font-style: inherit;">as</span> outf:</span>
-<span id="cb38-3">    pickle.dump(clean_counts2,outf)</span></code></pre></div>
-</div>
-<div id="cell-48" class="cell" data-execution_count="73">
-<div class="sourceCode cell-code" id="cb39" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb39-1">clean_itms2 <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> <span class="bu" style="color: null;
-background-color: null;
-font-style: inherit;">sorted</span>([(v,k) <span class="cf" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">for</span> k,v <span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">in</span> clean_counts2.items()],reverse<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span><span class="va" style="color: #111111;
-background-color: null;
-font-style: inherit;">True</span>)</span>
-<span id="cb39-2"><span class="bu" style="color: null;
-background-color: null;
-font-style: inherit;">print</span>(<span class="bu" style="color: null;
-background-color: null;
-font-style: inherit;">len</span>(clean_itms2),<span class="bu" style="color: null;
-background-color: null;
-font-style: inherit;">len</span>(clean_itms))</span>
-<span id="cb39-3">thousand <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> clean_itms2[:<span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">1000</span>]</span></code></pre></div>
-<div class="cell-output cell-output-stdout">
-<pre><code>7377524 7489755</code></pre>
-</div>
-</div>
-<p>So we did remove a few.</p>
-<p>Let’s look at what’s left:</p>
-<div id="cell-50" class="cell" data-execution_count="74">
-<div class="sourceCode cell-code" id="cb41" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb41-1">tmp <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> [x <span class="cf" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">for</span> x <span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">in</span> thousand <span class="cf" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">if</span> x[<span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">1</span>].count(<span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">'*'</span>)<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">==</span><span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">3</span>]</span>
-<span id="cb41-2"><span class="bu" style="color: null;
-background-color: null;
-font-style: inherit;">print</span>(<span class="ss" style="color: #20794D;
-background-color: null;
-font-style: inherit;">f'</span><span class="sc" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">{</span><span class="bu" style="color: null;
-background-color: null;
-font-style: inherit;">len</span>(tmp)<span class="sc" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">}</span><span class="ss" style="color: #20794D;
-background-color: null;
-font-style: inherit;"> examples'</span>)</span>
-<span id="cb41-3">tc,ts <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> <span class="bu" style="color: null;
-background-color: null;
-font-style: inherit;">zip</span>(<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">*</span>tmp)</span>
-<span id="cb41-4">Draw.MolsToGridImage([Chem.MolFromSmiles(x) <span class="cf" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">for</span> x <span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">in</span> ts][:<span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">16</span>],molsPerRow<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span><span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">4</span>,legends<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span>[<span class="bu" style="color: null;
-background-color: null;
-font-style: inherit;">str</span>(x) <span class="cf" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">for</span> x <span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">in</span> tc])</span></code></pre></div>
-<div class="cell-output cell-output-stdout">
-<pre><code>75 examples</code></pre>
-</div>
-<div class="cell-output cell-output-display" data-execution_count="74">
-<div>
-<figure class="figure">
-<p><img src="https://greglandrum.github.io/rdkit-blog/posts/2025-05-09-common-chemical-words-1_files/figure-html/cell-29-output-2.png" class="img-fluid figure-img"></p>
-</figure>
-</div>
-</div>
-</div>
-<p>Write out our thousand common chemical words, this file will be in the github repo:</p>
-<div id="cell-52" class="cell" data-execution_count="45">
-<div class="sourceCode cell-code" id="cb43" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb43-1">outf<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span><span class="bu" style="color: null;
-background-color: null;
-font-style: inherit;">open</span>(<span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">'../data/thousand_words.pubchem.no_iso.smi'</span>,<span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">'w+'</span>)</span>
-<span id="cb43-2"><span class="cf" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">for</span> tc,ts <span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">in</span> thousand:</span>
-<span id="cb43-3">    <span class="bu" style="color: null;
-background-color: null;
-font-style: inherit;">print</span>(ts,tc,<span class="bu" style="color: null;
-background-color: null;
-font-style: inherit;">file</span><span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span>outf)</span></code></pre></div>
-</div>
-<p>I’m going to want to use the ones that are still isotopically labeled later, so write those out too. This file will also be in the github repo:</p>
-<div id="cell-54" class="cell" data-execution_count="46">
-<div class="sourceCode cell-code" id="cb44" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb44-1">t_itms <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> [(v,k) <span class="cf" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">for</span> k,v <span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">in</span> all_counts.items()]</span>
-<span id="cb44-2">iso_itms <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> <span class="bu" style="color: null;
-background-color: null;
-font-style: inherit;">sorted</span>([(v,k) <span class="cf" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">for</span> v,k <span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">in</span> t_itms <span class="cf" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">if</span> k.count(<span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">'*'</span>)<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">&gt;</span><span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">0</span>],reverse<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span><span class="va" style="color: #111111;
-background-color: null;
-font-style: inherit;">True</span>)</span>
-<span id="cb44-3"><span class="bu" style="color: null;
-background-color: null;
-font-style: inherit;">print</span>(<span class="bu" style="color: null;
-background-color: null;
-font-style: inherit;">len</span>(iso_itms))</span>
-<span id="cb44-4">thousand_iso <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> iso_itms[:<span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">1000</span>]</span>
-<span id="cb44-5">outf<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span><span class="bu" style="color: null;
-background-color: null;
-font-style: inherit;">open</span>(<span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">'../data/thousand_words.pubchem.iso.smi'</span>,<span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">'w+'</span>)</span>
-<span id="cb44-6"><span class="cf" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">for</span> tc,ts <span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">in</span> thousand_iso:</span>
-<span id="cb44-7">    <span class="bu" style="color: null;
-background-color: null;
-font-style: inherit;">print</span>(ts,tc,<span class="bu" style="color: null;
-background-color: null;
-font-style: inherit;">file</span><span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span>outf)</span></code></pre></div>
-<div class="cell-output cell-output-stdout">
-<pre><code>7838372</code></pre>
-</div>
-</div>
-<p>As a teaser, let’s make some new molecules:</p>
-<div id="cell-56" class="cell" data-execution_count="60">
-<div class="sourceCode cell-code" id="cb46" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb46-1"><span class="im" style="color: #00769E;
-background-color: null;
-font-style: inherit;">import</span> random</span>
-<span id="cb46-2">thousand_iso_frags <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> [Chem.MolFromSmiles(y) <span class="cf" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">for</span> x,y <span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">in</span> thousand_iso]</span>
-<span id="cb46-3">new_mols <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> []</span>
-<span id="cb46-4"><span class="co" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;"># the building algorithm tends to explore around a given point, </span></span>
-<span id="cb46-5"><span class="co" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;"># so let's pick a number of starting points and enumerate a few molecules</span></span>
-<span id="cb46-6"><span class="co" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;"># around each of them:</span></span>
-<span id="cb46-7"><span class="cf" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">for</span> i <span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">in</span> <span class="bu" style="color: null;
-background-color: null;
-font-style: inherit;">range</span>(<span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">5</span>):</span>
-<span id="cb46-8">    random.seed(<span class="bn" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">0x12367</span><span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">+</span>i)</span>
-<span id="cb46-9">    brics_gen <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> BRICS.BRICSBuild(thousand_iso_frags)</span>
-<span id="cb46-10">    <span class="cf" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">for</span> tm <span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">in</span> [<span class="bu" style="color: null;
-background-color: null;
-font-style: inherit;">next</span>(brics_gen) <span class="cf" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">for</span> x <span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">in</span> <span class="bu" style="color: null;
-background-color: null;
-font-style: inherit;">range</span>(<span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">4</span>)]:</span>
-<span id="cb46-11">        <span class="cf" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">try</span>:</span>
-<span id="cb46-12">            Chem.SanitizeMol(tm)</span>
-<span id="cb46-13">        <span class="cf" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">except</span>:</span>
-<span id="cb46-14">            <span class="cf" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">continue</span></span>
-<span id="cb46-15">        new_mols.append(tm)</span>
-<span id="cb46-16">Draw.MolsToGridImage(new_mols,molsPerRow<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span><span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">4</span>)</span></code></pre></div>
-<div class="cell-output cell-output-display" data-execution_count="60">
-<div>
-<figure class="figure">
-<p><img src="https://greglandrum.github.io/rdkit-blog/posts/2025-05-09-common-chemical-words-1_files/figure-html/cell-32-output-1.png" class="img-fluid figure-img"></p>
-</figure>
-</div>
-</div>
-</div>
-<p>That’s enough for now…</p>
-
-
-</section>
-</section>
-
- ]]></description>
-  <category>exploration</category>
-  <guid>https://greglandrum.github.io/rdkit-blog/posts/2025-05-09-common-chemical-words-1.html</guid>
-  <pubDate>Thu, 08 May 2025 22:00:00 GMT</pubDate>
-  <media:content url="https://greglandrum.github.io/rdkit-blog/posts/images/blog/common-chemical-words-1.png" medium="image" type="image/png" height="72" width="144"/>
 </item>
 </channel>
 </rss>
