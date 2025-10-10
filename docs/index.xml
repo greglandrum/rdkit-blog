@@ -10,7 +10,322 @@
 <atom:link href="https://greglandrum.github.io/rdkit-blog/index.xml" rel="self" type="application/rss+xml"/>
 <description>RDKit experiments, tips, and tutorials</description>
 <generator>quarto-1.6.43</generator>
-<lastBuildDate>Fri, 03 Oct 2025 22:00:00 GMT</lastBuildDate>
+<lastBuildDate>Thu, 09 Oct 2025 22:00:00 GMT</lastBuildDate>
+<item>
+  <title>Similarity search time and thresholds</title>
+  <link>https://greglandrum.github.io/rdkit-blog/posts/2025-10-10-similarity-search-time-and-thresholds-1.html</link>
+  <description><![CDATA[ 
+
+
+
+
+<p>This is an updated and modified version of a <a href="https://rdkit.blogspot.com/2015/08/impact-of-threshold-on-similarity.html">post I wrote back in 2015</a>. # Impact of the threshold on similarity search times</p>
+<p>A <a href="http://chembl.blogspot.ch/2015/08/lsh-based-similarity-search-in-mongodb.html">ChEMBL blog post</a> included the (to me) somewhat surprising result that similarity search times while using the RDKit cartridge did not show much of a dependency on the similarity threshold being used. I wanted to investigate this a bit more closely.</p>
+<p>I’m using a local install of ChEMBL35 for these tests. Since I don’t have the patience to wait for searches to complete with 1000 molecules, I will randomly select just 10:</p>
+<pre><code>chembl_35=# select * into temporary table foo from rdk.fps order by random() limit 10;
+SELECT 10
+chembl_35=# select molregno,m from rdk.mols join foo using (molregno);
+molregno |                                                      m                                                      
+----------+-------------------------------------------------------------------------------------------------------------
+    4111 | C=C1CC2(CCCCCCCCC2)OC1=O
+    4131 | CC1Cc2cc3c(cc2C(c2ccc(N)cc2)=NN1C=O)OCO3
+    4185 | CCOC(=O)/C=C(C)/C(F)=C/C=C(C)/C=C/c1c(C)cc(OC)c(C)c1C
+    4256 | CC(C)(C)c1cc(CCc2cccnc2)cc(C(C)(C)C)c1O
+    4292 | O=C(CCCCCCCCCBr)CC(=O)N[C@H]1CCOC1=O
+    4334 | CCCC[C@@H](C[C@@H](CCc1ccc(-c2ccc(F)cc2)cc1)C(=O)N[C@H](C(=O)Nc1ccccc1)C(C)(C)C)C(=O)O
+    4335 | COc1ccc(/C=C/c2cc(C(C)(C)C)c(O)c(C(C)(C)C)c2)cc1
+    4389 | Cc1ccc2c(c1)C(=O)N(CC(C)(C)C[N+](C)(C)CCCCCC[N+](C)(C)CC(C)(C)CN1C(=O)c3cccc4cccc(c34)C1=O)C2=O.[Br-].[Br-]
+    4591 | O=C(NCCCn1ccnc1)c1cc2ccccc2[nH]1
+    4599 | O=Cc1ccn(-c2cc3c(cc2Cl)nc(O)n2nc(C(=O)O)cc32)c1
+(10 rows)</code></pre>
+<p>And now look at timing results for a number of threshold values:</p>
+<pre><code>chembl_35=# set rdkit.tanimoto_threshold=0.4;select count(*) from rdk.fps fps1 cross join foo where fps1.mfp2%foo.mfp2;
+SET
+Time: 0.202 ms
+count 
+-------
+3431
+(1 row)
+
+Time: 2446.118 ms (00:02.446)
+chembl_35=# set rdkit.tanimoto_threshold=0.5;select count(*) from rdk.fps fps1 cross join foo where fps1.mfp2%foo.mfp2;
+SET
+Time: 0.245 ms
+count 
+-------
+814
+(1 row)
+
+Time: 2258.420 ms (00:02.258)
+chembl_35=# set rdkit.tanimoto_threshold=0.6;select count(*) from rdk.fps fps1 cross join foo where fps1.mfp2%foo.mfp2;
+SET
+Time: 0.146 ms
+count 
+-------
+261
+(1 row)
+
+Time: 2005.068 ms (00:02.005)
+chembl_35=# set rdkit.tanimoto_threshold=0.7;select count(*) from rdk.fps fps1 cross join foo where fps1.mfp2%foo.mfp2;
+SET
+Time: 0.304 ms
+count 
+-------
+122
+(1 row)
+
+Time: 1702.164 ms (00:01.702)
+chembl_35=# set rdkit.tanimoto_threshold=0.8;select count(*) from rdk.fps fps1 cross join foo where fps1.mfp2%foo.mfp2;
+SET
+Time: 0.147 ms
+count 
+-------
+    35
+(1 row)
+
+Time: 1272.436 ms (00:01.272)
+chembl_35=# set rdkit.tanimoto_threshold=0.9;select count(*) from rdk.fps fps1 cross join foo where fps1.mfp2%foo.mfp2;
+SET
+Time: 0.207 ms
+count 
+-------
+    21
+(1 row)
+
+Time: 645.774 ms
+chembl_35=# set rdkit.tanimoto_threshold=0.95;select count(*) from rdk.fps fps1 cross join foo where fps1.mfp2%foo.mfp2;
+SET
+Time: 0.101 ms
+count 
+-------
+    17
+(1 row)
+
+Time: 268.827 ms
+chembl_35=# set rdkit.tanimoto_threshold=0.99;select count(*) from rdk.fps fps1 cross join foo where fps1.mfp2%foo.mfp2;
+SET
+Time: 0.242 ms
+count 
+-------
+    14
+(1 row)
+
+Time: 54.065 ms</code></pre>
+<p>In the previous version of the post, there were some interesting differences here. That’s no longer the case. this is probably at least partially because both Postgres and the cartridge have seen some improvements in the last ten years (for example, index-only scans are now possible). I guess the bigger part is because I’m using a more capable machine with a bunch more RAM.</p>
+<section id="a-larger-test-zinc" class="level2">
+<h2 class="anchored" data-anchor-id="a-larger-test-zinc">A larger test: ZINC</h2>
+<p>To see if there are any trends for a larger dataset, I grabbed a copy of the <a href="http://zinc.docking.org/subsets/all-clean">ZINC All Clean set</a>. After removing the molecules that the RDKit doesn’t like (there are actually only 14 molecules in the full set that the RDKit rejected), this leaves 16.4 million molecules.</p>
+<p>For the record, here’s how I built the database:</p>
+<pre><code>(rdkit_build) glandrum@stoat:/scratch/RDKit_git/LocalData$ createdb zinc
+(rdkit_build) glandrum@stoat:/scratch/RDKit_git/LocalData$ psql -c 'create table raw_data (id SERIAL, smiles text, zinc_id char(12))' zinc
+CREATE TABLE
+(rdkit_build) glandrum@stoat:/scratch/RDKit_git/LocalData$ cd Zinc
+(rdkit_build) glandrum@stoat:/scratch/RDKit_git/LocalData/Zinc$ zcat zinc_all_clean.smi.gz | sed '1d; s/\\/\\\\/g' |psql -c "copy raw_data (smiles,zinc_id) from stdin with delimiter ' '" zinc
+COPY 16403864
+(rdkit_build) glandrum@stoat:/scratch/RDKit_git/LocalData/Zinc$ psql zinc
+psql (14.19 (Ubuntu 14.19-0ubuntu0.22.04.1))
+Type "help" for help.
+
+zinc=# \timing
+Timing is on.
+zinc=# create extension rdkit;
+CREATE EXTENSION
+Time: 21.754 ms
+zinc=# select * into mols from (select id,mol_from_smiles(smiles::cstring) m from raw_data) tmp where m is not null;
+  ... snip ...
+SELECT 16403848
+Time: 945195.267 ms (15:45.195)
+zinc=# select id,morganbv_fp(m) as mfp2 into fps from mols;
+SELECT 16403848
+Time: 155185.639 ms (02:35.186)
+zinc=# create index fps_mfp2_idx on fps using gist(mfp2);
+CREATE INDEX
+Time: 140542.861 ms (02:20.543)
+zinc=# select * into temporary table foo from fps tablesample bernoulli (1) repeatable (123456) limit 10;
+SELECT 10
+Time: 11.977 ms</code></pre>
+<p>Here are the 10 random molecules:</p>
+<pre><code>zinc=# select id,m from mols join foo using (id);
+id    |                             m                             
+------+-----------------------------------------------------------
+12317 | CCc1nnc(NC(=O)[C@H](CC)Oc2ccccc2)s1
+385   | CCOC(=O)c1ccccc1C(=O)OCC
+24317 | CC(C)(C)c1ccc([C@@]23OC(=O)C(C)(C)[C@@H]2OC(=O)C3(C)C)cc1
+48    | CC(C)(C)[NH2+]C[C@H](O)COc1cc(Cl)ccc1Cl
+225   | CC[C@@]1(CO)CCC[NH+]2CCc3c([nH]c4ccccc34)[C@@H]21
+90    | C[NH2+]C[C@@H](OC)c1cccc(C(F)(F)F)c1
+24406 | CCOC1(OCC)[NH+]=C(N)[C@@]2(C#N)C3(CCCCC3)[C@@]12C#N
+24738 | Cc1ccc(S(=O)(=O)Nc2ccccc2C#N)cc1
+356   | CCc1c(O)c(=O)ccn1CC
+8     | O=C([O-])[C@@H](O)c1ccccc1
+(10 rows)
+
+Time: 5167.539 ms (00:05.168)</code></pre>
+<p>Now the searches:</p>
+<pre><code>zinc=# set rdkit.tanimoto_threshold=0.4; select count(*) from fps fps1 cross join foo where fps1.mfp2%foo.mfp2;
+SET
+Time: 0.133 ms
+count 
+-------
+55762
+(1 row)
+
+Time: 15931.816 ms (00:15.932)
+zinc=# set rdkit.tanimoto_threshold=0.5; select count(*) from fps fps1 cross join foo where fps1.mfp2%foo.mfp2;
+SET
+Time: 0.183 ms
+count 
+-------
+4486
+(1 row)
+
+Time: 13616.273 ms (00:13.616)
+zinc=# set rdkit.tanimoto_threshold=0.6; select count(*) from fps fps1 cross join foo where fps1.mfp2%foo.mfp2;
+SET
+Time: 0.205 ms
+count 
+-------
+623
+(1 row)
+
+Time: 11555.706 ms (00:11.556)
+zinc=# set rdkit.tanimoto_threshold=0.7; select count(*) from fps fps1 cross join foo where fps1.mfp2%foo.mfp2;
+SET
+Time: 0.213 ms
+count 
+-------
+165
+(1 row)
+
+Time: 8509.171 ms (00:08.509)
+zinc=# set rdkit.tanimoto_threshold=0.8; select count(*) from fps fps1 cross join foo where fps1.mfp2%foo.mfp2;
+SET
+Time: 0.097 ms
+count 
+-------
+    50
+(1 row)
+
+Time: 4717.467 ms (00:04.717)
+zinc=# set rdkit.tanimoto_threshold=0.9; select count(*) from fps fps1 cross join foo where fps1.mfp2%foo.mfp2;
+SET
+Time: 0.097 ms
+count 
+-------
+    20
+(1 row)
+
+Time: 1026.567 ms (00:01.027)
+zinc=# set rdkit.tanimoto_threshold=0.95; select count(*) from fps fps1 cross join foo where fps1.mfp2%foo.mfp2;
+SET
+Time: 0.103 ms
+count 
+-------
+    20
+(1 row)
+
+Time: 195.971 ms
+zinc=# set rdkit.tanimoto_threshold=0.99; select count(*) from fps fps1 cross join foo where fps1.mfp2%foo.mfp2;
+SET
+Time: 0.096 ms
+count 
+-------
+    20
+(1 row)
+
+Time: 34.866 ms</code></pre>
+<p>I’m going to look at two interesting steps in this data: from a threshold of 0.4 to 0.6, and from 0.6 to 0.99. In the first case, the number of hits goes from 55762 to 623, while the time goes from 15.9s to 11.6s. In the second case, the number of hits goes from 623 to 20, while the time goes from 11.6s to 34.9ms. In the first case the number if hits drops by almost two orders of magnitude while the time only drops by about 25%. In the second case, the number of hits drops by a factor of 30, while the time drops by a factor of almost 39.</p>
+<p>Look at the output from <code>EXPLAIN ANALYZE</code> for these queries to see if we can figure out what’s going on:</p>
+<pre><code>zinc=# set rdkit.tanimoto_threshold=0.4;
+SET
+Time: 0.152 ms
+zinc=# explain (analyze on, buffers on) select count(*) from fps fps1 cross join foo where fps1.mfp2%foo.mfp2;
+                                                                    QUERY PLAN                                                                      
+------------------------------------------------------------------------------------------------------------------------------------------------------
+Aggregate  (cost=1376580.94..1376580.95 rows=1 width=8) (actual time=16239.641..16239.642 rows=1 loops=1)
+Buffers: shared hit=9573 read=2374633, local hit=1
+-&gt;  Nested Loop  (cost=0.42..1324498.62 rows=20832924 width=0) (actual time=8.908..16236.122 rows=55762 loops=1)
+        Buffers: shared hit=9573 read=2374633, local hit=1
+        -&gt;  Seq Scan on foo  (cost=0.00..22.70 rows=1270 width=32) (actual time=0.004..0.016 rows=10 loops=1)
+            Buffers: local hit=1
+        -&gt;  Index Only Scan using fps_mfp2_idx on fps fps1  (cost=0.42..878.85 rows=16404 width=65) (actual time=6.231..1622.310 rows=5576 loops=10)
+            Index Cond: (mfp2 % foo.mfp2)
+            Heap Fetches: 0
+            Buffers: shared hit=9573 read=2374633
+Planning Time: 0.052 ms
+JIT:
+Functions: 5
+Options: Inlining true, Optimization true, Expressions true, Deforming true
+Timing: Generation 0.126 ms, Inlining 1.992 ms, Optimization 3.165 ms, Emission 3.565 ms, Total 8.848 ms
+Execution Time: 16239.872 ms
+(16 rows)
+
+Time: 16240.250 ms (00:16.240)
+zinc=# set rdkit.tanimoto_threshold=0.6;
+SET
+Time: 0.114 ms
+zinc=# explain (analyze on, buffers on) select count(*) from fps fps1 cross join foo where fps1.mfp2%foo.mfp2;
+                                                                    QUERY PLAN                                                                      
+------------------------------------------------------------------------------------------------------------------------------------------------------
+Aggregate  (cost=1376580.94..1376580.95 rows=1 width=8) (actual time=13299.969..13299.970 rows=1 loops=1)
+Buffers: shared hit=4685 read=1995775, local hit=1
+-&gt;  Nested Loop  (cost=0.42..1324498.62 rows=20832924 width=0) (actual time=112.152..13299.772 rows=758 loops=1)
+        Buffers: shared hit=4685 read=1995775, local hit=1
+        -&gt;  Seq Scan on foo  (cost=0.00..22.70 rows=1270 width=32) (actual time=0.004..0.013 rows=10 loops=1)
+            Buffers: local hit=1
+        -&gt;  Index Only Scan using fps_mfp2_idx on fps fps1  (cost=0.42..878.85 rows=16404 width=65) (actual time=112.027..1329.058 rows=76 loops=10)
+            Index Cond: (mfp2 % foo.mfp2)
+            Heap Fetches: 0
+            Buffers: shared hit=4685 read=1995775
+Planning Time: 0.052 ms
+JIT:
+Functions: 5
+Options: Inlining true, Optimization true, Expressions true, Deforming true
+Timing: Generation 0.126 ms, Inlining 2.130 ms, Optimization 3.170 ms, Emission 3.601 ms, Total 9.027 ms
+Execution Time: 13300.146 ms
+(16 rows)
+
+Time: 13300.681 ms (00:13.301)
+zinc=# set rdkit.tanimoto_threshold=0.99;
+SET
+Time: 0.253 ms
+zinc=# explain (analyze on, buffers on) select count(*) from fps fps1 cross join foo where fps1.mfp2%foo.mfp2;
+                                                                QUERY PLAN                                                                   
+------------------------------------------------------------------------------------------------------------------------------------------------
+Aggregate  (cost=1376580.94..1376580.95 rows=1 width=8) (actual time=50.800..50.801 rows=1 loops=1)
+Buffers: shared hit=14558 read=5872, local hit=1
+-&gt;  Nested Loop  (cost=0.42..1324498.62 rows=20832924 width=0) (actual time=11.722..50.787 rows=12 loops=1)
+        Buffers: shared hit=14558 read=5872, local hit=1
+        -&gt;  Seq Scan on foo  (cost=0.00..22.70 rows=1270 width=32) (actual time=0.003..0.010 rows=10 loops=1)
+            Buffers: local hit=1
+        -&gt;  Index Only Scan using fps_mfp2_idx on fps fps1  (cost=0.42..878.85 rows=16404 width=65) (actual time=2.392..4.188 rows=1 loops=10)
+            Index Cond: (mfp2 % foo.mfp2)
+            Heap Fetches: 0
+            Buffers: shared hit=14558 read=5872
+Planning Time: 0.052 ms
+JIT:
+Functions: 5
+Options: Inlining true, Optimization true, Expressions true, Deforming true
+Timing: Generation 0.123 ms, Inlining 2.134 ms, Optimization 3.203 ms, Emission 3.554 ms, Total 9.014 ms
+Execution Time: 50.972 ms
+(16 rows)
+
+Time: 51.323 ms</code></pre>
+<p>` The big difference I see here is the number of buffers that actually need to be read when executing the queries. At the 0.4 threshold, we need to read 2.37 million buffers, at 0.7 it’s just under 2 million, and at 0.99 we only need to read 5872. This is presumably because the index is pruning so many rows at the higher thresholds. I’m definitely not an expert at interpreting this output, so if anyone has other ideas or explanations, please let me know!</p>
+</section>
+<section id="an-aside-chemfp-performance" class="level2">
+<h2 class="anchored" data-anchor-id="an-aside-chemfp-performance">An aside: chemfp performance</h2>
+<p>The previous version of this post included a performance comparison with <a href="http://chemfp.com/">chemfp</a>. Since I no longer have access to the licensed version of chemfp, I’m going to skip that here. I assume it’s dramatically quicker than the cartridge. :-)</p>
+
+
+</section>
+
+ ]]></description>
+  <category>cartridge</category>
+  <category>questions</category>
+  <guid>https://greglandrum.github.io/rdkit-blog/posts/2025-10-10-similarity-search-time-and-thresholds-1.html</guid>
+  <pubDate>Thu, 09 Oct 2025 22:00:00 GMT</pubDate>
+</item>
 <item>
   <title>Rendering intramolecular H bonds in 2D</title>
   <link>https://greglandrum.github.io/rdkit-blog/posts/2025-10-04-rendering-intramolecular-h-bonds.html</link>
@@ -24087,354 +24402,6 @@ font-style: inherit;">len</span>(t)]]))</span></code></pre></div>
   <guid>https://greglandrum.github.io/rdkit-blog/posts/2025-05-22-common-chemical-words-2.html</guid>
   <pubDate>Wed, 21 May 2025 22:00:00 GMT</pubDate>
   <media:content url="https://greglandrum.github.io/rdkit-blog/posts/images/blog/common-chemical-words-2.png" medium="image" type="image/png" height="57" width="144"/>
-</item>
-<item>
-  <title>Using custom fingerprints in PostgreSQL</title>
-  <link>https://greglandrum.github.io/rdkit-blog/posts/2025-05-17-custom-fingerprints-in-postgresql.html</link>
-  <description><![CDATA[ 
-
-
-
-
-<p>This is an updated and lightly revised version of an <a href="https://rdkit.blogspot.com/2017/04/using-custom-fingerprint-in-postgresql.html">older post</a>.</p>
-<p>A <a href="http://www.mail-archive.com/rdkit-discuss@lists.sourceforge.net/msg06764.html">question</a> recently came up on the mailing list about how to use custom fingerprints with the RDKit PostgreSQL cartridge without having to edit the cartridge code itself. Since the answer isn’t trivial but may be useful to others, I’m doing a blog post with the answer.</p>
-<p>We’ll start the usual way, with a bunch of imports. In the interests of being maximally explicit and having this whole notebook be normal Python code, I’m handling the database connection with the usual psycopg2 connector to PostgreSQL.</p>
-<div id="cell-2" class="cell" data-execution_count="1">
-<div class="sourceCode cell-code" id="cb1" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb1-1"><span class="im" style="color: #00769E;
-background-color: null;
-font-style: inherit;">from</span> rdkit <span class="im" style="color: #00769E;
-background-color: null;
-font-style: inherit;">import</span> Chem</span>
-<span id="cb1-2"><span class="im" style="color: #00769E;
-background-color: null;
-font-style: inherit;">from</span> rdkit <span class="im" style="color: #00769E;
-background-color: null;
-font-style: inherit;">import</span> DataStructs</span>
-<span id="cb1-3"><span class="im" style="color: #00769E;
-background-color: null;
-font-style: inherit;">from</span> rdkit.Chem.Draw <span class="im" style="color: #00769E;
-background-color: null;
-font-style: inherit;">import</span> IPythonConsole</span>
-<span id="cb1-4"><span class="im" style="color: #00769E;
-background-color: null;
-font-style: inherit;">from</span> rdkit.Chem <span class="im" style="color: #00769E;
-background-color: null;
-font-style: inherit;">import</span> Draw</span>
-<span id="cb1-5"><span class="im" style="color: #00769E;
-background-color: null;
-font-style: inherit;">import</span> rdkit</span>
-<span id="cb1-6"><span class="im" style="color: #00769E;
-background-color: null;
-font-style: inherit;">import</span> psycopg2</span>
-<span id="cb1-7"><span class="bu" style="color: null;
-background-color: null;
-font-style: inherit;">print</span>(rdkit.__version__)</span></code></pre></div>
-<div class="cell-output cell-output-stdout">
-<pre><code>2025.03.2</code></pre>
-</div>
-</div>
-<p>Read in a set of molecule data that we’ve used before:</p>
-<div id="cell-4" class="cell" data-execution_count="2">
-<div class="sourceCode cell-code" id="cb3" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb3-1"><span class="cf" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">with</span> <span class="bu" style="color: null;
-background-color: null;
-font-style: inherit;">open</span>(<span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">'../data/chembl16_2010-2012.smi'</span>) <span class="im" style="color: #00769E;
-background-color: null;
-font-style: inherit;">as</span> inf:</span>
-<span id="cb3-2">    data <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> [x.strip().split() <span class="cf" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">for</span> x <span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">in</span> inf]</span>
-<span id="cb3-3"><span class="bu" style="color: null;
-background-color: null;
-font-style: inherit;">len</span>(data)</span></code></pre></div>
-<div class="cell-output cell-output-display" data-execution_count="2">
-<pre><code>234681</code></pre>
-</div>
-</div>
-<p>Establish a connection to the database we’ll use and insert that data:</p>
-<div id="cell-6" class="cell" data-execution_count="4">
-<div class="sourceCode cell-code" id="cb5" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb5-1">conn <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> psycopg2.<span class="ex" style="color: null;
-background-color: null;
-font-style: inherit;">connect</span>(database<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span><span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">'rdkit_blog_demo'</span>)</span>
-<span id="cb5-2">curs <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> conn.cursor()</span>
-<span id="cb5-3">curs.execute(<span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">'create extension if not exists rdkit'</span>)</span>
-<span id="cb5-4">curs.execute(<span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">'drop table if exists raw_data'</span>)</span>
-<span id="cb5-5">curs.execute(<span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">'create table raw_data (smiles text,molregno int)'</span>)</span>
-<span id="cb5-6">curs.executemany(<span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">'insert into raw_data values (</span><span class="sc" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">%s</span><span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">,</span><span class="sc" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">%s</span><span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">)'</span>,data)</span>
-<span id="cb5-7">conn.commit()</span></code></pre></div>
-</div>
-<p>Create a molecule table with the first 10K rows (we don’t need all the data for the purposes of this post):</p>
-<div id="cell-8" class="cell" data-execution_count="5">
-<div class="sourceCode cell-code" id="cb6" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb6-1">curs.execute(<span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">'drop table if exists mols'</span>)</span>
-<span id="cb6-2">curs.execute(<span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">'select molregno,mol_from_smiles(smiles::cstring) as m into mols from raw_data limit 10000'</span>)</span>
-<span id="cb6-3">conn.commit()</span></code></pre></div>
-</div>
-<p>Now generate our custom fingerprints for those molecules. We’re using the topological torsion form of Sheridan’s physicochemical property fingerprints (https://doi.org/10.1021/ci950274j).</p>
-<p>These are just standard topological torsion FPs with different atom types.</p>
-<p>Here’s an example of the atom types:</p>
-<div id="cell-11" class="cell" data-execution_count="7">
-<div class="sourceCode cell-code" id="cb7" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb7-1"><span class="im" style="color: #00769E;
-background-color: null;
-font-style: inherit;">from</span> rdkit.Chem.AtomPairs <span class="im" style="color: #00769E;
-background-color: null;
-font-style: inherit;">import</span> Sheridan</span>
-<span id="cb7-2">mol <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> Chem.MolFromSmiles(<span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">'OCCCN'</span>)</span>
-<span id="cb7-3"><span class="bu" style="color: null;
-background-color: null;
-font-style: inherit;">print</span>(Sheridan.AssignPattyTypes(mol))</span></code></pre></div>
-<div class="cell-output cell-output-stdout">
-<pre><code>['POL', 'HYD', 'HYD', 'HYD', 'CAT']</code></pre>
-</div>
-</div>
-<div id="cell-12" class="cell" data-execution_count="14">
-<div class="sourceCode cell-code" id="cb9" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb9-1"><span class="im" style="color: #00769E;
-background-color: null;
-font-style: inherit;">from</span> rdkit.Chem <span class="im" style="color: #00769E;
-background-color: null;
-font-style: inherit;">import</span> rdFingerprintGenerator</span>
-<span id="cb9-2">fpg <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> rdFingerprintGenerator.GetTopologicalTorsionGenerator()</span>
-<span id="cb9-3"></span>
-<span id="cb9-4">fps <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> []</span>
-<span id="cb9-5"><span class="co" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;"># grab the molecules, we're pulling them out of the database in their pickled form:</span></span>
-<span id="cb9-6">curs.execute(<span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">'select molregno,mol_send(m) from mols limit 10000'</span>)</span>
-<span id="cb9-7"><span class="cf" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">for</span> molregno,pkl <span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">in</span> curs.fetchall():</span>
-<span id="cb9-8">    <span class="cf" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">if</span> pkl <span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">is</span> <span class="va" style="color: #111111;
-background-color: null;
-font-style: inherit;">None</span>: <span class="cf" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">continue</span></span>
-<span id="cb9-9">    <span class="co" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;"># construct a molecule</span></span>
-<span id="cb9-10">    m <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> Chem.Mol(pkl.tobytes())</span>
-<span id="cb9-11">    typs <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> [Sheridan.typMap[x] <span class="cf" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">for</span> x <span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">in</span> Sheridan.AssignPattyTypes(m)]</span>
-<span id="cb9-12">    fp <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> fpg.GetFingerprint(m,customAtomInvariants<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span>typs)</span>
-<span id="cb9-13">    fps.append((molregno,fp))</span></code></pre></div>
-</div>
-<p>Now insert the fingerprints into the database, we do this by sending a byte string to the database using <code>DataStructs.BitVectToBinaryText()</code> on the python side and then converting that into a bit vector in the database using the function <code>bfp_from_binary_text()</code>:</p>
-<div id="cell-14" class="cell" data-execution_count="9">
-<div class="sourceCode cell-code" id="cb10" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb10-1">curs.execute(<span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">'drop table if exists fps'</span>)</span>
-<span id="cb10-2">curs.execute(<span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">'create table fps (molregno int, btfp bfp)'</span>)</span>
-<span id="cb10-3">curs.executemany(<span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">'insert into fps values (</span><span class="sc" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">%s</span><span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">,bfp_from_binary_text(</span><span class="sc" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">%s</span><span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">))'</span>,</span>
-<span id="cb10-4">                 [(x,DataStructs.BitVectToBinaryText(y)) <span class="cf" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">for</span> x,y <span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">in</span> fps])</span>
-<span id="cb10-5">conn.commit()</span></code></pre></div>
-</div>
-<p>If this were a larger database I’d also create an index on the fingerprint column in order to speed similarity searches up a bit, but since this one’s small we’ll skip that.</p>
-<p>And here’s how you do a query:</p>
-<div id="cell-17" class="cell" data-execution_count="10">
-<div class="sourceCode cell-code" id="cb11" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb11-1">fp <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> fps[<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">-</span><span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">1</span>][<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">-</span><span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">1</span>]</span>
-<span id="cb11-2">curs.execute(<span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">'set rdkit.tanimoto_threshold=0.6'</span>)</span>
-<span id="cb11-3">curs.execute(<span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">'select molregno,m from mols join fps using (molregno) where btfp</span><span class="sc" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">%%</span><span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">bfp_from_binary_text(</span><span class="sc" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">%s</span><span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">)'</span>,</span>
-<span id="cb11-4">             (DataStructs.BitVectToBinaryText(fp),))</span>
-<span id="cb11-5">res <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> curs.fetchall()</span>
-<span id="cb11-6"><span class="bu" style="color: null;
-background-color: null;
-font-style: inherit;">len</span>(res)</span></code></pre></div>
-<div class="cell-output cell-output-display" data-execution_count="10">
-<pre><code>2</code></pre>
-</div>
-</div>
-<p>It’s always good to test that we’re getting the right answers, so let’s verify that by repeating the same process in Python (just to be sure we did everything right!):</p>
-<div id="cell-19" class="cell" data-execution_count="11">
-<div class="sourceCode cell-code" id="cb13" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb13-1"><span class="bu" style="color: null;
-background-color: null;
-font-style: inherit;">len</span>([x <span class="cf" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">for</span> (x,y) <span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">in</span> fps <span class="cf" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">if</span> DataStructs.TanimotoSimilarity(y,fp)<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">&gt;=</span><span class="fl" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">0.6</span>])</span></code></pre></div>
-<div class="cell-output cell-output-display" data-execution_count="11">
-<pre><code>2</code></pre>
-</div>
-</div>
-<p>Pull back some similarity values:</p>
-<div id="cell-21" class="cell" data-execution_count="12">
-<div class="sourceCode cell-code" id="cb15" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb15-1">curs.execute(<span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">'select molregno,tanimoto_sml(btfp,bfp_from_binary_text(</span><span class="sc" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">%s</span><span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">)) from fps limit 10'</span>,</span>
-<span id="cb15-2">             (DataStructs.BitVectToBinaryText(fp),))</span>
-<span id="cb15-3">curs.fetchall()</span></code></pre></div>
-<div class="cell-output cell-output-display" data-execution_count="12">
-<pre><code>[(23, 0.15217391304347827),
- (97, 0.1643835616438356),
- (115, 0.21428571428571427),
- (146, 0.2054794520547945),
- (147, 0.15517241379310345),
- (148, 0.1),
- (173, 0.21818181818181817),
- (194, 0.13559322033898305),
- (213, 0.2982456140350877),
- (205, 0.19696969696969696)]</code></pre>
-</div>
-</div>
-<p>And again, just a test, ensure that we’re getting the same thing we’d see in Python:</p>
-<div id="cell-23" class="cell" data-execution_count="13">
-<div class="sourceCode cell-code" id="cb17" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb17-1">[(x,DataStructs.TanimotoSimilarity(y,fp)) <span class="cf" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">for</span> (x,y) <span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">in</span> fps][:<span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">10</span>]</span></code></pre></div>
-<div class="cell-output cell-output-display" data-execution_count="13">
-<pre><code>[(23, 0.15217391304347827),
- (97, 0.1643835616438356),
- (115, 0.21428571428571427),
- (146, 0.2054794520547945),
- (147, 0.15517241379310345),
- (148, 0.1),
- (173, 0.21818181818181817),
- (194, 0.13559322033898305),
- (213, 0.2982456140350877),
- (205, 0.19696969696969696)]</code></pre>
-</div>
-</div>
-<p>That’s it. Not particularly complicated, but still a useful thing to know how to do. Following this approach, any bit vector fingerprint (even one’s generated outside of the RDKit) can be inserted into PostgreSQL tables and then searched using the RDKit cartridge.</p>
-
-
-
- ]]></description>
-  <category>cartridge</category>
-  <category>fingerprints</category>
-  <category>tutorial</category>
-  <guid>https://greglandrum.github.io/rdkit-blog/posts/2025-05-17-custom-fingerprints-in-postgresql.html</guid>
-  <pubDate>Fri, 16 May 2025 22:00:00 GMT</pubDate>
 </item>
 </channel>
 </rss>

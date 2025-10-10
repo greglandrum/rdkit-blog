@@ -1,0 +1,1062 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en"><head>
+
+<meta charset="utf-8">
+<meta name="generator" content="quarto-1.6.43">
+
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+
+<meta name="dcterms.date" content="2025-10-10">
+<meta name="description" content="How does the similarity threshold affect search times using the cartridge?">
+
+<title>Similarity search time and thresholds – RDKit blog</title>
+<style>
+code{white-space: pre-wrap;}
+span.smallcaps{font-variant: small-caps;}
+div.columns{display: flex; gap: min(4vw, 1.5em);}
+div.column{flex: auto; overflow-x: auto;}
+div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+ul.task-list{list-style: none;}
+ul.task-list li input[type="checkbox"] {
+  width: 0.8em;
+  margin: 0 0.8em 0.2em -1em; /* quarto-specific, see https://github.com/quarto-dev/quarto-cli/issues/4556 */ 
+  vertical-align: middle;
+}
+</style>
+
+
+<script src="../site_libs/quarto-nav/quarto-nav.js"></script>
+<script src="../site_libs/quarto-nav/headroom.min.js"></script>
+<script src="../site_libs/clipboard/clipboard.min.js"></script>
+<script src="../site_libs/quarto-search/autocomplete.umd.js"></script>
+<script src="../site_libs/quarto-search/fuse.min.js"></script>
+<script src="../site_libs/quarto-search/quarto-search.js"></script>
+<meta name="quarto:offset" content="../">
+<link href="../posts/icons/favicon.ico" rel="icon">
+<script src="../site_libs/quarto-html/quarto.js"></script>
+<script src="../site_libs/quarto-html/popper.min.js"></script>
+<script src="../site_libs/quarto-html/tippy.umd.min.js"></script>
+<script src="../site_libs/quarto-html/anchor.min.js"></script>
+<link href="../site_libs/quarto-html/tippy.css" rel="stylesheet">
+<link href="../site_libs/quarto-html/quarto-syntax-highlighting-d4d76bf8491c20bad77d141916dc28e1.css" rel="stylesheet" class="quarto-color-scheme" id="quarto-text-highlighting-styles">
+<link href="../site_libs/quarto-html/quarto-syntax-highlighting-dark-4379b0ccadffce622b03caf4c46266b3.css" rel="prefetch" class="quarto-color-scheme quarto-color-alternate" id="quarto-text-highlighting-styles">
+<script src="../site_libs/bootstrap/bootstrap.min.js"></script>
+<link href="../site_libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
+<link href="../site_libs/bootstrap/bootstrap-40840319e1d09552a0f54992bf705f97.min.css" rel="stylesheet" append-hash="true" class="quarto-color-scheme" id="quarto-bootstrap" data-mode="light">
+<link href="../site_libs/bootstrap/bootstrap-dark-f86ed83de42dc3a6349cec1bcdefd5d4.min.css" rel="prefetch" append-hash="true" class="quarto-color-scheme quarto-color-alternate" id="quarto-bootstrap" data-mode="dark">
+<script id="quarto-search-options" type="application/json">{
+  "location": "navbar",
+  "copy-button": false,
+  "collapse-after": 3,
+  "panel-placement": "end",
+  "type": "overlay",
+  "limit": 50,
+  "keyboard-shortcut": [
+    "f",
+    "/",
+    "s"
+  ],
+  "show-item-context": false,
+  "language": {
+    "search-no-results-text": "No results",
+    "search-matching-documents-text": "matching documents",
+    "search-copy-link-title": "Copy link to search",
+    "search-hide-matches-text": "Hide additional matches",
+    "search-more-match-text": "more match in this document",
+    "search-more-matches-text": "more matches in this document",
+    "search-clear-button-title": "Clear",
+    "search-text-placeholder": "",
+    "search-detached-cancel-button-title": "Cancel",
+    "search-submit-button-title": "Submit",
+    "search-label": "Search"
+  }
+}</script>
+
+
+<link rel="stylesheet" href="../styles.css">
+</head>
+
+<body class="nav-fixed">
+
+<div id="quarto-search-results"></div>
+  <header id="quarto-header" class="headroom fixed-top">
+    <nav class="navbar navbar-expand-lg " data-bs-theme="dark">
+      <div class="navbar-container container-fluid">
+      <div class="navbar-brand-container mx-auto">
+    <a class="navbar-brand" href="../index.html">
+    <span class="navbar-title">RDKit blog</span>
+    </a>
+  </div>
+            <div id="quarto-search" class="" title="Search"></div>
+          <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarCollapse" aria-controls="navbarCollapse" role="menu" aria-expanded="false" aria-label="Toggle navigation" onclick="if (window.quartoToggleHeadroom) { window.quartoToggleHeadroom(); }">
+  <span class="navbar-toggler-icon"></span>
+</button>
+          <div class="collapse navbar-collapse" id="navbarCollapse">
+            <ul class="navbar-nav navbar-nav-scroll ms-auto">
+  <li class="nav-item">
+    <a class="nav-link" href="../about.html"> 
+<span class="menu-text">RDKit experiments, tips, and tutorials</span></a>
+  </li>  
+  <li class="nav-item compact">
+    <a class="nav-link" href="https://github.com/rdkit/rdkit"> <i class="bi bi-github" role="img">
+</i> 
+<span class="menu-text"></span></a>
+  </li>  
+  <li class="nav-item compact">
+    <a class="nav-link" href="https://bsky.app/profile/rdkit.bsky.social"> <i class="bi bi-twitter" role="img">
+</i> 
+<span class="menu-text"></span></a>
+  </li>  
+  <li class="nav-item compact">
+    <a class="nav-link" href="https://www.linkedin.com/groups/8192558/"> <i class="bi bi-linkedin" role="img">
+</i> 
+<span class="menu-text"></span></a>
+  </li>  
+  <li class="nav-item compact">
+    <a class="nav-link" href="../index.xml"> <i class="bi bi-rss" role="img">
+</i> 
+<span class="menu-text"></span></a>
+  </li>  
+</ul>
+          </div> <!-- /navcollapse -->
+            <div class="quarto-navbar-tools">
+  <a href="" class="quarto-color-scheme-toggle quarto-navigation-tool  px-1" onclick="window.quartoToggleColorScheme(); return false;" title="Toggle dark mode"><i class="bi"></i></a>
+</div>
+      </div> <!-- /container-fluid -->
+    </nav>
+</header>
+<!-- content -->
+<div id="quarto-content" class="quarto-container page-columns page-rows-contents page-layout-article page-navbar">
+<!-- sidebar -->
+<!-- margin-sidebar -->
+    <div id="quarto-margin-sidebar" class="sidebar margin-sidebar">
+        <nav id="TOC" role="doc-toc" class="toc-active">
+    <h2 id="toc-title">On this page</h2>
+   
+  <ul>
+  <li><a href="#a-larger-test-zinc" id="toc-a-larger-test-zinc" class="nav-link active" data-scroll-target="#a-larger-test-zinc">A larger test: ZINC</a></li>
+  <li><a href="#an-aside-chemfp-performance" id="toc-an-aside-chemfp-performance" class="nav-link" data-scroll-target="#an-aside-chemfp-performance">An aside: chemfp performance</a></li>
+  </ul>
+</nav>
+    </div>
+<!-- main -->
+<main class="content" id="quarto-document-content">
+
+<header id="title-block-header" class="quarto-title-block default">
+<div class="quarto-title">
+<h1 class="title">Similarity search time and thresholds</h1>
+  <div class="quarto-categories">
+    <div class="quarto-category">cartridge</div>
+    <div class="quarto-category">questions</div>
+  </div>
+  </div>
+
+<div>
+  <div class="description">
+    How does the similarity threshold affect search times using the cartridge?
+  </div>
+</div>
+
+
+<div class="quarto-title-meta">
+
+    
+    <div>
+    <div class="quarto-title-meta-heading">Published</div>
+    <div class="quarto-title-meta-contents">
+      <p class="date">October 10, 2025</p>
+    </div>
+  </div>
+  
+    
+  </div>
+  
+
+
+</header>
+
+
+<p>This is an updated and modified version of a <a href="https://rdkit.blogspot.com/2015/08/impact-of-threshold-on-similarity.html">post I wrote back in 2015</a>. # Impact of the threshold on similarity search times</p>
+<p>A <a href="http://chembl.blogspot.ch/2015/08/lsh-based-similarity-search-in-mongodb.html">ChEMBL blog post</a> included the (to me) somewhat surprising result that similarity search times while using the RDKit cartridge did not show much of a dependency on the similarity threshold being used. I wanted to investigate this a bit more closely.</p>
+<p>I’m using a local install of ChEMBL35 for these tests. Since I don’t have the patience to wait for searches to complete with 1000 molecules, I will randomly select just 10:</p>
+<pre><code>chembl_35=# select * into temporary table foo from rdk.fps order by random() limit 10;
+SELECT 10
+chembl_35=# select molregno,m from rdk.mols join foo using (molregno);
+molregno |                                                      m                                                      
+----------+-------------------------------------------------------------------------------------------------------------
+    4111 | C=C1CC2(CCCCCCCCC2)OC1=O
+    4131 | CC1Cc2cc3c(cc2C(c2ccc(N)cc2)=NN1C=O)OCO3
+    4185 | CCOC(=O)/C=C(C)/C(F)=C/C=C(C)/C=C/c1c(C)cc(OC)c(C)c1C
+    4256 | CC(C)(C)c1cc(CCc2cccnc2)cc(C(C)(C)C)c1O
+    4292 | O=C(CCCCCCCCCBr)CC(=O)N[C@H]1CCOC1=O
+    4334 | CCCC[C@@H](C[C@@H](CCc1ccc(-c2ccc(F)cc2)cc1)C(=O)N[C@H](C(=O)Nc1ccccc1)C(C)(C)C)C(=O)O
+    4335 | COc1ccc(/C=C/c2cc(C(C)(C)C)c(O)c(C(C)(C)C)c2)cc1
+    4389 | Cc1ccc2c(c1)C(=O)N(CC(C)(C)C[N+](C)(C)CCCCCC[N+](C)(C)CC(C)(C)CN1C(=O)c3cccc4cccc(c34)C1=O)C2=O.[Br-].[Br-]
+    4591 | O=C(NCCCn1ccnc1)c1cc2ccccc2[nH]1
+    4599 | O=Cc1ccn(-c2cc3c(cc2Cl)nc(O)n2nc(C(=O)O)cc32)c1
+(10 rows)</code></pre>
+<p>And now look at timing results for a number of threshold values:</p>
+<pre><code>chembl_35=# set rdkit.tanimoto_threshold=0.4;select count(*) from rdk.fps fps1 cross join foo where fps1.mfp2%foo.mfp2;
+SET
+Time: 0.202 ms
+count 
+-------
+3431
+(1 row)
+
+Time: 2446.118 ms (00:02.446)
+chembl_35=# set rdkit.tanimoto_threshold=0.5;select count(*) from rdk.fps fps1 cross join foo where fps1.mfp2%foo.mfp2;
+SET
+Time: 0.245 ms
+count 
+-------
+814
+(1 row)
+
+Time: 2258.420 ms (00:02.258)
+chembl_35=# set rdkit.tanimoto_threshold=0.6;select count(*) from rdk.fps fps1 cross join foo where fps1.mfp2%foo.mfp2;
+SET
+Time: 0.146 ms
+count 
+-------
+261
+(1 row)
+
+Time: 2005.068 ms (00:02.005)
+chembl_35=# set rdkit.tanimoto_threshold=0.7;select count(*) from rdk.fps fps1 cross join foo where fps1.mfp2%foo.mfp2;
+SET
+Time: 0.304 ms
+count 
+-------
+122
+(1 row)
+
+Time: 1702.164 ms (00:01.702)
+chembl_35=# set rdkit.tanimoto_threshold=0.8;select count(*) from rdk.fps fps1 cross join foo where fps1.mfp2%foo.mfp2;
+SET
+Time: 0.147 ms
+count 
+-------
+    35
+(1 row)
+
+Time: 1272.436 ms (00:01.272)
+chembl_35=# set rdkit.tanimoto_threshold=0.9;select count(*) from rdk.fps fps1 cross join foo where fps1.mfp2%foo.mfp2;
+SET
+Time: 0.207 ms
+count 
+-------
+    21
+(1 row)
+
+Time: 645.774 ms
+chembl_35=# set rdkit.tanimoto_threshold=0.95;select count(*) from rdk.fps fps1 cross join foo where fps1.mfp2%foo.mfp2;
+SET
+Time: 0.101 ms
+count 
+-------
+    17
+(1 row)
+
+Time: 268.827 ms
+chembl_35=# set rdkit.tanimoto_threshold=0.99;select count(*) from rdk.fps fps1 cross join foo where fps1.mfp2%foo.mfp2;
+SET
+Time: 0.242 ms
+count 
+-------
+    14
+(1 row)
+
+Time: 54.065 ms</code></pre>
+<p>In the previous version of the post, there were some interesting differences here. That’s no longer the case. this is probably at least partially because both Postgres and the cartridge have seen some improvements in the last ten years (for example, index-only scans are now possible). I guess the bigger part is because I’m using a more capable machine with a bunch more RAM.</p>
+<section id="a-larger-test-zinc" class="level2">
+<h2 class="anchored" data-anchor-id="a-larger-test-zinc">A larger test: ZINC</h2>
+<p>To see if there are any trends for a larger dataset, I grabbed a copy of the <a href="http://zinc.docking.org/subsets/all-clean">ZINC All Clean set</a>. After removing the molecules that the RDKit doesn’t like (there are actually only 14 molecules in the full set that the RDKit rejected), this leaves 16.4 million molecules.</p>
+<p>For the record, here’s how I built the database:</p>
+<pre><code>(rdkit_build) glandrum@stoat:/scratch/RDKit_git/LocalData$ createdb zinc
+(rdkit_build) glandrum@stoat:/scratch/RDKit_git/LocalData$ psql -c 'create table raw_data (id SERIAL, smiles text, zinc_id char(12))' zinc
+CREATE TABLE
+(rdkit_build) glandrum@stoat:/scratch/RDKit_git/LocalData$ cd Zinc
+(rdkit_build) glandrum@stoat:/scratch/RDKit_git/LocalData/Zinc$ zcat zinc_all_clean.smi.gz | sed '1d; s/\\/\\\\/g' |psql -c "copy raw_data (smiles,zinc_id) from stdin with delimiter ' '" zinc
+COPY 16403864
+(rdkit_build) glandrum@stoat:/scratch/RDKit_git/LocalData/Zinc$ psql zinc
+psql (14.19 (Ubuntu 14.19-0ubuntu0.22.04.1))
+Type "help" for help.
+
+zinc=# \timing
+Timing is on.
+zinc=# create extension rdkit;
+CREATE EXTENSION
+Time: 21.754 ms
+zinc=# select * into mols from (select id,mol_from_smiles(smiles::cstring) m from raw_data) tmp where m is not null;
+  ... snip ...
+SELECT 16403848
+Time: 945195.267 ms (15:45.195)
+zinc=# select id,morganbv_fp(m) as mfp2 into fps from mols;
+SELECT 16403848
+Time: 155185.639 ms (02:35.186)
+zinc=# create index fps_mfp2_idx on fps using gist(mfp2);
+CREATE INDEX
+Time: 140542.861 ms (02:20.543)
+zinc=# select * into temporary table foo from fps tablesample bernoulli (1) repeatable (123456) limit 10;
+SELECT 10
+Time: 11.977 ms</code></pre>
+<p>Here are the 10 random molecules:</p>
+<pre><code>zinc=# select id,m from mols join foo using (id);
+id    |                             m                             
+------+-----------------------------------------------------------
+12317 | CCc1nnc(NC(=O)[C@H](CC)Oc2ccccc2)s1
+385   | CCOC(=O)c1ccccc1C(=O)OCC
+24317 | CC(C)(C)c1ccc([C@@]23OC(=O)C(C)(C)[C@@H]2OC(=O)C3(C)C)cc1
+48    | CC(C)(C)[NH2+]C[C@H](O)COc1cc(Cl)ccc1Cl
+225   | CC[C@@]1(CO)CCC[NH+]2CCc3c([nH]c4ccccc34)[C@@H]21
+90    | C[NH2+]C[C@@H](OC)c1cccc(C(F)(F)F)c1
+24406 | CCOC1(OCC)[NH+]=C(N)[C@@]2(C#N)C3(CCCCC3)[C@@]12C#N
+24738 | Cc1ccc(S(=O)(=O)Nc2ccccc2C#N)cc1
+356   | CCc1c(O)c(=O)ccn1CC
+8     | O=C([O-])[C@@H](O)c1ccccc1
+(10 rows)
+
+Time: 5167.539 ms (00:05.168)</code></pre>
+<p>Now the searches:</p>
+<pre><code>zinc=# set rdkit.tanimoto_threshold=0.4; select count(*) from fps fps1 cross join foo where fps1.mfp2%foo.mfp2;
+SET
+Time: 0.133 ms
+count 
+-------
+55762
+(1 row)
+
+Time: 15931.816 ms (00:15.932)
+zinc=# set rdkit.tanimoto_threshold=0.5; select count(*) from fps fps1 cross join foo where fps1.mfp2%foo.mfp2;
+SET
+Time: 0.183 ms
+count 
+-------
+4486
+(1 row)
+
+Time: 13616.273 ms (00:13.616)
+zinc=# set rdkit.tanimoto_threshold=0.6; select count(*) from fps fps1 cross join foo where fps1.mfp2%foo.mfp2;
+SET
+Time: 0.205 ms
+count 
+-------
+623
+(1 row)
+
+Time: 11555.706 ms (00:11.556)
+zinc=# set rdkit.tanimoto_threshold=0.7; select count(*) from fps fps1 cross join foo where fps1.mfp2%foo.mfp2;
+SET
+Time: 0.213 ms
+count 
+-------
+165
+(1 row)
+
+Time: 8509.171 ms (00:08.509)
+zinc=# set rdkit.tanimoto_threshold=0.8; select count(*) from fps fps1 cross join foo where fps1.mfp2%foo.mfp2;
+SET
+Time: 0.097 ms
+count 
+-------
+    50
+(1 row)
+
+Time: 4717.467 ms (00:04.717)
+zinc=# set rdkit.tanimoto_threshold=0.9; select count(*) from fps fps1 cross join foo where fps1.mfp2%foo.mfp2;
+SET
+Time: 0.097 ms
+count 
+-------
+    20
+(1 row)
+
+Time: 1026.567 ms (00:01.027)
+zinc=# set rdkit.tanimoto_threshold=0.95; select count(*) from fps fps1 cross join foo where fps1.mfp2%foo.mfp2;
+SET
+Time: 0.103 ms
+count 
+-------
+    20
+(1 row)
+
+Time: 195.971 ms
+zinc=# set rdkit.tanimoto_threshold=0.99; select count(*) from fps fps1 cross join foo where fps1.mfp2%foo.mfp2;
+SET
+Time: 0.096 ms
+count 
+-------
+    20
+(1 row)
+
+Time: 34.866 ms</code></pre>
+<p>I’m going to look at two interesting steps in this data: from a threshold of 0.4 to 0.6, and from 0.6 to 0.99. In the first case, the number of hits goes from 55762 to 623, while the time goes from 15.9s to 11.6s. In the second case, the number of hits goes from 623 to 20, while the time goes from 11.6s to 34.9ms. In the first case the number if hits drops by almost two orders of magnitude while the time only drops by about 25%. In the second case, the number of hits drops by a factor of 30, while the time drops by a factor of almost 39.</p>
+<p>Look at the output from <code>EXPLAIN ANALYZE</code> for these queries to see if we can figure out what’s going on:</p>
+<pre><code>zinc=# set rdkit.tanimoto_threshold=0.4;
+SET
+Time: 0.152 ms
+zinc=# explain (analyze on, buffers on) select count(*) from fps fps1 cross join foo where fps1.mfp2%foo.mfp2;
+                                                                    QUERY PLAN                                                                      
+------------------------------------------------------------------------------------------------------------------------------------------------------
+Aggregate  (cost=1376580.94..1376580.95 rows=1 width=8) (actual time=16239.641..16239.642 rows=1 loops=1)
+Buffers: shared hit=9573 read=2374633, local hit=1
+-&gt;  Nested Loop  (cost=0.42..1324498.62 rows=20832924 width=0) (actual time=8.908..16236.122 rows=55762 loops=1)
+        Buffers: shared hit=9573 read=2374633, local hit=1
+        -&gt;  Seq Scan on foo  (cost=0.00..22.70 rows=1270 width=32) (actual time=0.004..0.016 rows=10 loops=1)
+            Buffers: local hit=1
+        -&gt;  Index Only Scan using fps_mfp2_idx on fps fps1  (cost=0.42..878.85 rows=16404 width=65) (actual time=6.231..1622.310 rows=5576 loops=10)
+            Index Cond: (mfp2 % foo.mfp2)
+            Heap Fetches: 0
+            Buffers: shared hit=9573 read=2374633
+Planning Time: 0.052 ms
+JIT:
+Functions: 5
+Options: Inlining true, Optimization true, Expressions true, Deforming true
+Timing: Generation 0.126 ms, Inlining 1.992 ms, Optimization 3.165 ms, Emission 3.565 ms, Total 8.848 ms
+Execution Time: 16239.872 ms
+(16 rows)
+
+Time: 16240.250 ms (00:16.240)
+zinc=# set rdkit.tanimoto_threshold=0.6;
+SET
+Time: 0.114 ms
+zinc=# explain (analyze on, buffers on) select count(*) from fps fps1 cross join foo where fps1.mfp2%foo.mfp2;
+                                                                    QUERY PLAN                                                                      
+------------------------------------------------------------------------------------------------------------------------------------------------------
+Aggregate  (cost=1376580.94..1376580.95 rows=1 width=8) (actual time=13299.969..13299.970 rows=1 loops=1)
+Buffers: shared hit=4685 read=1995775, local hit=1
+-&gt;  Nested Loop  (cost=0.42..1324498.62 rows=20832924 width=0) (actual time=112.152..13299.772 rows=758 loops=1)
+        Buffers: shared hit=4685 read=1995775, local hit=1
+        -&gt;  Seq Scan on foo  (cost=0.00..22.70 rows=1270 width=32) (actual time=0.004..0.013 rows=10 loops=1)
+            Buffers: local hit=1
+        -&gt;  Index Only Scan using fps_mfp2_idx on fps fps1  (cost=0.42..878.85 rows=16404 width=65) (actual time=112.027..1329.058 rows=76 loops=10)
+            Index Cond: (mfp2 % foo.mfp2)
+            Heap Fetches: 0
+            Buffers: shared hit=4685 read=1995775
+Planning Time: 0.052 ms
+JIT:
+Functions: 5
+Options: Inlining true, Optimization true, Expressions true, Deforming true
+Timing: Generation 0.126 ms, Inlining 2.130 ms, Optimization 3.170 ms, Emission 3.601 ms, Total 9.027 ms
+Execution Time: 13300.146 ms
+(16 rows)
+
+Time: 13300.681 ms (00:13.301)
+zinc=# set rdkit.tanimoto_threshold=0.99;
+SET
+Time: 0.253 ms
+zinc=# explain (analyze on, buffers on) select count(*) from fps fps1 cross join foo where fps1.mfp2%foo.mfp2;
+                                                                QUERY PLAN                                                                   
+------------------------------------------------------------------------------------------------------------------------------------------------
+Aggregate  (cost=1376580.94..1376580.95 rows=1 width=8) (actual time=50.800..50.801 rows=1 loops=1)
+Buffers: shared hit=14558 read=5872, local hit=1
+-&gt;  Nested Loop  (cost=0.42..1324498.62 rows=20832924 width=0) (actual time=11.722..50.787 rows=12 loops=1)
+        Buffers: shared hit=14558 read=5872, local hit=1
+        -&gt;  Seq Scan on foo  (cost=0.00..22.70 rows=1270 width=32) (actual time=0.003..0.010 rows=10 loops=1)
+            Buffers: local hit=1
+        -&gt;  Index Only Scan using fps_mfp2_idx on fps fps1  (cost=0.42..878.85 rows=16404 width=65) (actual time=2.392..4.188 rows=1 loops=10)
+            Index Cond: (mfp2 % foo.mfp2)
+            Heap Fetches: 0
+            Buffers: shared hit=14558 read=5872
+Planning Time: 0.052 ms
+JIT:
+Functions: 5
+Options: Inlining true, Optimization true, Expressions true, Deforming true
+Timing: Generation 0.123 ms, Inlining 2.134 ms, Optimization 3.203 ms, Emission 3.554 ms, Total 9.014 ms
+Execution Time: 50.972 ms
+(16 rows)
+
+Time: 51.323 ms</code></pre>
+<p>` The big difference I see here is the number of buffers that actually need to be read when executing the queries. At the 0.4 threshold, we need to read 2.37 million buffers, at 0.7 it’s just under 2 million, and at 0.99 we only need to read 5872. This is presumably because the index is pruning so many rows at the higher thresholds. I’m definitely not an expert at interpreting this output, so if anyone has other ideas or explanations, please let me know!</p>
+</section>
+<section id="an-aside-chemfp-performance" class="level2">
+<h2 class="anchored" data-anchor-id="an-aside-chemfp-performance">An aside: chemfp performance</h2>
+<p>The previous version of this post included a performance comparison with <a href="http://chemfp.com/">chemfp</a>. Since I no longer have access to the licensed version of chemfp, I’m going to skip that here. I assume it’s dramatically quicker than the cartridge. :-)</p>
+
+
+</section>
+
+</main> <!-- /main -->
+<script id="quarto-html-after-body" type="application/javascript">
+window.document.addEventListener("DOMContentLoaded", function (event) {
+  const toggleBodyColorMode = (bsSheetEl) => {
+    const mode = bsSheetEl.getAttribute("data-mode");
+    const bodyEl = window.document.querySelector("body");
+    if (mode === "dark") {
+      bodyEl.classList.add("quarto-dark");
+      bodyEl.classList.remove("quarto-light");
+    } else {
+      bodyEl.classList.add("quarto-light");
+      bodyEl.classList.remove("quarto-dark");
+    }
+  }
+  const toggleBodyColorPrimary = () => {
+    const bsSheetEl = window.document.querySelector("link#quarto-bootstrap");
+    if (bsSheetEl) {
+      toggleBodyColorMode(bsSheetEl);
+    }
+  }
+  toggleBodyColorPrimary();  
+  const disableStylesheet = (stylesheets) => {
+    for (let i=0; i < stylesheets.length; i++) {
+      const stylesheet = stylesheets[i];
+      stylesheet.rel = 'prefetch';
+    }
+  }
+  const enableStylesheet = (stylesheets) => {
+    for (let i=0; i < stylesheets.length; i++) {
+      const stylesheet = stylesheets[i];
+      stylesheet.rel = 'stylesheet';
+    }
+  }
+  const manageTransitions = (selector, allowTransitions) => {
+    const els = window.document.querySelectorAll(selector);
+    for (let i=0; i < els.length; i++) {
+      const el = els[i];
+      if (allowTransitions) {
+        el.classList.remove('notransition');
+      } else {
+        el.classList.add('notransition');
+      }
+    }
+  }
+  const toggleGiscusIfUsed = (isAlternate, darkModeDefault) => {
+    const baseTheme = document.querySelector('#giscus-base-theme')?.value ?? 'light';
+    const alternateTheme = document.querySelector('#giscus-alt-theme')?.value ?? 'dark';
+    let newTheme = '';
+    if(darkModeDefault) {
+      newTheme = isAlternate ? baseTheme : alternateTheme;
+    } else {
+      newTheme = isAlternate ? alternateTheme : baseTheme;
+    }
+    const changeGiscusTheme = () => {
+      // From: https://github.com/giscus/giscus/issues/336
+      const sendMessage = (message) => {
+        const iframe = document.querySelector('iframe.giscus-frame');
+        if (!iframe) return;
+        iframe.contentWindow.postMessage({ giscus: message }, 'https://giscus.app');
+      }
+      sendMessage({
+        setConfig: {
+          theme: newTheme
+        }
+      });
+    }
+    const isGiscussLoaded = window.document.querySelector('iframe.giscus-frame') !== null;
+    if (isGiscussLoaded) {
+      changeGiscusTheme();
+    }
+  }
+  const toggleColorMode = (alternate) => {
+    // Switch the stylesheets
+    const alternateStylesheets = window.document.querySelectorAll('link.quarto-color-scheme.quarto-color-alternate');
+    manageTransitions('#quarto-margin-sidebar .nav-link', false);
+    if (alternate) {
+      enableStylesheet(alternateStylesheets);
+      for (const sheetNode of alternateStylesheets) {
+        if (sheetNode.id === "quarto-bootstrap") {
+          toggleBodyColorMode(sheetNode);
+        }
+      }
+    } else {
+      disableStylesheet(alternateStylesheets);
+      toggleBodyColorPrimary();
+    }
+    manageTransitions('#quarto-margin-sidebar .nav-link', true);
+    // Switch the toggles
+    const toggles = window.document.querySelectorAll('.quarto-color-scheme-toggle');
+    for (let i=0; i < toggles.length; i++) {
+      const toggle = toggles[i];
+      if (toggle) {
+        if (alternate) {
+          toggle.classList.add("alternate");     
+        } else {
+          toggle.classList.remove("alternate");
+        }
+      }
+    }
+    // Hack to workaround the fact that safari doesn't
+    // properly recolor the scrollbar when toggling (#1455)
+    if (navigator.userAgent.indexOf('Safari') > 0 && navigator.userAgent.indexOf('Chrome') == -1) {
+      manageTransitions("body", false);
+      window.scrollTo(0, 1);
+      setTimeout(() => {
+        window.scrollTo(0, 0);
+        manageTransitions("body", true);
+      }, 40);  
+    }
+  }
+  const isFileUrl = () => { 
+    return window.location.protocol === 'file:';
+  }
+  const hasAlternateSentinel = () => {  
+    let styleSentinel = getColorSchemeSentinel();
+    if (styleSentinel !== null) {
+      return styleSentinel === "alternate";
+    } else {
+      return false;
+    }
+  }
+  const setStyleSentinel = (alternate) => {
+    const value = alternate ? "alternate" : "default";
+    if (!isFileUrl()) {
+      window.localStorage.setItem("quarto-color-scheme", value);
+    } else {
+      localAlternateSentinel = value;
+    }
+  }
+  const getColorSchemeSentinel = () => {
+    if (!isFileUrl()) {
+      const storageValue = window.localStorage.getItem("quarto-color-scheme");
+      return storageValue != null ? storageValue : localAlternateSentinel;
+    } else {
+      return localAlternateSentinel;
+    }
+  }
+  const darkModeDefault = false;
+  let localAlternateSentinel = darkModeDefault ? 'alternate' : 'default';
+  // Dark / light mode switch
+  window.quartoToggleColorScheme = () => {
+    // Read the current dark / light value 
+    let toAlternate = !hasAlternateSentinel();
+    toggleColorMode(toAlternate);
+    setStyleSentinel(toAlternate);
+    toggleGiscusIfUsed(toAlternate, darkModeDefault);
+  };
+  // Ensure there is a toggle, if there isn't float one in the top right
+  if (window.document.querySelector('.quarto-color-scheme-toggle') === null) {
+    const a = window.document.createElement('a');
+    a.classList.add('top-right');
+    a.classList.add('quarto-color-scheme-toggle');
+    a.href = "";
+    a.onclick = function() { try { window.quartoToggleColorScheme(); } catch {} return false; };
+    const i = window.document.createElement("i");
+    i.classList.add('bi');
+    a.appendChild(i);
+    window.document.body.appendChild(a);
+  }
+  // Switch to dark mode if need be
+  if (hasAlternateSentinel()) {
+    toggleColorMode(true);
+  } else {
+    toggleColorMode(false);
+  }
+  const icon = "";
+  const anchorJS = new window.AnchorJS();
+  anchorJS.options = {
+    placement: 'right',
+    icon: icon
+  };
+  anchorJS.add('.anchored');
+  const isCodeAnnotation = (el) => {
+    for (const clz of el.classList) {
+      if (clz.startsWith('code-annotation-')) {                     
+        return true;
+      }
+    }
+    return false;
+  }
+  const onCopySuccess = function(e) {
+    // button target
+    const button = e.trigger;
+    // don't keep focus
+    button.blur();
+    // flash "checked"
+    button.classList.add('code-copy-button-checked');
+    var currentTitle = button.getAttribute("title");
+    button.setAttribute("title", "Copied!");
+    let tooltip;
+    if (window.bootstrap) {
+      button.setAttribute("data-bs-toggle", "tooltip");
+      button.setAttribute("data-bs-placement", "left");
+      button.setAttribute("data-bs-title", "Copied!");
+      tooltip = new bootstrap.Tooltip(button, 
+        { trigger: "manual", 
+          customClass: "code-copy-button-tooltip",
+          offset: [0, -8]});
+      tooltip.show();    
+    }
+    setTimeout(function() {
+      if (tooltip) {
+        tooltip.hide();
+        button.removeAttribute("data-bs-title");
+        button.removeAttribute("data-bs-toggle");
+        button.removeAttribute("data-bs-placement");
+      }
+      button.setAttribute("title", currentTitle);
+      button.classList.remove('code-copy-button-checked');
+    }, 1000);
+    // clear code selection
+    e.clearSelection();
+  }
+  const getTextToCopy = function(trigger) {
+      const codeEl = trigger.previousElementSibling.cloneNode(true);
+      for (const childEl of codeEl.children) {
+        if (isCodeAnnotation(childEl)) {
+          childEl.remove();
+        }
+      }
+      return codeEl.innerText;
+  }
+  const clipboard = new window.ClipboardJS('.code-copy-button:not([data-in-quarto-modal])', {
+    text: getTextToCopy
+  });
+  clipboard.on('success', onCopySuccess);
+  if (window.document.getElementById('quarto-embedded-source-code-modal')) {
+    const clipboardModal = new window.ClipboardJS('.code-copy-button[data-in-quarto-modal]', {
+      text: getTextToCopy,
+      container: window.document.getElementById('quarto-embedded-source-code-modal')
+    });
+    clipboardModal.on('success', onCopySuccess);
+  }
+    var localhostRegex = new RegExp(/^(?:http|https):\/\/localhost\:?[0-9]*\//);
+    var mailtoRegex = new RegExp(/^mailto:/);
+      var filterRegex = new RegExp("https:\/\/greglandrum\.github\.io\/rdkit-blog\/");
+    var isInternal = (href) => {
+        return filterRegex.test(href) || localhostRegex.test(href) || mailtoRegex.test(href);
+    }
+    // Inspect non-navigation links and adorn them if external
+ 	var links = window.document.querySelectorAll('a[href]:not(.nav-link):not(.navbar-brand):not(.toc-action):not(.sidebar-link):not(.sidebar-item-toggle):not(.pagination-link):not(.no-external):not([aria-hidden]):not(.dropdown-item):not(.quarto-navigation-tool):not(.about-link)');
+    for (var i=0; i<links.length; i++) {
+      const link = links[i];
+      if (!isInternal(link.href)) {
+        // undo the damage that might have been done by quarto-nav.js in the case of
+        // links that we want to consider external
+        if (link.dataset.originalHref !== undefined) {
+          link.href = link.dataset.originalHref;
+        }
+      }
+    }
+  function tippyHover(el, contentFn, onTriggerFn, onUntriggerFn) {
+    const config = {
+      allowHTML: true,
+      maxWidth: 500,
+      delay: 100,
+      arrow: false,
+      appendTo: function(el) {
+          return el.parentElement;
+      },
+      interactive: true,
+      interactiveBorder: 10,
+      theme: 'quarto',
+      placement: 'bottom-start',
+    };
+    if (contentFn) {
+      config.content = contentFn;
+    }
+    if (onTriggerFn) {
+      config.onTrigger = onTriggerFn;
+    }
+    if (onUntriggerFn) {
+      config.onUntrigger = onUntriggerFn;
+    }
+    window.tippy(el, config); 
+  }
+  const noterefs = window.document.querySelectorAll('a[role="doc-noteref"]');
+  for (var i=0; i<noterefs.length; i++) {
+    const ref = noterefs[i];
+    tippyHover(ref, function() {
+      // use id or data attribute instead here
+      let href = ref.getAttribute('data-footnote-href') || ref.getAttribute('href');
+      try { href = new URL(href).hash; } catch {}
+      const id = href.replace(/^#\/?/, "");
+      const note = window.document.getElementById(id);
+      if (note) {
+        return note.innerHTML;
+      } else {
+        return "";
+      }
+    });
+  }
+  const xrefs = window.document.querySelectorAll('a.quarto-xref');
+  const processXRef = (id, note) => {
+    // Strip column container classes
+    const stripColumnClz = (el) => {
+      el.classList.remove("page-full", "page-columns");
+      if (el.children) {
+        for (const child of el.children) {
+          stripColumnClz(child);
+        }
+      }
+    }
+    stripColumnClz(note)
+    if (id === null || id.startsWith('sec-')) {
+      // Special case sections, only their first couple elements
+      const container = document.createElement("div");
+      if (note.children && note.children.length > 2) {
+        container.appendChild(note.children[0].cloneNode(true));
+        for (let i = 1; i < note.children.length; i++) {
+          const child = note.children[i];
+          if (child.tagName === "P" && child.innerText === "") {
+            continue;
+          } else {
+            container.appendChild(child.cloneNode(true));
+            break;
+          }
+        }
+        if (window.Quarto?.typesetMath) {
+          window.Quarto.typesetMath(container);
+        }
+        return container.innerHTML
+      } else {
+        if (window.Quarto?.typesetMath) {
+          window.Quarto.typesetMath(note);
+        }
+        return note.innerHTML;
+      }
+    } else {
+      // Remove any anchor links if they are present
+      const anchorLink = note.querySelector('a.anchorjs-link');
+      if (anchorLink) {
+        anchorLink.remove();
+      }
+      if (window.Quarto?.typesetMath) {
+        window.Quarto.typesetMath(note);
+      }
+      if (note.classList.contains("callout")) {
+        return note.outerHTML;
+      } else {
+        return note.innerHTML;
+      }
+    }
+  }
+  for (var i=0; i<xrefs.length; i++) {
+    const xref = xrefs[i];
+    tippyHover(xref, undefined, function(instance) {
+      instance.disable();
+      let url = xref.getAttribute('href');
+      let hash = undefined; 
+      if (url.startsWith('#')) {
+        hash = url;
+      } else {
+        try { hash = new URL(url).hash; } catch {}
+      }
+      if (hash) {
+        const id = hash.replace(/^#\/?/, "");
+        const note = window.document.getElementById(id);
+        if (note !== null) {
+          try {
+            const html = processXRef(id, note.cloneNode(true));
+            instance.setContent(html);
+          } finally {
+            instance.enable();
+            instance.show();
+          }
+        } else {
+          // See if we can fetch this
+          fetch(url.split('#')[0])
+          .then(res => res.text())
+          .then(html => {
+            const parser = new DOMParser();
+            const htmlDoc = parser.parseFromString(html, "text/html");
+            const note = htmlDoc.getElementById(id);
+            if (note !== null) {
+              const html = processXRef(id, note);
+              instance.setContent(html);
+            } 
+          }).finally(() => {
+            instance.enable();
+            instance.show();
+          });
+        }
+      } else {
+        // See if we can fetch a full url (with no hash to target)
+        // This is a special case and we should probably do some content thinning / targeting
+        fetch(url)
+        .then(res => res.text())
+        .then(html => {
+          const parser = new DOMParser();
+          const htmlDoc = parser.parseFromString(html, "text/html");
+          const note = htmlDoc.querySelector('main.content');
+          if (note !== null) {
+            // This should only happen for chapter cross references
+            // (since there is no id in the URL)
+            // remove the first header
+            if (note.children.length > 0 && note.children[0].tagName === "HEADER") {
+              note.children[0].remove();
+            }
+            const html = processXRef(null, note);
+            instance.setContent(html);
+          } 
+        }).finally(() => {
+          instance.enable();
+          instance.show();
+        });
+      }
+    }, function(instance) {
+    });
+  }
+      let selectedAnnoteEl;
+      const selectorForAnnotation = ( cell, annotation) => {
+        let cellAttr = 'data-code-cell="' + cell + '"';
+        let lineAttr = 'data-code-annotation="' +  annotation + '"';
+        const selector = 'span[' + cellAttr + '][' + lineAttr + ']';
+        return selector;
+      }
+      const selectCodeLines = (annoteEl) => {
+        const doc = window.document;
+        const targetCell = annoteEl.getAttribute("data-target-cell");
+        const targetAnnotation = annoteEl.getAttribute("data-target-annotation");
+        const annoteSpan = window.document.querySelector(selectorForAnnotation(targetCell, targetAnnotation));
+        const lines = annoteSpan.getAttribute("data-code-lines").split(",");
+        const lineIds = lines.map((line) => {
+          return targetCell + "-" + line;
+        })
+        let top = null;
+        let height = null;
+        let parent = null;
+        if (lineIds.length > 0) {
+            //compute the position of the single el (top and bottom and make a div)
+            const el = window.document.getElementById(lineIds[0]);
+            top = el.offsetTop;
+            height = el.offsetHeight;
+            parent = el.parentElement.parentElement;
+          if (lineIds.length > 1) {
+            const lastEl = window.document.getElementById(lineIds[lineIds.length - 1]);
+            const bottom = lastEl.offsetTop + lastEl.offsetHeight;
+            height = bottom - top;
+          }
+          if (top !== null && height !== null && parent !== null) {
+            // cook up a div (if necessary) and position it 
+            let div = window.document.getElementById("code-annotation-line-highlight");
+            if (div === null) {
+              div = window.document.createElement("div");
+              div.setAttribute("id", "code-annotation-line-highlight");
+              div.style.position = 'absolute';
+              parent.appendChild(div);
+            }
+            div.style.top = top - 2 + "px";
+            div.style.height = height + 4 + "px";
+            div.style.left = 0;
+            let gutterDiv = window.document.getElementById("code-annotation-line-highlight-gutter");
+            if (gutterDiv === null) {
+              gutterDiv = window.document.createElement("div");
+              gutterDiv.setAttribute("id", "code-annotation-line-highlight-gutter");
+              gutterDiv.style.position = 'absolute';
+              const codeCell = window.document.getElementById(targetCell);
+              const gutter = codeCell.querySelector('.code-annotation-gutter');
+              gutter.appendChild(gutterDiv);
+            }
+            gutterDiv.style.top = top - 2 + "px";
+            gutterDiv.style.height = height + 4 + "px";
+          }
+          selectedAnnoteEl = annoteEl;
+        }
+      };
+      const unselectCodeLines = () => {
+        const elementsIds = ["code-annotation-line-highlight", "code-annotation-line-highlight-gutter"];
+        elementsIds.forEach((elId) => {
+          const div = window.document.getElementById(elId);
+          if (div) {
+            div.remove();
+          }
+        });
+        selectedAnnoteEl = undefined;
+      };
+        // Handle positioning of the toggle
+    window.addEventListener(
+      "resize",
+      throttle(() => {
+        elRect = undefined;
+        if (selectedAnnoteEl) {
+          selectCodeLines(selectedAnnoteEl);
+        }
+      }, 10)
+    );
+    function throttle(fn, ms) {
+    let throttle = false;
+    let timer;
+      return (...args) => {
+        if(!throttle) { // first call gets through
+            fn.apply(this, args);
+            throttle = true;
+        } else { // all the others get throttled
+            if(timer) clearTimeout(timer); // cancel #2
+            timer = setTimeout(() => {
+              fn.apply(this, args);
+              timer = throttle = false;
+            }, ms);
+        }
+      };
+    }
+      // Attach click handler to the DT
+      const annoteDls = window.document.querySelectorAll('dt[data-target-cell]');
+      for (const annoteDlNode of annoteDls) {
+        annoteDlNode.addEventListener('click', (event) => {
+          const clickedEl = event.target;
+          if (clickedEl !== selectedAnnoteEl) {
+            unselectCodeLines();
+            const activeEl = window.document.querySelector('dt[data-target-cell].code-annotation-active');
+            if (activeEl) {
+              activeEl.classList.remove('code-annotation-active');
+            }
+            selectCodeLines(clickedEl);
+            clickedEl.classList.add('code-annotation-active');
+          } else {
+            // Unselect the line
+            unselectCodeLines();
+            clickedEl.classList.remove('code-annotation-active');
+          }
+        });
+      }
+  const findCites = (el) => {
+    const parentEl = el.parentElement;
+    if (parentEl) {
+      const cites = parentEl.dataset.cites;
+      if (cites) {
+        return {
+          el,
+          cites: cites.split(' ')
+        };
+      } else {
+        return findCites(el.parentElement)
+      }
+    } else {
+      return undefined;
+    }
+  };
+  var bibliorefs = window.document.querySelectorAll('a[role="doc-biblioref"]');
+  for (var i=0; i<bibliorefs.length; i++) {
+    const ref = bibliorefs[i];
+    const citeInfo = findCites(ref);
+    if (citeInfo) {
+      tippyHover(citeInfo.el, function() {
+        var popup = window.document.createElement('div');
+        citeInfo.cites.forEach(function(cite) {
+          var citeDiv = window.document.createElement('div');
+          citeDiv.classList.add('hanging-indent');
+          citeDiv.classList.add('csl-entry');
+          var biblioDiv = window.document.getElementById('ref-' + cite);
+          if (biblioDiv) {
+            citeDiv.innerHTML = biblioDiv.innerHTML;
+          }
+          popup.appendChild(citeDiv);
+        });
+        return popup.innerHTML;
+      });
+    }
+  }
+});
+</script>
+<script src="https://utteranc.es/client.js" repo="greglandrum/rdkit-blog" issue-term="pathname" theme="github-light" crossorigin="anonymous" async="">
+</script>
+</div> <!-- /content -->
+<footer class="footer">
+  <div class="nav-footer">
+    <div class="nav-footer-left">
+<p>Copyright (C) 2025 Greg Landrum</p>
+</div>   
+    <div class="nav-footer-center">
+      &nbsp;
+    </div>
+    <div class="nav-footer-right">
+<p><a href="https://www.rdkit.org"><img src="https://www.rdkit.org/logo.small.png" class="img-fluid" alt="RDKit" width="64"></a></p>
+</div>
+  </div>
+</footer>
+
+
+
+
+</body></html>

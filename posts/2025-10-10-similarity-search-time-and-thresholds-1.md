@@ -258,7 +258,7 @@ I'm going to look at two interesting steps in this data: from a threshold of 0.4
 
 Look at the output from `EXPLAIN ANALYZE` for these queries to see if we can figure out what's going on:
 
-`   zinc=# set rdkit.tanimoto_threshold=0.4;
+    zinc=# set rdkit.tanimoto_threshold=0.4;
     SET
     Time: 0.152 ms
     zinc=# explain (analyze on, buffers on) select count(*) from fps fps1 cross join foo where fps1.mfp2%foo.mfp2;
