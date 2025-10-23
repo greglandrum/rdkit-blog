@@ -11,11 +11,13 @@ title: Using the RDKit in a C++ program
 toc: true
 
 ---
+Updated: 2025-10-22 to include Windows instructions.
+
 Updated: 2025-09-19 to modernize this and get it working again.
 
 
-*Note:* the instructions in this blog post currently only work on linux and Mac systems.
-I haven't tried it out on Windows yet, but I will update the post if I can make that work.
+
+*Note:* the instructions in this blog post have been tested on Linux, Mac, and Windows with Visual Studio installed. It will also work fine under WSL on Windows (since that's just Linux). I haven't tried it with other compilers on Windows.
 
 Last week I (re)discoverered that it's pretty easy to use the RDKit in other C++
 projects. This is obviously somthing that's possible, but I thought of it as
@@ -43,7 +45,7 @@ with the RDKit from conda-forge.
 Here's a simple demo program which reads in a set of molecules from an input
 file and generates tautomer hashes for them. It uses the `boost::timer` library
 in order to separately time how long it takes to read the molecules and generate
-the hashes. I called this file `tautomer_hash.cpp`:
+the hashes. With modern C++ there are other ways to do this, but it's worthwhile to show how to include boost dependencies. I called this file `tautomer_hash.cpp`:
 ```
 //
 //  Copyright (C) 2021-2025 Greg Landrum
@@ -106,7 +108,7 @@ how to write nice C++ programs. :-)
 The way to make the build easy is to use cmake to set everything up, so I need a
 `CMakeLists.txt` file that defines my executable and its RDKit dependencies:
 ```
-cmake_minimum_required(VERSION 3.20)
+cmake_minimum_required(VERSION 3.30)
 
 project(simple_cxx_example)
 set(CMAKE_CXX_STANDARD 20)
@@ -124,12 +126,10 @@ This tells cmake to find the RDKit and boost builds we have installed (which
 defines the executable I want to create, and then lists the RDKit and boost
 libraries I use. And that is pretty much that.
 
-Now I create a build dir, run `cmake` to setup the build, and run `make` to actually
-build my program:
+Next I create a build dir and run `cmake` to setup the build. On Windows I executed these commands using the bash shell that comes with a git install, but I'm sure you can make this work with other Windows shells too.
+
 ```
 (rdkit_dev) glandrum@stoat:~/RDKit_blog/src/simple_cxx_example$ mkdir build
-(rdkit_dev) glandrum@stoat:~/RDKit_blog/src/simple_cxx_example$ cd biuld
-bash: cd: biuld: No such file or directory
 (rdkit_dev) glandrum@stoat:~/RDKit_blog/src/simple_cxx_example$ cd build
 (rdkit_dev) glandrum@stoat:~/RDKit_blog/src/simple_cxx_example/build$ cmake ..
 -- The C compiler identification is GNU 14.3.0
@@ -161,6 +161,9 @@ This warning is for project developers.  Use -Wno-dev to suppress it.
 -- Configuring done (0.3s)
 -- Generating done (0.0s)
 -- Build files have been written to: /home/glandrum/RDKit_blog/src/simple_cxx_example/build
+```
+On Linux or the Mac you can now run `make`:
+```
 (rdkit_dev) glandrum@stoat:~/RDKit_blog/src/simple_cxx_example/build$ make tautomer_hash
 [ 50%] Building CXX object CMakeFiles/tautomer_hash.dir/tautomer_hash.cpp.o
 [100%] Linking CXX executable tautomer_hash
@@ -177,6 +180,28 @@ generating hashes
 done
 (rdkit_dev) glandrum@stoat:~/RDKit_blog/src/simple_cxx_example/build$ 
 ```
+
+On Windows you can most easily build the program using cmake itself, notice that I need to tell cmake to build in Release mode (you end up with a Debug build if you don't do this):
+```
+glandrum@ferret MINGW64 ~/Code/rdkit_blog/src/simple_cxx_example/build (master)
+$ cmake --build . --config Release
+MSBuild version 17.14.23+b0019275e for .NET Framework
+
+  1>Checking Build System
+  Building Custom Rule C:/Users/glandrum/Code/rdkit_blog/src/simple_cxx_example
+  /CMakeLists.txt
+  Scanning sources for module dependencies...
+  tautomer_hash.cpp
+  Compiling...
+  tautomer_hash.cpp
+  tautomer_hash.vcxproj -> C:\Users\glandrum\Code\rdkit_blog\src\simple_cxx_exa
+  mple\build\Release\tautomer_hash.exe
+  Building Custom Rule C:/Users/glandrum/Code/rdkit_blog/src/simple_cxx_example
+  /CMakeLists.txt
+```
+The Windows build system puts the code in the `Release` subdirectory, so you run it with: `./Release/tautomer_hash`
+
+Note that it's also possible to use cmake to run the build on Linux or the Mac; I'm just used to doing that with make.
 
 If you don't feel like copy/pasting, the source files for this post are [available from github](https://github.com/greglandrum/rdkit_blog/tree/master/src/simple_cxx_example). 
 

@@ -169,15 +169,16 @@ ul.task-list li input[type="checkbox"] {
 </header>
 
 
+<p>Updated: 2025-10-22 to include Windows instructions.</p>
 <p>Updated: 2025-09-19 to modernize this and get it working again.</p>
-<p><em>Note:</em> the instructions in this blog post currently only work on linux and Mac systems. I haven’t tried it out on Windows yet, but I will update the post if I can make that work.</p>
+<p><em>Note:</em> the instructions in this blog post have been tested on Linux, Mac, and Windows with Visual Studio installed. It will also work fine under WSL on Windows (since that’s just Linux). I haven’t tried it with other compilers on Windows.</p>
 <p>Last week I (re)discoverered that it’s pretty easy to use the RDKit in other C++ projects. This is obviously somthing that’s possible, but I thought of it as being something of a pain. It turns out that it’s not, as I hope to show you in this post.</p>
 <p>I started by setting up a fresh conda environment and grabbing an RDKit build from conda-forge, this is much easier than doing your own build. I’m not installing the entire RDKit (there are no python packages), just the libraries and headers needed to build C++ programs that use the RDKit.</p>
 <p>The first thing is to create and activate a new conda environment that has the required dependencies installed:</p>
 <pre><code>mamba create -n rdkit_dev cmake librdkit-dev eigen libboost-devel compilers
 conda activate rdkit_dev</code></pre>
 <p>Note: I’m doing tihs with <a href="https://github.com/mamba-org/mamba">mamba</a> here because it makes doing conda installs much faster. I’ve also installed the conda-forge compiler package since that makes sure I have a recent enough compiler and c++ libraries to work with the up-to-date version of boost we get with the RDKit from conda-forge.</p>
-<p>Here’s a simple demo program which reads in a set of molecules from an input file and generates tautomer hashes for them. It uses the <code>boost::timer</code> library in order to separately time how long it takes to read the molecules and generate the hashes. I called this file <code>tautomer_hash.cpp</code>:</p>
+<p>Here’s a simple demo program which reads in a set of molecules from an input file and generates tautomer hashes for them. It uses the <code>boost::timer</code> library in order to separately time how long it takes to read the molecules and generate the hashes. With modern C++ there are other ways to do this, but it’s worthwhile to show how to include boost dependencies. I called this file <code>tautomer_hash.cpp</code>:</p>
 <pre><code>//
 //  Copyright (C) 2021-2025 Greg Landrum
 //
@@ -233,7 +234,7 @@ int main(int argc, char *argv[]) {
 }</code></pre>
 <p>This is a pretty crappy program since it doesn’t do much error checking, but the purpose here is to demonstrate how to get the environment setup, not to teach how to write nice C++ programs. :-)</p>
 <p>The way to make the build easy is to use cmake to set everything up, so I need a <code>CMakeLists.txt</code> file that defines my executable and its RDKit dependencies:</p>
-<pre><code>cmake_minimum_required(VERSION 3.20)
+<pre><code>cmake_minimum_required(VERSION 3.30)
 
 project(simple_cxx_example)
 set(CMAKE_CXX_STANDARD 20)
@@ -246,10 +247,8 @@ add_executable(tautomer_hash tautomer_hash.cpp)
 target_link_libraries(tautomer_hash  RDKit::MolHash RDKit::FileParsers RDKit::SmilesParse
    Boost::timer)</code></pre>
 <p>This tells cmake to find the RDKit and boost builds we have installed (which “just works” since cmake, boost, and the RDKit were all installed from conda), defines the executable I want to create, and then lists the RDKit and boost libraries I use. And that is pretty much that.</p>
-<p>Now I create a build dir, run <code>cmake</code> to setup the build, and run <code>make</code> to actually build my program:</p>
+<p>Next I create a build dir and run <code>cmake</code> to setup the build. On Windows I executed these commands using the bash shell that comes with a git install, but I’m sure you can make this work with other Windows shells too.</p>
 <pre><code>(rdkit_dev) glandrum@stoat:~/RDKit_blog/src/simple_cxx_example$ mkdir build
-(rdkit_dev) glandrum@stoat:~/RDKit_blog/src/simple_cxx_example$ cd biuld
-bash: cd: biuld: No such file or directory
 (rdkit_dev) glandrum@stoat:~/RDKit_blog/src/simple_cxx_example$ cd build
 (rdkit_dev) glandrum@stoat:~/RDKit_blog/src/simple_cxx_example/build$ cmake ..
 -- The C compiler identification is GNU 14.3.0
@@ -280,8 +279,9 @@ This warning is for project developers.  Use -Wno-dev to suppress it.
 -- Found Boost: /home/glandrum/mambaforge/envs/rdkit_dev/lib/cmake/Boost-1.86.0/BoostConfig.cmake (found suitable version "1.86.0", minimum required is "1.86.0") found components: headers iostreams serialization
 -- Configuring done (0.3s)
 -- Generating done (0.0s)
--- Build files have been written to: /home/glandrum/RDKit_blog/src/simple_cxx_example/build
-(rdkit_dev) glandrum@stoat:~/RDKit_blog/src/simple_cxx_example/build$ make tautomer_hash
+-- Build files have been written to: /home/glandrum/RDKit_blog/src/simple_cxx_example/build</code></pre>
+<p>On Linux or the Mac you can now run <code>make</code>:</p>
+<pre><code>(rdkit_dev) glandrum@stoat:~/RDKit_blog/src/simple_cxx_example/build$ make tautomer_hash
 [ 50%] Building CXX object CMakeFiles/tautomer_hash.dir/tautomer_hash.cpp.o
 [100%] Linking CXX executable tautomer_hash
 [100%] Built target tautomer_hash</code></pre>
@@ -294,6 +294,24 @@ generating hashes
  0.610000s wall, 0.600000s user + 0.010000s system = 0.610000s CPU (100.0%)
 done
 (rdkit_dev) glandrum@stoat:~/RDKit_blog/src/simple_cxx_example/build$ </code></pre>
+<p>On Windows you can most easily build the program using cmake itself, notice that I need to tell cmake to build in Release mode (you end up with a Debug build if you don’t do this):</p>
+<pre><code>glandrum@ferret MINGW64 ~/Code/rdkit_blog/src/simple_cxx_example/build (master)
+$ cmake --build . --config Release
+MSBuild version 17.14.23+b0019275e for .NET Framework
+
+  1&gt;Checking Build System
+  Building Custom Rule C:/Users/glandrum/Code/rdkit_blog/src/simple_cxx_example
+  /CMakeLists.txt
+  Scanning sources for module dependencies...
+  tautomer_hash.cpp
+  Compiling...
+  tautomer_hash.cpp
+  tautomer_hash.vcxproj -&gt; C:\Users\glandrum\Code\rdkit_blog\src\simple_cxx_exa
+  mple\build\Release\tautomer_hash.exe
+  Building Custom Rule C:/Users/glandrum/Code/rdkit_blog/src/simple_cxx_example
+  /CMakeLists.txt</code></pre>
+<p>The Windows build system puts the code in the <code>Release</code> subdirectory, so you run it with: <code>./Release/tautomer_hash</code></p>
+<p>Note that it’s also possible to use cmake to run the build on Linux or the Mac; I’m just used to doing that with make.</p>
 <p>If you don’t feel like copy/pasting, the source files for this post are <a href="https://github.com/greglandrum/rdkit_blog/tree/master/src/simple_cxx_example">available from github</a>.</p>
 <p>This all works so nicely because of the time and effort Riccardo Vianello invested a few years ago to improve the RDKit’s cmake integration.</p>
 <p>Next step: add this to the documentation!</p>
