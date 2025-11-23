@@ -1,0 +1,1606 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en"><head>
+
+<meta charset="utf-8">
+<meta name="generator" content="quarto-1.6.43">
+
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+
+<meta name="dcterms.date" content="2025-11-23">
+<meta name="description" content="Comparing 3D alignment methods.">
+
+<title>Working with the LOBSTER Data set III – RDKit blog</title>
+<style>
+code{white-space: pre-wrap;}
+span.smallcaps{font-variant: small-caps;}
+div.columns{display: flex; gap: min(4vw, 1.5em);}
+div.column{flex: auto; overflow-x: auto;}
+div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+ul.task-list{list-style: none;}
+ul.task-list li input[type="checkbox"] {
+  width: 0.8em;
+  margin: 0 0.8em 0.2em -1em; /* quarto-specific, see https://github.com/quarto-dev/quarto-cli/issues/4556 */ 
+  vertical-align: middle;
+}
+/* CSS for syntax highlighting */
+pre > code.sourceCode { white-space: pre; position: relative; }
+pre > code.sourceCode > span { line-height: 1.25; }
+pre > code.sourceCode > span:empty { height: 1.2em; }
+.sourceCode { overflow: visible; }
+code.sourceCode > span { color: inherit; text-decoration: inherit; }
+div.sourceCode { margin: 1em 0; }
+pre.sourceCode { margin: 0; }
+@media screen {
+div.sourceCode { overflow: auto; }
+}
+@media print {
+pre > code.sourceCode { white-space: pre-wrap; }
+pre > code.sourceCode > span { display: inline-block; text-indent: -5em; padding-left: 5em; }
+}
+pre.numberSource code
+  { counter-reset: source-line 0; }
+pre.numberSource code > span
+  { position: relative; left: -4em; counter-increment: source-line; }
+pre.numberSource code > span > a:first-child::before
+  { content: counter(source-line);
+    position: relative; left: -1em; text-align: right; vertical-align: baseline;
+    border: none; display: inline-block;
+    -webkit-touch-callout: none; -webkit-user-select: none;
+    -khtml-user-select: none; -moz-user-select: none;
+    -ms-user-select: none; user-select: none;
+    padding: 0 4px; width: 4em;
+  }
+pre.numberSource { margin-left: 3em;  padding-left: 4px; }
+div.sourceCode
+  {   }
+@media screen {
+pre > code.sourceCode > span > a:first-child::before { text-decoration: underline; }
+}
+</style>
+
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.5.1/jquery.min.js" integrity="sha512-bLT0Qm9VnAYZDflyKcBaQ2gg0hSYNQrJ8RilYldYQ1FxQYoCLtUjuuRuZo+fjqhx/qtq/1itJ0C2ejDxltZVFg==" crossorigin="anonymous"></script><script src="../site_libs/quarto-nav/quarto-nav.js"></script>
+<script src="../site_libs/quarto-nav/headroom.min.js"></script>
+<script src="../site_libs/clipboard/clipboard.min.js"></script>
+<script src="../site_libs/quarto-search/autocomplete.umd.js"></script>
+<script src="../site_libs/quarto-search/fuse.min.js"></script>
+<script src="../site_libs/quarto-search/quarto-search.js"></script>
+<meta name="quarto:offset" content="../">
+<link href="../posts/icons/favicon.ico" rel="icon">
+<script src="../site_libs/quarto-html/quarto.js"></script>
+<script src="../site_libs/quarto-html/popper.min.js"></script>
+<script src="../site_libs/quarto-html/tippy.umd.min.js"></script>
+<script src="../site_libs/quarto-html/anchor.min.js"></script>
+<link href="../site_libs/quarto-html/tippy.css" rel="stylesheet">
+<link href="../site_libs/quarto-html/quarto-syntax-highlighting-d4d76bf8491c20bad77d141916dc28e1.css" rel="stylesheet" class="quarto-color-scheme" id="quarto-text-highlighting-styles">
+<link href="../site_libs/quarto-html/quarto-syntax-highlighting-dark-4379b0ccadffce622b03caf4c46266b3.css" rel="prefetch" class="quarto-color-scheme quarto-color-alternate" id="quarto-text-highlighting-styles">
+<script src="../site_libs/bootstrap/bootstrap.min.js"></script>
+<link href="../site_libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
+<link href="../site_libs/bootstrap/bootstrap-40840319e1d09552a0f54992bf705f97.min.css" rel="stylesheet" append-hash="true" class="quarto-color-scheme" id="quarto-bootstrap" data-mode="light">
+<link href="../site_libs/bootstrap/bootstrap-dark-f86ed83de42dc3a6349cec1bcdefd5d4.min.css" rel="prefetch" append-hash="true" class="quarto-color-scheme quarto-color-alternate" id="quarto-bootstrap" data-mode="dark">
+<script id="quarto-search-options" type="application/json">{
+  "location": "navbar",
+  "copy-button": false,
+  "collapse-after": 3,
+  "panel-placement": "end",
+  "type": "overlay",
+  "limit": 50,
+  "keyboard-shortcut": [
+    "f",
+    "/",
+    "s"
+  ],
+  "show-item-context": false,
+  "language": {
+    "search-no-results-text": "No results",
+    "search-matching-documents-text": "matching documents",
+    "search-copy-link-title": "Copy link to search",
+    "search-hide-matches-text": "Hide additional matches",
+    "search-more-match-text": "more match in this document",
+    "search-more-matches-text": "more matches in this document",
+    "search-clear-button-title": "Clear",
+    "search-text-placeholder": "",
+    "search-detached-cancel-button-title": "Cancel",
+    "search-submit-button-title": "Submit",
+    "search-label": "Search"
+  }
+}</script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.6/require.min.js" integrity="sha512-c3Nl8+7g4LMSTdrm621y7kf9v3SDPnhxLNhcjFJbKECVnmZHTdo+IRO05sNLTH/D3vA6u1X32ehoLC7WFVdheg==" crossorigin="anonymous"></script>
+
+<script type="application/javascript">define('jquery', [],function() {return window.jQuery;})</script>
+
+
+<link rel="stylesheet" href="../styles.css">
+</head>
+
+<body class="nav-fixed">
+
+<div id="quarto-search-results"></div>
+  <header id="quarto-header" class="headroom fixed-top">
+    <nav class="navbar navbar-expand-lg " data-bs-theme="dark">
+      <div class="navbar-container container-fluid">
+      <div class="navbar-brand-container mx-auto">
+    <a class="navbar-brand" href="../index.html">
+    <span class="navbar-title">RDKit blog</span>
+    </a>
+  </div>
+            <div id="quarto-search" class="" title="Search"></div>
+          <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarCollapse" aria-controls="navbarCollapse" role="menu" aria-expanded="false" aria-label="Toggle navigation" onclick="if (window.quartoToggleHeadroom) { window.quartoToggleHeadroom(); }">
+  <span class="navbar-toggler-icon"></span>
+</button>
+          <div class="collapse navbar-collapse" id="navbarCollapse">
+            <ul class="navbar-nav navbar-nav-scroll ms-auto">
+  <li class="nav-item">
+    <a class="nav-link" href="../about.html"> 
+<span class="menu-text">RDKit experiments, tips, and tutorials</span></a>
+  </li>  
+  <li class="nav-item compact">
+    <a class="nav-link" href="https://github.com/rdkit/rdkit"> <i class="bi bi-github" role="img">
+</i> 
+<span class="menu-text"></span></a>
+  </li>  
+  <li class="nav-item compact">
+    <a class="nav-link" href="https://bsky.app/profile/rdkit.bsky.social"> <i class="bi bi-twitter" role="img">
+</i> 
+<span class="menu-text"></span></a>
+  </li>  
+  <li class="nav-item compact">
+    <a class="nav-link" href="https://www.linkedin.com/groups/8192558/"> <i class="bi bi-linkedin" role="img">
+</i> 
+<span class="menu-text"></span></a>
+  </li>  
+  <li class="nav-item compact">
+    <a class="nav-link" href="../index.xml"> <i class="bi bi-rss" role="img">
+</i> 
+<span class="menu-text"></span></a>
+  </li>  
+</ul>
+          </div> <!-- /navcollapse -->
+            <div class="quarto-navbar-tools">
+  <a href="" class="quarto-color-scheme-toggle quarto-navigation-tool  px-1" onclick="window.quartoToggleColorScheme(); return false;" title="Toggle dark mode"><i class="bi"></i></a>
+</div>
+      </div> <!-- /container-fluid -->
+    </nav>
+</header>
+<!-- content -->
+<div id="quarto-content" class="quarto-container page-columns page-rows-contents page-layout-article page-navbar">
+<!-- sidebar -->
+<!-- margin-sidebar -->
+    <div id="quarto-margin-sidebar" class="sidebar margin-sidebar">
+        <nav id="TOC" role="doc-toc" class="toc-active">
+    <h2 id="toc-title">On this page</h2>
+   
+  <ul>
+  <li><a href="#getting-started" id="toc-getting-started" class="nav-link active" data-scroll-target="#getting-started">Getting started</a></li>
+  <li><a href="#comparing-shape-similarity-metrics-in-the-lobster-data-set" id="toc-comparing-shape-similarity-metrics-in-the-lobster-data-set" class="nav-link" data-scroll-target="#comparing-shape-similarity-metrics-in-the-lobster-data-set">Comparing shape-similarity metrics in the LOBSTER data set</a></li>
+  <li><a href="#shape-based-alignment" id="toc-shape-based-alignment" class="nav-link" data-scroll-target="#shape-based-alignment">Shape-based alignment</a></li>
+  <li><a href="#open3dalign" id="toc-open3dalign" class="nav-link" data-scroll-target="#open3dalign">Open3DAlign</a></li>
+  <li><a href="#comparing-performance-on-easy-cases" id="toc-comparing-performance-on-easy-cases" class="nav-link" data-scroll-target="#comparing-performance-on-easy-cases">Comparing performance on “easy” cases</a></li>
+  </ul>
+</nav>
+    </div>
+<!-- main -->
+<main class="content" id="quarto-document-content">
+
+<header id="title-block-header" class="quarto-title-block default">
+<div class="quarto-title">
+<h1 class="title">Working with the LOBSTER Data set III</h1>
+  <div class="quarto-categories">
+    <div class="quarto-category">datasets</div>
+    <div class="quarto-category">3d</div>
+    <div class="quarto-category">superposition</div>
+  </div>
+  </div>
+
+<div>
+  <div class="description">
+    Comparing 3D alignment methods.
+  </div>
+</div>
+
+
+<div class="quarto-title-meta">
+
+    
+    <div>
+    <div class="quarto-title-meta-heading">Published</div>
+    <div class="quarto-title-meta-contents">
+      <p class="date">November 23, 2025</p>
+    </div>
+  </div>
+  
+    
+  </div>
+  
+
+
+</header>
+
+
+<p>This is my third post looking at the LOBSTER data set <a href="https://doi.org/10.1007/s10822-024-00581-1">published last year</a> by the Rarey and BioSolveIT group. Here are links for <a href="https://greglandrum.github.io/rdkit-blog/posts/2025-11-08-working-with-lobster-1.html">Part 1</a> and <a href="https://greglandrum.github.io/rdkit-blog/posts/2025-11-16-working-with-lobster-2.html">Part 2</a>.</p>
+<p>This time I look at applying the different 3D alignment algorithms the RDKit includes to the data.</p>
+<div id="209d81ae" class="cell" data-execution_count="1">
+<div class="sourceCode cell-code" id="cb1"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> rdkit <span class="im">import</span> Chem</span>
+<span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> rdkit.Chem <span class="im">import</span> Draw</span>
+<span id="cb1-3"><a href="#cb1-3" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> rdkit.Chem.Draw <span class="im">import</span> IPythonConsole</span>
+<span id="cb1-4"><a href="#cb1-4" aria-hidden="true" tabindex="-1"></a>IPythonConsole.ipython_3d <span class="op">=</span> <span class="va">True</span></span>
+<span id="cb1-5"><a href="#cb1-5" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-6"><a href="#cb1-6" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> matplotlib <span class="im">import</span> pyplot <span class="im">as</span> plt</span>
+<span id="cb1-7"><a href="#cb1-7" aria-hidden="true" tabindex="-1"></a>plt.style.use(<span class="st">'tableau-colorblind10'</span>)</span>
+<span id="cb1-8"><a href="#cb1-8" aria-hidden="true" tabindex="-1"></a>plt.rcParams[<span class="st">'font.size'</span>] <span class="op">=</span> <span class="st">'16'</span></span>
+<span id="cb1-9"><a href="#cb1-9" aria-hidden="true" tabindex="-1"></a><span class="op">%</span>matplotlib inline</span>
+<span id="cb1-10"><a href="#cb1-10" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-11"><a href="#cb1-11" aria-hidden="true" tabindex="-1"></a><span class="op">%</span>load_ext sql</span>
+<span id="cb1-12"><a href="#cb1-12" aria-hidden="true" tabindex="-1"></a><span class="op">%</span>config SqlMagic.feedback<span class="op">=</span><span class="dv">0</span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+<div id="f3d421d6" class="cell" data-scrolled="true" data-execution_count="10">
+<div class="sourceCode cell-code" id="cb2"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> rdkit</span>
+<span id="cb2-2"><a href="#cb2-2" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(rdkit.__version__)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>2025.09.2</code></pre>
+</div>
+</div>
+<section id="getting-started" class="level1">
+<h1>Getting started</h1>
+<div id="dc28d683" class="cell" data-execution_count="2">
+<div class="sourceCode cell-code" id="cb4"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> lwreg</span>
+<span id="cb4-2"><a href="#cb4-2" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> lwreg <span class="im">import</span> utils</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+<p>Load our lwreg configuration from the database we created before:</p>
+<div id="e184d2ce" class="cell" data-execution_count="3">
+<div class="sourceCode cell-code" id="cb5"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a>config <span class="op">=</span> utils.configure_from_database(dbname<span class="op">=</span><span class="st">'lobster_112024'</span>,dbtype<span class="op">=</span><span class="st">'postgresql'</span>)</span>
+<span id="cb5-2"><a href="#cb5-2" aria-hidden="true" tabindex="-1"></a>lwreg.set_default_config(config)</span>
+<span id="cb5-3"><a href="#cb5-3" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb5-4"><a href="#cb5-4" aria-hidden="true" tabindex="-1"></a>config</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-display" data-execution_count="3">
+<pre><code>{'dbname': 'lobster_112024',
+ 'dbtype': 'postgresql',
+ 'cacheConnection': True,
+ 'standardization': 'none',
+ 'removeHs': 1,
+ 'useTautomerHashv2': 0,
+ 'registerConformers': 1,
+ 'numConformerDigits': 3,
+ 'lwregSchema': ''}</code></pre>
+</div>
+</div>
+<p>Get a map from (nm,pdb) tuples to (molregno,confid,molblock):</p>
+<div id="8ff64590" class="cell" data-execution_count="6">
+<div class="sourceCode cell-code" id="cb7"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb7-1"><a href="#cb7-1" aria-hidden="true" tabindex="-1"></a>d <span class="op">=</span> <span class="op">%</span>sql postgresql:<span class="op">//</span>localhost<span class="op">/</span>lobster_112024 <span class="op">\</span></span>
+<span id="cb7-2"><a href="#cb7-2" aria-hidden="true" tabindex="-1"></a>    select ligname,pdb,molregno,conf_id,molblock <span class="op">\</span></span>
+<span id="cb7-3"><a href="#cb7-3" aria-hidden="true" tabindex="-1"></a>    <span class="im">from</span> lobster_data.all_ligands join conformers using (molregno,conf_id)<span class="op">;</span></span>
+<span id="cb7-4"><a href="#cb7-4" aria-hidden="true" tabindex="-1"></a>ligs <span class="op">=</span> {}</span>
+<span id="cb7-5"><a href="#cb7-5" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> nm,pdb,mrn,cid,mb <span class="kw">in</span> d:</span>
+<span id="cb7-6"><a href="#cb7-6" aria-hidden="true" tabindex="-1"></a>    mol <span class="op">=</span> Chem.MolFromMolBlock(mb,removeHs<span class="op">=</span><span class="va">False</span>)</span>
+<span id="cb7-7"><a href="#cb7-7" aria-hidden="true" tabindex="-1"></a>    mol_noh <span class="op">=</span> Chem.MolFromMolBlock(mb)</span>
+<span id="cb7-8"><a href="#cb7-8" aria-hidden="true" tabindex="-1"></a>    ligs[(nm,pdb.lower())] <span class="op">=</span> (mrn,cid,mb,mol,mol_noh)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+<div id="be748ca6" class="cell" data-execution_count="7">
+<div class="sourceCode cell-code" id="cb8"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb8-1"><a href="#cb8-1" aria-hidden="true" tabindex="-1"></a>pairstats <span class="op">=</span> <span class="op">%</span>sql postgresql:<span class="op">//</span>localhost<span class="op">/</span>lobster_112024 <span class="op">\</span></span>
+<span id="cb8-2"><a href="#cb8-2" aria-hidden="true" tabindex="-1"></a>    select <span class="op">*</span> <span class="im">from</span> lobster_data.pair_stats</span>
+<span id="cb8-3"><a href="#cb8-3" aria-hidden="true" tabindex="-1"></a>pairstats <span class="op">=</span> <span class="bu">list</span>(pairstats.dicts())</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+<div id="b00099e2" class="cell" data-execution_count="9">
+<div class="sourceCode cell-code" id="cb9"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb9-1"><a href="#cb9-1" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> scipy <span class="im">import</span> stats</span>
+<span id="cb9-2"><a href="#cb9-2" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> comparison_plot(pairstats,metric1,metric2,invert1<span class="op">=</span><span class="va">False</span>,invert2<span class="op">=</span><span class="va">False</span>,includeLine<span class="op">=</span><span class="va">False</span>):</span>
+<span id="cb9-3"><a href="#cb9-3" aria-hidden="true" tabindex="-1"></a>    x1 <span class="op">=</span> [x[metric1] <span class="cf">for</span> x <span class="kw">in</span> pairstats]</span>
+<span id="cb9-4"><a href="#cb9-4" aria-hidden="true" tabindex="-1"></a>    <span class="cf">if</span> invert1:</span>
+<span id="cb9-5"><a href="#cb9-5" aria-hidden="true" tabindex="-1"></a>        x1 <span class="op">=</span> [<span class="dv">1</span><span class="op">-</span>x <span class="cf">for</span> x <span class="kw">in</span> x1]</span>
+<span id="cb9-6"><a href="#cb9-6" aria-hidden="true" tabindex="-1"></a>        metric1 <span class="op">=</span> <span class="ss">f'1-</span><span class="sc">{</span>metric1<span class="sc">}</span><span class="ss">'</span></span>
+<span id="cb9-7"><a href="#cb9-7" aria-hidden="true" tabindex="-1"></a>    x2 <span class="op">=</span> [x[metric2] <span class="cf">for</span> x <span class="kw">in</span> pairstats]</span>
+<span id="cb9-8"><a href="#cb9-8" aria-hidden="true" tabindex="-1"></a>    <span class="cf">if</span> invert2:</span>
+<span id="cb9-9"><a href="#cb9-9" aria-hidden="true" tabindex="-1"></a>        x2 <span class="op">=</span> [<span class="dv">1</span><span class="op">-</span>x <span class="cf">for</span> x <span class="kw">in</span> x2]</span>
+<span id="cb9-10"><a href="#cb9-10" aria-hidden="true" tabindex="-1"></a>        metric2 <span class="op">=</span> <span class="ss">f'1-</span><span class="sc">{</span>metric2<span class="sc">}</span><span class="ss">'</span></span>
+<span id="cb9-11"><a href="#cb9-11" aria-hidden="true" tabindex="-1"></a>    r,_ <span class="op">=</span> stats.spearmanr(x1,x2)</span>
+<span id="cb9-12"><a href="#cb9-12" aria-hidden="true" tabindex="-1"></a>    tau,_ <span class="op">=</span> stats.kendalltau(x1,x2)</span>
+<span id="cb9-13"><a href="#cb9-13" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-14"><a href="#cb9-14" aria-hidden="true" tabindex="-1"></a>    plt.figure(figsize<span class="op">=</span>(<span class="dv">10</span>,<span class="dv">5</span>))</span>
+<span id="cb9-15"><a href="#cb9-15" aria-hidden="true" tabindex="-1"></a>    plt.subplot(<span class="dv">1</span>,<span class="dv">2</span>,<span class="dv">1</span>)</span>
+<span id="cb9-16"><a href="#cb9-16" aria-hidden="true" tabindex="-1"></a>    plt.scatter(x1,x2,alpha<span class="op">=</span><span class="fl">0.5</span>,s<span class="op">=</span><span class="dv">5</span>)</span>
+<span id="cb9-17"><a href="#cb9-17" aria-hidden="true" tabindex="-1"></a>    <span class="cf">if</span> includeLine:</span>
+<span id="cb9-18"><a href="#cb9-18" aria-hidden="true" tabindex="-1"></a>        plt.plot((<span class="dv">0</span>,<span class="dv">1</span>),(<span class="dv">0</span>,<span class="dv">1</span>),<span class="st">'k-'</span>)</span>
+<span id="cb9-19"><a href="#cb9-19" aria-hidden="true" tabindex="-1"></a>    plt.xlabel(metric1)</span>
+<span id="cb9-20"><a href="#cb9-20" aria-hidden="true" tabindex="-1"></a>    plt.ylabel(metric2)</span>
+<span id="cb9-21"><a href="#cb9-21" aria-hidden="true" tabindex="-1"></a>    plt.title(<span class="ss">f'rho=</span><span class="sc">{</span>r<span class="sc">:.2f}</span><span class="ss">, tau=</span><span class="sc">{</span>tau<span class="sc">:.2f}</span><span class="ss">'</span>)<span class="op">;</span></span>
+<span id="cb9-22"><a href="#cb9-22" aria-hidden="true" tabindex="-1"></a>    plt.subplot(<span class="dv">1</span>,<span class="dv">2</span>,<span class="dv">2</span>)</span>
+<span id="cb9-23"><a href="#cb9-23" aria-hidden="true" tabindex="-1"></a>    plt.hexbin(x1,x2,cmap<span class="op">=</span><span class="st">'Blues'</span>)<span class="op">;</span></span>
+<span id="cb9-24"><a href="#cb9-24" aria-hidden="true" tabindex="-1"></a>    plt.tight_layout()</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+</section>
+<section id="comparing-shape-similarity-metrics-in-the-lobster-data-set" class="level1">
+<h1>Comparing shape-similarity metrics in the LOBSTER data set</h1>
+<p>First let’s look at the metrics in the LOBSTER data set:</p>
+<div id="40fd7306" class="cell" data-execution_count="34">
+<div class="sourceCode cell-code" id="cb10"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb10-1"><a href="#cb10-1" aria-hidden="true" tabindex="-1"></a>comparison_plot(pairstats,<span class="st">'shape_tversky_index'</span>,<span class="st">'shape_tanimoto_distance'</span>,invert1<span class="op">=</span><span class="va">True</span>,includeLine<span class="op">=</span><span class="va">True</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="2025-11-23-working-with-lobster-3_files/figure-html/cell-9-output-1.png" class="img-fluid figure-img"></p>
+</figure>
+</div>
+</div>
+</div>
+<p>In the LOBSTER paper they use an asymmetric definition of the Tversky metric to detect how much of the template is covered by the probe. This yield small Tversky distances (large Tversky index values) when a small template is completely covered by a large probe. The Tanimoto distance, on the other hand, is symmetric, so it’s always greater than 1-Tversky here.</p>
+<p>And now the protrude distance, which looks at how much of the larger shape is <em>not</em> overlapping the smaller shape.</p>
+<div id="152edde9" class="cell" data-scrolled="false" data-execution_count="35">
+<div class="sourceCode cell-code" id="cb11"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb11-1"><a href="#cb11-1" aria-hidden="true" tabindex="-1"></a>comparison_plot(pairstats,<span class="st">'shape_tversky_index'</span>,<span class="st">'shape_protrude_distance'</span>,invert1<span class="op">=</span><span class="va">True</span>,includeLine<span class="op">=</span><span class="va">True</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="2025-11-23-working-with-lobster-3_files/figure-html/cell-10-output-1.png" class="img-fluid figure-img"></p>
+</figure>
+</div>
+</div>
+</div>
+<p>The protrude distance is, by default, symmetric: it is the fraction of the smaller of the two shapes that protrudes outside the larger of the two.</p>
+</section>
+<section id="shape-based-alignment" class="level1">
+<h1>Shape-based alignment</h1>
+<p>Let’s see what we get when we perform shape-based alignment using the crystal conformers.</p>
+<p>Start by aligning the crystal conformers.</p>
+<div id="571327f7" class="cell" data-execution_count="45">
+<div class="sourceCode cell-code" id="cb12"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb12-1"><a href="#cb12-1" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> rdkit.Chem <span class="im">import</span> rdShapeAlign</span>
+<span id="cb12-2"><a href="#cb12-2" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> rdkit.Chem <span class="im">import</span> rdShapeHelpers</span>
+<span id="cb12-3"><a href="#cb12-3" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> rdkit.Chem <span class="im">import</span> rdMolTransforms</span>
+<span id="cb12-4"><a href="#cb12-4" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb12-5"><a href="#cb12-5" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> tqdm <span class="im">import</span> tqdm</span>
+<span id="cb12-6"><a href="#cb12-6" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> d <span class="kw">in</span> tqdm(pairstats):</span>
+<span id="cb12-7"><a href="#cb12-7" aria-hidden="true" tabindex="-1"></a>    m1 <span class="op">=</span> Chem.Mol(ligs[(d[<span class="st">'ligname1'</span>],d[<span class="st">'pdb1'</span>])][<span class="dv">3</span>])</span>
+<span id="cb12-8"><a href="#cb12-8" aria-hidden="true" tabindex="-1"></a>    m2 <span class="op">=</span> Chem.Mol(ligs[(d[<span class="st">'ligname2'</span>],d[<span class="st">'pdb2'</span>])][<span class="dv">3</span>])</span>
+<span id="cb12-9"><a href="#cb12-9" aria-hidden="true" tabindex="-1"></a>    rdMolTransforms.CanonicalizeConformer(m1.GetConformer())</span>
+<span id="cb12-10"><a href="#cb12-10" aria-hidden="true" tabindex="-1"></a>    rdMolTransforms.CanonicalizeConformer(m2.GetConformer())</span>
+<span id="cb12-11"><a href="#cb12-11" aria-hidden="true" tabindex="-1"></a>    </span>
+<span id="cb12-12"><a href="#cb12-12" aria-hidden="true" tabindex="-1"></a>    st,ct <span class="op">=</span> rdShapeAlign.AlignMol(m1,m2,opt_param<span class="op">=</span><span class="fl">0.5</span>)</span>
+<span id="cb12-13"><a href="#cb12-13" aria-hidden="true" tabindex="-1"></a>    d[<span class="st">'shape_align_ShapeTanimoto'</span>] <span class="op">=</span> st</span>
+<span id="cb12-14"><a href="#cb12-14" aria-hidden="true" tabindex="-1"></a>    d[<span class="st">'shape_align_ColorTanimoto'</span>] <span class="op">=</span> ct</span>
+<span id="cb12-15"><a href="#cb12-15" aria-hidden="true" tabindex="-1"></a>    d[<span class="st">'shape_align_ShapeTversky'</span>] <span class="op">=</span> rdShapeHelpers.ShapeTverskyIndex(m1,m2,<span class="dv">0</span>,<span class="dv">1</span>)</span>
+<span id="cb12-16"><a href="#cb12-16" aria-hidden="true" tabindex="-1"></a>    </span>
+<span id="cb12-17"><a href="#cb12-17" aria-hidden="true" tabindex="-1"></a></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stderr">
+<pre><code>100%|█████████████████████████████████████████████████████████████████████████████████████████████████████████| 72592/72592 [01:15&lt;00:00, 964.83it/s]</code></pre>
+</div>
+</div>
+<div id="421db64b" class="cell" data-execution_count="37">
+<div class="sourceCode cell-code" id="cb14"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb14-1"><a href="#cb14-1" aria-hidden="true" tabindex="-1"></a>comparison_plot(pairstats,<span class="st">'shape_tversky_index'</span>,<span class="st">'shape_align_ShapeTversky'</span>,invert1<span class="op">=</span><span class="va">False</span>,invert2<span class="op">=</span><span class="va">False</span>,</span>
+<span id="cb14-2"><a href="#cb14-2" aria-hidden="true" tabindex="-1"></a>                includeLine<span class="op">=</span><span class="va">True</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="2025-11-23-working-with-lobster-3_files/figure-html/cell-12-output-1.png" class="img-fluid figure-img"></p>
+</figure>
+</div>
+</div>
+</div>
+<p>Look at examples where the ShapeTversky in the shape alignment is significantly lower than that in the crystal alignment:</p>
+<div id="32327c0b" class="cell" data-scrolled="false" data-execution_count="39">
+<div class="sourceCode cell-code" id="cb15"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb15-1"><a href="#cb15-1" aria-hidden="true" tabindex="-1"></a>pruned <span class="op">=</span> [r <span class="cf">for</span> r <span class="kw">in</span> pairstats <span class="cf">if</span> r[<span class="st">'shape_tversky_index'</span>]<span class="op">&gt;</span><span class="fl">0.9</span> <span class="kw">and</span> r[<span class="st">'shape_align_ShapeTversky'</span>]<span class="op">&lt;</span><span class="fl">0.8</span>]</span>
+<span id="cb15-2"><a href="#cb15-2" aria-hidden="true" tabindex="-1"></a><span class="bu">len</span>(pruned)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-display" data-execution_count="39">
+<pre><code>79</code></pre>
+</div>
+</div>
+<div id="9c6ad641" class="cell" data-execution_count="40">
+<div class="sourceCode cell-code" id="cb17"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb17-1"><a href="#cb17-1" aria-hidden="true" tabindex="-1"></a>d <span class="op">=</span> pruned[<span class="dv">0</span>]</span>
+<span id="cb17-2"><a href="#cb17-2" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>((d[<span class="st">'ligname1'</span>],d[<span class="st">'pdb1'</span>]),(d[<span class="st">'ligname2'</span>],d[<span class="st">'pdb2'</span>]))</span>
+<span id="cb17-3"><a href="#cb17-3" aria-hidden="true" tabindex="-1"></a>m1 <span class="op">=</span> ligs[(d[<span class="st">'ligname1'</span>],d[<span class="st">'pdb1'</span>])][<span class="dv">3</span>]</span>
+<span id="cb17-4"><a href="#cb17-4" aria-hidden="true" tabindex="-1"></a>m2 <span class="op">=</span> ligs[(d[<span class="st">'ligname2'</span>],d[<span class="st">'pdb2'</span>])][<span class="dv">3</span>]</span>
+<span id="cb17-5"><a href="#cb17-5" aria-hidden="true" tabindex="-1"></a>m1c <span class="op">=</span> Chem.Mol(m1)</span>
+<span id="cb17-6"><a href="#cb17-6" aria-hidden="true" tabindex="-1"></a>m2c <span class="op">=</span> Chem.Mol(m2)</span>
+<span id="cb17-7"><a href="#cb17-7" aria-hidden="true" tabindex="-1"></a>rdMolTransforms.CanonicalizeConformer(m1c.GetConformer())</span>
+<span id="cb17-8"><a href="#cb17-8" aria-hidden="true" tabindex="-1"></a>rdMolTransforms.CanonicalizeConformer(m2c.GetConformer())</span>
+<span id="cb17-9"><a href="#cb17-9" aria-hidden="true" tabindex="-1"></a>st,ct <span class="op">=</span> rdShapeAlign.AlignMol(m1c,m2c,opt_param<span class="op">=</span><span class="fl">0.5</span>)</span>
+<span id="cb17-10"><a href="#cb17-10" aria-hidden="true" tabindex="-1"></a>tversky <span class="op">=</span> rdShapeHelpers.ShapeTverskyIndex(m1c,m2c,<span class="dv">0</span>,<span class="dv">1</span>)</span>
+<span id="cb17-11"><a href="#cb17-11" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb17-12"><a href="#cb17-12" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(st,ct)</span>
+<span id="cb17-13"><a href="#cb17-13" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(d[<span class="st">'shape_tversky_index'</span>],tversky)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>('1D1_A_401', '4i5p') ('11G_A_401', '4i6b')
+0.6968245697702556 0.11721759959746417
+0.951 0.7622862091361766</code></pre>
+</div>
+</div>
+<div id="740e66da" class="cell" data-execution_count="23">
+<div class="sourceCode cell-code" id="cb19"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb19-1"><a href="#cb19-1" aria-hidden="true" tabindex="-1"></a>IPythonConsole.drawMols3D([m1,m2])</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-display">
+<div id="3dmolviewer_17638177524668813" style="position: relative; width: 400px; height: 400px;">
+        <p id="3dmolwarning_17638177524668813" style="background-color:#ffcccc;color:black">3Dmol.js failed to load for some reason.  Please check your browser console for error messages.<br></p>
+        </div>
+<script>
+
+var loadScriptAsync = function(uri){
+  return new Promise((resolve, reject) => {
+    //this is to ignore the existence of requirejs amd
+    var savedexports, savedmodule;
+    if (typeof exports !== 'undefined') savedexports = exports;
+    else exports = {}
+    if (typeof module !== 'undefined') savedmodule = module;
+    else module = {}
+
+    var tag = document.createElement('script');
+    tag.src = uri;
+    tag.async = true;
+    tag.onload = () => {
+        exports = savedexports;
+        module = savedmodule;
+        resolve();
+    };
+  var firstScriptTag = document.getElementsByTagName('script')[0];
+  firstScriptTag.parentNode.insertBefore(tag, firstScriptTag);
+});
+};
+
+if(typeof $3Dmolpromise === 'undefined') {
+$3Dmolpromise = null;
+  $3Dmolpromise = loadScriptAsync('https://cdnjs.cloudflare.com/ajax/libs/3Dmol/2.4.0/3Dmol-min.js');
+}
+
+var viewer_17638177524668813 = null;
+var warn = document.getElementById("3dmolwarning_17638177524668813");
+if(warn) {
+    warn.parentNode.removeChild(warn);
+}
+$3Dmolpromise.then(function() {
+viewer_17638177524668813 = $3Dmol.createViewer(document.getElementById("3dmolviewer_17638177524668813"),{backgroundColor:"white"});
+viewer_17638177524668813.zoomTo();
+    viewer_17638177524668813.addModel("1D1_A_401\n     RDKit          3D\n\n 47 50  0  0  0  0  0  0  0  0999 V2000\n   13.6199    4.3394   10.4996 O   0  0  0  0  0  0  0  0  0  0  0  0\n    7.7618    4.8606    9.8156 N   0  0  0  0  0  0  0  0  0  0  0  0\n    6.3944    8.1554   10.4865 N   0  0  0  0  0  0  0  0  0  0  0  0\n    8.8228    6.9055   10.3637 N   0  0  0  0  0  0  0  0  0  0  0  0\n   11.3439    4.1903   10.1704 N   0  0  0  0  0  0  0  0  0  0  0  0\n   11.1937    7.0400   10.7008 N   0  0  0  0  0  0  0  0  0  0  0  0\n   11.4418    2.7500    9.8990 C   0  0  0  0  0  0  0  0  0  0  0  0\n   12.5846    6.7088    8.1521 C   0  0  0  0  0  0  0  0  0  0  0  0\n    5.1305    8.6178   10.3300 C   0  0  0  0  0  0  0  0  0  0  0  0\n    8.9115    4.1784    9.8385 C   0  0  0  0  0  0  0  0  0  0  0  0\n   13.2854    6.9331    9.4894 C   0  0  0  0  0  0  0  0  0  0  0  0\n    4.3546    7.6253    9.7593 C   0  0  0  0  0  0  0  0  0  0  0  0\n   11.2442   10.8146   10.4451 C   0  0  0  0  0  0  0  0  0  0  0  0\n   12.0524   10.5627   11.7193 C   0  0  0  0  0  0  0  0  0  0  0  0\n    5.1599    6.5268    9.5477 C   0  0  0  0  0  0  0  0  0  0  0  0\n   10.9220    9.4513    9.8291 C   0  0  0  0  0  0  0  0  0  0  0  0\n   12.1073    9.0549   11.9258 C   0  0  0  0  0  0  0  0  0  0  0  0\n    7.7087    6.1931   10.0763 C   0  0  0  0  0  0  0  0  0  0  0  0\n   12.5167    4.9218   10.4741 C   0  0  0  0  0  0  0  0  0  0  0  0\n   10.0267    6.3014   10.4072 C   0  0  0  0  0  0  0  0  0  0  0  0\n    6.4005    6.8977   10.0241 C   0  0  0  0  0  0  0  0  0  0  0  0\n   11.0272    8.4858   10.9997 C   0  0  0  0  0  0  0  0  0  0  0  0\n   10.0969    4.8441   10.1252 C   0  0  0  0  0  0  0  0  0  0  0  0\n   12.5146    6.3877   10.7066 C   0  0  2  0  0  0  0  0  0  0  0  0\n    7.1705    8.6548   10.8716 H   0  0  0  0  0  0  0  0  0  0  0  0\n   10.5316    2.3851    9.7034 H   0  0  0  0  0  0  0  0  0  0  0  0\n   12.0380    2.5991    9.1105 H   0  0  0  0  0  0  0  0  0  0  0  0\n   11.8225    2.2853   10.6985 H   0  0  0  0  0  0  0  0  0  0  0  0\n   13.1437    7.0883    7.4150 H   0  0  0  0  0  0  0  0  0  0  0  0\n   12.4572    5.7282    8.0029 H   0  0  0  0  0  0  0  0  0  0  0  0\n   11.6937    7.1629    8.1623 H   0  0  0  0  0  0  0  0  0  0  0  0\n    4.8102    9.5299   10.5859 H   0  0  0  0  0  0  0  0  0  0  0  0\n    8.9181    3.1963    9.6508 H   0  0  0  0  0  0  0  0  0  0  0  0\n   13.4138    7.9169    9.6149 H   0  0  0  0  0  0  0  0  0  0  0  0\n   14.1773    6.4822    9.4555 H   0  0  0  0  0  0  0  0  0  0  0  0\n    3.3815    7.6927    9.5391 H   0  0  0  0  0  0  0  0  0  0  0  0\n   11.7810   11.3615    9.8026 H   0  0  0  0  0  0  0  0  0  0  0  0\n   10.3974   11.2977   10.6676 H   0  0  0  0  0  0  0  0  0  0  0  0\n   11.6061   10.9996   12.5002 H   0  0  0  0  0  0  0  0  0  0  0  0\n   12.9774   10.9285   11.6164 H   0  0  0  0  0  0  0  0  0  0  0  0\n    4.9014    5.6518    9.1383 H   0  0  0  0  0  0  0  0  0  0  0  0\n   11.5827    9.2183    9.1156 H   0  0  0  0  0  0  0  0  0  0  0  0\n    9.9991    9.4442    9.4441 H   0  0  0  0  0  0  0  0  0  0  0  0\n   11.9105    8.8236   12.8786 H   0  0  0  0  0  0  0  0  0  0  0  0\n   13.0076    8.6988   11.6755 H   0  0  0  0  0  0  0  0  0  0  0  0\n   10.1653    8.5658   11.5006 H   0  0  0  0  0  0  0  0  0  0  0  0\n   13.0038    6.6046   11.5513 H   0  0  0  0  0  0  0  0  0  0  0  0\n  1 19  2  0\n  2 10  2  0\n  2 18  1  0\n  3  9  1  0\n  3 21  1  0\n  4 18  2  0\n  4 20  1  0\n  5  7  1  0\n  5 19  1  0\n  5 23  1  0\n  6 20  1  0\n  6 22  1  0\n  6 24  1  0\n  8 11  1  0\n  9 12  2  0\n 10 23  1  0\n 11 24  1  0\n 12 15  1  0\n 13 14  1  0\n 13 16  1  0\n 14 17  1  0\n 15 21  2  0\n 16 22  1  0\n 17 22  1  0\n 18 21  1  0\n 19 24  1  0\n 20 23  2  0\n  3 25  1  0\n  7 26  1  0\n  7 27  1  0\n  7 28  1  0\n  8 29  1  0\n  8 30  1  0\n  8 31  1  0\n  9 32  1  0\n 10 33  1  0\n 11 34  1  0\n 11 35  1  0\n 12 36  1  0\n 13 37  1  0\n 13 38  1  0\n 14 39  1  0\n 14 40  1  0\n 15 41  1  0\n 16 42  1  0\n 16 43  1  0\n 17 44  1  0\n 17 45  1  0\n 22 46  1  0\n 24 47  1  1\nM  END\n","sdf");
+    viewer_17638177524668813.setStyle({"stick": {}});
+    viewer_17638177524668813.addModel("11G_A_401\n     RDKit          3D\n\n 39 41  0  0  0  0  0  0  0  0999 V2000\n   13.7894    4.4428   10.3494 O   0  0  0  0  0  0  0  0  0  0  0  0\n    7.8726    4.6211    9.8263 N   0  0  0  0  0  0  0  0  0  0  0  0\n    8.8273    6.7054   10.3791 N   0  0  0  0  0  0  0  0  0  0  0  0\n   11.5066    4.1352   10.0896 N   0  0  0  0  0  0  0  0  0  0  0  0\n   11.2049    6.9725   10.6578 N   0  0  0  0  0  0  0  0  0  0  0  0\n   11.6873    2.7043    9.7926 C   0  0  0  0  0  0  0  0  0  0  0  0\n   12.4405    6.6667    7.9974 C   0  0  0  0  0  0  0  0  0  0  0  0\n    7.7641    5.9335   10.1031 C   0  0  0  0  0  0  0  0  0  0  0  0\n    9.0581    3.9966    9.8132 C   0  0  0  0  0  0  0  0  0  0  0  0\n   13.1998    6.9634    9.3043 C   0  0  0  0  0  0  0  0  0  0  0  0\n   11.1166   10.7637   10.5685 C   0  0  0  0  0  0  0  0  0  0  0  0\n   12.0115   10.4860   11.7845 C   0  0  0  0  0  0  0  0  0  0  0  0\n   10.8537    9.4217    9.8798 C   0  0  0  0  0  0  0  0  0  0  0  0\n   12.0927    8.9675   11.9237 C   0  0  0  0  0  0  0  0  0  0  0  0\n   12.6406    4.9395   10.3645 C   0  0  0  0  0  0  0  0  0  0  0  0\n   10.0728    6.1742   10.3871 C   0  0  0  0  0  0  0  0  0  0  0  0\n   11.0071    8.4100   10.9985 C   0  0  0  0  0  0  0  0  0  0  0  0\n   10.2189    4.7262   10.0771 C   0  0  0  0  0  0  0  0  0  0  0  0\n   12.5553    6.3954   10.5958 C   0  0  2  0  0  0  0  0  0  0  0  0\n   10.7960    2.2839    9.6229 H   0  0  0  0  0  0  0  0  0  0  0  0\n   12.2638    2.6024    8.9819 H   0  0  0  0  0  0  0  0  0  0  0  0\n   12.1249    2.2549   10.5714 H   0  0  0  0  0  0  0  0  0  0  0  0\n   12.9324    7.0719    7.2267 H   0  0  0  0  0  0  0  0  0  0  0  0\n   12.3745    5.6773    7.8675 H   0  0  0  0  0  0  0  0  0  0  0  0\n   11.5218    7.0581    8.0493 H   0  0  0  0  0  0  0  0  0  0  0  0\n    6.8552    6.3505   10.1032 H   0  0  0  0  0  0  0  0  0  0  0  0\n    9.1110    3.0176    9.6163 H   0  0  0  0  0  0  0  0  0  0  0  0\n   13.2651    7.9563    9.4038 H   0  0  0  0  0  0  0  0  0  0  0  0\n   14.1178    6.5756    9.2220 H   0  0  0  0  0  0  0  0  0  0  0  0\n   11.5797   11.3868    9.9381 H   0  0  0  0  0  0  0  0  0  0  0  0\n   10.2528   11.1709   10.8653 H   0  0  0  0  0  0  0  0  0  0  0  0\n   11.6104   10.8876   12.6078 H   0  0  0  0  0  0  0  0  0  0  0  0\n   12.9235   10.8688   11.6371 H   0  0  0  0  0  0  0  0  0  0  0  0\n   11.5217    9.2559    9.1544 H   0  0  0  0  0  0  0  0  0  0  0  0\n    9.9307    9.3923    9.4960 H   0  0  0  0  0  0  0  0  0  0  0  0\n   11.9191    8.6940   12.8698 H   0  0  0  0  0  0  0  0  0  0  0  0\n   12.9941    8.6388   11.6417 H   0  0  0  0  0  0  0  0  0  0  0  0\n   10.1559    8.4512   11.5217 H   0  0  0  0  0  0  0  0  0  0  0  0\n   13.0882    6.6568   11.4007 H   0  0  0  0  0  0  0  0  0  0  0  0\n  1 15  2  0\n  2  8  2  0\n  2  9  1  0\n  3  8  1  0\n  3 16  2  0\n  4  6  1  0\n  4 15  1  0\n  4 18  1  0\n  5 16  1  0\n  5 17  1  0\n  5 19  1  0\n  7 10  1  0\n  9 18  2  0\n 10 19  1  0\n 11 12  1  0\n 11 13  1  0\n 12 14  1  0\n 13 17  1  0\n 14 17  1  0\n 15 19  1  0\n 16 18  1  0\n  6 20  1  0\n  6 21  1  0\n  6 22  1  0\n  7 23  1  0\n  7 24  1  0\n  7 25  1  0\n  8 26  1  0\n  9 27  1  0\n 10 28  1  0\n 10 29  1  0\n 11 30  1  0\n 11 31  1  0\n 12 32  1  0\n 12 33  1  0\n 13 34  1  0\n 13 35  1  0\n 14 36  1  0\n 14 37  1  0\n 17 38  1  0\n 19 39  1  1\nM  END\n","sdf");
+    viewer_17638177524668813.setStyle({"stick": {}});
+    viewer_17638177524668813.setStyle({"model": 0},{"stick": {"colorscheme": "cyanCarbon"}});
+    viewer_17638177524668813.setStyle({"model": 1},{"stick": {"colorscheme": "redCarbon"}});
+    viewer_17638177524668813.setBackgroundColor("0xeeeeee");
+    viewer_17638177524668813.zoomTo();
+viewer_17638177524668813.render();
+});
+</script>
+</div>
+</div>
+<div id="4b78264b" class="cell" data-scrolled="false" data-execution_count="24">
+<div class="sourceCode cell-code" id="cb20"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb20-1"><a href="#cb20-1" aria-hidden="true" tabindex="-1"></a>IPythonConsole.drawMols3D([m1c,m2c])</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-display">
+<div id="3dmolviewer_17638177652198553" style="position: relative; width: 400px; height: 400px;">
+        <p id="3dmolwarning_17638177652198553" style="background-color:#ffcccc;color:black">3Dmol.js failed to load for some reason.  Please check your browser console for error messages.<br></p>
+        </div>
+<script>
+
+var loadScriptAsync = function(uri){
+  return new Promise((resolve, reject) => {
+    //this is to ignore the existence of requirejs amd
+    var savedexports, savedmodule;
+    if (typeof exports !== 'undefined') savedexports = exports;
+    else exports = {}
+    if (typeof module !== 'undefined') savedmodule = module;
+    else module = {}
+
+    var tag = document.createElement('script');
+    tag.src = uri;
+    tag.async = true;
+    tag.onload = () => {
+        exports = savedexports;
+        module = savedmodule;
+        resolve();
+    };
+  var firstScriptTag = document.getElementsByTagName('script')[0];
+  firstScriptTag.parentNode.insertBefore(tag, firstScriptTag);
+});
+};
+
+if(typeof $3Dmolpromise === 'undefined') {
+$3Dmolpromise = null;
+  $3Dmolpromise = loadScriptAsync('https://cdnjs.cloudflare.com/ajax/libs/3Dmol/2.4.0/3Dmol-min.js');
+}
+
+var viewer_17638177652198553 = null;
+var warn = document.getElementById("3dmolwarning_17638177652198553");
+if(warn) {
+    warn.parentNode.removeChild(warn);
+}
+$3Dmolpromise.then(function() {
+viewer_17638177652198553 = $3Dmol.createViewer(document.getElementById("3dmolviewer_17638177652198553"),{backgroundColor:"white"});
+viewer_17638177652198553.zoomTo();
+    viewer_17638177652198553.addModel("1D1_A_401\n     RDKit          3D\n\n 47 50  0  0  0  0  0  0  0  0999 V2000\n    4.0527    1.8957   -0.3913 O   0  0  0  0  0  0  0  0  0  0  0  0\n   -1.8480    2.2030   -0.0118 N   0  0  0  0  0  0  0  0  0  0  0  0\n   -3.5993   -0.9673   -0.2516 N   0  0  0  0  0  0  0  0  0  0  0  0\n   -1.0374   -0.0165   -0.1681 N   0  0  0  0  0  0  0  0  0  0  0  0\n    1.8029    2.3697   -0.2356 N   0  0  0  0  0  0  0  0  0  0  0  0\n    1.3087   -0.4889   -0.3277 N   0  0  0  0  0  0  0  0  0  0  0  0\n    2.0742    3.8124   -0.1844 C   0  0  0  0  0  0  0  0  0  0  0  0\n    2.6170    0.0789    2.2230 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -4.9181   -1.2423   -0.1069 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -0.6198    2.7287   -0.0662 C   0  0  0  0  0  0  0  0  0  0  0  0\n    3.3412   -0.4413    0.9841 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -5.5835   -0.0843    0.2526 C   0  0  0  0  0  0  0  0  0  0  0  0\n    0.8590   -4.1509    0.5110 C   0  0  0  0  0  0  0  0  0  0  0  0\n    1.7484   -4.2074   -0.7324 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -4.6529    0.9285    0.3431 C   0  0  0  0  0  0  0  0  0  0  0  0\n    0.6891   -2.6772    0.8870 C   0  0  0  0  0  0  0  0  0  0  0  0\n    2.0070   -2.7705   -1.1655 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -2.0615    0.8622   -0.0663 C   0  0  0  0  0  0  0  0  0  0  0  0\n    2.8834    1.4626   -0.3468 C   0  0  0  0  0  0  0  0  0  0  0  0\n    0.2353    0.4228   -0.2272 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -3.4509    0.3385    0.0102 C   0  0  0  0  0  0  0  0  0  0  0  0\n    0.9698   -1.9332   -0.4096 C   0  0  0  0  0  0  0  0  0  0  0  0\n    0.4810    1.8872   -0.1699 C   0  0  0  0  0  0  0  0  0  0  0  0\n    2.7019   -0.0105   -0.3496 C   0  0  2  0  0  0  0  0  0  0  0  0\n   -2.8782   -1.6123   -0.5044 H   0  0  0  0  0  0  0  0  0  0  0  0\n    1.2112    4.3113   -0.1063 H   0  0  0  0  0  0  0  0  0  0  0  0\n    2.6496    4.0155    0.6079 H   0  0  0  0  0  0  0  0  0  0  0  0\n    2.5468    4.0926   -1.0201 H   0  0  0  0  0  0  0  0  0  0  0  0\n    3.0892   -0.2414    3.0442 H   0  0  0  0  0  0  0  0  0  0  0  0\n    2.6111    1.0788    2.2104 H   0  0  0  0  0  0  0  0  0  0  0  0\n    1.6761   -0.2600    2.2260 H   0  0  0  0  0  0  0  0  0  0  0  0\n   -5.3421   -2.1383   -0.2387 H   0  0  0  0  0  0  0  0  0  0  0  0\n   -0.4945    3.7201   -0.0325 H   0  0  0  0  0  0  0  0  0  0  0  0\n    3.3466   -1.4407    1.0207 H   0  0  0  0  0  0  0  0  0  0  0  0\n    4.2815   -0.1019    1.0050 H   0  0  0  0  0  0  0  0  0  0  0  0\n   -6.5659    0.0027    0.4178 H   0  0  0  0  0  0  0  0  0  0  0  0\n    1.2916   -4.6477    1.2634 H   0  0  0  0  0  0  0  0  0  0  0  0\n   -0.0326   -4.5577    0.3120 H   0  0  0  0  0  0  0  0  0  0  0  0\n    1.2842   -4.7075   -1.4633 H   0  0  0  0  0  0  0  0  0  0  0  0\n    2.6128   -4.6608   -0.5151 H   0  0  0  0  0  0  0  0  0  0  0  0\n   -4.8138    1.8828    0.5949 H   0  0  0  0  0  0  0  0  0  0  0  0\n    1.3422   -2.4136    1.5967 H   0  0  0  0  0  0  0  0  0  0  0  0\n   -0.2412   -2.4967    1.2063 H   0  0  0  0  0  0  0  0  0  0  0  0\n    1.8840   -2.6740   -2.1532 H   0  0  0  0  0  0  0  0  0  0  0  0\n    2.9339   -2.4901   -0.9160 H   0  0  0  0  0  0  0  0  0  0  0  0\n    0.1278   -1.9883   -0.9463 H   0  0  0  0  0  0  0  0  0  0  0  0\n    3.1957   -0.4183   -1.1175 H   0  0  0  0  0  0  0  0  0  0  0  0\n  1 19  2  0\n  2 10  2  0\n  2 18  1  0\n  3  9  1  0\n  3 21  1  0\n  4 18  2  0\n  4 20  1  0\n  5  7  1  0\n  5 19  1  0\n  5 23  1  0\n  6 20  1  0\n  6 22  1  0\n  6 24  1  0\n  8 11  1  0\n  9 12  2  0\n 10 23  1  0\n 11 24  1  0\n 12 15  1  0\n 13 14  1  0\n 13 16  1  0\n 14 17  1  0\n 15 21  2  0\n 16 22  1  0\n 17 22  1  0\n 18 21  1  0\n 19 24  1  0\n 20 23  2  0\n  3 25  1  0\n  7 26  1  0\n  7 27  1  0\n  7 28  1  0\n  8 29  1  0\n  8 30  1  0\n  8 31  1  0\n  9 32  1  0\n 10 33  1  0\n 11 34  1  0\n 11 35  1  0\n 12 36  1  0\n 13 37  1  0\n 13 38  1  0\n 14 39  1  0\n 14 40  1  0\n 15 41  1  0\n 16 42  1  0\n 16 43  1  0\n 17 44  1  0\n 17 45  1  0\n 22 46  1  0\n 24 47  1  6\nM  END\n","sdf");
+    viewer_17638177652198553.setStyle({"stick": {}});
+    viewer_17638177652198553.addModel("11G_A_401\n     RDKit          3D\n\n 39 41  0  0  0  0  0  0  0  0999 V2000\n    1.2908    3.3626   -0.0826 O   0  0  0  0  0  0  0  0  0  0  0  0\n    2.1667   -2.5110   -0.2996 N   0  0  0  0  0  0  0  0  0  0  0  0\n   -0.1004   -1.9105   -0.0530 N   0  0  0  0  0  0  0  0  0  0  0  0\n    2.0042    1.1592   -0.1788 N   0  0  0  0  0  0  0  0  0  0  0  0\n   -0.7924    0.3938    0.0616 N   0  0  0  0  0  0  0  0  0  0  0  0\n    3.4111    1.5729   -0.3120 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -0.3606    1.5738   -2.6066 C   0  0  0  0  0  0  0  0  0  0  0  0\n    0.8662   -2.8340   -0.1762 C   0  0  0  0  0  0  0  0  0  0  0  0\n    2.5819   -1.2370   -0.3026 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -0.9431    2.3142   -1.3879 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -4.4736   -0.3472   -0.4755 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -4.5054    0.6223    0.7143 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -3.0300   -0.3987   -0.9834 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -3.0517    0.9677    1.0295 C   0  0  0  0  0  0  0  0  0  0  0  0\n    0.9942    2.1467   -0.0644 C   0  0  0  0  0  0  0  0  0  0  0  0\n    0.2109   -0.5927   -0.0495 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -2.2084   -0.0364    0.2382 C   0  0  0  0  0  0  0  0  0  0  0  0\n    1.6419   -0.2106   -0.1916 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -0.4447    1.8204   -0.0045 C   0  0  2  0  0  0  0  0  0  0  0  0\n    3.9919    0.7619   -0.3813 H   0  0  0  0  0  0  0  0  0  0  0  0\n    3.5179    2.1309   -1.1349 H   0  0  0  0  0  0  0  0  0  0  0  0\n    3.6788    2.1070    0.4899 H   0  0  0  0  0  0  0  0  0  0  0  0\n   -0.7406    1.9627   -3.4459 H   0  0  0  0  0  0  0  0  0  0  0  0\n    0.6344    1.6744   -2.6134 H   0  0  0  0  0  0  0  0  0  0  0  0\n   -0.5972    0.6038   -2.5518 H   0  0  0  0  0  0  0  0  0  0  0  0\n    0.6096   -3.8005   -0.1764 H   0  0  0  0  0  0  0  0  0  0  0  0\n    3.5555   -1.0233   -0.3836 H   0  0  0  0  0  0  0  0  0  0  0  0\n   -1.9375    2.2113   -1.4116 H   0  0  0  0  0  0  0  0  0  0  0  0\n   -0.7060    3.2819   -1.4732 H   0  0  0  0  0  0  0  0  0  0  0  0\n   -5.0797   -0.0194   -1.2002 H   0  0  0  0  0  0  0  0  0  0  0  0\n   -4.7659   -1.2577   -0.1828 H   0  0  0  0  0  0  0  0  0  0  0  0\n   -4.9361    0.1859    1.5043 H   0  0  0  0  0  0  0  0  0  0  0  0\n   -5.0126    1.4495    0.4727 H   0  0  0  0  0  0  0  0  0  0  0  0\n   -2.8867    0.2632   -1.7191 H   0  0  0  0  0  0  0  0  0  0  0  0\n   -2.7990   -1.3152   -1.3100 H   0  0  0  0  0  0  0  0  0  0  0  0\n   -2.8757    0.8754    2.0096 H   0  0  0  0  0  0  0  0  0  0  0  0\n   -2.8443    1.9022    0.7401 H   0  0  0  0  0  0  0  0  0  0  0  0\n   -2.1737   -0.8640    0.7984 H   0  0  0  0  0  0  0  0  0  0  0  0\n   -0.8912    2.3272    0.7330 H   0  0  0  0  0  0  0  0  0  0  0  0\n  1 15  2  0\n  2  8  2  0\n  2  9  1  0\n  3  8  1  0\n  3 16  2  0\n  4  6  1  0\n  4 15  1  0\n  4 18  1  0\n  5 16  1  0\n  5 17  1  0\n  5 19  1  0\n  7 10  1  0\n  9 18  2  0\n 10 19  1  0\n 11 12  1  0\n 11 13  1  0\n 12 14  1  0\n 13 17  1  0\n 14 17  1  0\n 15 19  1  0\n 16 18  1  0\n  6 20  1  0\n  6 21  1  0\n  6 22  1  0\n  7 23  1  0\n  7 24  1  0\n  7 25  1  0\n  8 26  1  0\n  9 27  1  0\n 10 28  1  0\n 10 29  1  0\n 11 30  1  0\n 11 31  1  0\n 12 32  1  0\n 12 33  1  0\n 13 34  1  0\n 13 35  1  0\n 14 36  1  0\n 14 37  1  0\n 17 38  1  0\n 19 39  1  1\nM  END\n","sdf");
+    viewer_17638177652198553.setStyle({"stick": {}});
+    viewer_17638177652198553.setStyle({"model": 0},{"stick": {"colorscheme": "cyanCarbon"}});
+    viewer_17638177652198553.setStyle({"model": 1},{"stick": {"colorscheme": "redCarbon"}});
+    viewer_17638177652198553.setBackgroundColor("0xeeeeee");
+    viewer_17638177652198553.zoomTo();
+viewer_17638177652198553.render();
+});
+</script>
+</div>
+</div>
+<p>This is a case where the asymmetry of the Tversky Index used in the Lobster paper shows. Here in the crystal alignment the second of the two molecules is more or less completely contained within the first one; that leads to a very high Tversky index that drops significantly if we re-order the molecules:</p>
+<div id="9b8ce793" class="cell" data-execution_count="25">
+<div class="sourceCode cell-code" id="cb21"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb21-1"><a href="#cb21-1" aria-hidden="true" tabindex="-1"></a>tversky12 <span class="op">=</span> rdShapeHelpers.ShapeTverskyIndex(m1,m2,<span class="dv">0</span>,<span class="dv">1</span>)</span>
+<span id="cb21-2"><a href="#cb21-2" aria-hidden="true" tabindex="-1"></a>tversky21 <span class="op">=</span> rdShapeHelpers.ShapeTverskyIndex(m2,m1,<span class="dv">0</span>,<span class="dv">1</span>)</span>
+<span id="cb21-3"><a href="#cb21-3" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f'</span><span class="sc">{</span>tversky12<span class="sc">:.2f}</span><span class="ss"> -&gt; </span><span class="sc">{</span>tversky21<span class="sc">:.2f}</span><span class="ss">'</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>0.95 -&gt; 0.76</code></pre>
+</div>
+</div>
+<p>The shape alignment is symmetrical because it maximizes the overall overlap:</p>
+<div id="11c56455" class="cell" data-execution_count="28">
+<div class="sourceCode cell-code" id="cb23"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb23-1"><a href="#cb23-1" aria-hidden="true" tabindex="-1"></a>m1c <span class="op">=</span> Chem.Mol(m1)</span>
+<span id="cb23-2"><a href="#cb23-2" aria-hidden="true" tabindex="-1"></a>m2c <span class="op">=</span> Chem.Mol(m2)</span>
+<span id="cb23-3"><a href="#cb23-3" aria-hidden="true" tabindex="-1"></a>rdMolTransforms.CanonicalizeConformer(m1c.GetConformer())</span>
+<span id="cb23-4"><a href="#cb23-4" aria-hidden="true" tabindex="-1"></a>rdMolTransforms.CanonicalizeConformer(m2c.GetConformer())</span>
+<span id="cb23-5"><a href="#cb23-5" aria-hidden="true" tabindex="-1"></a>st2,ct2 <span class="op">=</span> rdShapeAlign.AlignMol(m2c,m1c,opt_param<span class="op">=</span><span class="fl">0.5</span>)</span>
+<span id="cb23-6"><a href="#cb23-6" aria-hidden="true" tabindex="-1"></a>tversky2 <span class="op">=</span> rdShapeHelpers.ShapeTverskyIndex(m1c,m2c,<span class="dv">0</span>,<span class="dv">1</span>)</span>
+<span id="cb23-7"><a href="#cb23-7" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb23-8"><a href="#cb23-8" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f'</span><span class="sc">{</span>tversky<span class="sc">:.2f}</span><span class="ss"> -&gt; </span><span class="sc">{</span>tversky2<span class="sc">:.2f}</span><span class="ss">'</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>0.76 -&gt; 0.76</code></pre>
+</div>
+</div>
+<p>What about molecules with a very low crystal Tversky index and a high one from the shape alignment?</p>
+<div id="fbd00cf0" class="cell" data-execution_count="29">
+<div class="sourceCode cell-code" id="cb25"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb25-1"><a href="#cb25-1" aria-hidden="true" tabindex="-1"></a>pruned <span class="op">=</span> [r <span class="cf">for</span> r <span class="kw">in</span> pairstats <span class="cf">if</span> r[<span class="st">'shape_tversky_index'</span>]<span class="op">&lt;</span><span class="fl">0.1</span> <span class="kw">and</span> r[<span class="st">'shape_align_ShapeTversky'</span>]<span class="op">&gt;</span><span class="fl">0.8</span>]</span>
+<span id="cb25-2"><a href="#cb25-2" aria-hidden="true" tabindex="-1"></a><span class="bu">len</span>(pruned)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-display" data-execution_count="29">
+<pre><code>42</code></pre>
+</div>
+</div>
+<div id="c16d6901" class="cell" data-execution_count="30">
+<div class="sourceCode cell-code" id="cb27"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb27-1"><a href="#cb27-1" aria-hidden="true" tabindex="-1"></a>d <span class="op">=</span> pruned[<span class="dv">0</span>]</span>
+<span id="cb27-2"><a href="#cb27-2" aria-hidden="true" tabindex="-1"></a>m1 <span class="op">=</span> ligs[(d[<span class="st">'ligname1'</span>],d[<span class="st">'pdb1'</span>])][<span class="dv">3</span>]</span>
+<span id="cb27-3"><a href="#cb27-3" aria-hidden="true" tabindex="-1"></a>m2 <span class="op">=</span> ligs[(d[<span class="st">'ligname2'</span>],d[<span class="st">'pdb2'</span>])][<span class="dv">3</span>]</span>
+<span id="cb27-4"><a href="#cb27-4" aria-hidden="true" tabindex="-1"></a>m1c <span class="op">=</span> Chem.Mol(m1)</span>
+<span id="cb27-5"><a href="#cb27-5" aria-hidden="true" tabindex="-1"></a>m2c <span class="op">=</span> Chem.Mol(m2)</span>
+<span id="cb27-6"><a href="#cb27-6" aria-hidden="true" tabindex="-1"></a>rdMolTransforms.CanonicalizeConformer(m1c.GetConformer())</span>
+<span id="cb27-7"><a href="#cb27-7" aria-hidden="true" tabindex="-1"></a>rdMolTransforms.CanonicalizeConformer(m2c.GetConformer())</span>
+<span id="cb27-8"><a href="#cb27-8" aria-hidden="true" tabindex="-1"></a>st,ct <span class="op">=</span> rdShapeAlign.AlignMol(m1c,m2c,opt_param<span class="op">=</span><span class="fl">0.5</span>)</span>
+<span id="cb27-9"><a href="#cb27-9" aria-hidden="true" tabindex="-1"></a>tversky <span class="op">=</span> rdShapeHelpers.ShapeTverskyIndex(m1c,m2c,<span class="dv">0</span>,<span class="dv">1</span>)</span>
+<span id="cb27-10"><a href="#cb27-10" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb27-11"><a href="#cb27-11" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(st,ct)</span>
+<span id="cb27-12"><a href="#cb27-12" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(d[<span class="st">'shape_tversky_index'</span>],tversky)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>0.3489983628032094 0.08050058859625212
+0.0 0.8264984227129337</code></pre>
+</div>
+</div>
+<div id="b871c795" class="cell" data-execution_count="31">
+<div class="sourceCode cell-code" id="cb29"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb29-1"><a href="#cb29-1" aria-hidden="true" tabindex="-1"></a>IPythonConsole.drawMols3D([m1,m2])</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-display">
+<div id="3dmolviewer_17638185210383122" style="position: relative; width: 400px; height: 400px;">
+        <p id="3dmolwarning_17638185210383122" style="background-color:#ffcccc;color:black">3Dmol.js failed to load for some reason.  Please check your browser console for error messages.<br></p>
+        </div>
+<script>
+
+var loadScriptAsync = function(uri){
+  return new Promise((resolve, reject) => {
+    //this is to ignore the existence of requirejs amd
+    var savedexports, savedmodule;
+    if (typeof exports !== 'undefined') savedexports = exports;
+    else exports = {}
+    if (typeof module !== 'undefined') savedmodule = module;
+    else module = {}
+
+    var tag = document.createElement('script');
+    tag.src = uri;
+    tag.async = true;
+    tag.onload = () => {
+        exports = savedexports;
+        module = savedmodule;
+        resolve();
+    };
+  var firstScriptTag = document.getElementsByTagName('script')[0];
+  firstScriptTag.parentNode.insertBefore(tag, firstScriptTag);
+});
+};
+
+if(typeof $3Dmolpromise === 'undefined') {
+$3Dmolpromise = null;
+  $3Dmolpromise = loadScriptAsync('https://cdnjs.cloudflare.com/ajax/libs/3Dmol/2.4.0/3Dmol-min.js');
+}
+
+var viewer_17638185210383122 = null;
+var warn = document.getElementById("3dmolwarning_17638185210383122");
+if(warn) {
+    warn.parentNode.removeChild(warn);
+}
+$3Dmolpromise.then(function() {
+viewer_17638185210383122 = $3Dmol.createViewer(document.getElementById("3dmolviewer_17638185210383122"),{backgroundColor:"white"});
+viewer_17638185210383122.zoomTo();
+    viewer_17638185210383122.addModel("N4Z_A_401\n     RDKit          3D\n\n 72 77  0  0  0  0  0  0  0  0999 V2000\n   36.2199  -10.7081    9.0552 Cl  0  0  0  0  0  0  0  0  0  0  0  0\n   27.3817  -12.6095    9.7595 S   0  0  0  0  0  0  0  0  0  0  0  0\n   35.4096   -9.2060    5.5168 F   0  0  0  0  0  0  0  0  0  0  0  0\n   33.4858   -9.8570    4.9932 F   0  0  0  0  0  0  0  0  0  0  0  0\n   26.8175  -13.1097   10.9746 O   0  0  0  0  0  0  0  0  0  0  0  0\n   27.7227  -13.5288    8.7055 O   0  0  0  0  0  0  0  0  0  0  0  0\n   28.5512  -13.5624   15.4356 O   0  0  0  0  0  0  0  0  0  0  0  0\n   33.6681   -7.6959    5.6877 O   0  0  0  0  0  0  0  0  0  0  0  0\n   33.8898   -9.5898    7.1939 O   0  0  0  0  0  0  0  0  0  0  0  0\n   32.4974   -9.3694   19.4636 N   0  0  0  0  0  0  0  0  0  0  0  0\n   34.7262   -8.5287   12.0676 N   0  0  0  0  0  0  0  0  0  0  0  0\n   29.5461  -11.7556   14.1966 N   0  0  0  0  0  0  0  0  0  0  0  0\n   29.4388  -11.6124   16.4996 N   0  0  0  0  0  0  0  0  0  0  0  0\n   30.4059   -9.8858   15.2888 N   0  0  0  0  0  0  0  0  0  0  0  0\n   30.5112   -9.9849   12.9555 N   0  0  0  0  0  0  0  0  0  0  0  0\n   32.4252   -9.8165   11.0866 N   0  0  0  0  0  0  0  0  0  0  0  0\n   30.3391   -9.7008   17.6449 N   0  0  0  0  0  0  0  0  0  0  0  0\n   26.3454  -11.2645    9.1219 C   0  0  0  0  0  0  0  0  0  0  0  0\n   28.0008  -14.1448   14.2300 C   0  0  0  0  0  0  0  0  0  0  0  0\n   32.3985   -8.5488   18.2092 C   0  0  0  0  0  0  0  0  0  0  0  0\n   31.5894  -10.5531   19.6096 C   0  0  0  0  0  0  0  0  0  0  0  0\n   35.8361   -8.1651   12.7555 C   0  0  0  0  0  0  0  0  0  0  0  0\n   30.9414   -8.3582   17.6650 C   0  0  0  0  0  0  0  0  0  0  0  0\n   30.1756  -10.3268   18.9836 C   0  0  0  0  0  0  0  0  0  0  0  0\n   37.1187   -8.5879   12.3401 C   0  0  0  0  0  0  0  0  0  0  0  0\n   32.6687   -5.9855    8.8089 C   0  0  0  0  0  0  0  0  0  0  0  0\n   37.2349   -9.4037   11.2013 C   0  0  0  0  0  0  0  0  0  0  0  0\n   29.8827  -11.6054    9.1608 C   0  0  0  0  0  0  0  0  0  0  0  0\n   32.9026   -6.1187    7.4330 C   0  0  0  0  0  0  0  0  0  0  0  0\n   31.0569  -10.9011    9.4315 C   0  0  0  0  0  0  0  0  0  0  0  0\n   32.8124   -7.0968    9.6774 C   0  0  0  0  0  0  0  0  0  0  0  0\n   29.0776  -11.2062   11.4192 C   0  0  0  0  0  0  0  0  0  0  0  0\n   36.0740   -9.7303   10.4899 C   0  0  0  0  0  0  0  0  0  0  0  0\n   28.8826  -11.7375   10.1374 C   0  0  0  0  0  0  0  0  0  0  0  0\n   29.1554  -12.2946   15.3639 C   0  0  0  0  0  0  0  0  0  0  0  0\n   30.1514  -10.5453   14.1417 C   0  0  0  0  0  0  0  0  0  0  0  0\n   30.0348  -10.3797   16.4910 C   0  0  0  0  0  0  0  0  0  0  0  0\n   33.3050   -7.3953    6.9916 C   0  0  0  0  0  0  0  0  0  0  0  0\n   31.2771  -10.4141   10.7348 C   0  0  0  0  0  0  0  0  0  0  0  0\n   30.2939  -10.5517   11.7267 C   0  0  0  0  0  0  0  0  0  0  0  0\n   33.5115   -8.4444    7.8586 C   0  0  0  0  0  0  0  0  0  0  0  0\n   34.7981   -9.2932   10.9450 C   0  0  0  0  0  0  0  0  0  0  0  0\n   33.5115   -9.5735   10.1572 C   0  0  2  0  0  0  0  0  0  0  0  0\n   33.2926   -8.3469    9.2417 C   0  0  0  0  0  0  0  0  0  0  0  0\n   34.1336   -9.0653    5.8659 C   0  0  0  0  0  0  0  0  0  0  0  0\n   32.3134   -8.7579   20.2331 H   0  0  0  0  0  0  0  0  0  0  0  0\n   30.9670   -9.0953   12.9819 H   0  0  0  0  0  0  0  0  0  0  0  0\n   32.5376   -9.5242   12.0363 H   0  0  0  0  0  0  0  0  0  0  0  0\n   26.7395  -10.9142    8.2722 H   0  0  0  0  0  0  0  0  0  0  0  0\n   25.4236  -11.6093    8.9446 H   0  0  0  0  0  0  0  0  0  0  0  0\n   26.3018  -10.5284    9.7974 H   0  0  0  0  0  0  0  0  0  0  0  0\n   27.6093  -15.0404   14.4412 H   0  0  0  0  0  0  0  0  0  0  0  0\n   27.2869  -13.5463   13.8666 H   0  0  0  0  0  0  0  0  0  0  0  0\n   28.7259  -14.2500   13.5495 H   0  0  0  0  0  0  0  0  0  0  0  0\n   32.9399   -8.9989   17.4990 H   0  0  0  0  0  0  0  0  0  0  0  0\n   32.7816   -7.6445   18.3974 H   0  0  0  0  0  0  0  0  0  0  0  0\n   31.4776  -10.7495   20.5837 H   0  0  0  0  0  0  0  0  0  0  0  0\n   32.0148  -11.3374   19.1581 H   0  0  0  0  0  0  0  0  0  0  0  0\n   35.7459   -7.5895   13.5683 H   0  0  0  0  0  0  0  0  0  0  0  0\n   30.4215   -7.7528   18.2676 H   0  0  0  0  0  0  0  0  0  0  0  0\n   30.9623   -7.9726   16.7425 H   0  0  0  0  0  0  0  0  0  0  0  0\n   29.7054  -11.2043   18.8891 H   0  0  0  0  0  0  0  0  0  0  0  0\n   29.6395   -9.7231   19.5736 H   0  0  0  0  0  0  0  0  0  0  0  0\n   37.9332   -8.3104   12.8496 H   0  0  0  0  0  0  0  0  0  0  0  0\n   32.3978   -5.0978    9.1814 H   0  0  0  0  0  0  0  0  0  0  0  0\n   38.1276   -9.7436   10.9056 H   0  0  0  0  0  0  0  0  0  0  0  0\n   29.7521  -12.0208    8.2606 H   0  0  0  0  0  0  0  0  0  0  0  0\n   32.7904   -5.3520    6.8010 H   0  0  0  0  0  0  0  0  0  0  0  0\n   31.7322  -10.7446    8.7107 H   0  0  0  0  0  0  0  0  0  0  0  0\n   32.5624   -6.9885   10.6395 H   0  0  0  0  0  0  0  0  0  0  0  0\n   28.3617  -11.2891   12.1124 H   0  0  0  0  0  0  0  0  0  0  0  0\n   33.6452  -10.3861    9.5899 H   0  0  0  0  0  0  0  0  0  0  0  0\n  1 33  1  0\n  2  5  2  0\n  2  6  2  0\n  2 18  1  0\n  2 34  1  0\n  3 45  1  0\n  4 45  1  0\n  7 19  1  0\n  7 35  1  0\n  8 38  1  0\n  8 45  1  0\n  9 41  1  0\n  9 45  1  0\n 10 20  1  0\n 10 21  1  0\n 11 22  2  0\n 11 42  1  0\n 12 35  2  0\n 12 36  1  0\n 13 35  1  0\n 13 37  2  0\n 14 36  2  0\n 14 37  1  0\n 15 36  1  0\n 15 40  1  0\n 16 39  1  0\n 16 43  1  0\n 17 23  1  0\n 17 24  1  0\n 17 37  1  0\n 20 23  1  0\n 21 24  1  0\n 22 25  1  0\n 25 27  2  0\n 26 29  1  0\n 26 31  2  0\n 27 33  1  0\n 28 30  2  0\n 28 34  1  0\n 29 38  2  0\n 30 39  1  0\n 31 44  1  0\n 32 34  2  0\n 32 40  1  0\n 33 42  2  0\n 38 41  1  0\n 39 40  2  0\n 41 44  2  0\n 42 43  1  0\n 43 44  1  0\n 10 46  1  0\n 15 47  1  0\n 16 48  1  0\n 18 49  1  0\n 18 50  1  0\n 18 51  1  0\n 19 52  1  0\n 19 53  1  0\n 19 54  1  0\n 20 55  1  0\n 20 56  1  0\n 21 57  1  0\n 21 58  1  0\n 22 59  1  0\n 23 60  1  0\n 23 61  1  0\n 24 62  1  0\n 24 63  1  0\n 25 64  1  0\n 26 65  1  0\n 27 66  1  0\n 28 67  1  0\n 29 68  1  0\n 30 69  1  0\n 31 70  1  0\n 32 71  1  0\n 43 72  1  6\nM  END\n","sdf");
+    viewer_17638185210383122.setStyle({"stick": {}});
+    viewer_17638185210383122.addModel("5JT_A_402\n     RDKit          3D\n\n 31 33  0  0  0  0  0  0  0  0999 V2000\n   36.5041   -2.1215   21.0296 N   0  0  0  0  0  0  0  0  0  0  0  0\n   35.9148    4.4231   18.2923 N   0  0  0  0  0  0  0  0  0  0  0  0\n   36.3566    2.1132   18.3739 N   0  0  0  0  0  0  0  0  0  0  0  0\n   33.6253    5.0470   18.9094 N   0  0  0  0  0  0  0  0  0  0  0  0\n   34.7689    0.4709   18.9206 N   0  0  0  0  0  0  0  0  0  0  0  0\n   36.7684    3.3861   18.1191 C   0  0  0  0  0  0  0  0  0  0  0  0\n   32.5188    4.4301   19.2432 C   0  0  0  0  0  0  0  0  0  0  0  0\n   33.4106   -0.0916   18.8718 C   0  0  0  0  0  0  0  0  0  0  0  0\n   33.0467   -0.4305   20.3537 C   0  0  0  0  0  0  0  0  0  0  0  0\n   35.8246   -0.4775   19.3067 C   0  0  0  0  0  0  0  0  0  0  0  0\n   32.7306    3.1059   19.2582 C   0  0  0  0  0  0  0  0  0  0  0  0\n   34.0678   -1.4666   20.9262 C   0  0  0  0  0  0  0  0  0  0  0  0\n   35.5583   -1.0136   20.7452 C   0  0  1  0  0  0  0  0  0  0  0  0\n   34.6301    4.1847   18.6654 C   0  0  0  0  0  0  0  0  0  0  0  0\n   35.0755    1.7912   18.7220 C   0  0  0  0  0  0  0  0  0  0  0  0\n   34.1793    2.8845   18.8800 C   0  0  0  0  0  0  0  0  0  0  0  0\n   36.3397   -2.4717   21.9518 H   0  0  0  0  0  0  0  0  0  0  0  0\n   36.3669   -2.8559   20.3649 H   0  0  0  0  0  0  0  0  0  0  0  0\n   33.7132    6.0410   18.8436 H   0  0  0  0  0  0  0  0  0  0  0  0\n   37.7022    3.5552   17.8038 H   0  0  0  0  0  0  0  0  0  0  0  0\n   31.6499    4.8778   19.4544 H   0  0  0  0  0  0  0  0  0  0  0  0\n   33.3947   -0.9187   18.3099 H   0  0  0  0  0  0  0  0  0  0  0  0\n   32.7683    0.5776   18.4982 H   0  0  0  0  0  0  0  0  0  0  0  0\n   32.1255   -0.8180   20.3890 H   0  0  0  0  0  0  0  0  0  0  0  0\n   33.0782    0.4048   20.9026 H   0  0  0  0  0  0  0  0  0  0  0  0\n   36.7105   -0.0140   19.2847 H   0  0  0  0  0  0  0  0  0  0  0  0\n   35.8331   -1.2435   18.6640 H   0  0  0  0  0  0  0  0  0  0  0  0\n   32.0586    2.3987   19.4777 H   0  0  0  0  0  0  0  0  0  0  0  0\n   33.9388   -2.3378   20.4525 H   0  0  0  0  0  0  0  0  0  0  0  0\n   33.8869   -1.5879   21.9022 H   0  0  0  0  0  0  0  0  0  0  0  0\n   35.7404   -0.2737   21.3928 H   0  0  0  0  0  0  0  0  0  0  0  0\n  1 13  1  0\n  2  6  2  0\n  2 14  1  0\n  3  6  1  0\n  3 15  2  0\n  4  7  1  0\n  4 14  1  0\n  5  8  1  0\n  5 10  1  0\n  5 15  1  0\n  7 11  2  0\n  8  9  1  0\n  9 12  1  0\n 10 13  1  0\n 11 16  1  0\n 12 13  1  0\n 14 16  2  0\n 15 16  1  0\n  1 17  1  0\n  1 18  1  0\n  4 19  1  0\n  6 20  1  0\n  7 21  1  0\n  8 22  1  0\n  8 23  1  0\n  9 24  1  0\n  9 25  1  0\n 10 26  1  0\n 10 27  1  0\n 11 28  1  0\n 12 29  1  0\n 12 30  1  0\n 13 31  1  1\nM  END\n","sdf");
+    viewer_17638185210383122.setStyle({"stick": {}});
+    viewer_17638185210383122.setStyle({"model": 0},{"stick": {"colorscheme": "cyanCarbon"}});
+    viewer_17638185210383122.setStyle({"model": 1},{"stick": {"colorscheme": "redCarbon"}});
+    viewer_17638185210383122.setBackgroundColor("0xeeeeee");
+    viewer_17638185210383122.zoomTo();
+viewer_17638185210383122.render();
+});
+</script>
+</div>
+</div>
+<div id="5ff7da55" class="cell" data-scrolled="false" data-execution_count="32">
+<div class="sourceCode cell-code" id="cb30"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb30-1"><a href="#cb30-1" aria-hidden="true" tabindex="-1"></a>IPythonConsole.drawMols3D([m1c,m2c])</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-display">
+<div id="3dmolviewer_1763818529126895" style="position: relative; width: 400px; height: 400px;">
+        <p id="3dmolwarning_1763818529126895" style="background-color:#ffcccc;color:black">3Dmol.js failed to load for some reason.  Please check your browser console for error messages.<br></p>
+        </div>
+<script>
+
+var loadScriptAsync = function(uri){
+  return new Promise((resolve, reject) => {
+    //this is to ignore the existence of requirejs amd
+    var savedexports, savedmodule;
+    if (typeof exports !== 'undefined') savedexports = exports;
+    else exports = {}
+    if (typeof module !== 'undefined') savedmodule = module;
+    else module = {}
+
+    var tag = document.createElement('script');
+    tag.src = uri;
+    tag.async = true;
+    tag.onload = () => {
+        exports = savedexports;
+        module = savedmodule;
+        resolve();
+    };
+  var firstScriptTag = document.getElementsByTagName('script')[0];
+  firstScriptTag.parentNode.insertBefore(tag, firstScriptTag);
+});
+};
+
+if(typeof $3Dmolpromise === 'undefined') {
+$3Dmolpromise = null;
+  $3Dmolpromise = loadScriptAsync('https://cdnjs.cloudflare.com/ajax/libs/3Dmol/2.4.0/3Dmol-min.js');
+}
+
+var viewer_1763818529126895 = null;
+var warn = document.getElementById("3dmolwarning_1763818529126895");
+if(warn) {
+    warn.parentNode.removeChild(warn);
+}
+$3Dmolpromise.then(function() {
+viewer_1763818529126895 = $3Dmol.createViewer(document.getElementById("3dmolviewer_1763818529126895"),{backgroundColor:"white"});
+viewer_1763818529126895.zoomTo();
+    viewer_1763818529126895.addModel("N4Z_A_401\n     RDKit          3D\n\n 72 77  0  0  0  0  0  0  0  0999 V2000\n    3.9440   -2.0052   -2.7857 Cl  0  0  0  0  0  0  0  0  0  0  0  0\n   -0.4775    5.4335   -0.0762 S   0  0  0  0  0  0  0  0  0  0  0  0\n    7.1313   -0.4980   -1.0531 F   0  0  0  0  0  0  0  0  0  0  0  0\n    6.7279    1.5232   -0.6644 F   0  0  0  0  0  0  0  0  0  0  0  0\n   -1.8918    5.5663   -0.2413 O   0  0  0  0  0  0  0  0  0  0  0  0\n    0.4079    6.0394   -1.0360 O   0  0  0  0  0  0  0  0  0  0  0  0\n   -5.3343    2.4658   -1.5248 O   0  0  0  0  0  0  0  0  0  0  0  0\n    6.6275    0.1107    1.1190 O   0  0  0  0  0  0  0  0  0  0  0  0\n    4.9597    0.1264   -0.6482 O   0  0  0  0  0  0  0  0  0  0  0  0\n   -6.5625   -4.2497    0.1401 N   0  0  0  0  0  0  0  0  0  0  0  0\n    1.1203   -3.1315   -0.1754 N   0  0  0  0  0  0  0  0  0  0  0  0\n   -3.4587    1.4230   -0.4366 N   0  0  0  0  0  0  0  0  0  0  0  0\n   -5.5410    0.4359   -0.2762 N   0  0  0  0  0  0  0  0  0  0  0  0\n   -3.7183   -0.5617    0.7559 N   0  0  0  0  0  0  0  0  0  0  0  0\n   -1.6003    0.4205    0.6350 N   0  0  0  0  0  0  0  0  0  0  0  0\n    0.8497   -0.3312   -0.1505 N   0  0  0  0  0  0  0  0  0  0  0  0\n   -5.8240   -1.6223    0.9321 N   0  0  0  0  0  0  0  0  0  0  0  0\n   -0.0186    5.9192    1.6099 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -4.5835    3.6828   -1.7501 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -5.2998   -3.9912    0.9117 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -7.2908   -3.0756   -0.4413 C   0  0  0  0  0  0  0  0  0  0  0  0\n    1.0036   -4.4609   -0.4130 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -5.3289   -2.7016    1.8015 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -7.2222   -1.8000    0.4588 C   0  0  0  0  0  0  0  0  0  0  0  0\n    1.7800   -5.0909   -1.4113 C   0  0  0  0  0  0  0  0  0  0  0  0\n    3.7969   -1.2391    3.0765 C   0  0  0  0  0  0  0  0  0  0  0  0\n    2.6772   -4.3188   -2.1694 C   0  0  0  0  0  0  0  0  0  0  0  0\n    1.2308    3.2947   -0.4348 C   0  0  0  0  0  0  0  0  0  0  0  0\n    5.0959   -0.7605    2.8554 C   0  0  0  0  0  0  0  0  0  0  0  0\n    1.5856    1.9451   -0.4048 C   0  0  0  0  0  0  0  0  0  0  0  0\n    2.8372   -1.2338    2.0329 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -1.0250    2.7570    0.2933 C   0  0  0  0  0  0  0  0  0  0  0  0\n    2.8033   -2.9559   -1.8743 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -0.0587    3.7072   -0.0627 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -4.7716    1.4587   -0.7208 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -2.9229    0.4334    0.3168 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -5.0456   -0.5768    0.5009 C   0  0  0  0  0  0  0  0  0  0  0  0\n    5.3788   -0.3105    1.5500 C   0  0  0  0  0  0  0  0  0  0  0  0\n    0.6003    0.9857   -0.1000 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -0.6976    1.3808    0.2589 C   0  0  0  0  0  0  0  0  0  0  0  0\n    4.4577   -0.3814    0.5295 C   0  0  0  0  0  0  0  0  0  0  0  0\n    1.9967   -2.3549   -0.8672 C   0  0  0  0  0  0  0  0  0  0  0  0\n    2.1531   -0.8812   -0.4692 C   0  0  2  0  0  0  0  0  0  0  0  0\n    3.1504   -0.8588    0.7121 C   0  0  0  0  0  0  0  0  0  0  0  0\n    6.3578    0.2821   -0.3028 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -7.1965   -4.7160    0.7569 H   0  0  0  0  0  0  0  0  0  0  0  0\n   -1.2623   -0.3446    1.1830 H   0  0  0  0  0  0  0  0  0  0  0  0\n    0.1001   -0.9648    0.0410 H   0  0  0  0  0  0  0  0  0  0  0  0\n    0.9703    5.8265    1.7260 H   0  0  0  0  0  0  0  0  0  0  0  0\n   -0.2850    6.8702    1.7670 H   0  0  0  0  0  0  0  0  0  0  0  0\n   -0.4881    5.3287    2.2663 H   0  0  0  0  0  0  0  0  0  0  0  0\n   -5.1118    4.2966   -2.3368 H   0  0  0  0  0  0  0  0  0  0  0  0\n   -4.4045    4.1310   -0.8743 H   0  0  0  0  0  0  0  0  0  0  0  0\n   -3.7156    3.4616   -2.1949 H   0  0  0  0  0  0  0  0  0  0  0  0\n   -4.5481   -3.9018    0.2581 H   0  0  0  0  0  0  0  0  0  0  0  0\n   -5.1320   -4.7769    1.5071 H   0  0  0  0  0  0  0  0  0  0  0  0\n   -8.2510   -3.3263   -0.5641 H   0  0  0  0  0  0  0  0  0  0  0  0\n   -6.8865   -2.8593   -1.3300 H   0  0  0  0  0  0  0  0  0  0  0  0\n    0.3590   -5.0033    0.1259 H   0  0  0  0  0  0  0  0  0  0  0  0\n   -5.9429   -2.8302    2.5802 H   0  0  0  0  0  0  0  0  0  0  0  0\n   -4.4102   -2.4871    2.1332 H   0  0  0  0  0  0  0  0  0  0  0  0\n   -7.5020   -0.9993   -0.0710 H   0  0  0  0  0  0  0  0  0  0  0  0\n   -7.8314   -1.9097    1.2441 H   0  0  0  0  0  0  0  0  0  0  0  0\n    1.6924   -6.0733   -1.5763 H   0  0  0  0  0  0  0  0  0  0  0  0\n    3.5446   -1.5876    3.9793 H   0  0  0  0  0  0  0  0  0  0  0  0\n    3.2139   -4.7340   -2.9038 H   0  0  0  0  0  0  0  0  0  0  0  0\n    1.9030    3.9759   -0.7247 H   0  0  0  0  0  0  0  0  0  0  0  0\n    5.7825   -0.7396    3.5820 H   0  0  0  0  0  0  0  0  0  0  0  0\n    2.5256    1.6633   -0.5972 H   0  0  0  0  0  0  0  0  0  0  0  0\n    1.8989   -1.5078    2.2435 H   0  0  0  0  0  0  0  0  0  0  0  0\n   -1.9403    3.0496    0.5698 H   0  0  0  0  0  0  0  0  0  0  0  0\n    2.5437   -0.3740   -1.2374 H   0  0  0  0  0  0  0  0  0  0  0  0\n  1 33  1  0\n  2  5  2  0\n  2  6  2  0\n  2 18  1  0\n  2 34  1  0\n  3 45  1  0\n  4 45  1  0\n  7 19  1  0\n  7 35  1  0\n  8 38  1  0\n  8 45  1  0\n  9 41  1  0\n  9 45  1  0\n 10 20  1  0\n 10 21  1  0\n 11 22  2  0\n 11 42  1  0\n 12 35  2  0\n 12 36  1  0\n 13 35  1  0\n 13 37  2  0\n 14 36  2  0\n 14 37  1  0\n 15 36  1  0\n 15 40  1  0\n 16 39  1  0\n 16 43  1  0\n 17 23  1  0\n 17 24  1  0\n 17 37  1  0\n 20 23  1  0\n 21 24  1  0\n 22 25  1  0\n 25 27  2  0\n 26 29  1  0\n 26 31  2  0\n 27 33  1  0\n 28 30  2  0\n 28 34  1  0\n 29 38  2  0\n 30 39  1  0\n 31 44  1  0\n 32 34  2  0\n 32 40  1  0\n 33 42  2  0\n 38 41  1  0\n 39 40  2  0\n 41 44  2  0\n 42 43  1  0\n 43 44  1  0\n 10 46  1  0\n 15 47  1  0\n 16 48  1  0\n 18 49  1  0\n 18 50  1  0\n 18 51  1  0\n 19 52  1  0\n 19 53  1  0\n 19 54  1  0\n 20 55  1  0\n 20 56  1  0\n 21 57  1  0\n 21 58  1  0\n 22 59  1  0\n 23 60  1  0\n 23 61  1  0\n 24 62  1  0\n 24 63  1  0\n 25 64  1  0\n 26 65  1  0\n 27 66  1  0\n 28 67  1  0\n 29 68  1  0\n 30 69  1  0\n 31 70  1  0\n 32 71  1  0\n 43 72  1  6\nM  END\n","sdf");
+    viewer_1763818529126895.setStyle({"stick": {}});
+    viewer_1763818529126895.addModel("5JT_A_402\n     RDKit          3D\n\n 31 33  0  0  0  0  0  0  0  0999 V2000\n   -5.4331    2.2314   -1.0580 N   0  0  0  0  0  0  0  0  0  0  0  0\n    1.6630    2.2681   -0.4957 N   0  0  0  0  0  0  0  0  0  0  0  0\n   -0.5778    2.7858    0.0029 N   0  0  0  0  0  0  0  0  0  0  0  0\n    2.1975   -0.1239   -0.4281 N   0  0  0  0  0  0  0  0  0  0  0  0\n   -2.2104    1.2054    0.5976 N   0  0  0  0  0  0  0  0  0  0  0  0\n    0.6837    3.1864   -0.3180 C   0  0  0  0  0  0  0  0  0  0  0  0\n    1.5744   -1.2392   -0.1380 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -2.6467   -0.0132    1.2966 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -3.4114   -0.8565    0.2255 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -3.2936    2.1098    0.1831 C   0  0  0  0  0  0  0  0  0  0  0  0\n    0.3024   -0.9700    0.1905 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -4.6341   -0.0451   -0.3135 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -4.2374    1.3844   -0.8221 C   0  0  1  0  0  0  0  0  0  0  0  0\n    1.3969    0.9505   -0.2964 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -0.9154    1.4852    0.2493 C   0  0  0  0  0  0  0  0  0  0  0  0\n    0.1246    0.5292    0.0824 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -6.0447    1.7726   -1.7027 H   0  0  0  0  0  0  0  0  0  0  0  0\n   -5.9120    2.3805   -0.1929 H   0  0  0  0  0  0  0  0  0  0  0  0\n    3.1547   -0.0762   -0.7137 H   0  0  0  0  0  0  0  0  0  0  0  0\n    0.8870    4.1599   -0.4227 H   0  0  0  0  0  0  0  0  0  0  0  0\n    1.9844   -2.1511   -0.1584 H   0  0  0  0  0  0  0  0  0  0  0  0\n   -3.2529    0.2183    2.0574 H   0  0  0  0  0  0  0  0  0  0  0  0\n   -1.8568   -0.5199    1.6420 H   0  0  0  0  0  0  0  0  0  0  0  0\n   -3.7345   -1.7068    0.6412 H   0  0  0  0  0  0  0  0  0  0  0  0\n   -2.7943   -1.0694   -0.5320 H   0  0  0  0  0  0  0  0  0  0  0  0\n   -2.9006    2.9180   -0.2557 H   0  0  0  0  0  0  0  0  0  0  0  0\n   -3.8180    2.3891    0.9874 H   0  0  0  0  0  0  0  0  0  0  0  0\n   -0.3964   -1.6340    0.4564 H   0  0  0  0  0  0  0  0  0  0  0  0\n   -5.3031    0.0522    0.4235 H   0  0  0  0  0  0  0  0  0  0  0  0\n   -5.0448   -0.5516   -1.0717 H   0  0  0  0  0  0  0  0  0  0  0  0\n   -3.7506    1.2829   -1.6898 H   0  0  0  0  0  0  0  0  0  0  0  0\n  1 13  1  0\n  2  6  2  0\n  2 14  1  0\n  3  6  1  0\n  3 15  2  0\n  4  7  1  0\n  4 14  1  0\n  5  8  1  0\n  5 10  1  0\n  5 15  1  0\n  7 11  2  0\n  8  9  1  0\n  9 12  1  0\n 10 13  1  0\n 11 16  1  0\n 12 13  1  0\n 14 16  2  0\n 15 16  1  0\n  1 17  1  0\n  1 18  1  0\n  4 19  1  0\n  6 20  1  0\n  7 21  1  0\n  8 22  1  0\n  8 23  1  0\n  9 24  1  0\n  9 25  1  0\n 10 26  1  0\n 10 27  1  0\n 11 28  1  0\n 12 29  1  0\n 12 30  1  0\n 13 31  1  6\nM  END\n","sdf");
+    viewer_1763818529126895.setStyle({"stick": {}});
+    viewer_1763818529126895.setStyle({"model": 0},{"stick": {"colorscheme": "cyanCarbon"}});
+    viewer_1763818529126895.setStyle({"model": 1},{"stick": {"colorscheme": "redCarbon"}});
+    viewer_1763818529126895.setBackgroundColor("0xeeeeee");
+    viewer_1763818529126895.zoomTo();
+viewer_1763818529126895.render();
+});
+</script>
+</div>
+</div>
+<p>This is a situation described in the LOBSTER paper: the crystal ligands are in very different parts of the pocket that was identified by SIENA.</p>
+<p>We can figure out what’s going on by looking at the PDB entries:</p>
+<div id="253da19a" class="cell" data-execution_count="33">
+<div class="sourceCode cell-code" id="cb31"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb31-1"><a href="#cb31-1" aria-hidden="true" tabindex="-1"></a>d</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-display" data-execution_count="33">
+<pre><code>{'ligname1': 'N4Z_A_401',
+ 'pdb1': '6tel',
+ 'ligname2': '5JT_A_402',
+ 'pdb2': '5mw3',
+ 'ensemble': '5JU_A_401-5mw4',
+ 'morgan_fp_tanimoto': 0.115,
+ 'gobbi_2d_pharmacophore_fp_tanimoto': 0.102,
+ 'hac_difference': 29,
+ 'shape_tversky_index': 0.0,
+ 'shape_tanimoto_distance': 1.0,
+ 'shape_protrude_distance': 1.0,
+ 'shape_align_ShapeTanimoto': 0.3489983628032094,
+ 'shape_align_ColorTanimoto': 0.08050058859625212,
+ 'shape_align_ShapeTversky': 0.8264984227129337,
+ 'O3A_RMSD': 0.18706387903535077,
+ 'O3A_score': 99.22402124958128,
+ 'O3A_ShapeTversky': 0.6229205175600739,
+ 'CrippenO3A_RMSD': 0.3775024004623698,
+ 'CrippenO3A_score': 64.29333441352107,
+ 'CrippenO3A_ShapeTversky': 0.7638085218306154}</code></pre>
+</div>
+</div>
+<p>From looking at the PDBe pages for <a href="https://www.ebi.ac.uk/pdbe/entry/pdb/6tel?activeTab=ligands&amp;id=N4Z">ligand N4Z in 6tel</a> and <a href="https://www.ebi.ac.uk/pdbe/entry/pdb/5mw3?activeTab=ligands&amp;id=5JT">ligand 5JT in 5mw3</a> it looks like the automatic curation procedure for LOBSTER may have picked the wrong ligand for 5mw3 (which has two bound ligands), <a href="https://www.ebi.ac.uk/pdbe/entry/pdb/5mw3?activeTab=ligands&amp;id=5JJ">ligand 5JJ</a> looks like it may be a more similar pocket (or part of the pocket) to ligand N4Z.</p>
+</section>
+<section id="open3dalign" class="level1">
+<h1>Open3DAlign</h1>
+<p>What about an alternative 3D alignment algorithm? Let’s try aligning with Paolo Tosco’s <a href="https://link.springer.com/article/10.1007/s10822-011-9462-9">Open3DAlign</a>:</p>
+<div id="e6ecccef" class="cell">
+<div class="sourceCode cell-code" id="cb33"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb33-1"><a href="#cb33-1" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> rdkit.Chem <span class="im">import</span> rdMolAlign</span>
+<span id="cb33-2"><a href="#cb33-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb33-3"><a href="#cb33-3" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> tqdm <span class="im">import</span> tqdm</span>
+<span id="cb33-4"><a href="#cb33-4" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> d <span class="kw">in</span> tqdm(pairstats):</span>
+<span id="cb33-5"><a href="#cb33-5" aria-hidden="true" tabindex="-1"></a>    m1 <span class="op">=</span> Chem.Mol(ligs[(d[<span class="st">'ligname1'</span>],d[<span class="st">'pdb1'</span>])][<span class="dv">3</span>])</span>
+<span id="cb33-6"><a href="#cb33-6" aria-hidden="true" tabindex="-1"></a>    m2 <span class="op">=</span> Chem.Mol(ligs[(d[<span class="st">'ligname2'</span>],d[<span class="st">'pdb2'</span>])][<span class="dv">3</span>])</span>
+<span id="cb33-7"><a href="#cb33-7" aria-hidden="true" tabindex="-1"></a>    </span>
+<span id="cb33-8"><a href="#cb33-8" aria-hidden="true" tabindex="-1"></a>    <span class="cf">try</span>:</span>
+<span id="cb33-9"><a href="#cb33-9" aria-hidden="true" tabindex="-1"></a>        o3a <span class="op">=</span> rdMolAlign.GetO3A(m2,m1)</span>
+<span id="cb33-10"><a href="#cb33-10" aria-hidden="true" tabindex="-1"></a>        rmsd <span class="op">=</span> o3a.Align()</span>
+<span id="cb33-11"><a href="#cb33-11" aria-hidden="true" tabindex="-1"></a>        score <span class="op">=</span> o3a.Score()</span>
+<span id="cb33-12"><a href="#cb33-12" aria-hidden="true" tabindex="-1"></a>        tversky <span class="op">=</span> rdShapeHelpers.ShapeTverskyIndex(m1,m2,<span class="dv">0</span>,<span class="dv">1</span>)</span>
+<span id="cb33-13"><a href="#cb33-13" aria-hidden="true" tabindex="-1"></a>    <span class="cf">except</span> <span class="pp">ValueError</span>:</span>
+<span id="cb33-14"><a href="#cb33-14" aria-hidden="true" tabindex="-1"></a>        <span class="co"># we get failures for molecules that don't have MMFF94 parameters.</span></span>
+<span id="cb33-15"><a href="#cb33-15" aria-hidden="true" tabindex="-1"></a>        <span class="co"># set the results for those to zero</span></span>
+<span id="cb33-16"><a href="#cb33-16" aria-hidden="true" tabindex="-1"></a>        rmsd <span class="op">=</span> <span class="dv">0</span></span>
+<span id="cb33-17"><a href="#cb33-17" aria-hidden="true" tabindex="-1"></a>        score <span class="op">=</span> <span class="dv">0</span></span>
+<span id="cb33-18"><a href="#cb33-18" aria-hidden="true" tabindex="-1"></a>        tversky <span class="op">=</span> <span class="dv">0</span></span>
+<span id="cb33-19"><a href="#cb33-19" aria-hidden="true" tabindex="-1"></a>    d[<span class="st">'O3A_RMSD'</span>] <span class="op">=</span> rmsd</span>
+<span id="cb33-20"><a href="#cb33-20" aria-hidden="true" tabindex="-1"></a>    d[<span class="st">'O3A_score'</span>] <span class="op">=</span> score</span>
+<span id="cb33-21"><a href="#cb33-21" aria-hidden="true" tabindex="-1"></a>    d[<span class="st">'O3A_ShapeTversky'</span>] <span class="op">=</span> tversky</span>
+<span id="cb33-22"><a href="#cb33-22" aria-hidden="true" tabindex="-1"></a>    </span>
+<span id="cb33-23"><a href="#cb33-23" aria-hidden="true" tabindex="-1"></a></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+<div id="c69a2fbc" class="cell" data-execution_count="36">
+<div class="sourceCode cell-code" id="cb34"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb34-1"><a href="#cb34-1" aria-hidden="true" tabindex="-1"></a>comparison_plot(pairstats,<span class="st">'shape_tversky_index'</span>,<span class="st">'O3A_ShapeTversky'</span>,invert1<span class="op">=</span><span class="va">False</span>,invert2<span class="op">=</span><span class="va">False</span>,</span>
+<span id="cb34-2"><a href="#cb34-2" aria-hidden="true" tabindex="-1"></a>                includeLine<span class="op">=</span><span class="va">True</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="2025-11-23-working-with-lobster-3_files/figure-html/cell-25-output-1.png" class="img-fluid figure-img"></p>
+</figure>
+</div>
+</div>
+</div>
+<p>Ignoring the cases where Open3DAlign didn’t have parameters, that’s pretty similar to what we saw with the shape alignment, though there are points with a high Tversky index in the crystal structure and low Open3D align result.</p>
+<div id="56c89664" class="cell" data-execution_count="42">
+<div class="sourceCode cell-code" id="cb35"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb35-1"><a href="#cb35-1" aria-hidden="true" tabindex="-1"></a>ligname1,pdb1 <span class="op">=</span> (<span class="st">'1D1_A_401'</span>, <span class="st">'4i5p'</span>) </span>
+<span id="cb35-2"><a href="#cb35-2" aria-hidden="true" tabindex="-1"></a>ligname2,pdb2 <span class="op">=</span> (<span class="st">'11G_A_401'</span>, <span class="st">'4i6b'</span>)</span>
+<span id="cb35-3"><a href="#cb35-3" aria-hidden="true" tabindex="-1"></a>d <span class="op">=</span> pruned[<span class="dv">0</span>]</span>
+<span id="cb35-4"><a href="#cb35-4" aria-hidden="true" tabindex="-1"></a>m1 <span class="op">=</span> ligs[(ligname1,pdb1)][<span class="dv">3</span>]</span>
+<span id="cb35-5"><a href="#cb35-5" aria-hidden="true" tabindex="-1"></a>m2 <span class="op">=</span> ligs[(ligname2,pdb2)][<span class="dv">3</span>]</span>
+<span id="cb35-6"><a href="#cb35-6" aria-hidden="true" tabindex="-1"></a>m1c <span class="op">=</span> Chem.Mol(m1)</span>
+<span id="cb35-7"><a href="#cb35-7" aria-hidden="true" tabindex="-1"></a>m2c <span class="op">=</span> Chem.Mol(m2)</span>
+<span id="cb35-8"><a href="#cb35-8" aria-hidden="true" tabindex="-1"></a>rdMolTransforms.CanonicalizeConformer(m1c.GetConformer())</span>
+<span id="cb35-9"><a href="#cb35-9" aria-hidden="true" tabindex="-1"></a>rdMolTransforms.CanonicalizeConformer(m2c.GetConformer())</span>
+<span id="cb35-10"><a href="#cb35-10" aria-hidden="true" tabindex="-1"></a>st,ct <span class="op">=</span> rdShapeAlign.AlignMol(m1c,m2c,opt_param<span class="op">=</span><span class="fl">0.5</span>)</span>
+<span id="cb35-11"><a href="#cb35-11" aria-hidden="true" tabindex="-1"></a>stversky <span class="op">=</span> rdShapeHelpers.ShapeTverskyIndex(m1c,m2c,<span class="dv">0</span>,<span class="dv">1</span>)</span>
+<span id="cb35-12"><a href="#cb35-12" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb35-13"><a href="#cb35-13" aria-hidden="true" tabindex="-1"></a>m1c2 <span class="op">=</span> Chem.Mol(m1)</span>
+<span id="cb35-14"><a href="#cb35-14" aria-hidden="true" tabindex="-1"></a>m2c2 <span class="op">=</span> Chem.Mol(m2)</span>
+<span id="cb35-15"><a href="#cb35-15" aria-hidden="true" tabindex="-1"></a>o3a <span class="op">=</span> rdMolAlign.GetO3A(m2c2,m1c2)</span>
+<span id="cb35-16"><a href="#cb35-16" aria-hidden="true" tabindex="-1"></a>rmsd <span class="op">=</span> o3a.Align()</span>
+<span id="cb35-17"><a href="#cb35-17" aria-hidden="true" tabindex="-1"></a>o3atversky <span class="op">=</span> rdShapeHelpers.ShapeTverskyIndex(m1c2,m2c2,<span class="dv">0</span>,<span class="dv">1</span>)</span>
+<span id="cb35-18"><a href="#cb35-18" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb35-19"><a href="#cb35-19" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(stversky,o3atversky)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>0.7622862091361766 0.9846320346320346</code></pre>
+</div>
+</div>
+<p>The shape-based alignment (we saw this above):</p>
+<div id="3bbc7999" class="cell" data-execution_count="43">
+<div class="sourceCode cell-code" id="cb37"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb37-1"><a href="#cb37-1" aria-hidden="true" tabindex="-1"></a>IPythonConsole.drawMols3D([m1c,m2c])</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-display">
+<div id="3dmolviewer_17638734672885962" style="position: relative; width: 400px; height: 400px;">
+        <p id="3dmolwarning_17638734672885962" style="background-color:#ffcccc;color:black">3Dmol.js failed to load for some reason.  Please check your browser console for error messages.<br></p>
+        </div>
+<script>
+
+var loadScriptAsync = function(uri){
+  return new Promise((resolve, reject) => {
+    //this is to ignore the existence of requirejs amd
+    var savedexports, savedmodule;
+    if (typeof exports !== 'undefined') savedexports = exports;
+    else exports = {}
+    if (typeof module !== 'undefined') savedmodule = module;
+    else module = {}
+
+    var tag = document.createElement('script');
+    tag.src = uri;
+    tag.async = true;
+    tag.onload = () => {
+        exports = savedexports;
+        module = savedmodule;
+        resolve();
+    };
+  var firstScriptTag = document.getElementsByTagName('script')[0];
+  firstScriptTag.parentNode.insertBefore(tag, firstScriptTag);
+});
+};
+
+if(typeof $3Dmolpromise === 'undefined') {
+$3Dmolpromise = null;
+  $3Dmolpromise = loadScriptAsync('https://cdnjs.cloudflare.com/ajax/libs/3Dmol/2.4.0/3Dmol-min.js');
+}
+
+var viewer_17638734672885962 = null;
+var warn = document.getElementById("3dmolwarning_17638734672885962");
+if(warn) {
+    warn.parentNode.removeChild(warn);
+}
+$3Dmolpromise.then(function() {
+viewer_17638734672885962 = $3Dmol.createViewer(document.getElementById("3dmolviewer_17638734672885962"),{backgroundColor:"white"});
+viewer_17638734672885962.zoomTo();
+    viewer_17638734672885962.addModel("1D1_A_401\n     RDKit          3D\n\n 47 50  0  0  0  0  0  0  0  0999 V2000\n    4.0527    1.8957   -0.3913 O   0  0  0  0  0  0  0  0  0  0  0  0\n   -1.8480    2.2030   -0.0118 N   0  0  0  0  0  0  0  0  0  0  0  0\n   -3.5993   -0.9673   -0.2516 N   0  0  0  0  0  0  0  0  0  0  0  0\n   -1.0374   -0.0165   -0.1681 N   0  0  0  0  0  0  0  0  0  0  0  0\n    1.8029    2.3697   -0.2356 N   0  0  0  0  0  0  0  0  0  0  0  0\n    1.3087   -0.4889   -0.3277 N   0  0  0  0  0  0  0  0  0  0  0  0\n    2.0742    3.8124   -0.1844 C   0  0  0  0  0  0  0  0  0  0  0  0\n    2.6170    0.0789    2.2230 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -4.9181   -1.2423   -0.1069 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -0.6198    2.7287   -0.0662 C   0  0  0  0  0  0  0  0  0  0  0  0\n    3.3412   -0.4413    0.9841 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -5.5835   -0.0843    0.2526 C   0  0  0  0  0  0  0  0  0  0  0  0\n    0.8590   -4.1509    0.5110 C   0  0  0  0  0  0  0  0  0  0  0  0\n    1.7484   -4.2074   -0.7324 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -4.6529    0.9285    0.3431 C   0  0  0  0  0  0  0  0  0  0  0  0\n    0.6891   -2.6772    0.8870 C   0  0  0  0  0  0  0  0  0  0  0  0\n    2.0070   -2.7705   -1.1655 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -2.0615    0.8622   -0.0663 C   0  0  0  0  0  0  0  0  0  0  0  0\n    2.8834    1.4626   -0.3468 C   0  0  0  0  0  0  0  0  0  0  0  0\n    0.2353    0.4228   -0.2272 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -3.4509    0.3385    0.0102 C   0  0  0  0  0  0  0  0  0  0  0  0\n    0.9698   -1.9332   -0.4096 C   0  0  0  0  0  0  0  0  0  0  0  0\n    0.4810    1.8872   -0.1699 C   0  0  0  0  0  0  0  0  0  0  0  0\n    2.7019   -0.0105   -0.3496 C   0  0  2  0  0  0  0  0  0  0  0  0\n   -2.8782   -1.6123   -0.5044 H   0  0  0  0  0  0  0  0  0  0  0  0\n    1.2112    4.3113   -0.1063 H   0  0  0  0  0  0  0  0  0  0  0  0\n    2.6496    4.0155    0.6079 H   0  0  0  0  0  0  0  0  0  0  0  0\n    2.5468    4.0926   -1.0201 H   0  0  0  0  0  0  0  0  0  0  0  0\n    3.0892   -0.2414    3.0442 H   0  0  0  0  0  0  0  0  0  0  0  0\n    2.6111    1.0788    2.2104 H   0  0  0  0  0  0  0  0  0  0  0  0\n    1.6761   -0.2600    2.2260 H   0  0  0  0  0  0  0  0  0  0  0  0\n   -5.3421   -2.1383   -0.2387 H   0  0  0  0  0  0  0  0  0  0  0  0\n   -0.4945    3.7201   -0.0325 H   0  0  0  0  0  0  0  0  0  0  0  0\n    3.3466   -1.4407    1.0207 H   0  0  0  0  0  0  0  0  0  0  0  0\n    4.2815   -0.1019    1.0050 H   0  0  0  0  0  0  0  0  0  0  0  0\n   -6.5659    0.0027    0.4178 H   0  0  0  0  0  0  0  0  0  0  0  0\n    1.2916   -4.6477    1.2634 H   0  0  0  0  0  0  0  0  0  0  0  0\n   -0.0326   -4.5577    0.3120 H   0  0  0  0  0  0  0  0  0  0  0  0\n    1.2842   -4.7075   -1.4633 H   0  0  0  0  0  0  0  0  0  0  0  0\n    2.6128   -4.6608   -0.5151 H   0  0  0  0  0  0  0  0  0  0  0  0\n   -4.8138    1.8828    0.5949 H   0  0  0  0  0  0  0  0  0  0  0  0\n    1.3422   -2.4136    1.5967 H   0  0  0  0  0  0  0  0  0  0  0  0\n   -0.2412   -2.4967    1.2063 H   0  0  0  0  0  0  0  0  0  0  0  0\n    1.8840   -2.6740   -2.1532 H   0  0  0  0  0  0  0  0  0  0  0  0\n    2.9339   -2.4901   -0.9160 H   0  0  0  0  0  0  0  0  0  0  0  0\n    0.1278   -1.9883   -0.9463 H   0  0  0  0  0  0  0  0  0  0  0  0\n    3.1957   -0.4183   -1.1175 H   0  0  0  0  0  0  0  0  0  0  0  0\n  1 19  2  0\n  2 10  2  0\n  2 18  1  0\n  3  9  1  0\n  3 21  1  0\n  4 18  2  0\n  4 20  1  0\n  5  7  1  0\n  5 19  1  0\n  5 23  1  0\n  6 20  1  0\n  6 22  1  0\n  6 24  1  0\n  8 11  1  0\n  9 12  2  0\n 10 23  1  0\n 11 24  1  0\n 12 15  1  0\n 13 14  1  0\n 13 16  1  0\n 14 17  1  0\n 15 21  2  0\n 16 22  1  0\n 17 22  1  0\n 18 21  1  0\n 19 24  1  0\n 20 23  2  0\n  3 25  1  0\n  7 26  1  0\n  7 27  1  0\n  7 28  1  0\n  8 29  1  0\n  8 30  1  0\n  8 31  1  0\n  9 32  1  0\n 10 33  1  0\n 11 34  1  0\n 11 35  1  0\n 12 36  1  0\n 13 37  1  0\n 13 38  1  0\n 14 39  1  0\n 14 40  1  0\n 15 41  1  0\n 16 42  1  0\n 16 43  1  0\n 17 44  1  0\n 17 45  1  0\n 22 46  1  0\n 24 47  1  6\nM  END\n","sdf");
+    viewer_17638734672885962.setStyle({"stick": {}});
+    viewer_17638734672885962.addModel("11G_A_401\n     RDKit          3D\n\n 39 41  0  0  0  0  0  0  0  0999 V2000\n    1.2908    3.3626   -0.0826 O   0  0  0  0  0  0  0  0  0  0  0  0\n    2.1667   -2.5110   -0.2996 N   0  0  0  0  0  0  0  0  0  0  0  0\n   -0.1004   -1.9105   -0.0530 N   0  0  0  0  0  0  0  0  0  0  0  0\n    2.0042    1.1592   -0.1788 N   0  0  0  0  0  0  0  0  0  0  0  0\n   -0.7924    0.3938    0.0616 N   0  0  0  0  0  0  0  0  0  0  0  0\n    3.4111    1.5729   -0.3120 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -0.3606    1.5738   -2.6066 C   0  0  0  0  0  0  0  0  0  0  0  0\n    0.8662   -2.8340   -0.1762 C   0  0  0  0  0  0  0  0  0  0  0  0\n    2.5819   -1.2370   -0.3026 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -0.9431    2.3142   -1.3879 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -4.4736   -0.3472   -0.4755 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -4.5054    0.6223    0.7143 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -3.0300   -0.3987   -0.9834 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -3.0517    0.9677    1.0295 C   0  0  0  0  0  0  0  0  0  0  0  0\n    0.9942    2.1467   -0.0644 C   0  0  0  0  0  0  0  0  0  0  0  0\n    0.2109   -0.5927   -0.0495 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -2.2084   -0.0364    0.2382 C   0  0  0  0  0  0  0  0  0  0  0  0\n    1.6419   -0.2106   -0.1916 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -0.4447    1.8204   -0.0045 C   0  0  2  0  0  0  0  0  0  0  0  0\n    3.9919    0.7619   -0.3813 H   0  0  0  0  0  0  0  0  0  0  0  0\n    3.5179    2.1309   -1.1349 H   0  0  0  0  0  0  0  0  0  0  0  0\n    3.6788    2.1070    0.4899 H   0  0  0  0  0  0  0  0  0  0  0  0\n   -0.7406    1.9627   -3.4459 H   0  0  0  0  0  0  0  0  0  0  0  0\n    0.6344    1.6744   -2.6134 H   0  0  0  0  0  0  0  0  0  0  0  0\n   -0.5972    0.6038   -2.5518 H   0  0  0  0  0  0  0  0  0  0  0  0\n    0.6096   -3.8005   -0.1764 H   0  0  0  0  0  0  0  0  0  0  0  0\n    3.5555   -1.0233   -0.3836 H   0  0  0  0  0  0  0  0  0  0  0  0\n   -1.9375    2.2113   -1.4116 H   0  0  0  0  0  0  0  0  0  0  0  0\n   -0.7060    3.2819   -1.4732 H   0  0  0  0  0  0  0  0  0  0  0  0\n   -5.0797   -0.0194   -1.2002 H   0  0  0  0  0  0  0  0  0  0  0  0\n   -4.7659   -1.2577   -0.1828 H   0  0  0  0  0  0  0  0  0  0  0  0\n   -4.9361    0.1859    1.5043 H   0  0  0  0  0  0  0  0  0  0  0  0\n   -5.0126    1.4495    0.4727 H   0  0  0  0  0  0  0  0  0  0  0  0\n   -2.8867    0.2632   -1.7191 H   0  0  0  0  0  0  0  0  0  0  0  0\n   -2.7990   -1.3152   -1.3100 H   0  0  0  0  0  0  0  0  0  0  0  0\n   -2.8757    0.8754    2.0096 H   0  0  0  0  0  0  0  0  0  0  0  0\n   -2.8443    1.9022    0.7401 H   0  0  0  0  0  0  0  0  0  0  0  0\n   -2.1737   -0.8640    0.7984 H   0  0  0  0  0  0  0  0  0  0  0  0\n   -0.8912    2.3272    0.7330 H   0  0  0  0  0  0  0  0  0  0  0  0\n  1 15  2  0\n  2  8  2  0\n  2  9  1  0\n  3  8  1  0\n  3 16  2  0\n  4  6  1  0\n  4 15  1  0\n  4 18  1  0\n  5 16  1  0\n  5 17  1  0\n  5 19  1  0\n  7 10  1  0\n  9 18  2  0\n 10 19  1  0\n 11 12  1  0\n 11 13  1  0\n 12 14  1  0\n 13 17  1  0\n 14 17  1  0\n 15 19  1  0\n 16 18  1  0\n  6 20  1  0\n  6 21  1  0\n  6 22  1  0\n  7 23  1  0\n  7 24  1  0\n  7 25  1  0\n  8 26  1  0\n  9 27  1  0\n 10 28  1  0\n 10 29  1  0\n 11 30  1  0\n 11 31  1  0\n 12 32  1  0\n 12 33  1  0\n 13 34  1  0\n 13 35  1  0\n 14 36  1  0\n 14 37  1  0\n 17 38  1  0\n 19 39  1  1\nM  END\n","sdf");
+    viewer_17638734672885962.setStyle({"stick": {}});
+    viewer_17638734672885962.setStyle({"model": 0},{"stick": {"colorscheme": "cyanCarbon"}});
+    viewer_17638734672885962.setStyle({"model": 1},{"stick": {"colorscheme": "redCarbon"}});
+    viewer_17638734672885962.setBackgroundColor("0xeeeeee");
+    viewer_17638734672885962.zoomTo();
+viewer_17638734672885962.render();
+});
+</script>
+</div>
+</div>
+<p>And the Open3D alignment:</p>
+<div id="9db2e901" class="cell" data-execution_count="44">
+<div class="sourceCode cell-code" id="cb38"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb38-1"><a href="#cb38-1" aria-hidden="true" tabindex="-1"></a>IPythonConsole.drawMols3D([m1c2,m2c2])</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-display">
+<div id="3dmolviewer_17638734790354753" style="position: relative; width: 400px; height: 400px;">
+        <p id="3dmolwarning_17638734790354753" style="background-color:#ffcccc;color:black">3Dmol.js failed to load for some reason.  Please check your browser console for error messages.<br></p>
+        </div>
+<script>
+
+var loadScriptAsync = function(uri){
+  return new Promise((resolve, reject) => {
+    //this is to ignore the existence of requirejs amd
+    var savedexports, savedmodule;
+    if (typeof exports !== 'undefined') savedexports = exports;
+    else exports = {}
+    if (typeof module !== 'undefined') savedmodule = module;
+    else module = {}
+
+    var tag = document.createElement('script');
+    tag.src = uri;
+    tag.async = true;
+    tag.onload = () => {
+        exports = savedexports;
+        module = savedmodule;
+        resolve();
+    };
+  var firstScriptTag = document.getElementsByTagName('script')[0];
+  firstScriptTag.parentNode.insertBefore(tag, firstScriptTag);
+});
+};
+
+if(typeof $3Dmolpromise === 'undefined') {
+$3Dmolpromise = null;
+  $3Dmolpromise = loadScriptAsync('https://cdnjs.cloudflare.com/ajax/libs/3Dmol/2.4.0/3Dmol-min.js');
+}
+
+var viewer_17638734790354753 = null;
+var warn = document.getElementById("3dmolwarning_17638734790354753");
+if(warn) {
+    warn.parentNode.removeChild(warn);
+}
+$3Dmolpromise.then(function() {
+viewer_17638734790354753 = $3Dmol.createViewer(document.getElementById("3dmolviewer_17638734790354753"),{backgroundColor:"white"});
+viewer_17638734790354753.zoomTo();
+    viewer_17638734790354753.addModel("1D1_A_401\n     RDKit          3D\n\n 47 50  0  0  0  0  0  0  0  0999 V2000\n   13.6199    4.3394   10.4996 O   0  0  0  0  0  0  0  0  0  0  0  0\n    7.7618    4.8606    9.8156 N   0  0  0  0  0  0  0  0  0  0  0  0\n    6.3944    8.1554   10.4865 N   0  0  0  0  0  0  0  0  0  0  0  0\n    8.8228    6.9055   10.3637 N   0  0  0  0  0  0  0  0  0  0  0  0\n   11.3439    4.1903   10.1704 N   0  0  0  0  0  0  0  0  0  0  0  0\n   11.1937    7.0400   10.7008 N   0  0  0  0  0  0  0  0  0  0  0  0\n   11.4418    2.7500    9.8990 C   0  0  0  0  0  0  0  0  0  0  0  0\n   12.5846    6.7088    8.1521 C   0  0  0  0  0  0  0  0  0  0  0  0\n    5.1305    8.6178   10.3300 C   0  0  0  0  0  0  0  0  0  0  0  0\n    8.9115    4.1784    9.8385 C   0  0  0  0  0  0  0  0  0  0  0  0\n   13.2854    6.9331    9.4894 C   0  0  0  0  0  0  0  0  0  0  0  0\n    4.3546    7.6253    9.7593 C   0  0  0  0  0  0  0  0  0  0  0  0\n   11.2442   10.8146   10.4451 C   0  0  0  0  0  0  0  0  0  0  0  0\n   12.0524   10.5627   11.7193 C   0  0  0  0  0  0  0  0  0  0  0  0\n    5.1599    6.5268    9.5477 C   0  0  0  0  0  0  0  0  0  0  0  0\n   10.9220    9.4513    9.8291 C   0  0  0  0  0  0  0  0  0  0  0  0\n   12.1073    9.0549   11.9258 C   0  0  0  0  0  0  0  0  0  0  0  0\n    7.7087    6.1931   10.0763 C   0  0  0  0  0  0  0  0  0  0  0  0\n   12.5167    4.9218   10.4741 C   0  0  0  0  0  0  0  0  0  0  0  0\n   10.0267    6.3014   10.4072 C   0  0  0  0  0  0  0  0  0  0  0  0\n    6.4005    6.8977   10.0241 C   0  0  0  0  0  0  0  0  0  0  0  0\n   11.0272    8.4858   10.9997 C   0  0  0  0  0  0  0  0  0  0  0  0\n   10.0969    4.8441   10.1252 C   0  0  0  0  0  0  0  0  0  0  0  0\n   12.5146    6.3877   10.7066 C   0  0  2  0  0  0  0  0  0  0  0  0\n    7.1705    8.6548   10.8716 H   0  0  0  0  0  0  0  0  0  0  0  0\n   10.5316    2.3851    9.7034 H   0  0  0  0  0  0  0  0  0  0  0  0\n   12.0380    2.5991    9.1105 H   0  0  0  0  0  0  0  0  0  0  0  0\n   11.8225    2.2853   10.6985 H   0  0  0  0  0  0  0  0  0  0  0  0\n   13.1437    7.0883    7.4150 H   0  0  0  0  0  0  0  0  0  0  0  0\n   12.4572    5.7282    8.0029 H   0  0  0  0  0  0  0  0  0  0  0  0\n   11.6937    7.1629    8.1623 H   0  0  0  0  0  0  0  0  0  0  0  0\n    4.8102    9.5299   10.5859 H   0  0  0  0  0  0  0  0  0  0  0  0\n    8.9181    3.1963    9.6508 H   0  0  0  0  0  0  0  0  0  0  0  0\n   13.4138    7.9169    9.6149 H   0  0  0  0  0  0  0  0  0  0  0  0\n   14.1773    6.4822    9.4555 H   0  0  0  0  0  0  0  0  0  0  0  0\n    3.3815    7.6927    9.5391 H   0  0  0  0  0  0  0  0  0  0  0  0\n   11.7810   11.3615    9.8026 H   0  0  0  0  0  0  0  0  0  0  0  0\n   10.3974   11.2977   10.6676 H   0  0  0  0  0  0  0  0  0  0  0  0\n   11.6061   10.9996   12.5002 H   0  0  0  0  0  0  0  0  0  0  0  0\n   12.9774   10.9285   11.6164 H   0  0  0  0  0  0  0  0  0  0  0  0\n    4.9014    5.6518    9.1383 H   0  0  0  0  0  0  0  0  0  0  0  0\n   11.5827    9.2183    9.1156 H   0  0  0  0  0  0  0  0  0  0  0  0\n    9.9991    9.4442    9.4441 H   0  0  0  0  0  0  0  0  0  0  0  0\n   11.9105    8.8236   12.8786 H   0  0  0  0  0  0  0  0  0  0  0  0\n   13.0076    8.6988   11.6755 H   0  0  0  0  0  0  0  0  0  0  0  0\n   10.1653    8.5658   11.5006 H   0  0  0  0  0  0  0  0  0  0  0  0\n   13.0038    6.6046   11.5513 H   0  0  0  0  0  0  0  0  0  0  0  0\n  1 19  2  0\n  2 10  2  0\n  2 18  1  0\n  3  9  1  0\n  3 21  1  0\n  4 18  2  0\n  4 20  1  0\n  5  7  1  0\n  5 19  1  0\n  5 23  1  0\n  6 20  1  0\n  6 22  1  0\n  6 24  1  0\n  8 11  1  0\n  9 12  2  0\n 10 23  1  0\n 11 24  1  0\n 12 15  1  0\n 13 14  1  0\n 13 16  1  0\n 14 17  1  0\n 15 21  2  0\n 16 22  1  0\n 17 22  1  0\n 18 21  1  0\n 19 24  1  0\n 20 23  2  0\n  3 25  1  0\n  7 26  1  0\n  7 27  1  0\n  7 28  1  0\n  8 29  1  0\n  8 30  1  0\n  8 31  1  0\n  9 32  1  0\n 10 33  1  0\n 11 34  1  0\n 11 35  1  0\n 12 36  1  0\n 13 37  1  0\n 13 38  1  0\n 14 39  1  0\n 14 40  1  0\n 15 41  1  0\n 16 42  1  0\n 16 43  1  0\n 17 44  1  0\n 17 45  1  0\n 22 46  1  0\n 24 47  1  1\nM  END\n","sdf");
+    viewer_17638734790354753.setStyle({"stick": {}});
+    viewer_17638734790354753.addModel("11G_A_401\n     RDKit          3D\n\n 39 41  0  0  0  0  0  0  0  0999 V2000\n   13.6387    4.3854   10.5227 O   0  0  0  0  0  0  0  0  0  0  0  0\n    7.7586    4.8504    9.8003 N   0  0  0  0  0  0  0  0  0  0  0  0\n    8.8004    6.8956   10.3415 N   0  0  0  0  0  0  0  0  0  0  0  0\n   11.3526    4.1877   10.1938 N   0  0  0  0  0  0  0  0  0  0  0  0\n   11.1784    7.0485   10.6933 N   0  0  0  0  0  0  0  0  0  0  0  0\n   11.4693    2.7433    9.9324 C   0  0  0  0  0  0  0  0  0  0  0  0\n   12.4814    6.6218    8.0821 C   0  0  0  0  0  0  0  0  0  0  0  0\n    7.7085    6.1724   10.0463 C   0  0  0  0  0  0  0  0  0  0  0  0\n    8.9104    4.1667    9.8393 C   0  0  0  0  0  0  0  0  0  0  0  0\n   13.2126    6.9087    9.4071 C   0  0  0  0  0  0  0  0  0  0  0  0\n   11.2871   10.8364   10.5232 C   0  0  0  0  0  0  0  0  0  0  0  0\n   12.1272   10.5410   11.7736 C   0  0  0  0  0  0  0  0  0  0  0  0\n   10.9781    9.4945    9.8539 C   0  0  0  0  0  0  0  0  0  0  0  0\n   12.1261    9.0238   11.9466 C   0  0  0  0  0  0  0  0  0  0  0  0\n   12.5169    4.9397   10.4895 C   0  0  0  0  0  0  0  0  0  0  0  0\n   10.0162    6.3026   10.4017 C   0  0  0  0  0  0  0  0  0  0  0  0\n   11.0436    8.5014   10.9976 C   0  0  0  0  0  0  0  0  0  0  0  0\n   10.0979    4.8425   10.1265 C   0  0  0  0  0  0  0  0  0  0  0  0\n   12.4988    6.4028   10.6879 C   0  0  2  0  0  0  0  0  0  0  0  0\n   10.5636    2.3647    9.7419 H   0  0  0  0  0  0  0  0  0  0  0  0\n   12.0655    2.5944    9.1435 H   0  0  0  0  0  0  0  0  0  0  0  0\n   11.8582    2.2898   10.7344 H   0  0  0  0  0  0  0  0  0  0  0  0\n   13.0179    6.9844    7.3200 H   0  0  0  0  0  0  0  0  0  0  0  0\n   12.3691    5.6343    7.9705 H   0  0  0  0  0  0  0  0  0  0  0  0\n   11.5828    7.0601    8.0955 H   0  0  0  0  0  0  0  0  0  0  0  0\n    6.8226    6.6347   10.0077 H   0  0  0  0  0  0  0  0  0  0  0  0\n    8.9194    3.1822    9.6644 H   0  0  0  0  0  0  0  0  0  0  0  0\n   13.3254    7.8990    9.4883 H   0  0  0  0  0  0  0  0  0  0  0  0\n   14.1117    6.4734    9.3633 H   0  0  0  0  0  0  0  0  0  0  0  0\n   11.8015   11.4212    9.8958 H   0  0  0  0  0  0  0  0  0  0  0  0\n   10.4362   11.2932   10.7828 H   0  0  0  0  0  0  0  0  0  0  0  0\n   11.7210   10.9805   12.5748 H   0  0  0  0  0  0  0  0  0  0  0  0\n   13.0619   10.8739   11.6487 H   0  0  0  0  0  0  0  0  0  0  0  0\n   11.6597    9.2791    9.1546 H   0  0  0  0  0  0  0  0  0  0  0  0\n   10.0676    9.5032    9.4404 H   0  0  0  0  0  0  0  0  0  0  0  0\n   11.9085    8.7805   12.8919 H   0  0  0  0  0  0  0  0  0  0  0  0\n   13.0181    8.6439   11.7015 H   0  0  0  0  0  0  0  0  0  0  0  0\n   10.1793    8.5971   11.4914 H   0  0  0  0  0  0  0  0  0  0  0  0\n   13.0183    6.6548   11.5045 H   0  0  0  0  0  0  0  0  0  0  0  0\n  1 15  2  0\n  2  8  2  0\n  2  9  1  0\n  3  8  1  0\n  3 16  2  0\n  4  6  1  0\n  4 15  1  0\n  4 18  1  0\n  5 16  1  0\n  5 17  1  0\n  5 19  1  0\n  7 10  1  0\n  9 18  2  0\n 10 19  1  0\n 11 12  1  0\n 11 13  1  0\n 12 14  1  0\n 13 17  1  0\n 14 17  1  0\n 15 19  1  0\n 16 18  1  0\n  6 20  1  0\n  6 21  1  0\n  6 22  1  0\n  7 23  1  0\n  7 24  1  0\n  7 25  1  0\n  8 26  1  0\n  9 27  1  0\n 10 28  1  0\n 10 29  1  0\n 11 30  1  0\n 11 31  1  0\n 12 32  1  0\n 12 33  1  0\n 13 34  1  0\n 13 35  1  0\n 14 36  1  0\n 14 37  1  0\n 17 38  1  0\n 19 39  1  1\nM  END\n","sdf");
+    viewer_17638734790354753.setStyle({"stick": {}});
+    viewer_17638734790354753.setStyle({"model": 0},{"stick": {"colorscheme": "cyanCarbon"}});
+    viewer_17638734790354753.setStyle({"model": 1},{"stick": {"colorscheme": "redCarbon"}});
+    viewer_17638734790354753.setBackgroundColor("0xeeeeee");
+    viewer_17638734790354753.zoomTo();
+viewer_17638734790354753.render();
+});
+</script>
+</div>
+</div>
+<p>Here we can see that Open3DAlign can quite happily align a smaller molecule to a larger one.</p>
+<p>Directly compare the O3A results to the shape alignment results:</p>
+<div id="45b81c1f" class="cell" data-execution_count="13">
+<div class="sourceCode cell-code" id="cb39"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb39-1"><a href="#cb39-1" aria-hidden="true" tabindex="-1"></a>comparison_plot(pairstats,<span class="st">'shape_align_ShapeTversky'</span>,<span class="st">'O3A_ShapeTversky'</span>,invert1<span class="op">=</span><span class="va">False</span>,invert2<span class="op">=</span><span class="va">False</span>,</span>
+<span id="cb39-2"><a href="#cb39-2" aria-hidden="true" tabindex="-1"></a>                includeLine<span class="op">=</span><span class="va">True</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="2025-11-23-working-with-lobster-3_files/figure-html/cell-29-output-1.png" class="img-fluid figure-img"></p>
+</figure>
+</div>
+</div>
+</div>
+<p>There’s a reasonable number of pairs with high O3A similarities and low shape-align similarities. These are probably cases like we just saw: alignments of a small ligand to a larger one where there’s a good feature overlap between the small and large structures.</p>
+<p>Aside from the alignments that didn’t work due to missing parameters (where the O3A Tversky is 0), the correlation is quite good</p>
+<p>The RDKit has a variation on Open3DAlign that uses atomic contributions to the MolLogP value instead of MMFF94 atom types</p>
+<div id="6e9ee47e" class="cell" data-execution_count="62">
+<div class="sourceCode cell-code" id="cb40"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb40-1"><a href="#cb40-1" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> rdkit.Chem <span class="im">import</span> rdMolAlign</span>
+<span id="cb40-2"><a href="#cb40-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb40-3"><a href="#cb40-3" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> tqdm <span class="im">import</span> tqdm</span>
+<span id="cb40-4"><a href="#cb40-4" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> d <span class="kw">in</span> tqdm(pairstats):</span>
+<span id="cb40-5"><a href="#cb40-5" aria-hidden="true" tabindex="-1"></a>    m1 <span class="op">=</span> Chem.Mol(ligs[(d[<span class="st">'ligname1'</span>],d[<span class="st">'pdb1'</span>])][<span class="dv">3</span>])</span>
+<span id="cb40-6"><a href="#cb40-6" aria-hidden="true" tabindex="-1"></a>    m2 <span class="op">=</span> Chem.Mol(ligs[(d[<span class="st">'ligname2'</span>],d[<span class="st">'pdb2'</span>])][<span class="dv">3</span>])</span>
+<span id="cb40-7"><a href="#cb40-7" aria-hidden="true" tabindex="-1"></a>    </span>
+<span id="cb40-8"><a href="#cb40-8" aria-hidden="true" tabindex="-1"></a>    <span class="cf">try</span>:</span>
+<span id="cb40-9"><a href="#cb40-9" aria-hidden="true" tabindex="-1"></a>        o3a <span class="op">=</span> rdMolAlign.GetCrippenO3A(m2,m1)</span>
+<span id="cb40-10"><a href="#cb40-10" aria-hidden="true" tabindex="-1"></a>        rmsd <span class="op">=</span> o3a.Align()</span>
+<span id="cb40-11"><a href="#cb40-11" aria-hidden="true" tabindex="-1"></a>        score <span class="op">=</span> o3a.Score()</span>
+<span id="cb40-12"><a href="#cb40-12" aria-hidden="true" tabindex="-1"></a>        tversky <span class="op">=</span> rdShapeHelpers.ShapeTverskyIndex(m1,m2,<span class="dv">0</span>,<span class="dv">1</span>)</span>
+<span id="cb40-13"><a href="#cb40-13" aria-hidden="true" tabindex="-1"></a>    <span class="cf">except</span> <span class="pp">ValueError</span>:</span>
+<span id="cb40-14"><a href="#cb40-14" aria-hidden="true" tabindex="-1"></a>        rmsd <span class="op">=</span> <span class="dv">0</span></span>
+<span id="cb40-15"><a href="#cb40-15" aria-hidden="true" tabindex="-1"></a>        score <span class="op">=</span> <span class="dv">0</span></span>
+<span id="cb40-16"><a href="#cb40-16" aria-hidden="true" tabindex="-1"></a>        tversky <span class="op">=</span> <span class="dv">0</span></span>
+<span id="cb40-17"><a href="#cb40-17" aria-hidden="true" tabindex="-1"></a>    d[<span class="st">'CrippenO3A_RMSD'</span>] <span class="op">=</span> rmsd</span>
+<span id="cb40-18"><a href="#cb40-18" aria-hidden="true" tabindex="-1"></a>    d[<span class="st">'CrippenO3A_score'</span>] <span class="op">=</span> score</span>
+<span id="cb40-19"><a href="#cb40-19" aria-hidden="true" tabindex="-1"></a>    d[<span class="st">'CrippenO3A_ShapeTversky'</span>] <span class="op">=</span> tversky</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stderr">
+<pre><code>100%|█████████████████████████████████████████████████████████████████████████████████████████████████████████| 72592/72592 [04:25&lt;00:00, 273.70it/s]</code></pre>
+</div>
+</div>
+<p>It took a while to get here, so save the results:</p>
+<div id="252a2d60" class="cell" data-execution_count="66">
+<div class="sourceCode cell-code" id="cb42"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb42-1"><a href="#cb42-1" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> pickle</span>
+<span id="cb42-2"><a href="#cb42-2" aria-hidden="true" tabindex="-1"></a>pickle.dump(pairstats,<span class="bu">open</span>(<span class="st">'./results/pairstats.pkl'</span>,<span class="st">'wb+'</span>))</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+<p>Compare the Crippen alignment to the shape one</p>
+<div id="d29a1236" class="cell" data-execution_count="14">
+<div class="sourceCode cell-code" id="cb43"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb43-1"><a href="#cb43-1" aria-hidden="true" tabindex="-1"></a>comparison_plot(pairstats,<span class="st">'shape_align_ShapeTversky'</span>,<span class="st">'CrippenO3A_ShapeTversky'</span>,invert1<span class="op">=</span><span class="va">False</span>,invert2<span class="op">=</span><span class="va">False</span>,</span>
+<span id="cb43-2"><a href="#cb43-2" aria-hidden="true" tabindex="-1"></a>                includeLine<span class="op">=</span><span class="va">True</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="2025-11-23-working-with-lobster-3_files/figure-html/cell-32-output-1.png" class="img-fluid figure-img"></p>
+</figure>
+</div>
+</div>
+</div>
+<p>This looks quite similar to the last results, but this time we don’t have failed alignments due to missing atom types.</p>
+<p>Compare the two different Open3DAlign results to each other:</p>
+<div id="971ac0b6" class="cell" data-execution_count="15">
+<div class="sourceCode cell-code" id="cb44"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb44-1"><a href="#cb44-1" aria-hidden="true" tabindex="-1"></a>comparison_plot(pairstats,<span class="st">'O3A_ShapeTversky'</span>,<span class="st">'CrippenO3A_ShapeTversky'</span>,invert1<span class="op">=</span><span class="va">False</span>,invert2<span class="op">=</span><span class="va">False</span>,</span>
+<span id="cb44-2"><a href="#cb44-2" aria-hidden="true" tabindex="-1"></a>                includeLine<span class="op">=</span><span class="va">True</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="2025-11-23-working-with-lobster-3_files/figure-html/cell-33-output-1.png" class="img-fluid figure-img"></p>
+</figure>
+</div>
+</div>
+</div>
+<p>And, finally, compare the Crippen O3A results to the crystal alignments:</p>
+<div id="63bc738b" class="cell" data-scrolled="false" data-execution_count="16">
+<div class="sourceCode cell-code" id="cb45"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb45-1"><a href="#cb45-1" aria-hidden="true" tabindex="-1"></a>comparison_plot(pairstats,<span class="st">'shape_tversky_index'</span>,<span class="st">'CrippenO3A_ShapeTversky'</span>,invert1<span class="op">=</span><span class="va">False</span>,invert2<span class="op">=</span><span class="va">False</span>,</span>
+<span id="cb45-2"><a href="#cb45-2" aria-hidden="true" tabindex="-1"></a>                includeLine<span class="op">=</span><span class="va">True</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="2025-11-23-working-with-lobster-3_files/figure-html/cell-34-output-1.png" class="img-fluid figure-img"></p>
+</figure>
+</div>
+</div>
+</div>
+</section>
+<section id="comparing-performance-on-easy-cases" class="level1">
+<h1>Comparing performance on “easy” cases</h1>
+<p>The LOBSTER paper suggests that ligand pairs that have a Tversky overlap of 0.9 or higher are good starting points for studying superposition algorithms.</p>
+<p>Let’s see how well the three alignment approaches we applied here do:</p>
+<div id="7802e015" class="cell" data-execution_count="45">
+<div class="sourceCode cell-code" id="cb46"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb46-1"><a href="#cb46-1" aria-hidden="true" tabindex="-1"></a>pruned <span class="op">=</span> [r <span class="cf">for</span> r <span class="kw">in</span> pairstats <span class="cf">if</span> r[<span class="st">'shape_tversky_index'</span>]<span class="op">&gt;=</span><span class="fl">0.9</span>]</span>
+<span id="cb46-2"><a href="#cb46-2" aria-hidden="true" tabindex="-1"></a><span class="bu">len</span>(pruned)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-display" data-execution_count="45">
+<pre><code>2653</code></pre>
+</div>
+</div>
+<div id="ccad849e" class="cell" data-execution_count="47">
+<div class="sourceCode cell-code" id="cb48"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb48-1"><a href="#cb48-1" aria-hidden="true" tabindex="-1"></a>comparison_plot(pruned,<span class="st">'shape_tversky_index'</span>,<span class="st">'shape_align_ShapeTversky'</span>,invert1<span class="op">=</span><span class="va">False</span>,invert2<span class="op">=</span><span class="va">False</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="2025-11-23-working-with-lobster-3_files/figure-html/cell-36-output-1.png" class="img-fluid figure-img"></p>
+</figure>
+</div>
+</div>
+</div>
+<div id="7297e2a6" class="cell" data-execution_count="50">
+<div class="sourceCode cell-code" id="cb49"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb49-1"><a href="#cb49-1" aria-hidden="true" tabindex="-1"></a>comparison_plot(pruned,<span class="st">'shape_tversky_index'</span>,<span class="st">'CrippenO3A_ShapeTversky'</span>,invert1<span class="op">=</span><span class="va">False</span>,invert2<span class="op">=</span><span class="va">False</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="2025-11-23-working-with-lobster-3_files/figure-html/cell-37-output-1.png" class="img-fluid figure-img"></p>
+</figure>
+</div>
+</div>
+</div>
+<p>Make the same plot with the default O3A alignments that did not fail due to missing parameters:</p>
+<div id="a28f98b7" class="cell" data-scrolled="false" data-execution_count="51">
+<div class="sourceCode cell-code" id="cb50"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb50-1"><a href="#cb50-1" aria-hidden="true" tabindex="-1"></a>comparison_plot([x <span class="cf">for</span> x <span class="kw">in</span> pruned <span class="cf">if</span> x[<span class="st">'O3A_ShapeTversky'</span>]<span class="op">&gt;</span><span class="dv">0</span>],<span class="st">'shape_tversky_index'</span>,<span class="st">'O3A_ShapeTversky'</span>,invert1<span class="op">=</span><span class="va">False</span>,invert2<span class="op">=</span><span class="va">False</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="2025-11-23-working-with-lobster-3_files/figure-html/cell-38-output-1.png" class="img-fluid figure-img"></p>
+</figure>
+</div>
+</div>
+</div>
+<p>Here’s what that looks like with the failed alignments included:</p>
+<div id="aa9a03bb" class="cell" data-execution_count="49">
+<div class="sourceCode cell-code" id="cb51"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb51-1"><a href="#cb51-1" aria-hidden="true" tabindex="-1"></a>comparison_plot(pruned,<span class="st">'shape_tversky_index'</span>,<span class="st">'O3A_ShapeTversky'</span>,invert1<span class="op">=</span><span class="va">False</span>,invert2<span class="op">=</span><span class="va">False</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="2025-11-23-working-with-lobster-3_files/figure-html/cell-39-output-1.png" class="img-fluid figure-img"></p>
+</figure>
+</div>
+</div>
+</div>
+<p>Based on this simple analysis, it looks like the Open3DAlign methods are doing better than the shape-based alignment. Given the differences in size between some of the ligands, this isn’t terribly surprising.</p>
+<p>To really dig into alignment quality, we’d probably also want to look beyond just shape overlap and considere things like how far the aligned poses are from what is observed in the crystal using some kind of RMSD measure, but that’s for a possible future post.</p>
+
+
+</section>
+
+</main> <!-- /main -->
+<script id="quarto-html-after-body" type="application/javascript">
+window.document.addEventListener("DOMContentLoaded", function (event) {
+  const toggleBodyColorMode = (bsSheetEl) => {
+    const mode = bsSheetEl.getAttribute("data-mode");
+    const bodyEl = window.document.querySelector("body");
+    if (mode === "dark") {
+      bodyEl.classList.add("quarto-dark");
+      bodyEl.classList.remove("quarto-light");
+    } else {
+      bodyEl.classList.add("quarto-light");
+      bodyEl.classList.remove("quarto-dark");
+    }
+  }
+  const toggleBodyColorPrimary = () => {
+    const bsSheetEl = window.document.querySelector("link#quarto-bootstrap");
+    if (bsSheetEl) {
+      toggleBodyColorMode(bsSheetEl);
+    }
+  }
+  toggleBodyColorPrimary();  
+  const disableStylesheet = (stylesheets) => {
+    for (let i=0; i < stylesheets.length; i++) {
+      const stylesheet = stylesheets[i];
+      stylesheet.rel = 'prefetch';
+    }
+  }
+  const enableStylesheet = (stylesheets) => {
+    for (let i=0; i < stylesheets.length; i++) {
+      const stylesheet = stylesheets[i];
+      stylesheet.rel = 'stylesheet';
+    }
+  }
+  const manageTransitions = (selector, allowTransitions) => {
+    const els = window.document.querySelectorAll(selector);
+    for (let i=0; i < els.length; i++) {
+      const el = els[i];
+      if (allowTransitions) {
+        el.classList.remove('notransition');
+      } else {
+        el.classList.add('notransition');
+      }
+    }
+  }
+  const toggleGiscusIfUsed = (isAlternate, darkModeDefault) => {
+    const baseTheme = document.querySelector('#giscus-base-theme')?.value ?? 'light';
+    const alternateTheme = document.querySelector('#giscus-alt-theme')?.value ?? 'dark';
+    let newTheme = '';
+    if(darkModeDefault) {
+      newTheme = isAlternate ? baseTheme : alternateTheme;
+    } else {
+      newTheme = isAlternate ? alternateTheme : baseTheme;
+    }
+    const changeGiscusTheme = () => {
+      // From: https://github.com/giscus/giscus/issues/336
+      const sendMessage = (message) => {
+        const iframe = document.querySelector('iframe.giscus-frame');
+        if (!iframe) return;
+        iframe.contentWindow.postMessage({ giscus: message }, 'https://giscus.app');
+      }
+      sendMessage({
+        setConfig: {
+          theme: newTheme
+        }
+      });
+    }
+    const isGiscussLoaded = window.document.querySelector('iframe.giscus-frame') !== null;
+    if (isGiscussLoaded) {
+      changeGiscusTheme();
+    }
+  }
+  const toggleColorMode = (alternate) => {
+    // Switch the stylesheets
+    const alternateStylesheets = window.document.querySelectorAll('link.quarto-color-scheme.quarto-color-alternate');
+    manageTransitions('#quarto-margin-sidebar .nav-link', false);
+    if (alternate) {
+      enableStylesheet(alternateStylesheets);
+      for (const sheetNode of alternateStylesheets) {
+        if (sheetNode.id === "quarto-bootstrap") {
+          toggleBodyColorMode(sheetNode);
+        }
+      }
+    } else {
+      disableStylesheet(alternateStylesheets);
+      toggleBodyColorPrimary();
+    }
+    manageTransitions('#quarto-margin-sidebar .nav-link', true);
+    // Switch the toggles
+    const toggles = window.document.querySelectorAll('.quarto-color-scheme-toggle');
+    for (let i=0; i < toggles.length; i++) {
+      const toggle = toggles[i];
+      if (toggle) {
+        if (alternate) {
+          toggle.classList.add("alternate");     
+        } else {
+          toggle.classList.remove("alternate");
+        }
+      }
+    }
+    // Hack to workaround the fact that safari doesn't
+    // properly recolor the scrollbar when toggling (#1455)
+    if (navigator.userAgent.indexOf('Safari') > 0 && navigator.userAgent.indexOf('Chrome') == -1) {
+      manageTransitions("body", false);
+      window.scrollTo(0, 1);
+      setTimeout(() => {
+        window.scrollTo(0, 0);
+        manageTransitions("body", true);
+      }, 40);  
+    }
+  }
+  const isFileUrl = () => { 
+    return window.location.protocol === 'file:';
+  }
+  const hasAlternateSentinel = () => {  
+    let styleSentinel = getColorSchemeSentinel();
+    if (styleSentinel !== null) {
+      return styleSentinel === "alternate";
+    } else {
+      return false;
+    }
+  }
+  const setStyleSentinel = (alternate) => {
+    const value = alternate ? "alternate" : "default";
+    if (!isFileUrl()) {
+      window.localStorage.setItem("quarto-color-scheme", value);
+    } else {
+      localAlternateSentinel = value;
+    }
+  }
+  const getColorSchemeSentinel = () => {
+    if (!isFileUrl()) {
+      const storageValue = window.localStorage.getItem("quarto-color-scheme");
+      return storageValue != null ? storageValue : localAlternateSentinel;
+    } else {
+      return localAlternateSentinel;
+    }
+  }
+  const darkModeDefault = false;
+  let localAlternateSentinel = darkModeDefault ? 'alternate' : 'default';
+  // Dark / light mode switch
+  window.quartoToggleColorScheme = () => {
+    // Read the current dark / light value 
+    let toAlternate = !hasAlternateSentinel();
+    toggleColorMode(toAlternate);
+    setStyleSentinel(toAlternate);
+    toggleGiscusIfUsed(toAlternate, darkModeDefault);
+  };
+  // Ensure there is a toggle, if there isn't float one in the top right
+  if (window.document.querySelector('.quarto-color-scheme-toggle') === null) {
+    const a = window.document.createElement('a');
+    a.classList.add('top-right');
+    a.classList.add('quarto-color-scheme-toggle');
+    a.href = "";
+    a.onclick = function() { try { window.quartoToggleColorScheme(); } catch {} return false; };
+    const i = window.document.createElement("i");
+    i.classList.add('bi');
+    a.appendChild(i);
+    window.document.body.appendChild(a);
+  }
+  // Switch to dark mode if need be
+  if (hasAlternateSentinel()) {
+    toggleColorMode(true);
+  } else {
+    toggleColorMode(false);
+  }
+  const icon = "";
+  const anchorJS = new window.AnchorJS();
+  anchorJS.options = {
+    placement: 'right',
+    icon: icon
+  };
+  anchorJS.add('.anchored');
+  const isCodeAnnotation = (el) => {
+    for (const clz of el.classList) {
+      if (clz.startsWith('code-annotation-')) {                     
+        return true;
+      }
+    }
+    return false;
+  }
+  const onCopySuccess = function(e) {
+    // button target
+    const button = e.trigger;
+    // don't keep focus
+    button.blur();
+    // flash "checked"
+    button.classList.add('code-copy-button-checked');
+    var currentTitle = button.getAttribute("title");
+    button.setAttribute("title", "Copied!");
+    let tooltip;
+    if (window.bootstrap) {
+      button.setAttribute("data-bs-toggle", "tooltip");
+      button.setAttribute("data-bs-placement", "left");
+      button.setAttribute("data-bs-title", "Copied!");
+      tooltip = new bootstrap.Tooltip(button, 
+        { trigger: "manual", 
+          customClass: "code-copy-button-tooltip",
+          offset: [0, -8]});
+      tooltip.show();    
+    }
+    setTimeout(function() {
+      if (tooltip) {
+        tooltip.hide();
+        button.removeAttribute("data-bs-title");
+        button.removeAttribute("data-bs-toggle");
+        button.removeAttribute("data-bs-placement");
+      }
+      button.setAttribute("title", currentTitle);
+      button.classList.remove('code-copy-button-checked');
+    }, 1000);
+    // clear code selection
+    e.clearSelection();
+  }
+  const getTextToCopy = function(trigger) {
+      const codeEl = trigger.previousElementSibling.cloneNode(true);
+      for (const childEl of codeEl.children) {
+        if (isCodeAnnotation(childEl)) {
+          childEl.remove();
+        }
+      }
+      return codeEl.innerText;
+  }
+  const clipboard = new window.ClipboardJS('.code-copy-button:not([data-in-quarto-modal])', {
+    text: getTextToCopy
+  });
+  clipboard.on('success', onCopySuccess);
+  if (window.document.getElementById('quarto-embedded-source-code-modal')) {
+    const clipboardModal = new window.ClipboardJS('.code-copy-button[data-in-quarto-modal]', {
+      text: getTextToCopy,
+      container: window.document.getElementById('quarto-embedded-source-code-modal')
+    });
+    clipboardModal.on('success', onCopySuccess);
+  }
+    var localhostRegex = new RegExp(/^(?:http|https):\/\/localhost\:?[0-9]*\//);
+    var mailtoRegex = new RegExp(/^mailto:/);
+      var filterRegex = new RegExp("https:\/\/greglandrum\.github\.io\/rdkit-blog\/");
+    var isInternal = (href) => {
+        return filterRegex.test(href) || localhostRegex.test(href) || mailtoRegex.test(href);
+    }
+    // Inspect non-navigation links and adorn them if external
+ 	var links = window.document.querySelectorAll('a[href]:not(.nav-link):not(.navbar-brand):not(.toc-action):not(.sidebar-link):not(.sidebar-item-toggle):not(.pagination-link):not(.no-external):not([aria-hidden]):not(.dropdown-item):not(.quarto-navigation-tool):not(.about-link)');
+    for (var i=0; i<links.length; i++) {
+      const link = links[i];
+      if (!isInternal(link.href)) {
+        // undo the damage that might have been done by quarto-nav.js in the case of
+        // links that we want to consider external
+        if (link.dataset.originalHref !== undefined) {
+          link.href = link.dataset.originalHref;
+        }
+      }
+    }
+  function tippyHover(el, contentFn, onTriggerFn, onUntriggerFn) {
+    const config = {
+      allowHTML: true,
+      maxWidth: 500,
+      delay: 100,
+      arrow: false,
+      appendTo: function(el) {
+          return el.parentElement;
+      },
+      interactive: true,
+      interactiveBorder: 10,
+      theme: 'quarto',
+      placement: 'bottom-start',
+    };
+    if (contentFn) {
+      config.content = contentFn;
+    }
+    if (onTriggerFn) {
+      config.onTrigger = onTriggerFn;
+    }
+    if (onUntriggerFn) {
+      config.onUntrigger = onUntriggerFn;
+    }
+    window.tippy(el, config); 
+  }
+  const noterefs = window.document.querySelectorAll('a[role="doc-noteref"]');
+  for (var i=0; i<noterefs.length; i++) {
+    const ref = noterefs[i];
+    tippyHover(ref, function() {
+      // use id or data attribute instead here
+      let href = ref.getAttribute('data-footnote-href') || ref.getAttribute('href');
+      try { href = new URL(href).hash; } catch {}
+      const id = href.replace(/^#\/?/, "");
+      const note = window.document.getElementById(id);
+      if (note) {
+        return note.innerHTML;
+      } else {
+        return "";
+      }
+    });
+  }
+  const xrefs = window.document.querySelectorAll('a.quarto-xref');
+  const processXRef = (id, note) => {
+    // Strip column container classes
+    const stripColumnClz = (el) => {
+      el.classList.remove("page-full", "page-columns");
+      if (el.children) {
+        for (const child of el.children) {
+          stripColumnClz(child);
+        }
+      }
+    }
+    stripColumnClz(note)
+    if (id === null || id.startsWith('sec-')) {
+      // Special case sections, only their first couple elements
+      const container = document.createElement("div");
+      if (note.children && note.children.length > 2) {
+        container.appendChild(note.children[0].cloneNode(true));
+        for (let i = 1; i < note.children.length; i++) {
+          const child = note.children[i];
+          if (child.tagName === "P" && child.innerText === "") {
+            continue;
+          } else {
+            container.appendChild(child.cloneNode(true));
+            break;
+          }
+        }
+        if (window.Quarto?.typesetMath) {
+          window.Quarto.typesetMath(container);
+        }
+        return container.innerHTML
+      } else {
+        if (window.Quarto?.typesetMath) {
+          window.Quarto.typesetMath(note);
+        }
+        return note.innerHTML;
+      }
+    } else {
+      // Remove any anchor links if they are present
+      const anchorLink = note.querySelector('a.anchorjs-link');
+      if (anchorLink) {
+        anchorLink.remove();
+      }
+      if (window.Quarto?.typesetMath) {
+        window.Quarto.typesetMath(note);
+      }
+      if (note.classList.contains("callout")) {
+        return note.outerHTML;
+      } else {
+        return note.innerHTML;
+      }
+    }
+  }
+  for (var i=0; i<xrefs.length; i++) {
+    const xref = xrefs[i];
+    tippyHover(xref, undefined, function(instance) {
+      instance.disable();
+      let url = xref.getAttribute('href');
+      let hash = undefined; 
+      if (url.startsWith('#')) {
+        hash = url;
+      } else {
+        try { hash = new URL(url).hash; } catch {}
+      }
+      if (hash) {
+        const id = hash.replace(/^#\/?/, "");
+        const note = window.document.getElementById(id);
+        if (note !== null) {
+          try {
+            const html = processXRef(id, note.cloneNode(true));
+            instance.setContent(html);
+          } finally {
+            instance.enable();
+            instance.show();
+          }
+        } else {
+          // See if we can fetch this
+          fetch(url.split('#')[0])
+          .then(res => res.text())
+          .then(html => {
+            const parser = new DOMParser();
+            const htmlDoc = parser.parseFromString(html, "text/html");
+            const note = htmlDoc.getElementById(id);
+            if (note !== null) {
+              const html = processXRef(id, note);
+              instance.setContent(html);
+            } 
+          }).finally(() => {
+            instance.enable();
+            instance.show();
+          });
+        }
+      } else {
+        // See if we can fetch a full url (with no hash to target)
+        // This is a special case and we should probably do some content thinning / targeting
+        fetch(url)
+        .then(res => res.text())
+        .then(html => {
+          const parser = new DOMParser();
+          const htmlDoc = parser.parseFromString(html, "text/html");
+          const note = htmlDoc.querySelector('main.content');
+          if (note !== null) {
+            // This should only happen for chapter cross references
+            // (since there is no id in the URL)
+            // remove the first header
+            if (note.children.length > 0 && note.children[0].tagName === "HEADER") {
+              note.children[0].remove();
+            }
+            const html = processXRef(null, note);
+            instance.setContent(html);
+          } 
+        }).finally(() => {
+          instance.enable();
+          instance.show();
+        });
+      }
+    }, function(instance) {
+    });
+  }
+      let selectedAnnoteEl;
+      const selectorForAnnotation = ( cell, annotation) => {
+        let cellAttr = 'data-code-cell="' + cell + '"';
+        let lineAttr = 'data-code-annotation="' +  annotation + '"';
+        const selector = 'span[' + cellAttr + '][' + lineAttr + ']';
+        return selector;
+      }
+      const selectCodeLines = (annoteEl) => {
+        const doc = window.document;
+        const targetCell = annoteEl.getAttribute("data-target-cell");
+        const targetAnnotation = annoteEl.getAttribute("data-target-annotation");
+        const annoteSpan = window.document.querySelector(selectorForAnnotation(targetCell, targetAnnotation));
+        const lines = annoteSpan.getAttribute("data-code-lines").split(",");
+        const lineIds = lines.map((line) => {
+          return targetCell + "-" + line;
+        })
+        let top = null;
+        let height = null;
+        let parent = null;
+        if (lineIds.length > 0) {
+            //compute the position of the single el (top and bottom and make a div)
+            const el = window.document.getElementById(lineIds[0]);
+            top = el.offsetTop;
+            height = el.offsetHeight;
+            parent = el.parentElement.parentElement;
+          if (lineIds.length > 1) {
+            const lastEl = window.document.getElementById(lineIds[lineIds.length - 1]);
+            const bottom = lastEl.offsetTop + lastEl.offsetHeight;
+            height = bottom - top;
+          }
+          if (top !== null && height !== null && parent !== null) {
+            // cook up a div (if necessary) and position it 
+            let div = window.document.getElementById("code-annotation-line-highlight");
+            if (div === null) {
+              div = window.document.createElement("div");
+              div.setAttribute("id", "code-annotation-line-highlight");
+              div.style.position = 'absolute';
+              parent.appendChild(div);
+            }
+            div.style.top = top - 2 + "px";
+            div.style.height = height + 4 + "px";
+            div.style.left = 0;
+            let gutterDiv = window.document.getElementById("code-annotation-line-highlight-gutter");
+            if (gutterDiv === null) {
+              gutterDiv = window.document.createElement("div");
+              gutterDiv.setAttribute("id", "code-annotation-line-highlight-gutter");
+              gutterDiv.style.position = 'absolute';
+              const codeCell = window.document.getElementById(targetCell);
+              const gutter = codeCell.querySelector('.code-annotation-gutter');
+              gutter.appendChild(gutterDiv);
+            }
+            gutterDiv.style.top = top - 2 + "px";
+            gutterDiv.style.height = height + 4 + "px";
+          }
+          selectedAnnoteEl = annoteEl;
+        }
+      };
+      const unselectCodeLines = () => {
+        const elementsIds = ["code-annotation-line-highlight", "code-annotation-line-highlight-gutter"];
+        elementsIds.forEach((elId) => {
+          const div = window.document.getElementById(elId);
+          if (div) {
+            div.remove();
+          }
+        });
+        selectedAnnoteEl = undefined;
+      };
+        // Handle positioning of the toggle
+    window.addEventListener(
+      "resize",
+      throttle(() => {
+        elRect = undefined;
+        if (selectedAnnoteEl) {
+          selectCodeLines(selectedAnnoteEl);
+        }
+      }, 10)
+    );
+    function throttle(fn, ms) {
+    let throttle = false;
+    let timer;
+      return (...args) => {
+        if(!throttle) { // first call gets through
+            fn.apply(this, args);
+            throttle = true;
+        } else { // all the others get throttled
+            if(timer) clearTimeout(timer); // cancel #2
+            timer = setTimeout(() => {
+              fn.apply(this, args);
+              timer = throttle = false;
+            }, ms);
+        }
+      };
+    }
+      // Attach click handler to the DT
+      const annoteDls = window.document.querySelectorAll('dt[data-target-cell]');
+      for (const annoteDlNode of annoteDls) {
+        annoteDlNode.addEventListener('click', (event) => {
+          const clickedEl = event.target;
+          if (clickedEl !== selectedAnnoteEl) {
+            unselectCodeLines();
+            const activeEl = window.document.querySelector('dt[data-target-cell].code-annotation-active');
+            if (activeEl) {
+              activeEl.classList.remove('code-annotation-active');
+            }
+            selectCodeLines(clickedEl);
+            clickedEl.classList.add('code-annotation-active');
+          } else {
+            // Unselect the line
+            unselectCodeLines();
+            clickedEl.classList.remove('code-annotation-active');
+          }
+        });
+      }
+  const findCites = (el) => {
+    const parentEl = el.parentElement;
+    if (parentEl) {
+      const cites = parentEl.dataset.cites;
+      if (cites) {
+        return {
+          el,
+          cites: cites.split(' ')
+        };
+      } else {
+        return findCites(el.parentElement)
+      }
+    } else {
+      return undefined;
+    }
+  };
+  var bibliorefs = window.document.querySelectorAll('a[role="doc-biblioref"]');
+  for (var i=0; i<bibliorefs.length; i++) {
+    const ref = bibliorefs[i];
+    const citeInfo = findCites(ref);
+    if (citeInfo) {
+      tippyHover(citeInfo.el, function() {
+        var popup = window.document.createElement('div');
+        citeInfo.cites.forEach(function(cite) {
+          var citeDiv = window.document.createElement('div');
+          citeDiv.classList.add('hanging-indent');
+          citeDiv.classList.add('csl-entry');
+          var biblioDiv = window.document.getElementById('ref-' + cite);
+          if (biblioDiv) {
+            citeDiv.innerHTML = biblioDiv.innerHTML;
+          }
+          popup.appendChild(citeDiv);
+        });
+        return popup.innerHTML;
+      });
+    }
+  }
+});
+</script>
+<script src="https://utteranc.es/client.js" repo="greglandrum/rdkit-blog" issue-term="pathname" theme="github-light" crossorigin="anonymous" async="">
+</script>
+</div> <!-- /content -->
+<footer class="footer">
+  <div class="nav-footer">
+    <div class="nav-footer-left">
+<p>Copyright (C) 2025 Greg Landrum</p>
+</div>   
+    <div class="nav-footer-center">
+      &nbsp;
+    </div>
+    <div class="nav-footer-right">
+<p><a href="https://www.rdkit.org"><img src="https://www.rdkit.org/logo.small.png" class="img-fluid" alt="RDKit" width="64"></a></p>
+</div>
+  </div>
+</footer>
+
+
+
+
+</body></html>
