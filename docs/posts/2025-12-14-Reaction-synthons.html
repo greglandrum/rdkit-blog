@@ -1,0 +1,1633 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en"><head>
+
+<meta charset="utf-8">
+<meta name="generator" content="quarto-1.6.43">
+
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+
+<meta name="dcterms.date" content="2025-12-14">
+<meta name="description" content="A frequently requested tutorial part 2">
+
+<title>Building synthon spaces with combinatorial reactions – RDKit blog</title>
+<style>
+code{white-space: pre-wrap;}
+span.smallcaps{font-variant: small-caps;}
+div.columns{display: flex; gap: min(4vw, 1.5em);}
+div.column{flex: auto; overflow-x: auto;}
+div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+ul.task-list{list-style: none;}
+ul.task-list li input[type="checkbox"] {
+  width: 0.8em;
+  margin: 0 0.8em 0.2em -1em; /* quarto-specific, see https://github.com/quarto-dev/quarto-cli/issues/4556 */ 
+  vertical-align: middle;
+}
+/* CSS for syntax highlighting */
+pre > code.sourceCode { white-space: pre; position: relative; }
+pre > code.sourceCode > span { line-height: 1.25; }
+pre > code.sourceCode > span:empty { height: 1.2em; }
+.sourceCode { overflow: visible; }
+code.sourceCode > span { color: inherit; text-decoration: inherit; }
+div.sourceCode { margin: 1em 0; }
+pre.sourceCode { margin: 0; }
+@media screen {
+div.sourceCode { overflow: auto; }
+}
+@media print {
+pre > code.sourceCode { white-space: pre-wrap; }
+pre > code.sourceCode > span { display: inline-block; text-indent: -5em; padding-left: 5em; }
+}
+pre.numberSource code
+  { counter-reset: source-line 0; }
+pre.numberSource code > span
+  { position: relative; left: -4em; counter-increment: source-line; }
+pre.numberSource code > span > a:first-child::before
+  { content: counter(source-line);
+    position: relative; left: -1em; text-align: right; vertical-align: baseline;
+    border: none; display: inline-block;
+    -webkit-touch-callout: none; -webkit-user-select: none;
+    -khtml-user-select: none; -moz-user-select: none;
+    -ms-user-select: none; user-select: none;
+    padding: 0 4px; width: 4em;
+  }
+pre.numberSource { margin-left: 3em;  padding-left: 4px; }
+div.sourceCode
+  {   }
+@media screen {
+pre > code.sourceCode > span > a:first-child::before { text-decoration: underline; }
+}
+</style>
+
+
+<script src="../site_libs/quarto-nav/quarto-nav.js"></script>
+<script src="../site_libs/quarto-nav/headroom.min.js"></script>
+<script src="../site_libs/clipboard/clipboard.min.js"></script>
+<script src="../site_libs/quarto-search/autocomplete.umd.js"></script>
+<script src="../site_libs/quarto-search/fuse.min.js"></script>
+<script src="../site_libs/quarto-search/quarto-search.js"></script>
+<meta name="quarto:offset" content="../">
+<link href="../posts/icons/favicon.ico" rel="icon">
+<script src="../site_libs/quarto-html/quarto.js"></script>
+<script src="../site_libs/quarto-html/popper.min.js"></script>
+<script src="../site_libs/quarto-html/tippy.umd.min.js"></script>
+<script src="../site_libs/quarto-html/anchor.min.js"></script>
+<link href="../site_libs/quarto-html/tippy.css" rel="stylesheet">
+<link href="../site_libs/quarto-html/quarto-syntax-highlighting-d4d76bf8491c20bad77d141916dc28e1.css" rel="stylesheet" class="quarto-color-scheme" id="quarto-text-highlighting-styles">
+<link href="../site_libs/quarto-html/quarto-syntax-highlighting-dark-4379b0ccadffce622b03caf4c46266b3.css" rel="prefetch" class="quarto-color-scheme quarto-color-alternate" id="quarto-text-highlighting-styles">
+<script src="../site_libs/bootstrap/bootstrap.min.js"></script>
+<link href="../site_libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
+<link href="../site_libs/bootstrap/bootstrap-40840319e1d09552a0f54992bf705f97.min.css" rel="stylesheet" append-hash="true" class="quarto-color-scheme" id="quarto-bootstrap" data-mode="light">
+<link href="../site_libs/bootstrap/bootstrap-dark-f86ed83de42dc3a6349cec1bcdefd5d4.min.css" rel="prefetch" append-hash="true" class="quarto-color-scheme quarto-color-alternate" id="quarto-bootstrap" data-mode="dark">
+<script id="quarto-search-options" type="application/json">{
+  "location": "navbar",
+  "copy-button": false,
+  "collapse-after": 3,
+  "panel-placement": "end",
+  "type": "overlay",
+  "limit": 50,
+  "keyboard-shortcut": [
+    "f",
+    "/",
+    "s"
+  ],
+  "show-item-context": false,
+  "language": {
+    "search-no-results-text": "No results",
+    "search-matching-documents-text": "matching documents",
+    "search-copy-link-title": "Copy link to search",
+    "search-hide-matches-text": "Hide additional matches",
+    "search-more-match-text": "more match in this document",
+    "search-more-matches-text": "more matches in this document",
+    "search-clear-button-title": "Clear",
+    "search-text-placeholder": "",
+    "search-detached-cancel-button-title": "Cancel",
+    "search-submit-button-title": "Submit",
+    "search-label": "Search"
+  }
+}</script>
+
+
+<link rel="stylesheet" href="../styles.css">
+</head>
+
+<body class="nav-fixed">
+
+<div id="quarto-search-results"></div>
+  <header id="quarto-header" class="headroom fixed-top">
+    <nav class="navbar navbar-expand-lg " data-bs-theme="dark">
+      <div class="navbar-container container-fluid">
+      <div class="navbar-brand-container mx-auto">
+    <a class="navbar-brand" href="../index.html">
+    <span class="navbar-title">RDKit blog</span>
+    </a>
+  </div>
+            <div id="quarto-search" class="" title="Search"></div>
+          <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarCollapse" aria-controls="navbarCollapse" role="menu" aria-expanded="false" aria-label="Toggle navigation" onclick="if (window.quartoToggleHeadroom) { window.quartoToggleHeadroom(); }">
+  <span class="navbar-toggler-icon"></span>
+</button>
+          <div class="collapse navbar-collapse" id="navbarCollapse">
+            <ul class="navbar-nav navbar-nav-scroll ms-auto">
+  <li class="nav-item">
+    <a class="nav-link" href="../about.html"> 
+<span class="menu-text">RDKit experiments, tips, and tutorials</span></a>
+  </li>  
+  <li class="nav-item compact">
+    <a class="nav-link" href="https://github.com/rdkit/rdkit"> <i class="bi bi-github" role="img">
+</i> 
+<span class="menu-text"></span></a>
+  </li>  
+  <li class="nav-item compact">
+    <a class="nav-link" href="https://bsky.app/profile/rdkit.bsky.social"> <i class="bi bi-twitter" role="img">
+</i> 
+<span class="menu-text"></span></a>
+  </li>  
+  <li class="nav-item compact">
+    <a class="nav-link" href="https://www.linkedin.com/groups/8192558/"> <i class="bi bi-linkedin" role="img">
+</i> 
+<span class="menu-text"></span></a>
+  </li>  
+  <li class="nav-item compact">
+    <a class="nav-link" href="../index.xml"> <i class="bi bi-rss" role="img">
+</i> 
+<span class="menu-text"></span></a>
+  </li>  
+</ul>
+          </div> <!-- /navcollapse -->
+            <div class="quarto-navbar-tools">
+  <a href="" class="quarto-color-scheme-toggle quarto-navigation-tool  px-1" onclick="window.quartoToggleColorScheme(); return false;" title="Toggle dark mode"><i class="bi"></i></a>
+</div>
+      </div> <!-- /container-fluid -->
+    </nav>
+</header>
+<!-- content -->
+<div id="quarto-content" class="quarto-container page-columns page-rows-contents page-layout-article page-navbar">
+<!-- sidebar -->
+<!-- margin-sidebar -->
+    <div id="quarto-margin-sidebar" class="sidebar margin-sidebar">
+        <nav id="TOC" role="doc-toc" class="toc-active">
+    <h2 id="toc-title">On this page</h2>
+   
+  <ul>
+  <li><a href="#the-first-reaction" id="toc-the-first-reaction" class="nav-link active" data-scroll-target="#the-first-reaction">The first reaction</a></li>
+  <li><a href="#second-reaction" id="toc-second-reaction" class="nav-link" data-scroll-target="#second-reaction">Second reaction</a></li>
+  <li><a href="#combine-the-two-reaction-spaces" id="toc-combine-the-two-reaction-spaces" class="nav-link" data-scroll-target="#combine-the-two-reaction-spaces">Combine the two reaction spaces</a></li>
+  <li><a href="#reaction-3" id="toc-reaction-3" class="nav-link" data-scroll-target="#reaction-3">Reaction 3</a></li>
+  </ul>
+</nav>
+    </div>
+<!-- main -->
+<main class="content" id="quarto-document-content">
+
+<header id="title-block-header" class="quarto-title-block default">
+<div class="quarto-title">
+<h1 class="title">Building synthon spaces with combinatorial reactions</h1>
+  <div class="quarto-categories">
+    <div class="quarto-category">tutorial</div>
+    <div class="quarto-category">documentation</div>
+  </div>
+  </div>
+
+<div>
+  <div class="description">
+    A frequently requested tutorial part 2
+  </div>
+</div>
+
+
+<div class="quarto-title-meta">
+
+    
+    <div>
+    <div class="quarto-title-meta-heading">Published</div>
+    <div class="quarto-title-meta-contents">
+      <p class="date">December 14, 2025</p>
+    </div>
+  </div>
+  
+    
+  </div>
+  
+
+
+</header>
+
+
+<p>Last week’s <a href="https://greglandrum.github.io/rdkit-blog/posts/2025-12-07-BRICS-synthons.html">blog post</a> looked at using <a href="https://greglandrum.github.io/rdkit-blog/posts/2025-08-15-BRICS-tutorial.html">BRICS</a> to build a <a href="https://www.rdkit.org/docs/GettingStartedInPython.html#searching-synthon-spaces">synthon search space</a>. This post builds on that and creates a search space using some combichem reactions from a set published by <a href="http://pubs.acs.org/doi/abs/10.1021/ci200379p">Hartenfeller et al</a>.</p>
+<div id="872abcd6-8e5b-44ee-8e83-33b9d77adcd2" class="cell" data-execution_count="1">
+<div class="sourceCode cell-code" id="cb1"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> rdkit <span class="im">import</span> Chem</span>
+<span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> rdkit.Chem <span class="im">import</span> Draw</span>
+<span id="cb1-3"><a href="#cb1-3" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> rdkit.Chem <span class="im">import</span> rdChemReactions</span>
+<span id="cb1-4"><a href="#cb1-4" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> rdkit.Chem.Draw <span class="im">import</span> IPythonConsole</span>
+<span id="cb1-5"><a href="#cb1-5" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> rdkit.Chem <span class="im">import</span> rdSynthonSpaceSearch</span>
+<span id="cb1-6"><a href="#cb1-6" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-7"><a href="#cb1-7" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> rdkit</span>
+<span id="cb1-8"><a href="#cb1-8" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(rdkit.__version__)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>2025.09.3</code></pre>
+</div>
+</div>
+<p>I’m going to use a set of Enamine building blocks that I have on my machine. I loaded these into a <a href="https://greglandrum.github.io/rdkit-blog/posts/2021-12-20-substructlibrary-search-order.html">SubstructLibrary</a> to make them fast and easy to search.</p>
+<div id="b0cacab6" class="cell" data-execution_count="251">
+<div class="sourceCode cell-code" id="cb3"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> rdkit.Chem <span class="im">import</span> rdSubstructLibrary</span>
+<span id="cb3-2"><a href="#cb3-2" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> pickle</span>
+<span id="cb3-3"><a href="#cb3-3" aria-hidden="true" tabindex="-1"></a>sslib <span class="op">=</span> pickle.load(<span class="bu">open</span>(<span class="st">'/scratch/Data/Enamine/real_reagents.sslib.pkl'</span>,<span class="st">'rb'</span>))</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+<section id="the-first-reaction" class="level1">
+<h1>The first reaction</h1>
+<p>I’ll start with the Pictet-Spengler reaction from the <a href="http://pubs.acs.org/doi/abs/10.1021/ci200379p">Hartenfeller paper</a>. It’s the first reaction in the SI for that paper and there’s something the name that I really like.</p>
+<p>Here’s the definition of the reaction from the paper</p>
+<div id="60d638fc" class="cell" data-execution_count="207">
+<div class="sourceCode cell-code" id="cb4"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a>sma <span class="op">=</span> <span class="st">'[cH1:1]1:[c:2](-[CH2:7]-[CH2:8]-[NH2:9]):[c:3]:[c:4]:[c:5]:[c:6]:1.[#6:11]-[CH1;R0:10]=[OD1]&gt;&gt;[c:1]12:[c:2](-[CH2:7]-[CH2:8]-[NH1:9]-[C:10]-2(-[#6:11])):[c:3]:[c:4]:[c:5]:[c:6]:1'</span></span>
+<span id="cb4-2"><a href="#cb4-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-3"><a href="#cb4-3" aria-hidden="true" tabindex="-1"></a>rxn <span class="op">=</span> rdChemReactions.ReactionFromSmarts(sma)</span>
+<span id="cb4-4"><a href="#cb4-4" aria-hidden="true" tabindex="-1"></a>rxn</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-display" data-execution_count="207">
+<div>
+<figure class="figure">
+<p><img src="2025-12-14-Reaction-synthons_files/figure-html/cell-4-output-1.png" class="img-fluid figure-img"></p>
+</figure>
+</div>
+</div>
+</div>
+<p>These are the two prototype educts from the SI:</p>
+<div id="02076fd2" class="cell" data-scrolled="true" data-execution_count="208">
+<div class="sourceCode cell-code" id="cb5"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a>r1 <span class="op">=</span> Chem.MolFromSmiles(<span class="st">'c1cc(CCN)ccc1'</span>)</span>
+<span id="cb5-2"><a href="#cb5-2" aria-hidden="true" tabindex="-1"></a>r2 <span class="op">=</span> Chem.MolFromSmiles(<span class="st">'CC(=O)'</span>)</span>
+<span id="cb5-3"><a href="#cb5-3" aria-hidden="true" tabindex="-1"></a>Draw.MolsToGridImage((r1,r2))</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-display" data-execution_count="208">
+<div>
+<figure class="figure">
+<p><img src="2025-12-14-Reaction-synthons_files/figure-html/cell-5-output-1.png" class="img-fluid figure-img"></p>
+</figure>
+</div>
+</div>
+</div>
+<p>To make what’s going on in the reaction a bit easier to identify, here I add the atom map numbers from the reaction to the sample educts:</p>
+<div id="e392add8" class="cell" data-execution_count="209">
+<div class="sourceCode cell-code" id="cb6"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb6-1"><a href="#cb6-1" aria-hidden="true" tabindex="-1"></a>r_queries <span class="op">=</span> [rxn.GetReactantTemplate(x) <span class="cf">for</span> x <span class="kw">in</span> <span class="bu">range</span>(rxn.GetNumReactantTemplates())]</span>
+<span id="cb6-2"><a href="#cb6-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb6-3"><a href="#cb6-3" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> r,q <span class="kw">in</span> <span class="bu">zip</span>([r1,r2],r_queries):</span>
+<span id="cb6-4"><a href="#cb6-4" aria-hidden="true" tabindex="-1"></a>    match <span class="op">=</span> r.GetSubstructMatch(q)</span>
+<span id="cb6-5"><a href="#cb6-5" aria-hidden="true" tabindex="-1"></a>    <span class="cf">assert</span> match</span>
+<span id="cb6-6"><a href="#cb6-6" aria-hidden="true" tabindex="-1"></a>    <span class="cf">for</span> i,midx <span class="kw">in</span> <span class="bu">enumerate</span>(match):</span>
+<span id="cb6-7"><a href="#cb6-7" aria-hidden="true" tabindex="-1"></a>        mnum <span class="op">=</span> q.GetAtomWithIdx(i).GetAtomMapNum()</span>
+<span id="cb6-8"><a href="#cb6-8" aria-hidden="true" tabindex="-1"></a>        <span class="cf">if</span> mnum:</span>
+<span id="cb6-9"><a href="#cb6-9" aria-hidden="true" tabindex="-1"></a>            r.GetAtomWithIdx(midx).SetAtomMapNum(mnum)</span>
+<span id="cb6-10"><a href="#cb6-10" aria-hidden="true" tabindex="-1"></a>Draw.MolsToGridImage((r1,r2))</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-display" data-execution_count="209">
+<div>
+<figure class="figure">
+<p><img src="2025-12-14-Reaction-synthons_files/figure-html/cell-6-output-1.png" class="img-fluid figure-img"></p>
+</figure>
+</div>
+</div>
+</div>
+<div id="4865d47c" class="cell" data-execution_count="206">
+<div class="sourceCode cell-code" id="cb7"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb7-1"><a href="#cb7-1" aria-hidden="true" tabindex="-1"></a>r</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-display" data-execution_count="206">
+<div>
+<figure class="figure">
+<p><img src="2025-12-14-Reaction-synthons_files/figure-html/cell-7-output-1.png" class="img-fluid figure-img"></p>
+</figure>
+</div>
+</div>
+</div>
+<p>I’m going to encode the reaction as three synthons: a core and two “sidechains”</p>
+<div id="c91b7376" class="cell" data-scrolled="true" data-execution_count="195">
+<div class="sourceCode cell-code" id="cb8"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb8-1"><a href="#cb8-1" aria-hidden="true" tabindex="-1"></a>core <span class="op">=</span> Chem.MolFromSmiles(<span class="st">'[7*]CCNC([11*])[1*]'</span>)</span>
+<span id="cb8-2"><a href="#cb8-2" aria-hidden="true" tabindex="-1"></a>core</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-display" data-execution_count="195">
+<div>
+<figure class="figure">
+<p><img src="2025-12-14-Reaction-synthons_files/figure-html/cell-8-output-1.png" class="img-fluid figure-img"></p>
+</figure>
+</div>
+</div>
+</div>
+<p>Here’s what I get for the two sample educts:</p>
+<div id="53a79ef2" class="cell" data-execution_count="196">
+<div class="sourceCode cell-code" id="cb9"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb9-1"><a href="#cb9-1" aria-hidden="true" tabindex="-1"></a>chains <span class="op">=</span> [Chem.MolFromSmiles(x) <span class="cf">for</span> x <span class="kw">in</span> (<span class="st">'[7*]c1ccccc1[1*]'</span>,<span class="st">'C[11*]'</span>)]</span>
+<span id="cb9-2"><a href="#cb9-2" aria-hidden="true" tabindex="-1"></a>Draw.MolsToGridImage([core,chains[<span class="dv">0</span>],chains[<span class="dv">1</span>]],legends<span class="op">=</span>[<span class="st">'core'</span>,<span class="st">'educt1'</span>,<span class="st">'educt2'</span>])</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-display" data-execution_count="196">
+<div>
+<figure class="figure">
+<p><img src="2025-12-14-Reaction-synthons_files/figure-html/cell-9-output-1.png" class="img-fluid figure-img"></p>
+</figure>
+</div>
+</div>
+</div>
+<p>We can put these together using molzip (which is what the sython search code uses) to get the product:</p>
+<div id="883f16e5" class="cell" data-execution_count="197">
+<div class="sourceCode cell-code" id="cb10"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb10-1"><a href="#cb10-1" aria-hidden="true" tabindex="-1"></a>tm <span class="op">=</span> Chem.RWMol(core)</span>
+<span id="cb10-2"><a href="#cb10-2" aria-hidden="true" tabindex="-1"></a>tm.InsertMol(chains[<span class="dv">0</span>])</span>
+<span id="cb10-3"><a href="#cb10-3" aria-hidden="true" tabindex="-1"></a>tm.InsertMol(chains[<span class="dv">1</span>])</span>
+<span id="cb10-4"><a href="#cb10-4" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb10-5"><a href="#cb10-5" aria-hidden="true" tabindex="-1"></a>ps <span class="op">=</span> Chem.MolzipParams()</span>
+<span id="cb10-6"><a href="#cb10-6" aria-hidden="true" tabindex="-1"></a>ps.label <span class="op">=</span> Chem.MolzipLabel.Isotope</span>
+<span id="cb10-7"><a href="#cb10-7" aria-hidden="true" tabindex="-1"></a>tm <span class="op">=</span> Chem.molzip(tm,ps)</span>
+<span id="cb10-8"><a href="#cb10-8" aria-hidden="true" tabindex="-1"></a>tm</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-display" data-execution_count="197">
+<div>
+<figure class="figure">
+<p><img src="2025-12-14-Reaction-synthons_files/figure-html/cell-10-output-1.png" class="img-fluid figure-img"></p>
+</figure>
+</div>
+</div>
+</div>
+<p>Now we need reactions that transform the building blocks that you would find in a chemical catalog into the synthons we need for the two educts.</p>
+<p>I will do this using reactions.</p>
+<div id="e8142722" class="cell" data-execution_count="198">
+<div class="sourceCode cell-code" id="cb11"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb11-1"><a href="#cb11-1" aria-hidden="true" tabindex="-1"></a>r1_prep <span class="op">=</span> rdChemReactions.ReactionFromSmarts(<span class="st">'[cH1:1]1:[c:2](-[CH2:7]-[CH2:8]-[NH2:9]):[c:3]:[c:4]:[c:5]:[c:6]:1</span><span class="ch">\</span></span>
+<span id="cb11-2"><a href="#cb11-2" aria-hidden="true" tabindex="-1"></a><span class="st">&gt;&gt;[1*]-[c:1]1:[c:2](-[7*])[c:3]:[c:4]:[c:5]:[c:6]1'</span>)</span>
+<span id="cb11-3"><a href="#cb11-3" aria-hidden="true" tabindex="-1"></a>p <span class="op">=</span> r1_prep.RunReactant(r1,<span class="dv">0</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stderr">
+<pre><code>[15:59:19] mapped atoms in the reactants were not mapped in the products.
+  unmapped numbers are: 7 8 9 </code></pre>
+</div>
+</div>
+<div id="eadce555" class="cell" data-execution_count="199">
+<div class="sourceCode cell-code" id="cb13"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb13-1"><a href="#cb13-1" aria-hidden="true" tabindex="-1"></a>Draw.MolsToGridImage([r1,p[<span class="dv">0</span>][<span class="dv">0</span>]],legends<span class="op">=</span>[<span class="st">'building block'</span>,<span class="st">'synthon'</span>])</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-display" data-execution_count="199">
+<div>
+<figure class="figure">
+<p><img src="2025-12-14-Reaction-synthons_files/figure-html/cell-12-output-1.png" class="img-fluid figure-img"></p>
+</figure>
+</div>
+</div>
+</div>
+<div id="2ceebe11" class="cell" data-execution_count="200">
+<div class="sourceCode cell-code" id="cb14"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb14-1"><a href="#cb14-1" aria-hidden="true" tabindex="-1"></a>r2_prep <span class="op">=</span> rdChemReactions.ReactionFromSmarts(<span class="st">'[#6:11]-[CH1;R0:10]=[OD1]&gt;&gt;[#6:11]-[11*]'</span>)</span>
+<span id="cb14-2"><a href="#cb14-2" aria-hidden="true" tabindex="-1"></a>p <span class="op">=</span> r2_prep.RunReactant(r2,<span class="dv">0</span>)</span>
+<span id="cb14-3"><a href="#cb14-3" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb14-4"><a href="#cb14-4" aria-hidden="true" tabindex="-1"></a>Draw.MolsToGridImage([r2,p[<span class="dv">0</span>][<span class="dv">0</span>]],legends<span class="op">=</span>[<span class="st">'building block'</span>,<span class="st">'synthon'</span>])</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stderr">
+<pre><code>[15:59:41] mapped atoms in the reactants were not mapped in the products.
+  unmapped numbers are: 10 </code></pre>
+</div>
+<div class="cell-output cell-output-display" data-execution_count="200">
+<div>
+<figure class="figure">
+<p><img src="2025-12-14-Reaction-synthons_files/figure-html/cell-13-output-2.png" class="img-fluid figure-img"></p>
+</figure>
+</div>
+</div>
+</div>
+<p>More complex reactions (see the next example) may have multiple cores. I want to try and have the code for creating the space be reasonably generic, so I’ll put the preparation reactions and core into a list:</p>
+<div id="a9799540" class="cell" data-execution_count="215">
+<div class="sourceCode cell-code" id="cb16"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb16-1"><a href="#cb16-1" aria-hidden="true" tabindex="-1"></a>r_queries <span class="op">=</span> [rxn.GetReactantTemplate(x) <span class="cf">for</span> x <span class="kw">in</span> <span class="bu">range</span>(rxn.GetNumReactantTemplates())]</span>
+<span id="cb16-2"><a href="#cb16-2" aria-hidden="true" tabindex="-1"></a>possibles <span class="op">=</span> [(core,(r1_prep,r2_prep))]</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+<div id="6a98280b" class="cell" data-execution_count="220">
+<div class="sourceCode cell-code" id="cb17"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb17-1"><a href="#cb17-1" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> enumerate_synthons(possibles,outf,writeHeader<span class="op">=</span><span class="va">True</span>,startIdx<span class="op">=</span><span class="dv">1</span>,nWritten<span class="op">=</span><span class="dv">1</span>):</span>
+<span id="cb17-2"><a href="#cb17-2" aria-hidden="true" tabindex="-1"></a>    <span class="cf">if</span> writeHeader:</span>
+<span id="cb17-3"><a href="#cb17-3" aria-hidden="true" tabindex="-1"></a>        outf.write(<span class="st">'</span><span class="ch">\t</span><span class="st">'</span>.join([<span class="st">'SMILES'</span>,<span class="st">'synton_id'</span>,<span class="st">'synton#'</span>,<span class="st">'reaction_id'</span>,<span class="st">'release'</span>])<span class="op">+</span><span class="st">'</span><span class="ch">\n</span><span class="st">'</span>)</span>
+<span id="cb17-4"><a href="#cb17-4" aria-hidden="true" tabindex="-1"></a>    <span class="cf">for</span> rxnidx,poss <span class="kw">in</span> <span class="bu">enumerate</span>(possibles,start<span class="op">=</span>startIdx):</span>
+<span id="cb17-5"><a href="#cb17-5" aria-hidden="true" tabindex="-1"></a>        <span class="co"># get the core and preparation reactions</span></span>
+<span id="cb17-6"><a href="#cb17-6" aria-hidden="true" tabindex="-1"></a>        core,preps <span class="op">=</span> poss</span>
+<span id="cb17-7"><a href="#cb17-7" aria-hidden="true" tabindex="-1"></a>        <span class="co"># write out the core:</span></span>
+<span id="cb17-8"><a href="#cb17-8" aria-hidden="true" tabindex="-1"></a>        outf.write(<span class="ss">f'</span><span class="sc">{</span>Chem<span class="sc">.</span>MolToSmiles(core)<span class="sc">}</span><span class="ch">\t</span><span class="sc">{</span>nWritten<span class="sc">}</span><span class="ch">\t</span><span class="ss">1</span><span class="ch">\t</span><span class="ss">r</span><span class="sc">{</span>rxnidx<span class="sc">}</span><span class="ch">\t</span><span class="ss">1</span><span class="ch">\n</span><span class="ss">'</span>)</span>
+<span id="cb17-9"><a href="#cb17-9" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb17-10"><a href="#cb17-10" aria-hidden="true" tabindex="-1"></a>        <span class="co"># now prepare each of the sidechain synthons:</span></span>
+<span id="cb17-11"><a href="#cb17-11" aria-hidden="true" tabindex="-1"></a>        nWritten <span class="op">+=</span> <span class="dv">1</span></span>
+<span id="cb17-12"><a href="#cb17-12" aria-hidden="true" tabindex="-1"></a>        <span class="cf">for</span> ridx,prep <span class="kw">in</span> <span class="bu">enumerate</span>(preps):</span>
+<span id="cb17-13"><a href="#cb17-13" aria-hidden="true" tabindex="-1"></a>            <span class="cf">if</span> <span class="kw">not</span> prep.GetNumProductTemplates():</span>
+<span id="cb17-14"><a href="#cb17-14" aria-hidden="true" tabindex="-1"></a>                <span class="cf">continue</span></span>
+<span id="cb17-15"><a href="#cb17-15" aria-hidden="true" tabindex="-1"></a>            <span class="co"># find possible building blocks that could work here:</span></span>
+<span id="cb17-16"><a href="#cb17-16" aria-hidden="true" tabindex="-1"></a>            poss <span class="op">=</span> sslib.GetMatches(r_queries[ridx],maxResults<span class="op">=</span><span class="dv">10000</span>)</span>
+<span id="cb17-17"><a href="#cb17-17" aria-hidden="true" tabindex="-1"></a>            <span class="bu">print</span>(rxnidx,ridx,<span class="bu">len</span>(poss),nWritten)</span>
+<span id="cb17-18"><a href="#cb17-18" aria-hidden="true" tabindex="-1"></a>            seen <span class="op">=</span> <span class="bu">set</span>()</span>
+<span id="cb17-19"><a href="#cb17-19" aria-hidden="true" tabindex="-1"></a>            <span class="co"># now loop over those, prepare them, and write them to the output:</span></span>
+<span id="cb17-20"><a href="#cb17-20" aria-hidden="true" tabindex="-1"></a>            <span class="cf">for</span> mol <span class="kw">in</span> (sslib.GetMol(x) <span class="cf">for</span> x <span class="kw">in</span> poss):</span>
+<span id="cb17-21"><a href="#cb17-21" aria-hidden="true" tabindex="-1"></a>                <span class="co"># we use an R0 primitive in the query, so make sure</span></span>
+<span id="cb17-22"><a href="#cb17-22" aria-hidden="true" tabindex="-1"></a>                <span class="co"># we have ring presence</span></span>
+<span id="cb17-23"><a href="#cb17-23" aria-hidden="true" tabindex="-1"></a>                Chem.FastFindRings(mol)</span>
+<span id="cb17-24"><a href="#cb17-24" aria-hidden="true" tabindex="-1"></a>                <span class="co"># run our prep reaction:</span></span>
+<span id="cb17-25"><a href="#cb17-25" aria-hidden="true" tabindex="-1"></a>                ps <span class="op">=</span> prep.RunReactant(mol,<span class="dv">0</span>)</span>
+<span id="cb17-26"><a href="#cb17-26" aria-hidden="true" tabindex="-1"></a>                <span class="co"># write each product (in case there's more than one)</span></span>
+<span id="cb17-27"><a href="#cb17-27" aria-hidden="true" tabindex="-1"></a>                <span class="cf">for</span> p <span class="kw">in</span> ps:</span>
+<span id="cb17-28"><a href="#cb17-28" aria-hidden="true" tabindex="-1"></a>                    smi<span class="op">=</span> Chem.MolToSmiles(p[<span class="dv">0</span>])</span>
+<span id="cb17-29"><a href="#cb17-29" aria-hidden="true" tabindex="-1"></a>                    <span class="co"># don't write duplicates:</span></span>
+<span id="cb17-30"><a href="#cb17-30" aria-hidden="true" tabindex="-1"></a>                    <span class="cf">if</span> smi <span class="kw">in</span> seen:</span>
+<span id="cb17-31"><a href="#cb17-31" aria-hidden="true" tabindex="-1"></a>                        <span class="cf">continue</span></span>
+<span id="cb17-32"><a href="#cb17-32" aria-hidden="true" tabindex="-1"></a>                    outf.write(<span class="ss">f'</span><span class="sc">{</span>smi<span class="sc">}</span><span class="ch">\t</span><span class="sc">{</span>nWritten<span class="sc">}</span><span class="ch">\t</span><span class="sc">{</span>ridx<span class="op">+</span><span class="dv">2</span><span class="sc">}</span><span class="ch">\t</span><span class="ss">r</span><span class="sc">{</span>rxnidx<span class="sc">}</span><span class="ch">\t</span><span class="ss">1</span><span class="ch">\n</span><span class="ss">'</span>)</span>
+<span id="cb17-33"><a href="#cb17-33" aria-hidden="true" tabindex="-1"></a>                    seen.add(smi)</span>
+<span id="cb17-34"><a href="#cb17-34" aria-hidden="true" tabindex="-1"></a>                    nWritten <span class="op">+=</span> <span class="dv">1</span></span>
+<span id="cb17-35"><a href="#cb17-35" aria-hidden="true" tabindex="-1"></a>            <span class="bu">print</span>(<span class="st">'</span><span class="ch">\t</span><span class="st">'</span>,nWritten)</span>
+<span id="cb17-36"><a href="#cb17-36" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> rxnidx<span class="op">+</span><span class="dv">1</span>,nWritten</span>
+<span id="cb17-37"><a href="#cb17-37" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb17-38"><a href="#cb17-38" aria-hidden="true" tabindex="-1"></a><span class="cf">with</span> <span class="bu">open</span>(<span class="st">'./space1.txt'</span>,<span class="st">'w+'</span>) <span class="im">as</span> outf:</span>
+<span id="cb17-39"><a href="#cb17-39" aria-hidden="true" tabindex="-1"></a>    nextRxn,nextIdx <span class="op">=</span> enumerate_synthons(possibles,outf)</span>
+<span id="cb17-40"><a href="#cb17-40" aria-hidden="true" tabindex="-1"></a>            </span>
+<span id="cb17-41"><a href="#cb17-41" aria-hidden="true" tabindex="-1"></a>                </span>
+<span id="cb17-42"><a href="#cb17-42" aria-hidden="true" tabindex="-1"></a><span class="op">!</span>head space1.txt</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>1 0 264 2
+     333
+1 1 4456 333
+     4778
+SMILES  synton_id   synton# reaction_id release
+[1*]C([11*])NCC[7*] 1   1   r1  1
+[1*]c1ccccc1[7*]    2   2   r1  1
+[1*]c1cc(OC)ccc1[7*]    3   2   r1  1
+[1*]c1cc(S(N)(=O)=O)ccc1[7*]    4   2   r1  1
+[1*]c1cc(Cl)ccc1[7*]    5   2   r1  1
+[1*]c1cc(OC)c(OC)cc1[7*]    6   2   r1  1
+[1*]c1c([7*])ccc(OC)c1OC    7   2   r1  1
+[1*]c1cc(Cl)cc(Cl)c1[7*]    8   2   r1  1
+[1*]c1cc(F)ccc1[7*] 9   2   r1  1</code></pre>
+</div>
+</div>
+<div id="915fca67" class="cell" data-execution_count="213">
+<div class="sourceCode cell-code" id="cb19"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb19-1"><a href="#cb19-1" aria-hidden="true" tabindex="-1"></a>spc <span class="op">=</span> rdSynthonSpaceSearch.SynthonSpace()</span>
+<span id="cb19-2"><a href="#cb19-2" aria-hidden="true" tabindex="-1"></a>spc.ReadTextFile(<span class="st">'space1.txt'</span>)</span>
+<span id="cb19-3"><a href="#cb19-3" aria-hidden="true" tabindex="-1"></a>spc.GetNumProducts()</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-display" data-execution_count="213">
+<pre><code>1471295</code></pre>
+</div>
+</div>
+<div id="7666a191" class="cell" data-scrolled="false" data-execution_count="214">
+<div class="sourceCode cell-code" id="cb21"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb21-1"><a href="#cb21-1" aria-hidden="true" tabindex="-1"></a>q2 <span class="op">=</span> Chem.MolFromSmarts(<span class="st">''</span>)</span>
+<span id="cb21-2"><a href="#cb21-2" aria-hidden="true" tabindex="-1"></a>q1 <span class="op">=</span> Chem.MolFromSmarts(<span class="st">'c1cccc(C(F)(F)F)c1C'</span>)</span>
+<span id="cb21-3"><a href="#cb21-3" aria-hidden="true" tabindex="-1"></a><span class="co">#q = Chem.MolFromSmarts('O=c1ncncc1')</span></span>
+<span id="cb21-4"><a href="#cb21-4" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb21-5"><a href="#cb21-5" aria-hidden="true" tabindex="-1"></a>params <span class="op">=</span> rdSynthonSpaceSearch.SynthonSpaceSearchParams()</span>
+<span id="cb21-6"><a href="#cb21-6" aria-hidden="true" tabindex="-1"></a>params.randomSample <span class="op">=</span> <span class="va">True</span></span>
+<span id="cb21-7"><a href="#cb21-7" aria-hidden="true" tabindex="-1"></a>params.randomSeed <span class="op">=</span> <span class="bn">0xf00d</span></span>
+<span id="cb21-8"><a href="#cb21-8" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb21-9"><a href="#cb21-9" aria-hidden="true" tabindex="-1"></a>res <span class="op">=</span> spc.SubstructureSearch(q1,params<span class="op">=</span>params)</span>
+<span id="cb21-10"><a href="#cb21-10" aria-hidden="true" tabindex="-1"></a>resMols <span class="op">=</span> <span class="bu">list</span>(<span class="bu">sorted</span>(res.GetHitMolecules(),key<span class="op">=</span><span class="kw">lambda</span> x:x.GetNumHeavyAtoms()))</span>
+<span id="cb21-11"><a href="#cb21-11" aria-hidden="true" tabindex="-1"></a><span class="co"># resMols = res.GetHitMolecules()</span></span>
+<span id="cb21-12"><a href="#cb21-12" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f'</span><span class="sc">{</span><span class="bu">len</span>(resMols)<span class="sc">}</span><span class="ss"> results'</span>)</span>
+<span id="cb21-13"><a href="#cb21-13" aria-hidden="true" tabindex="-1"></a>Draw.MolsToGridImage(resMols[:<span class="dv">12</span>],subImgSize<span class="op">=</span>(<span class="dv">250</span>,<span class="dv">200</span>)) <span class="cf">if</span> <span class="bu">len</span>(resMols) <span class="cf">else</span> <span class="va">None</span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>1000 results</code></pre>
+</div>
+<div class="cell-output cell-output-display" data-execution_count="214">
+<div>
+<figure class="figure">
+<p><img src="2025-12-14-Reaction-synthons_files/figure-html/cell-17-output-2.png" class="img-fluid figure-img"></p>
+</figure>
+</div>
+</div>
+</div>
+</section>
+<section id="second-reaction" class="level1">
+<h1>Second reaction</h1>
+<p>The second reaction is <code>Niementowski_quinazoline</code>, also from the <a href="http://pubs.acs.org/doi/abs/10.1021/ci200379p">Hartenfeller paper</a>. I’ve used this reaction before in a <a href="https://greglandrum.github.io/rdkit-blog/posts/2025-06-12-using-reaction-info.html">blog post showing how to extract information from reaction products</a>.</p>
+<p>This one is a bit trickier to encode.</p>
+<p>Start with the reaction definition:</p>
+<div id="cccd2e00" class="cell" data-execution_count="252">
+<div class="sourceCode cell-code" id="cb23"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb23-1"><a href="#cb23-1" aria-hidden="true" tabindex="-1"></a>sma <span class="op">=</span> <span class="st">'[c:1](-[C;$(C-c1ccccc1):2](=[OD1:3])-[OH1]):[c:4](-[NH2:5]).[N;!H0;!$(N-N);!$(N-C=N);!$(N(-C=O)-C=O):6]-[C;H1,$(C-[#6]):7]=[OD1]&gt;&gt;[c:4]2:[c:1]-[C:2](=[O:3])-[N:6]-[C:7]=[N:5]-2'</span></span>
+<span id="cb23-2"><a href="#cb23-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb23-3"><a href="#cb23-3" aria-hidden="true" tabindex="-1"></a>rxn <span class="op">=</span> rdChemReactions.ReactionFromSmarts(sma)</span>
+<span id="cb23-4"><a href="#cb23-4" aria-hidden="true" tabindex="-1"></a>rxn</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-display" data-execution_count="252">
+<div>
+<figure class="figure">
+<p><img src="2025-12-14-Reaction-synthons_files/figure-html/cell-20-output-1.png" class="img-fluid figure-img"></p>
+</figure>
+</div>
+</div>
+</div>
+<p>These are the two educts from the SI:</p>
+<div id="6a8c623d" class="cell" data-scrolled="true" data-execution_count="253">
+<div class="sourceCode cell-code" id="cb24"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb24-1"><a href="#cb24-1" aria-hidden="true" tabindex="-1"></a>r1 <span class="op">=</span> Chem.MolFromSmiles(<span class="st">'c1c(C(=O)O)c(N)ccc1'</span>)</span>
+<span id="cb24-2"><a href="#cb24-2" aria-hidden="true" tabindex="-1"></a>r2 <span class="op">=</span> Chem.MolFromSmiles(<span class="st">'C(=O)N'</span>)</span>
+<span id="cb24-3"><a href="#cb24-3" aria-hidden="true" tabindex="-1"></a>Draw.MolsToGridImage((r1,r2))</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-display" data-execution_count="253">
+<div>
+<figure class="figure">
+<p><img src="2025-12-14-Reaction-synthons_files/figure-html/cell-21-output-1.png" class="img-fluid figure-img"></p>
+</figure>
+</div>
+</div>
+</div>
+<p>Here are the educts with atom map info:</p>
+<div id="c495cb86" class="cell" data-execution_count="254">
+<div class="sourceCode cell-code" id="cb25"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb25-1"><a href="#cb25-1" aria-hidden="true" tabindex="-1"></a>r_queries <span class="op">=</span> [rxn.GetReactantTemplate(x) <span class="cf">for</span> x <span class="kw">in</span> <span class="bu">range</span>(rxn.GetNumReactantTemplates())]</span>
+<span id="cb25-2"><a href="#cb25-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb25-3"><a href="#cb25-3" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> r,q <span class="kw">in</span> <span class="bu">zip</span>([r1,r2],r_queries):</span>
+<span id="cb25-4"><a href="#cb25-4" aria-hidden="true" tabindex="-1"></a>    match <span class="op">=</span> r.GetSubstructMatch(q)</span>
+<span id="cb25-5"><a href="#cb25-5" aria-hidden="true" tabindex="-1"></a>    <span class="cf">assert</span> match</span>
+<span id="cb25-6"><a href="#cb25-6" aria-hidden="true" tabindex="-1"></a>    <span class="cf">for</span> i,midx <span class="kw">in</span> <span class="bu">enumerate</span>(match):</span>
+<span id="cb25-7"><a href="#cb25-7" aria-hidden="true" tabindex="-1"></a>        mnum <span class="op">=</span> q.GetAtomWithIdx(i).GetAtomMapNum()</span>
+<span id="cb25-8"><a href="#cb25-8" aria-hidden="true" tabindex="-1"></a>        <span class="cf">if</span> mnum:</span>
+<span id="cb25-9"><a href="#cb25-9" aria-hidden="true" tabindex="-1"></a>            r.GetAtomWithIdx(midx).SetAtomMapNum(mnum)</span>
+<span id="cb25-10"><a href="#cb25-10" aria-hidden="true" tabindex="-1"></a>Draw.MolsToGridImage((r1,r2))</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-display" data-execution_count="254">
+<div>
+<figure class="figure">
+<p><img src="2025-12-14-Reaction-synthons_files/figure-html/cell-22-output-1.png" class="img-fluid figure-img"></p>
+</figure>
+</div>
+</div>
+</div>
+<div id="f13e33ba" class="cell" data-execution_count="288">
+<div class="sourceCode cell-code" id="cb26"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb26-1"><a href="#cb26-1" aria-hidden="true" tabindex="-1"></a><span class="co">#-----</span></span>
+<span id="cb26-2"><a href="#cb26-2" aria-hidden="true" tabindex="-1"></a><span class="co"># Educt 2 is a primary amine</span></span>
+<span id="cb26-3"><a href="#cb26-3" aria-hidden="true" tabindex="-1"></a><span class="co">#   core1: no substituent on educt 2 carbon</span></span>
+<span id="cb26-4"><a href="#cb26-4" aria-hidden="true" tabindex="-1"></a>core1 <span class="op">=</span> Chem.MolFromSmiles(<span class="st">'O=C1-N-C=N-C([1*]):C1[2*]'</span>,sanitize<span class="op">=</span><span class="va">True</span>)</span>
+<span id="cb26-5"><a href="#cb26-5" aria-hidden="true" tabindex="-1"></a><span class="co">#   core3: educt2 has a substituent on the carbon</span></span>
+<span id="cb26-6"><a href="#cb26-6" aria-hidden="true" tabindex="-1"></a>core3 <span class="op">=</span> Chem.MolFromSmiles(<span class="st">'O=C1-N-C([3*])=N-C([1*]):C1[2*]'</span>,sanitize<span class="op">=</span><span class="va">True</span>)</span>
+<span id="cb26-7"><a href="#cb26-7" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb26-8"><a href="#cb26-8" aria-hidden="true" tabindex="-1"></a><span class="co"># Educt 2 is a secondary amine</span></span>
+<span id="cb26-9"><a href="#cb26-9" aria-hidden="true" tabindex="-1"></a><span class="co">#   core2: no substituent on educt 2 carbon</span></span>
+<span id="cb26-10"><a href="#cb26-10" aria-hidden="true" tabindex="-1"></a>core2 <span class="op">=</span> Chem.MolFromSmiles(<span class="st">'O=C1-N([4*])-C=N-C([1*]):C1[2*]'</span>,sanitize<span class="op">=</span><span class="va">True</span>)</span>
+<span id="cb26-11"><a href="#cb26-11" aria-hidden="true" tabindex="-1"></a><span class="co">#   core4: educt2 has a substituent on the carbon</span></span>
+<span id="cb26-12"><a href="#cb26-12" aria-hidden="true" tabindex="-1"></a>core4 <span class="op">=</span> Chem.MolFromSmiles(<span class="st">'O=C1-N([4*])-C([3*])=N-C([1*]):C1[2*]'</span>,sanitize<span class="op">=</span><span class="va">True</span>)</span>
+<span id="cb26-13"><a href="#cb26-13" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb26-14"><a href="#cb26-14" aria-hidden="true" tabindex="-1"></a>Draw.MolsToGridImage([core1,core2,core3,core4],legends<span class="op">=</span>[<span class="st">'core1'</span>,<span class="st">'core2'</span>,<span class="st">'core3'</span>,<span class="st">'core4'</span>],molsPerRow<span class="op">=</span><span class="dv">4</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-display" data-execution_count="288">
+<div>
+<figure class="figure">
+<p><img src="2025-12-14-Reaction-synthons_files/figure-html/cell-23-output-1.png" class="img-fluid figure-img"></p>
+</figure>
+</div>
+</div>
+</div>
+<div id="01c2c2b3" class="cell" data-execution_count="257">
+<div class="sourceCode cell-code" id="cb27"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb27-1"><a href="#cb27-1" aria-hidden="true" tabindex="-1"></a>r1_prep <span class="op">=</span> rdChemReactions.ReactionFromSmarts(<span class="st">'[c:1]1(-[C:2](=[OD1:3])-[OH1]):[c:4](-[NH2:5])[c:6][c:7][c:8][c:9]1</span><span class="ch">\</span></span>
+<span id="cb27-2"><a href="#cb27-2" aria-hidden="true" tabindex="-1"></a><span class="st">&gt;&gt;[2*][c:6][c:7][c:8][c:9][1*]'</span>)</span>
+<span id="cb27-3"><a href="#cb27-3" aria-hidden="true" tabindex="-1"></a>p <span class="op">=</span> r1_prep.RunReactant(r1,<span class="dv">0</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stderr">
+<pre><code>[05:23:12] mapped atoms in the reactants were not mapped in the products.
+  unmapped numbers are: 1 2 3 4 5 </code></pre>
+</div>
+</div>
+<div id="1a50ccad" class="cell" data-execution_count="258">
+<div class="sourceCode cell-code" id="cb29"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb29-1"><a href="#cb29-1" aria-hidden="true" tabindex="-1"></a>p[<span class="dv">0</span>][<span class="dv">0</span>]</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-display" data-execution_count="258">
+<div>
+<figure class="figure">
+<p><img src="2025-12-14-Reaction-synthons_files/figure-html/cell-25-output-1.png" class="img-fluid figure-img"></p>
+</figure>
+</div>
+</div>
+</div>
+<p>Make sure we form the correct ring:</p>
+<div id="ffef8551" class="cell" data-execution_count="227">
+<div class="sourceCode cell-code" id="cb30"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb30-1"><a href="#cb30-1" aria-hidden="true" tabindex="-1"></a>ps <span class="op">=</span> Chem.MolzipParams()</span>
+<span id="cb30-2"><a href="#cb30-2" aria-hidden="true" tabindex="-1"></a>ps.label <span class="op">=</span> Chem.MolzipLabel.Isotope</span>
+<span id="cb30-3"><a href="#cb30-3" aria-hidden="true" tabindex="-1"></a>tm <span class="op">=</span> Chem.molzip(core1,p[<span class="dv">0</span>][<span class="dv">0</span>],ps)</span>
+<span id="cb30-4"><a href="#cb30-4" aria-hidden="true" tabindex="-1"></a>tm</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-display" data-execution_count="227">
+<div>
+<figure class="figure">
+<p><img src="2025-12-14-Reaction-synthons_files/figure-html/cell-26-output-1.png" class="img-fluid figure-img"></p>
+</figure>
+</div>
+</div>
+</div>
+<p>Now do the preparation reactions for R2, taking the four scenarios into account:</p>
+<div id="ef7e7721" class="cell" data-execution_count="294">
+<div class="sourceCode cell-code" id="cb31"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb31-1"><a href="#cb31-1" aria-hidden="true" tabindex="-1"></a>r2_prep1 <span class="op">=</span> rdChemReactions.ReactionFromSmarts(<span class="st">'[NH2;!$(N-N);!$(N-C=N);!$(N(-C=O)-C=O):6]-[CH1:7]=[OD1]</span><span class="ch">\</span></span>
+<span id="cb31-2"><a href="#cb31-2" aria-hidden="true" tabindex="-1"></a><span class="st">&gt;&gt;'</span>)</span>
+<span id="cb31-3"><a href="#cb31-3" aria-hidden="true" tabindex="-1"></a>r2_prep3 <span class="op">=</span> rdChemReactions.ReactionFromSmarts(<span class="st">'[NH2;!$(N-N);!$(N-C=N);!$(N(-C=O)-C=O):6]-[C:7](-[#6:3])=[OD1]</span><span class="ch">\</span></span>
+<span id="cb31-4"><a href="#cb31-4" aria-hidden="true" tabindex="-1"></a><span class="st">&gt;&gt;[3*][#6:3]'</span>)</span>
+<span id="cb31-5"><a href="#cb31-5" aria-hidden="true" tabindex="-1"></a>r2_prep2 <span class="op">=</span> rdChemReactions.ReactionFromSmarts(<span class="st">'[*:8][NH1;!$(N-N);!$(N-C=N);!$(N(-C=O)-C=O):6]-[CH1:7]=[OD1]</span><span class="ch">\</span></span>
+<span id="cb31-6"><a href="#cb31-6" aria-hidden="true" tabindex="-1"></a><span class="st">&gt;&gt;[4*][*:8]'</span>)</span>
+<span id="cb31-7"><a href="#cb31-7" aria-hidden="true" tabindex="-1"></a>r2_prep4 <span class="op">=</span> rdChemReactions.ReactionFromSmarts(<span class="st">'[*:8][NH1;!$(N-N);!$(N-C=N);!$(N(-C=O)-C=O):6]-[C;R0:7](-[#6:3])=[OD1]</span><span class="ch">\</span></span>
+<span id="cb31-8"><a href="#cb31-8" aria-hidden="true" tabindex="-1"></a><span class="st">&gt;&gt;([4*][*:8].[3*][*:7])'</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+<div id="9ea7b4fa" class="cell" data-execution_count="295">
+<div class="sourceCode cell-code" id="cb32"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb32-1"><a href="#cb32-1" aria-hidden="true" tabindex="-1"></a>possibles <span class="op">=</span> [(core1,(r1_prep,r2_prep1)),(core2,(r1_prep,r2_prep2)),</span>
+<span id="cb32-2"><a href="#cb32-2" aria-hidden="true" tabindex="-1"></a>             (core3,(r1_prep,r2_prep3)),(core4,(r1_prep,r2_prep4))]</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+<p>Create the synthon space:</p>
+<div id="737d10c1" class="cell" data-execution_count="296">
+<div class="sourceCode cell-code" id="cb33"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb33-1"><a href="#cb33-1" aria-hidden="true" tabindex="-1"></a><span class="cf">with</span> <span class="bu">open</span>(<span class="st">'./space2.txt'</span>,<span class="st">'w+'</span>) <span class="im">as</span> outf:</span>
+<span id="cb33-2"><a href="#cb33-2" aria-hidden="true" tabindex="-1"></a>    nextRxn,nextIdx <span class="op">=</span> enumerate_synthons(possibles,outf)</span>
+<span id="cb33-3"><a href="#cb33-3" aria-hidden="true" tabindex="-1"></a>            </span>
+<span id="cb33-4"><a href="#cb33-4" aria-hidden="true" tabindex="-1"></a>                </span>
+<span id="cb33-5"><a href="#cb33-5" aria-hidden="true" tabindex="-1"></a><span class="op">!</span>head space2.txt</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>1 0 189 2
+     188
+2 0 189 189
+     375
+2 1 8173 375</code></pre>
+</div>
+<div class="cell-output cell-output-stderr">
+<pre><code>[05:38:56] mapped atoms in the reactants were not mapped in the products.
+  unmapped numbers are: 6 7 </code></pre>
+</div>
+<div class="cell-output cell-output-stdout">
+<pre><code>     383
+3 0 189 384
+     570
+3 1 8173 570</code></pre>
+</div>
+<div class="cell-output cell-output-stderr">
+<pre><code>[05:38:57] mapped atoms in the reactants were not mapped in the products.
+  unmapped numbers are: 6 7 </code></pre>
+</div>
+<div class="cell-output cell-output-stdout">
+<pre><code>     1690
+4 0 189 1691
+     1877
+4 1 8173 1877</code></pre>
+</div>
+<div class="cell-output cell-output-stderr">
+<pre><code>[05:38:57] mapped atoms in the reactants were not mapped in the products.
+  unmapped numbers are: 6 3 </code></pre>
+</div>
+<div class="cell-output cell-output-stdout">
+<pre><code>     3769
+SMILES  synton_id   synton# reaction_id release
+[1*]c1nc[nH]c(=O)c1[2*] 1   1   r1  1
+[1*]ccc1c([2*])C(=O)c2ccccc2C1=O    2   2   r1  1
+[1*]cc(Cl)cc([2*])Cl    3   2   r1  1
+[1*]ccc(c[2*])C(F)(F)F  4   2   r1  1
+[1*]ccc(Cl)c[2*]    5   2   r1  1
+[1*]cc1ccccc1c[2*]  6   2   r1  1
+[1*]cc(OC)c(c[2*])OC    7   2   r1  1
+[1*]cc(cc[2*])S(=O)(=O)Nc1ccccc1OC  8   2   r1  1
+[1*]cc(cc[2*])S(=O)(=O)Nc1ccc(OC)cc1    9   2   r1  1</code></pre>
+</div>
+</div>
+<p>Read it in</p>
+<div id="8c666ccf" class="cell" data-scrolled="true" data-execution_count="297">
+<div class="sourceCode cell-code" id="cb41"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb41-1"><a href="#cb41-1" aria-hidden="true" tabindex="-1"></a>spc <span class="op">=</span> rdSynthonSpaceSearch.SynthonSpace()</span>
+<span id="cb41-2"><a href="#cb41-2" aria-hidden="true" tabindex="-1"></a>spc.ReadTextFile(<span class="st">'space2.txt'</span>)</span>
+<span id="cb41-3"><a href="#cb41-3" aria-hidden="true" tabindex="-1"></a>spc.GetNumProducts()</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-display" data-execution_count="297">
+<pre><code>561906</code></pre>
+</div>
+</div>
+<p>Search</p>
+<div id="96ca2242" class="cell" data-execution_count="286">
+<div class="sourceCode cell-code" id="cb43"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb43-1"><a href="#cb43-1" aria-hidden="true" tabindex="-1"></a>q2 <span class="op">=</span> Chem.MolFromSmarts(<span class="st">'cC(F)(F)F'</span>)</span>
+<span id="cb43-2"><a href="#cb43-2" aria-hidden="true" tabindex="-1"></a>params <span class="op">=</span> rdSynthonSpaceSearch.SynthonSpaceSearchParams()</span>
+<span id="cb43-3"><a href="#cb43-3" aria-hidden="true" tabindex="-1"></a>params.randomSample <span class="op">=</span> <span class="va">True</span></span>
+<span id="cb43-4"><a href="#cb43-4" aria-hidden="true" tabindex="-1"></a>params.randomSeed <span class="op">=</span> <span class="bn">0xf00d</span></span>
+<span id="cb43-5"><a href="#cb43-5" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb43-6"><a href="#cb43-6" aria-hidden="true" tabindex="-1"></a>res <span class="op">=</span> spc.SubstructureSearch(q2,params<span class="op">=</span>params)</span>
+<span id="cb43-7"><a href="#cb43-7" aria-hidden="true" tabindex="-1"></a>resMols <span class="op">=</span> <span class="bu">list</span>(<span class="bu">sorted</span>(res.GetHitMolecules(),key<span class="op">=</span><span class="kw">lambda</span> x:x.GetNumHeavyAtoms()))</span>
+<span id="cb43-8"><a href="#cb43-8" aria-hidden="true" tabindex="-1"></a><span class="co"># resMols = res.GetHitMolecules()</span></span>
+<span id="cb43-9"><a href="#cb43-9" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f'</span><span class="sc">{</span><span class="bu">len</span>(resMols)<span class="sc">}</span><span class="ss"> results'</span>)</span>
+<span id="cb43-10"><a href="#cb43-10" aria-hidden="true" tabindex="-1"></a>Draw.MolsToGridImage(resMols[:<span class="dv">12</span>],subImgSize<span class="op">=</span>(<span class="dv">250</span>,<span class="dv">200</span>)) <span class="cf">if</span> <span class="bu">len</span>(resMols) <span class="cf">else</span> <span class="va">None</span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>1000 results</code></pre>
+</div>
+<div class="cell-output cell-output-display" data-execution_count="286">
+<div>
+<figure class="figure">
+<p><img src="2025-12-14-Reaction-synthons_files/figure-html/cell-31-output-2.png" class="img-fluid figure-img"></p>
+</figure>
+</div>
+</div>
+</div>
+<p>We have results here for cores 2-4, but none for core 1. Let’s confirm that there are core1 results in the set</p>
+<div id="604129de" class="cell" data-execution_count="298">
+<div class="sourceCode cell-code" id="cb45"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb45-1"><a href="#cb45-1" aria-hidden="true" tabindex="-1"></a>q2 <span class="op">=</span> Chem.MolFromSmarts(<span class="st">'[#6](=O)@[#7H1]@[#6H1]@[#7]'</span>)</span>
+<span id="cb45-2"><a href="#cb45-2" aria-hidden="true" tabindex="-1"></a>params <span class="op">=</span> rdSynthonSpaceSearch.SynthonSpaceSearchParams()</span>
+<span id="cb45-3"><a href="#cb45-3" aria-hidden="true" tabindex="-1"></a>params.randomSample <span class="op">=</span> <span class="va">True</span></span>
+<span id="cb45-4"><a href="#cb45-4" aria-hidden="true" tabindex="-1"></a>params.randomSeed <span class="op">=</span> <span class="bn">0xf00d</span></span>
+<span id="cb45-5"><a href="#cb45-5" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb45-6"><a href="#cb45-6" aria-hidden="true" tabindex="-1"></a>res <span class="op">=</span> spc.SubstructureSearch(q2,params<span class="op">=</span>params)</span>
+<span id="cb45-7"><a href="#cb45-7" aria-hidden="true" tabindex="-1"></a>resMols <span class="op">=</span> <span class="bu">list</span>(<span class="bu">sorted</span>(res.GetHitMolecules(),key<span class="op">=</span><span class="kw">lambda</span> x:x.GetNumHeavyAtoms()))</span>
+<span id="cb45-8"><a href="#cb45-8" aria-hidden="true" tabindex="-1"></a><span class="co"># resMols = res.GetHitMolecules()</span></span>
+<span id="cb45-9"><a href="#cb45-9" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f'</span><span class="sc">{</span><span class="bu">len</span>(resMols)<span class="sc">}</span><span class="ss"> results'</span>)</span>
+<span id="cb45-10"><a href="#cb45-10" aria-hidden="true" tabindex="-1"></a>Draw.MolsToGridImage(resMols[:<span class="dv">12</span>],subImgSize<span class="op">=</span>(<span class="dv">250</span>,<span class="dv">200</span>)) <span class="cf">if</span> <span class="bu">len</span>(resMols) <span class="cf">else</span> <span class="va">None</span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stderr">
+<pre><code>[05:41:48] Complex queries can be slow.</code></pre>
+</div>
+<div class="cell-output cell-output-stdout">
+<pre><code>186 results</code></pre>
+</div>
+<div class="cell-output cell-output-display" data-execution_count="298">
+<div>
+<figure class="figure">
+<p><img src="2025-12-14-Reaction-synthons_files/figure-html/cell-32-output-3.png" class="img-fluid figure-img"></p>
+</figure>
+</div>
+</div>
+</div>
+</section>
+<section id="combine-the-two-reaction-spaces" class="level1">
+<h1>Combine the two reaction spaces</h1>
+<p>We now add these synthons to the other space. We could do this by sequentially enumerating the spaces into the same output file, but it’s quicker to re-enumerate the second space onto the bottom of the output file from the first one:</p>
+<div id="a6bc6a51" class="cell" data-execution_count="289">
+<div class="sourceCode cell-code" id="cb48"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb48-1"><a href="#cb48-1" aria-hidden="true" tabindex="-1"></a><span class="op">!</span>cp space1.txt combined.txt</span>
+<span id="cb48-2"><a href="#cb48-2" aria-hidden="true" tabindex="-1"></a><span class="op">!</span>tail combined.txt</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>[11*]c1ccnn1-c1cccnc1   4768    3   r1  1
+[11*]C1CC2(C1)CC(OC)C2  4769    3   r1  1
+[11*]c1c(Cl)cnc(F)c1Cl  4770    3   r1  1
+[11*]c1cc(Cl)c(C(=O)O)s1    4771    3   r1  1
+[11*]C1COC2CC1C2    4772    3   r1  1
+[11*]C12C3CCC(CC31)C2(F)F   4773    3   r1  1
+[11*]c1ccc(C(F)(F)C(F)(F)F)s1   4774    3   r1  1
+[11*]C12C3CC(CC31)C2NC(=O)OC(C)(C)C 4775    3   r1  1
+[11*]C1OCCOC1(C)C   4776    3   r1  1
+[11*]c1cc(C)cc(C(F)F)c1 4777    3   r1  1</code></pre>
+</div>
+</div>
+<p>Now re-enumerate the second space, start the synthon IDs at 4778 and the reaction IDs at 2:</p>
+<div id="47526c7a" class="cell" data-execution_count="299">
+<div class="sourceCode cell-code" id="cb50"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb50-1"><a href="#cb50-1" aria-hidden="true" tabindex="-1"></a><span class="cf">with</span> <span class="bu">open</span>(<span class="st">'combined.txt'</span>,<span class="st">'a'</span>) <span class="im">as</span> outf:</span>
+<span id="cb50-2"><a href="#cb50-2" aria-hidden="true" tabindex="-1"></a>    enumerate_synthons(possibles,outf,writeHeader<span class="op">=</span><span class="va">False</span>,nWritten<span class="op">=</span><span class="dv">4778</span>,startIdx<span class="op">=</span><span class="dv">2</span>)</span>
+<span id="cb50-3"><a href="#cb50-3" aria-hidden="true" tabindex="-1"></a>spc <span class="op">=</span> rdSynthonSpaceSearch.SynthonSpace()</span>
+<span id="cb50-4"><a href="#cb50-4" aria-hidden="true" tabindex="-1"></a>spc.ReadTextFile(<span class="st">'combined.txt'</span>)</span>
+<span id="cb50-5"><a href="#cb50-5" aria-hidden="true" tabindex="-1"></a>spc.GetNumProducts()</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>2 0 189 4779
+     4965
+3 0 189 4966
+     5152
+3 1 8173 5152
+     5160
+4 0 189 5161
+     5347
+4 1 8173 5347
+     6467
+5 0 189 6468
+     6654
+5 1 8173 6654
+     8546</code></pre>
+</div>
+<div class="cell-output cell-output-display" data-execution_count="299">
+<pre><code>5965799</code></pre>
+</div>
+</div>
+<div id="da47a957" class="cell" data-scrolled="true" data-execution_count="300">
+<div class="sourceCode cell-code" id="cb53"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb53-1"><a href="#cb53-1" aria-hidden="true" tabindex="-1"></a><span class="op">!</span>tail combined.txt</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>[3*]C.[4*]CC1(N)CCC1    8536    3   r5  1
+[3*]C.[4*]C1CCCCC1CN    8537    3   r5  1
+[3*]C.[4*]CC1(N)CCCCC1  8538    3   r5  1
+[3*]C.[4*]CC1(N)CCCC1   8539    3   r5  1
+[3*]C.[4*]C1CC(N)C12CCC2    8540    3   r5  1
+[3*]C.[4*]C1CCOCC1N 8541    3   r5  1
+[3*]C.[4*]CC(N)c1ccccc1OC   8542    3   r5  1
+[3*]C.[4*]C(CN)C(C)(C)C 8543    3   r5  1
+[3*]C.[4*]C1Cc2ccccc2C1N    8544    3   r5  1
+[3*]C.[4*]C1CC2(C1)CC(N)C2  8545    3   r5  1</code></pre>
+</div>
+</div>
+<p>Verify that searches return results from both spaces:</p>
+<div id="495fe668" class="cell" data-execution_count="301">
+<div class="sourceCode cell-code" id="cb55"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb55-1"><a href="#cb55-1" aria-hidden="true" tabindex="-1"></a>q2 <span class="op">=</span> Chem.MolFromSmarts(<span class="st">'cC(F)(F)F'</span>)</span>
+<span id="cb55-2"><a href="#cb55-2" aria-hidden="true" tabindex="-1"></a>params <span class="op">=</span> rdSynthonSpaceSearch.SynthonSpaceSearchParams()</span>
+<span id="cb55-3"><a href="#cb55-3" aria-hidden="true" tabindex="-1"></a>params.randomSample <span class="op">=</span> <span class="va">True</span></span>
+<span id="cb55-4"><a href="#cb55-4" aria-hidden="true" tabindex="-1"></a>params.randomSeed <span class="op">=</span> <span class="bn">0xf00d</span></span>
+<span id="cb55-5"><a href="#cb55-5" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb55-6"><a href="#cb55-6" aria-hidden="true" tabindex="-1"></a>res <span class="op">=</span> spc.SubstructureSearch(q2,params<span class="op">=</span>params)</span>
+<span id="cb55-7"><a href="#cb55-7" aria-hidden="true" tabindex="-1"></a>resMols <span class="op">=</span> <span class="bu">list</span>(<span class="bu">sorted</span>(res.GetHitMolecules(),key<span class="op">=</span><span class="kw">lambda</span> x:x.GetNumHeavyAtoms()))</span>
+<span id="cb55-8"><a href="#cb55-8" aria-hidden="true" tabindex="-1"></a><span class="co"># resMols = res.GetHitMolecules()</span></span>
+<span id="cb55-9"><a href="#cb55-9" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f'</span><span class="sc">{</span><span class="bu">len</span>(resMols)<span class="sc">}</span><span class="ss"> results'</span>)</span>
+<span id="cb55-10"><a href="#cb55-10" aria-hidden="true" tabindex="-1"></a>Draw.MolsToGridImage(resMols[:<span class="dv">12</span>],subImgSize<span class="op">=</span>(<span class="dv">250</span>,<span class="dv">200</span>)) <span class="cf">if</span> <span class="bu">len</span>(resMols) <span class="cf">else</span> <span class="va">None</span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>1000 results</code></pre>
+</div>
+<div class="cell-output cell-output-display" data-execution_count="301">
+<div>
+<figure class="figure">
+<p><img src="2025-12-14-Reaction-synthons_files/figure-html/cell-36-output-2.png" class="img-fluid figure-img"></p>
+</figure>
+</div>
+</div>
+</div>
+</section>
+<section id="reaction-3" class="level1">
+<h1>Reaction 3</h1>
+<p>For the last example, I’ll add the reaction definition for spiro chromanone from the Hartenfeller paper. This one is fun because it forms a spiro linkage.</p>
+<div id="ff4b7794" class="cell" data-execution_count="302">
+<div class="sourceCode cell-code" id="cb57"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb57-1"><a href="#cb57-1" aria-hidden="true" tabindex="-1"></a>sma <span class="op">=</span> <span class="st">'[c:1](-[C;$(C-c1ccccc1):2](=[OD1:3])-[CH3:4]):[c:5](-[OH1:6]).[C;$(C1-[CH2]-[CH2]-[N,C]-[CH2]-[CH2]-1):7](=[OD1])&gt;&gt;[O:6]1-[c:5]:[c:1]-[C:2](=[OD1:3])-[C:4]-[C:7]-1'</span></span>
+<span id="cb57-2"><a href="#cb57-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb57-3"><a href="#cb57-3" aria-hidden="true" tabindex="-1"></a>rxn <span class="op">=</span> rdChemReactions.ReactionFromSmarts(sma)</span>
+<span id="cb57-4"><a href="#cb57-4" aria-hidden="true" tabindex="-1"></a>rxn</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-display" data-execution_count="302">
+<div>
+<figure class="figure">
+<p><img src="2025-12-14-Reaction-synthons_files/figure-html/cell-38-output-1.png" class="img-fluid figure-img"></p>
+</figure>
+</div>
+</div>
+</div>
+<p>These are the two educts from the SI:</p>
+<div id="5197ad25" class="cell" data-scrolled="true" data-execution_count="303">
+<div class="sourceCode cell-code" id="cb58"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb58-1"><a href="#cb58-1" aria-hidden="true" tabindex="-1"></a>r1 <span class="op">=</span> Chem.MolFromSmiles(<span class="st">'c1cc(C(=O)C)c(O)cc1'</span>)</span>
+<span id="cb58-2"><a href="#cb58-2" aria-hidden="true" tabindex="-1"></a>r2 <span class="op">=</span> Chem.MolFromSmiles(<span class="st">'C1(=O)CCNCC1'</span>)</span>
+<span id="cb58-3"><a href="#cb58-3" aria-hidden="true" tabindex="-1"></a>Draw.MolsToGridImage((r1,r2))</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-display" data-execution_count="303">
+<div>
+<figure class="figure">
+<p><img src="2025-12-14-Reaction-synthons_files/figure-html/cell-39-output-1.png" class="img-fluid figure-img"></p>
+</figure>
+</div>
+</div>
+</div>
+<p>Here’s what the prototype product looks like:</p>
+<div id="aaba9e83" class="cell" data-execution_count="304">
+<div class="sourceCode cell-code" id="cb59"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb59-1"><a href="#cb59-1" aria-hidden="true" tabindex="-1"></a>p <span class="op">=</span> rxn.RunReactants([r1,r2])</span>
+<span id="cb59-2"><a href="#cb59-2" aria-hidden="true" tabindex="-1"></a>p[<span class="dv">0</span>][<span class="dv">0</span>]</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-display" data-execution_count="304">
+<div>
+<figure class="figure">
+<p><img src="2025-12-14-Reaction-synthons_files/figure-html/cell-40-output-1.png" class="img-fluid figure-img"></p>
+</figure>
+</div>
+</div>
+</div>
+<p>Here are the educts with atom map info:</p>
+<div id="7a4c0b4f" class="cell" data-execution_count="305">
+<div class="sourceCode cell-code" id="cb60"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb60-1"><a href="#cb60-1" aria-hidden="true" tabindex="-1"></a>r_queries <span class="op">=</span> [rxn.GetReactantTemplate(x) <span class="cf">for</span> x <span class="kw">in</span> <span class="bu">range</span>(rxn.GetNumReactantTemplates())]</span>
+<span id="cb60-2"><a href="#cb60-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb60-3"><a href="#cb60-3" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> r,q <span class="kw">in</span> <span class="bu">zip</span>([r1,r2],r_queries):</span>
+<span id="cb60-4"><a href="#cb60-4" aria-hidden="true" tabindex="-1"></a>    match <span class="op">=</span> r.GetSubstructMatch(q)</span>
+<span id="cb60-5"><a href="#cb60-5" aria-hidden="true" tabindex="-1"></a>    <span class="cf">assert</span> match</span>
+<span id="cb60-6"><a href="#cb60-6" aria-hidden="true" tabindex="-1"></a>    <span class="cf">for</span> i,midx <span class="kw">in</span> <span class="bu">enumerate</span>(match):</span>
+<span id="cb60-7"><a href="#cb60-7" aria-hidden="true" tabindex="-1"></a>        mnum <span class="op">=</span> q.GetAtomWithIdx(i).GetAtomMapNum()</span>
+<span id="cb60-8"><a href="#cb60-8" aria-hidden="true" tabindex="-1"></a>        <span class="cf">if</span> mnum:</span>
+<span id="cb60-9"><a href="#cb60-9" aria-hidden="true" tabindex="-1"></a>            r.GetAtomWithIdx(midx).SetAtomMapNum(mnum)</span>
+<span id="cb60-10"><a href="#cb60-10" aria-hidden="true" tabindex="-1"></a>Draw.MolsToGridImage((r1,r2))</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-display" data-execution_count="305">
+<div>
+<figure class="figure">
+<p><img src="2025-12-14-Reaction-synthons_files/figure-html/cell-41-output-1.png" class="img-fluid figure-img"></p>
+</figure>
+</div>
+</div>
+</div>
+<div id="ae71849f" class="cell" data-execution_count="309">
+<div class="sourceCode cell-code" id="cb61"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb61-1"><a href="#cb61-1" aria-hidden="true" tabindex="-1"></a>core <span class="op">=</span> Chem.MolFromSmiles(<span class="st">'O=C(-[C][4*])c([1*]):c([5*])[O][6*]'</span>,sanitize<span class="op">=</span><span class="va">False</span>)</span>
+<span id="cb61-2"><a href="#cb61-2" aria-hidden="true" tabindex="-1"></a>core</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-display" data-execution_count="309">
+<div>
+<figure class="figure">
+<p><img src="2025-12-14-Reaction-synthons_files/figure-html/cell-42-output-1.png" class="img-fluid figure-img"></p>
+</figure>
+</div>
+</div>
+</div>
+<div id="962786d1" class="cell" data-execution_count="317">
+<div class="sourceCode cell-code" id="cb62"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb62-1"><a href="#cb62-1" aria-hidden="true" tabindex="-1"></a>r1_prep <span class="op">=</span> rdChemReactions.ReactionFromSmarts(<span class="st">'[c:1]1(-[C:2](=[OD1:3])-[CH3:4]):[c:5](-[OH1:6]):[c:7]:[c:8]:[c:9]:[c:10]1</span><span class="ch">\</span></span>
+<span id="cb62-2"><a href="#cb62-2" aria-hidden="true" tabindex="-1"></a><span class="st">&gt;&gt;[*1]:[c:7]:[c:8]:[c:9]:[c:10]:[5*]'</span>)</span>
+<span id="cb62-3"><a href="#cb62-3" aria-hidden="true" tabindex="-1"></a>p1 <span class="op">=</span> r1_prep.RunReactant(r1,<span class="dv">0</span>)</span>
+<span id="cb62-4"><a href="#cb62-4" aria-hidden="true" tabindex="-1"></a>p1[<span class="dv">0</span>][<span class="dv">0</span>]</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stderr">
+<pre><code>[06:13:20] mapped atoms in the reactants were not mapped in the products.
+  unmapped numbers are: 1 2 3 4 5 6 </code></pre>
+</div>
+<div class="cell-output cell-output-display" data-execution_count="317">
+<div>
+<figure class="figure">
+<p><img src="2025-12-14-Reaction-synthons_files/figure-html/cell-43-output-2.png" class="img-fluid figure-img"></p>
+</figure>
+</div>
+</div>
+</div>
+<div id="81c1e13d" class="cell" data-execution_count="318">
+<div class="sourceCode cell-code" id="cb64"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb64-1"><a href="#cb64-1" aria-hidden="true" tabindex="-1"></a><span class="co">'[C;$(C1-[CH2]-[CH2]-[N,C]-[CH2]-[CH2]-1):7](=[OD1])'</span></span>
+<span id="cb64-2"><a href="#cb64-2" aria-hidden="true" tabindex="-1"></a>r2_prep <span class="op">=</span> rdChemReactions.ReactionFromSmarts(<span class="st">'O=[C:11]1-[CH2:12]-[CH2:13]-[N,C:14]-[CH2:15]-[CH2:16]-1</span><span class="ch">\</span></span>
+<span id="cb64-3"><a href="#cb64-3" aria-hidden="true" tabindex="-1"></a><span class="st">&gt;&gt;[4*][C:11]1([6*])-[CH2:12]-[CH2:13]-[N,C:14]-[CH2:15]-[CH2:16]-1'</span>)</span>
+<span id="cb64-4"><a href="#cb64-4" aria-hidden="true" tabindex="-1"></a>p2 <span class="op">=</span> r2_prep.RunReactant(r2,<span class="dv">0</span>)</span>
+<span id="cb64-5"><a href="#cb64-5" aria-hidden="true" tabindex="-1"></a>p2[<span class="dv">0</span>][<span class="dv">0</span>]</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-display" data-execution_count="318">
+<div>
+<figure class="figure">
+<p><img src="2025-12-14-Reaction-synthons_files/figure-html/cell-44-output-1.png" class="img-fluid figure-img"></p>
+</figure>
+</div>
+</div>
+</div>
+<p>Make sure we form the correct ring:</p>
+<div id="b44bb490" class="cell" data-execution_count="321">
+<div class="sourceCode cell-code" id="cb65"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb65-1"><a href="#cb65-1" aria-hidden="true" tabindex="-1"></a>tm <span class="op">=</span> Chem.RWMol(core)</span>
+<span id="cb65-2"><a href="#cb65-2" aria-hidden="true" tabindex="-1"></a>tm.InsertMol(p1[<span class="dv">0</span>][<span class="dv">0</span>])</span>
+<span id="cb65-3"><a href="#cb65-3" aria-hidden="true" tabindex="-1"></a>tm.InsertMol(p2[<span class="dv">0</span>][<span class="dv">0</span>])</span>
+<span id="cb65-4"><a href="#cb65-4" aria-hidden="true" tabindex="-1"></a>ps <span class="op">=</span> Chem.MolzipParams()</span>
+<span id="cb65-5"><a href="#cb65-5" aria-hidden="true" tabindex="-1"></a>ps.label <span class="op">=</span> Chem.MolzipLabel.Isotope</span>
+<span id="cb65-6"><a href="#cb65-6" aria-hidden="true" tabindex="-1"></a>tm <span class="op">=</span> Chem.molzip(tm,ps)</span>
+<span id="cb65-7"><a href="#cb65-7" aria-hidden="true" tabindex="-1"></a>tm</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-display" data-execution_count="321">
+<div>
+<figure class="figure">
+<p><img src="2025-12-14-Reaction-synthons_files/figure-html/cell-45-output-1.png" class="img-fluid figure-img"></p>
+</figure>
+</div>
+</div>
+</div>
+<div id="b3520b30" class="cell" data-execution_count="334">
+<div class="sourceCode cell-code" id="cb66"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb66-1"><a href="#cb66-1" aria-hidden="true" tabindex="-1"></a>Draw.MolsToGridImage([core,p1[<span class="dv">0</span>][<span class="dv">0</span>],p2[<span class="dv">0</span>][<span class="dv">0</span>],tm],legends<span class="op">=</span>[<span class="st">'synthon1'</span>,<span class="st">'synthon2'</span>,<span class="st">'synthon3'</span>,<span class="st">'product'</span>],molsPerRow<span class="op">=</span><span class="dv">4</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-display" data-execution_count="334">
+<div>
+<figure class="figure">
+<p><img src="2025-12-14-Reaction-synthons_files/figure-html/cell-46-output-1.png" class="img-fluid figure-img"></p>
+</figure>
+</div>
+</div>
+</div>
+<div id="4fecb38b" class="cell" data-execution_count="322">
+<div class="sourceCode cell-code" id="cb67"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb67-1"><a href="#cb67-1" aria-hidden="true" tabindex="-1"></a>possibles <span class="op">=</span> [(core,(r1_prep,r2_prep))]</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+<p>Create the synthon space:</p>
+<div id="99cc6ea4" class="cell" data-execution_count="323">
+<div class="sourceCode cell-code" id="cb68"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb68-1"><a href="#cb68-1" aria-hidden="true" tabindex="-1"></a><span class="cf">with</span> <span class="bu">open</span>(<span class="st">'./space3.txt'</span>,<span class="st">'w+'</span>) <span class="im">as</span> outf:</span>
+<span id="cb68-2"><a href="#cb68-2" aria-hidden="true" tabindex="-1"></a>    nextRxn,nextIdx <span class="op">=</span> enumerate_synthons(possibles,outf)</span>
+<span id="cb68-3"><a href="#cb68-3" aria-hidden="true" tabindex="-1"></a>            </span>
+<span id="cb68-4"><a href="#cb68-4" aria-hidden="true" tabindex="-1"></a>                </span>
+<span id="cb68-5"><a href="#cb68-5" aria-hidden="true" tabindex="-1"></a><span class="op">!</span>head space2.txt</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>1 0 58 2
+     60
+1 1 241 60
+     301
+SMILES  synton_id   synton# reaction_id release
+[1*]c1nc[nH]c(=O)c1[2*] 1   1   r1  1
+[1*]ccc1c([2*])C(=O)c2ccccc2C1=O    2   2   r1  1
+[1*]cc(Cl)cc([2*])Cl    3   2   r1  1
+[1*]ccc(c[2*])C(F)(F)F  4   2   r1  1
+[1*]ccc(Cl)c[2*]    5   2   r1  1
+[1*]cc1ccccc1c[2*]  6   2   r1  1
+[1*]cc(OC)c(c[2*])OC    7   2   r1  1
+[1*]cc(cc[2*])S(=O)(=O)Nc1ccccc1OC  8   2   r1  1
+[1*]cc(cc[2*])S(=O)(=O)Nc1ccc(OC)cc1    9   2   r1  1</code></pre>
+</div>
+</div>
+<p>Read it in</p>
+<div id="e6920d21" class="cell" data-scrolled="true" data-execution_count="324">
+<div class="sourceCode cell-code" id="cb70"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb70-1"><a href="#cb70-1" aria-hidden="true" tabindex="-1"></a>spc <span class="op">=</span> rdSynthonSpaceSearch.SynthonSpace()</span>
+<span id="cb70-2"><a href="#cb70-2" aria-hidden="true" tabindex="-1"></a>spc.ReadTextFile(<span class="st">'space3.txt'</span>)</span>
+<span id="cb70-3"><a href="#cb70-3" aria-hidden="true" tabindex="-1"></a>spc.GetNumProducts()</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-display" data-execution_count="324">
+<pre><code>13978</code></pre>
+</div>
+</div>
+<p>Search</p>
+<div id="3f3ee541" class="cell" data-execution_count="325">
+<div class="sourceCode cell-code" id="cb72"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb72-1"><a href="#cb72-1" aria-hidden="true" tabindex="-1"></a>q2 <span class="op">=</span> Chem.MolFromSmarts(<span class="st">'cC(F)(F)F'</span>)</span>
+<span id="cb72-2"><a href="#cb72-2" aria-hidden="true" tabindex="-1"></a>params <span class="op">=</span> rdSynthonSpaceSearch.SynthonSpaceSearchParams()</span>
+<span id="cb72-3"><a href="#cb72-3" aria-hidden="true" tabindex="-1"></a>params.randomSample <span class="op">=</span> <span class="va">True</span></span>
+<span id="cb72-4"><a href="#cb72-4" aria-hidden="true" tabindex="-1"></a>params.randomSeed <span class="op">=</span> <span class="bn">0xf00d</span></span>
+<span id="cb72-5"><a href="#cb72-5" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb72-6"><a href="#cb72-6" aria-hidden="true" tabindex="-1"></a>res <span class="op">=</span> spc.SubstructureSearch(q2,params<span class="op">=</span>params)</span>
+<span id="cb72-7"><a href="#cb72-7" aria-hidden="true" tabindex="-1"></a>resMols <span class="op">=</span> <span class="bu">list</span>(<span class="bu">sorted</span>(res.GetHitMolecules(),key<span class="op">=</span><span class="kw">lambda</span> x:x.GetNumHeavyAtoms()))</span>
+<span id="cb72-8"><a href="#cb72-8" aria-hidden="true" tabindex="-1"></a><span class="co"># resMols = res.GetHitMolecules()</span></span>
+<span id="cb72-9"><a href="#cb72-9" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f'</span><span class="sc">{</span><span class="bu">len</span>(resMols)<span class="sc">}</span><span class="ss"> results'</span>)</span>
+<span id="cb72-10"><a href="#cb72-10" aria-hidden="true" tabindex="-1"></a>Draw.MolsToGridImage(resMols[:<span class="dv">12</span>],subImgSize<span class="op">=</span>(<span class="dv">250</span>,<span class="dv">200</span>)) <span class="cf">if</span> <span class="bu">len</span>(resMols) <span class="cf">else</span> <span class="va">None</span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>778 results</code></pre>
+</div>
+<div class="cell-output cell-output-display" data-execution_count="325">
+<div>
+<figure class="figure">
+<p><img src="2025-12-14-Reaction-synthons_files/figure-html/cell-50-output-2.png" class="img-fluid figure-img"></p>
+</figure>
+</div>
+</div>
+</div>
+<p>And combine it with the other two:</p>
+<div id="75d1f4b5" class="cell" data-scrolled="true" data-execution_count="326">
+<div class="sourceCode cell-code" id="cb74"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb74-1"><a href="#cb74-1" aria-hidden="true" tabindex="-1"></a><span class="op">!</span>tail combined.txt</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>[3*]C.[4*]CC1(N)CCC1    8536    3   r5  1
+[3*]C.[4*]C1CCCCC1CN    8537    3   r5  1
+[3*]C.[4*]CC1(N)CCCCC1  8538    3   r5  1
+[3*]C.[4*]CC1(N)CCCC1   8539    3   r5  1
+[3*]C.[4*]C1CC(N)C12CCC2    8540    3   r5  1
+[3*]C.[4*]C1CCOCC1N 8541    3   r5  1
+[3*]C.[4*]CC(N)c1ccccc1OC   8542    3   r5  1
+[3*]C.[4*]C(CN)C(C)(C)C 8543    3   r5  1
+[3*]C.[4*]C1Cc2ccccc2C1N    8544    3   r5  1
+[3*]C.[4*]C1CC2(C1)CC(N)C2  8545    3   r5  1</code></pre>
+</div>
+</div>
+<div id="a25a69ca" class="cell" data-execution_count="328">
+<div class="sourceCode cell-code" id="cb76"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb76-1"><a href="#cb76-1" aria-hidden="true" tabindex="-1"></a><span class="cf">with</span> <span class="bu">open</span>(<span class="st">'combined.txt'</span>,<span class="st">'a'</span>) <span class="im">as</span> outf:</span>
+<span id="cb76-2"><a href="#cb76-2" aria-hidden="true" tabindex="-1"></a>    enumerate_synthons(possibles,outf,writeHeader<span class="op">=</span><span class="va">False</span>,nWritten<span class="op">=</span><span class="dv">8546</span>,startIdx<span class="op">=</span><span class="dv">6</span>)</span>
+<span id="cb76-3"><a href="#cb76-3" aria-hidden="true" tabindex="-1"></a>spc <span class="op">=</span> rdSynthonSpaceSearch.SynthonSpace()</span>
+<span id="cb76-4"><a href="#cb76-4" aria-hidden="true" tabindex="-1"></a>spc.ReadTextFile(<span class="st">'combined.txt'</span>)</span>
+<span id="cb76-5"><a href="#cb76-5" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(spc.GetNumProducts())</span>
+<span id="cb76-6"><a href="#cb76-6" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb76-7"><a href="#cb76-7" aria-hidden="true" tabindex="-1"></a><span class="op">!</span>tail combined.txt</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>6 0 58 8547
+     8605
+6 1 241 8605
+     8846
+6077623
+[4*]C1([6*])CCC(=C(F)F)CC1  8836    3   r6  1
+[4*]C1([6*])CCN(S(=O)(=O)F)CC1  8837    3   r6  1
+[4*]C1([6*])CCN(c2cc(=O)[nH]cn2)CC1 8838    3   r6  1
+[4*]C1([6*])CCN(OCc2ccc(Cl)cc2)CC1  8839    3   r6  1
+[4*]C1([6*])CCC(N2CCCC2)CC1 8840    3   r6  1
+[4*]C1([6*])CCC(N2CCOCC2)CC1    8841    3   r6  1
+[4*]C1([6*])CCN(c2cc[nH]c(=O)c2)CC1 8842    3   r6  1
+[4*]C1([6*])CCC([N+](=O)[O-])CC1    8843    3   r6  1
+[4*]C1([6*])CCC2(CC1)CC2C(=O)OC 8844    3   r6  1
+[4*]C1([6*])CCC2(CCC(CBr)O2)CC1 8845    3   r6  1</code></pre>
+</div>
+</div>
+<p>Do a search to be sure we get results from multiple reactions:</p>
+<div id="d5be75ad" class="cell" data-execution_count="332">
+<div class="sourceCode cell-code" id="cb78"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb78-1"><a href="#cb78-1" aria-hidden="true" tabindex="-1"></a>q2 <span class="op">=</span> Chem.MolFromSmarts(<span class="st">'cC(=O)C'</span>)</span>
+<span id="cb78-2"><a href="#cb78-2" aria-hidden="true" tabindex="-1"></a>params <span class="op">=</span> rdSynthonSpaceSearch.SynthonSpaceSearchParams()</span>
+<span id="cb78-3"><a href="#cb78-3" aria-hidden="true" tabindex="-1"></a>params.randomSample <span class="op">=</span> <span class="va">True</span></span>
+<span id="cb78-4"><a href="#cb78-4" aria-hidden="true" tabindex="-1"></a>params.randomSeed <span class="op">=</span> <span class="bn">0xf00d</span></span>
+<span id="cb78-5"><a href="#cb78-5" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb78-6"><a href="#cb78-6" aria-hidden="true" tabindex="-1"></a>res <span class="op">=</span> spc.SubstructureSearch(q2,params<span class="op">=</span>params)</span>
+<span id="cb78-7"><a href="#cb78-7" aria-hidden="true" tabindex="-1"></a>resMols <span class="op">=</span> <span class="bu">list</span>(<span class="bu">sorted</span>(res.GetHitMolecules(),key<span class="op">=</span><span class="kw">lambda</span> x:x.GetNumHeavyAtoms()))</span>
+<span id="cb78-8"><a href="#cb78-8" aria-hidden="true" tabindex="-1"></a><span class="co"># resMols = res.GetHitMolecules()</span></span>
+<span id="cb78-9"><a href="#cb78-9" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f'</span><span class="sc">{</span><span class="bu">len</span>(resMols)<span class="sc">}</span><span class="ss"> results'</span>)</span>
+<span id="cb78-10"><a href="#cb78-10" aria-hidden="true" tabindex="-1"></a>Draw.MolsToGridImage(resMols[:<span class="dv">12</span>],subImgSize<span class="op">=</span>(<span class="dv">250</span>,<span class="dv">200</span>)) <span class="cf">if</span> <span class="bu">len</span>(resMols) <span class="cf">else</span> <span class="va">None</span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>1000 results</code></pre>
+</div>
+<div class="cell-output cell-output-display" data-execution_count="332">
+<div>
+<figure class="figure">
+<p><img src="2025-12-14-Reaction-synthons_files/figure-html/cell-53-output-2.png" class="img-fluid figure-img"></p>
+</figure>
+</div>
+</div>
+</div>
+<p>There are many more reactions in the Hartenfeller paper, but I’m going to stop here.</p>
+
+
+</section>
+
+</main> <!-- /main -->
+<script id="quarto-html-after-body" type="application/javascript">
+window.document.addEventListener("DOMContentLoaded", function (event) {
+  const toggleBodyColorMode = (bsSheetEl) => {
+    const mode = bsSheetEl.getAttribute("data-mode");
+    const bodyEl = window.document.querySelector("body");
+    if (mode === "dark") {
+      bodyEl.classList.add("quarto-dark");
+      bodyEl.classList.remove("quarto-light");
+    } else {
+      bodyEl.classList.add("quarto-light");
+      bodyEl.classList.remove("quarto-dark");
+    }
+  }
+  const toggleBodyColorPrimary = () => {
+    const bsSheetEl = window.document.querySelector("link#quarto-bootstrap");
+    if (bsSheetEl) {
+      toggleBodyColorMode(bsSheetEl);
+    }
+  }
+  toggleBodyColorPrimary();  
+  const disableStylesheet = (stylesheets) => {
+    for (let i=0; i < stylesheets.length; i++) {
+      const stylesheet = stylesheets[i];
+      stylesheet.rel = 'prefetch';
+    }
+  }
+  const enableStylesheet = (stylesheets) => {
+    for (let i=0; i < stylesheets.length; i++) {
+      const stylesheet = stylesheets[i];
+      stylesheet.rel = 'stylesheet';
+    }
+  }
+  const manageTransitions = (selector, allowTransitions) => {
+    const els = window.document.querySelectorAll(selector);
+    for (let i=0; i < els.length; i++) {
+      const el = els[i];
+      if (allowTransitions) {
+        el.classList.remove('notransition');
+      } else {
+        el.classList.add('notransition');
+      }
+    }
+  }
+  const toggleGiscusIfUsed = (isAlternate, darkModeDefault) => {
+    const baseTheme = document.querySelector('#giscus-base-theme')?.value ?? 'light';
+    const alternateTheme = document.querySelector('#giscus-alt-theme')?.value ?? 'dark';
+    let newTheme = '';
+    if(darkModeDefault) {
+      newTheme = isAlternate ? baseTheme : alternateTheme;
+    } else {
+      newTheme = isAlternate ? alternateTheme : baseTheme;
+    }
+    const changeGiscusTheme = () => {
+      // From: https://github.com/giscus/giscus/issues/336
+      const sendMessage = (message) => {
+        const iframe = document.querySelector('iframe.giscus-frame');
+        if (!iframe) return;
+        iframe.contentWindow.postMessage({ giscus: message }, 'https://giscus.app');
+      }
+      sendMessage({
+        setConfig: {
+          theme: newTheme
+        }
+      });
+    }
+    const isGiscussLoaded = window.document.querySelector('iframe.giscus-frame') !== null;
+    if (isGiscussLoaded) {
+      changeGiscusTheme();
+    }
+  }
+  const toggleColorMode = (alternate) => {
+    // Switch the stylesheets
+    const alternateStylesheets = window.document.querySelectorAll('link.quarto-color-scheme.quarto-color-alternate');
+    manageTransitions('#quarto-margin-sidebar .nav-link', false);
+    if (alternate) {
+      enableStylesheet(alternateStylesheets);
+      for (const sheetNode of alternateStylesheets) {
+        if (sheetNode.id === "quarto-bootstrap") {
+          toggleBodyColorMode(sheetNode);
+        }
+      }
+    } else {
+      disableStylesheet(alternateStylesheets);
+      toggleBodyColorPrimary();
+    }
+    manageTransitions('#quarto-margin-sidebar .nav-link', true);
+    // Switch the toggles
+    const toggles = window.document.querySelectorAll('.quarto-color-scheme-toggle');
+    for (let i=0; i < toggles.length; i++) {
+      const toggle = toggles[i];
+      if (toggle) {
+        if (alternate) {
+          toggle.classList.add("alternate");     
+        } else {
+          toggle.classList.remove("alternate");
+        }
+      }
+    }
+    // Hack to workaround the fact that safari doesn't
+    // properly recolor the scrollbar when toggling (#1455)
+    if (navigator.userAgent.indexOf('Safari') > 0 && navigator.userAgent.indexOf('Chrome') == -1) {
+      manageTransitions("body", false);
+      window.scrollTo(0, 1);
+      setTimeout(() => {
+        window.scrollTo(0, 0);
+        manageTransitions("body", true);
+      }, 40);  
+    }
+  }
+  const isFileUrl = () => { 
+    return window.location.protocol === 'file:';
+  }
+  const hasAlternateSentinel = () => {  
+    let styleSentinel = getColorSchemeSentinel();
+    if (styleSentinel !== null) {
+      return styleSentinel === "alternate";
+    } else {
+      return false;
+    }
+  }
+  const setStyleSentinel = (alternate) => {
+    const value = alternate ? "alternate" : "default";
+    if (!isFileUrl()) {
+      window.localStorage.setItem("quarto-color-scheme", value);
+    } else {
+      localAlternateSentinel = value;
+    }
+  }
+  const getColorSchemeSentinel = () => {
+    if (!isFileUrl()) {
+      const storageValue = window.localStorage.getItem("quarto-color-scheme");
+      return storageValue != null ? storageValue : localAlternateSentinel;
+    } else {
+      return localAlternateSentinel;
+    }
+  }
+  const darkModeDefault = false;
+  let localAlternateSentinel = darkModeDefault ? 'alternate' : 'default';
+  // Dark / light mode switch
+  window.quartoToggleColorScheme = () => {
+    // Read the current dark / light value 
+    let toAlternate = !hasAlternateSentinel();
+    toggleColorMode(toAlternate);
+    setStyleSentinel(toAlternate);
+    toggleGiscusIfUsed(toAlternate, darkModeDefault);
+  };
+  // Ensure there is a toggle, if there isn't float one in the top right
+  if (window.document.querySelector('.quarto-color-scheme-toggle') === null) {
+    const a = window.document.createElement('a');
+    a.classList.add('top-right');
+    a.classList.add('quarto-color-scheme-toggle');
+    a.href = "";
+    a.onclick = function() { try { window.quartoToggleColorScheme(); } catch {} return false; };
+    const i = window.document.createElement("i");
+    i.classList.add('bi');
+    a.appendChild(i);
+    window.document.body.appendChild(a);
+  }
+  // Switch to dark mode if need be
+  if (hasAlternateSentinel()) {
+    toggleColorMode(true);
+  } else {
+    toggleColorMode(false);
+  }
+  const icon = "";
+  const anchorJS = new window.AnchorJS();
+  anchorJS.options = {
+    placement: 'right',
+    icon: icon
+  };
+  anchorJS.add('.anchored');
+  const isCodeAnnotation = (el) => {
+    for (const clz of el.classList) {
+      if (clz.startsWith('code-annotation-')) {                     
+        return true;
+      }
+    }
+    return false;
+  }
+  const onCopySuccess = function(e) {
+    // button target
+    const button = e.trigger;
+    // don't keep focus
+    button.blur();
+    // flash "checked"
+    button.classList.add('code-copy-button-checked');
+    var currentTitle = button.getAttribute("title");
+    button.setAttribute("title", "Copied!");
+    let tooltip;
+    if (window.bootstrap) {
+      button.setAttribute("data-bs-toggle", "tooltip");
+      button.setAttribute("data-bs-placement", "left");
+      button.setAttribute("data-bs-title", "Copied!");
+      tooltip = new bootstrap.Tooltip(button, 
+        { trigger: "manual", 
+          customClass: "code-copy-button-tooltip",
+          offset: [0, -8]});
+      tooltip.show();    
+    }
+    setTimeout(function() {
+      if (tooltip) {
+        tooltip.hide();
+        button.removeAttribute("data-bs-title");
+        button.removeAttribute("data-bs-toggle");
+        button.removeAttribute("data-bs-placement");
+      }
+      button.setAttribute("title", currentTitle);
+      button.classList.remove('code-copy-button-checked');
+    }, 1000);
+    // clear code selection
+    e.clearSelection();
+  }
+  const getTextToCopy = function(trigger) {
+      const codeEl = trigger.previousElementSibling.cloneNode(true);
+      for (const childEl of codeEl.children) {
+        if (isCodeAnnotation(childEl)) {
+          childEl.remove();
+        }
+      }
+      return codeEl.innerText;
+  }
+  const clipboard = new window.ClipboardJS('.code-copy-button:not([data-in-quarto-modal])', {
+    text: getTextToCopy
+  });
+  clipboard.on('success', onCopySuccess);
+  if (window.document.getElementById('quarto-embedded-source-code-modal')) {
+    const clipboardModal = new window.ClipboardJS('.code-copy-button[data-in-quarto-modal]', {
+      text: getTextToCopy,
+      container: window.document.getElementById('quarto-embedded-source-code-modal')
+    });
+    clipboardModal.on('success', onCopySuccess);
+  }
+    var localhostRegex = new RegExp(/^(?:http|https):\/\/localhost\:?[0-9]*\//);
+    var mailtoRegex = new RegExp(/^mailto:/);
+      var filterRegex = new RegExp("https:\/\/greglandrum\.github\.io\/rdkit-blog\/");
+    var isInternal = (href) => {
+        return filterRegex.test(href) || localhostRegex.test(href) || mailtoRegex.test(href);
+    }
+    // Inspect non-navigation links and adorn them if external
+ 	var links = window.document.querySelectorAll('a[href]:not(.nav-link):not(.navbar-brand):not(.toc-action):not(.sidebar-link):not(.sidebar-item-toggle):not(.pagination-link):not(.no-external):not([aria-hidden]):not(.dropdown-item):not(.quarto-navigation-tool):not(.about-link)');
+    for (var i=0; i<links.length; i++) {
+      const link = links[i];
+      if (!isInternal(link.href)) {
+        // undo the damage that might have been done by quarto-nav.js in the case of
+        // links that we want to consider external
+        if (link.dataset.originalHref !== undefined) {
+          link.href = link.dataset.originalHref;
+        }
+      }
+    }
+  function tippyHover(el, contentFn, onTriggerFn, onUntriggerFn) {
+    const config = {
+      allowHTML: true,
+      maxWidth: 500,
+      delay: 100,
+      arrow: false,
+      appendTo: function(el) {
+          return el.parentElement;
+      },
+      interactive: true,
+      interactiveBorder: 10,
+      theme: 'quarto',
+      placement: 'bottom-start',
+    };
+    if (contentFn) {
+      config.content = contentFn;
+    }
+    if (onTriggerFn) {
+      config.onTrigger = onTriggerFn;
+    }
+    if (onUntriggerFn) {
+      config.onUntrigger = onUntriggerFn;
+    }
+    window.tippy(el, config); 
+  }
+  const noterefs = window.document.querySelectorAll('a[role="doc-noteref"]');
+  for (var i=0; i<noterefs.length; i++) {
+    const ref = noterefs[i];
+    tippyHover(ref, function() {
+      // use id or data attribute instead here
+      let href = ref.getAttribute('data-footnote-href') || ref.getAttribute('href');
+      try { href = new URL(href).hash; } catch {}
+      const id = href.replace(/^#\/?/, "");
+      const note = window.document.getElementById(id);
+      if (note) {
+        return note.innerHTML;
+      } else {
+        return "";
+      }
+    });
+  }
+  const xrefs = window.document.querySelectorAll('a.quarto-xref');
+  const processXRef = (id, note) => {
+    // Strip column container classes
+    const stripColumnClz = (el) => {
+      el.classList.remove("page-full", "page-columns");
+      if (el.children) {
+        for (const child of el.children) {
+          stripColumnClz(child);
+        }
+      }
+    }
+    stripColumnClz(note)
+    if (id === null || id.startsWith('sec-')) {
+      // Special case sections, only their first couple elements
+      const container = document.createElement("div");
+      if (note.children && note.children.length > 2) {
+        container.appendChild(note.children[0].cloneNode(true));
+        for (let i = 1; i < note.children.length; i++) {
+          const child = note.children[i];
+          if (child.tagName === "P" && child.innerText === "") {
+            continue;
+          } else {
+            container.appendChild(child.cloneNode(true));
+            break;
+          }
+        }
+        if (window.Quarto?.typesetMath) {
+          window.Quarto.typesetMath(container);
+        }
+        return container.innerHTML
+      } else {
+        if (window.Quarto?.typesetMath) {
+          window.Quarto.typesetMath(note);
+        }
+        return note.innerHTML;
+      }
+    } else {
+      // Remove any anchor links if they are present
+      const anchorLink = note.querySelector('a.anchorjs-link');
+      if (anchorLink) {
+        anchorLink.remove();
+      }
+      if (window.Quarto?.typesetMath) {
+        window.Quarto.typesetMath(note);
+      }
+      if (note.classList.contains("callout")) {
+        return note.outerHTML;
+      } else {
+        return note.innerHTML;
+      }
+    }
+  }
+  for (var i=0; i<xrefs.length; i++) {
+    const xref = xrefs[i];
+    tippyHover(xref, undefined, function(instance) {
+      instance.disable();
+      let url = xref.getAttribute('href');
+      let hash = undefined; 
+      if (url.startsWith('#')) {
+        hash = url;
+      } else {
+        try { hash = new URL(url).hash; } catch {}
+      }
+      if (hash) {
+        const id = hash.replace(/^#\/?/, "");
+        const note = window.document.getElementById(id);
+        if (note !== null) {
+          try {
+            const html = processXRef(id, note.cloneNode(true));
+            instance.setContent(html);
+          } finally {
+            instance.enable();
+            instance.show();
+          }
+        } else {
+          // See if we can fetch this
+          fetch(url.split('#')[0])
+          .then(res => res.text())
+          .then(html => {
+            const parser = new DOMParser();
+            const htmlDoc = parser.parseFromString(html, "text/html");
+            const note = htmlDoc.getElementById(id);
+            if (note !== null) {
+              const html = processXRef(id, note);
+              instance.setContent(html);
+            } 
+          }).finally(() => {
+            instance.enable();
+            instance.show();
+          });
+        }
+      } else {
+        // See if we can fetch a full url (with no hash to target)
+        // This is a special case and we should probably do some content thinning / targeting
+        fetch(url)
+        .then(res => res.text())
+        .then(html => {
+          const parser = new DOMParser();
+          const htmlDoc = parser.parseFromString(html, "text/html");
+          const note = htmlDoc.querySelector('main.content');
+          if (note !== null) {
+            // This should only happen for chapter cross references
+            // (since there is no id in the URL)
+            // remove the first header
+            if (note.children.length > 0 && note.children[0].tagName === "HEADER") {
+              note.children[0].remove();
+            }
+            const html = processXRef(null, note);
+            instance.setContent(html);
+          } 
+        }).finally(() => {
+          instance.enable();
+          instance.show();
+        });
+      }
+    }, function(instance) {
+    });
+  }
+      let selectedAnnoteEl;
+      const selectorForAnnotation = ( cell, annotation) => {
+        let cellAttr = 'data-code-cell="' + cell + '"';
+        let lineAttr = 'data-code-annotation="' +  annotation + '"';
+        const selector = 'span[' + cellAttr + '][' + lineAttr + ']';
+        return selector;
+      }
+      const selectCodeLines = (annoteEl) => {
+        const doc = window.document;
+        const targetCell = annoteEl.getAttribute("data-target-cell");
+        const targetAnnotation = annoteEl.getAttribute("data-target-annotation");
+        const annoteSpan = window.document.querySelector(selectorForAnnotation(targetCell, targetAnnotation));
+        const lines = annoteSpan.getAttribute("data-code-lines").split(",");
+        const lineIds = lines.map((line) => {
+          return targetCell + "-" + line;
+        })
+        let top = null;
+        let height = null;
+        let parent = null;
+        if (lineIds.length > 0) {
+            //compute the position of the single el (top and bottom and make a div)
+            const el = window.document.getElementById(lineIds[0]);
+            top = el.offsetTop;
+            height = el.offsetHeight;
+            parent = el.parentElement.parentElement;
+          if (lineIds.length > 1) {
+            const lastEl = window.document.getElementById(lineIds[lineIds.length - 1]);
+            const bottom = lastEl.offsetTop + lastEl.offsetHeight;
+            height = bottom - top;
+          }
+          if (top !== null && height !== null && parent !== null) {
+            // cook up a div (if necessary) and position it 
+            let div = window.document.getElementById("code-annotation-line-highlight");
+            if (div === null) {
+              div = window.document.createElement("div");
+              div.setAttribute("id", "code-annotation-line-highlight");
+              div.style.position = 'absolute';
+              parent.appendChild(div);
+            }
+            div.style.top = top - 2 + "px";
+            div.style.height = height + 4 + "px";
+            div.style.left = 0;
+            let gutterDiv = window.document.getElementById("code-annotation-line-highlight-gutter");
+            if (gutterDiv === null) {
+              gutterDiv = window.document.createElement("div");
+              gutterDiv.setAttribute("id", "code-annotation-line-highlight-gutter");
+              gutterDiv.style.position = 'absolute';
+              const codeCell = window.document.getElementById(targetCell);
+              const gutter = codeCell.querySelector('.code-annotation-gutter');
+              gutter.appendChild(gutterDiv);
+            }
+            gutterDiv.style.top = top - 2 + "px";
+            gutterDiv.style.height = height + 4 + "px";
+          }
+          selectedAnnoteEl = annoteEl;
+        }
+      };
+      const unselectCodeLines = () => {
+        const elementsIds = ["code-annotation-line-highlight", "code-annotation-line-highlight-gutter"];
+        elementsIds.forEach((elId) => {
+          const div = window.document.getElementById(elId);
+          if (div) {
+            div.remove();
+          }
+        });
+        selectedAnnoteEl = undefined;
+      };
+        // Handle positioning of the toggle
+    window.addEventListener(
+      "resize",
+      throttle(() => {
+        elRect = undefined;
+        if (selectedAnnoteEl) {
+          selectCodeLines(selectedAnnoteEl);
+        }
+      }, 10)
+    );
+    function throttle(fn, ms) {
+    let throttle = false;
+    let timer;
+      return (...args) => {
+        if(!throttle) { // first call gets through
+            fn.apply(this, args);
+            throttle = true;
+        } else { // all the others get throttled
+            if(timer) clearTimeout(timer); // cancel #2
+            timer = setTimeout(() => {
+              fn.apply(this, args);
+              timer = throttle = false;
+            }, ms);
+        }
+      };
+    }
+      // Attach click handler to the DT
+      const annoteDls = window.document.querySelectorAll('dt[data-target-cell]');
+      for (const annoteDlNode of annoteDls) {
+        annoteDlNode.addEventListener('click', (event) => {
+          const clickedEl = event.target;
+          if (clickedEl !== selectedAnnoteEl) {
+            unselectCodeLines();
+            const activeEl = window.document.querySelector('dt[data-target-cell].code-annotation-active');
+            if (activeEl) {
+              activeEl.classList.remove('code-annotation-active');
+            }
+            selectCodeLines(clickedEl);
+            clickedEl.classList.add('code-annotation-active');
+          } else {
+            // Unselect the line
+            unselectCodeLines();
+            clickedEl.classList.remove('code-annotation-active');
+          }
+        });
+      }
+  const findCites = (el) => {
+    const parentEl = el.parentElement;
+    if (parentEl) {
+      const cites = parentEl.dataset.cites;
+      if (cites) {
+        return {
+          el,
+          cites: cites.split(' ')
+        };
+      } else {
+        return findCites(el.parentElement)
+      }
+    } else {
+      return undefined;
+    }
+  };
+  var bibliorefs = window.document.querySelectorAll('a[role="doc-biblioref"]');
+  for (var i=0; i<bibliorefs.length; i++) {
+    const ref = bibliorefs[i];
+    const citeInfo = findCites(ref);
+    if (citeInfo) {
+      tippyHover(citeInfo.el, function() {
+        var popup = window.document.createElement('div');
+        citeInfo.cites.forEach(function(cite) {
+          var citeDiv = window.document.createElement('div');
+          citeDiv.classList.add('hanging-indent');
+          citeDiv.classList.add('csl-entry');
+          var biblioDiv = window.document.getElementById('ref-' + cite);
+          if (biblioDiv) {
+            citeDiv.innerHTML = biblioDiv.innerHTML;
+          }
+          popup.appendChild(citeDiv);
+        });
+        return popup.innerHTML;
+      });
+    }
+  }
+});
+</script>
+<script src="https://utteranc.es/client.js" repo="greglandrum/rdkit-blog" issue-term="pathname" theme="github-light" crossorigin="anonymous" async="">
+</script>
+</div> <!-- /content -->
+<footer class="footer">
+  <div class="nav-footer">
+    <div class="nav-footer-left">
+<p>Copyright (C) 2025 Greg Landrum</p>
+</div>   
+    <div class="nav-footer-center">
+      &nbsp;
+    </div>
+    <div class="nav-footer-right">
+<p><a href="https://www.rdkit.org"><img src="https://www.rdkit.org/logo.small.png" class="img-fluid" alt="RDKit" width="64"></a></p>
+</div>
+  </div>
+</footer>
+
+
+
+
+</body></html>
