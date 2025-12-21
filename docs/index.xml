@@ -10,7 +10,138 @@
 <atom:link href="https://greglandrum.github.io/rdkit-blog/index.xml" rel="self" type="application/rss+xml"/>
 <description>RDKit experiments, tips, and tutorials</description>
 <generator>quarto-1.6.43</generator>
-<lastBuildDate>Sat, 13 Dec 2025 23:00:00 GMT</lastBuildDate>
+<lastBuildDate>Sat, 20 Dec 2025 23:00:00 GMT</lastBuildDate>
+<item>
+  <title>About tetrahedral chirality in the RDKit</title>
+  <link>https://greglandrum.github.io/rdkit-blog/posts/2025-12-21-Chiral-atoms.html</link>
+  <description><![CDATA[ 
+
+
+
+
+<p>This week, to try and find inspiration for a short, or at least quick, blog post, I did an “AI Search” and asked for some frequently un-answered RDKit questions. One of those was related to understanding stereochemistry. Then, this morning, I noticed a question in GitHub Discussions asking why the chirality on a tertiary amine wasn’t being preserved. My post topic was clear!</p>
+<p>The contents of this post will end up, in an edited form, in the <a href="https://www.rdkit.org/docs/RDKit_Book.html">RDKit Book</a></p>
+<div id="bc25d8a8-88c1-4cc7-bf29-cb01006f0f43" class="cell" data-execution_count="1">
+<div class="sourceCode cell-code" id="cb1" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb1-1"><span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">from</span> rdkit <span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">import</span> Chem</span>
+<span id="cb1-2"><span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">from</span> rdkit.Chem.Draw <span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">import</span> IPythonConsole</span>
+<span id="cb1-3">IPythonConsole.molSize <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> <span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">300</span>,<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">250</span></span></code></pre></div>
+</div>
+<section id="intro" class="level1">
+<h1>Intro</h1>
+<p>In this post I am going to focus solely on stereochemistry/chirality around tetrahedral atoms. I am aware that there are non-tetrahedral forms of stereochemistry for three- and four-coordinate atoms (and the RDKit supports some of them). Non-tetrahedral stereochemistry, double-bond stereochemistry, and atropisomerism are topics for a possible future post.</p>
+</section>
+<section id="what-can-be-chiral" class="level1">
+<h1>What can be chiral?</h1>
+<p>I will borrow the language used in the <a href="https://www.inchi-trust.org/download/104/InChI_TechMan.pdf">InChI technical manual</a> and use the term “stereogenic” to refer to atoms which can be chiral if all of their substituents are different. The RDKit uses the same conditions to determine which atoms can be involved in ring stereochemistry (see below).</p>
+<p>If you ever want to go straight to the source to see what could be a potential stereocenter, the function to look for is <a href="">isAtomPotentialChiralCenter()</a> .</p>
+<p>In general, the following conditions have to be met for an atom to be considered a potential stereocenter: - It must have a total nonzero-degree of three or four. I.e. three or four neighbors not connected via zero-order bonds. - It cannot have two attached hydrogen atoms (explicit or implicit). For the purposes of this count, only H atoms with unspecified isotopes count. - Three coordinate atoms cannot have an H atom attached, except for phosphines, arsines, S and Se with an explicit valence of four, and S+ and Se+ with an explicit valence of three. - Degree three N atoms cannot have an H atom attached and must be involved in either a three-membered ring or be a bridgehead</p>
+<p>Because arbitrary decisions have to be made when dealing with this topic - for example, are tertiary amines stereogenic? - we choose to (try and) follow InChI and use Table 8 from the <a href="https://www.inchi-trust.org/download/104/InChI_TechMan.pdf">InChI technical manual</a> here. If an element is not present in that InChI table, we use the general rules above. One notable exception for main-group atoms is that the RDKit allows trivalent N atoms that are in a bridgehead to be chiral centers.</p>
+<p>An example chiral phosphine (invented):</p>
+<div id="9adb5d8a-55f2-45de-b1e1-313623ce1af6" class="cell" data-execution_count="21">
+<div class="sourceCode cell-code" id="cb2" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb2-1">Chem.MolFromSmiles(<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'C12C[N@](C)C(C2)C[P@H]1'</span>)</span></code></pre></div>
+<div class="cell-output cell-output-display" data-execution_count="21">
+<div>
+<figure class="figure">
+<p><img src="https://greglandrum.github.io/rdkit-blog/posts/2025-12-21-Chiral-atoms_files/figure-html/cell-3-output-1.png" class="img-fluid figure-img"></p>
+</figure>
+</div>
+</div>
+</div>
+<blockquote class="blockquote">
+<p>That really should have the <code>[H]</code> drawn as a separate atom</p>
+</blockquote>
+<p>Notice that, though the chirality on the N was specified in the input, it was removed when the molecule was parsed: the N is neither in a three-membered ring nor a bridgehead.</p>
+<p>Here’s an example of a ChEMBL molecule with a chiral bridgehead N:</p>
+<div id="e67eb19b-e39b-4fe4-bab5-19452f532eec" class="cell" data-execution_count="15">
+<div class="sourceCode cell-code" id="cb3" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb3-1">Chem.MolFromSmiles(<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'COC(=O)[C@@H]1C[N@@]2CCC[C@@H]1C2'</span>)</span></code></pre></div>
+<div class="cell-output cell-output-display" data-execution_count="15">
+<div>
+<figure class="figure">
+<p><img src="https://greglandrum.github.io/rdkit-blog/posts/2025-12-21-Chiral-atoms_files/figure-html/cell-4-output-1.png" class="img-fluid figure-img"></p>
+</figure>
+</div>
+</div>
+</div>
+</section>
+<section id="the-rdkits-representation-of-atomic-stereochemistry" class="level1">
+<h1>The RDKit’s representation of atomic stereochemistry</h1>
+<div id="356bb9e8-7649-46d2-9c02-c1f5a21c7c9f" class="cell" data-execution_count="11">
+<div class="sourceCode cell-code" id="cb4" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb4-1">IPythonConsole.drawOptions.addAtomIndices <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> <span class="va" style="color: #111111;
+background-color: null;
+font-style: inherit;">True</span></span>
+<span id="cb4-2">m <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> Chem.MolFromSmiles(<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'C[C@](C(=O)O)(CCC)CC'</span>)</span>
+<span id="cb4-3">m</span></code></pre></div>
+<div class="cell-output cell-output-display" data-execution_count="11">
+<div>
+<figure class="figure">
+<p><img src="https://greglandrum.github.io/rdkit-blog/posts/2025-12-21-Chiral-atoms_files/figure-html/cell-5-output-1.png" class="img-fluid figure-img"></p>
+</figure>
+</div>
+</div>
+</div>
+<p>We can see the internal representation in the output of <code>Debug()</code> for the chiral center, atom 1:</p>
+<div id="aa58cc35-f803-42be-b7d8-1410902c12ad" class="cell" data-execution_count="12">
+<div class="sourceCode cell-code" id="cb5" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb5-1">m.Debug()</span></code></pre></div>
+<div class="cell-output cell-output-stderr">
+<pre><code>Atoms:
+    0 6 C chg: 0  deg: 1 exp: 1 imp: 3 hyb: SP3
+    1 6 C chg: 0  deg: 4 exp: 4 imp: 0 hyb: SP3 chi: CCW nbrs:[0 2 5 8]
+    2 6 C chg: 0  deg: 3 exp: 4 imp: 0 hyb: SP2
+    3 8 O chg: 0  deg: 1 exp: 2 imp: 0 hyb: SP2
+    4 8 O chg: 0  deg: 1 exp: 1 imp: 1 hyb: SP2
+    5 6 C chg: 0  deg: 2 exp: 2 imp: 2 hyb: SP3
+    6 6 C chg: 0  deg: 2 exp: 2 imp: 2 hyb: SP3
+    7 6 C chg: 0  deg: 1 exp: 1 imp: 3 hyb: SP3
+    8 6 C chg: 0  deg: 2 exp: 2 imp: 2 hyb: SP3
+    9 6 C chg: 0  deg: 1 exp: 1 imp: 3 hyb: SP3
+Bonds:
+    0 0-&gt;1 order: 1
+    1 1-&gt;2 order: 1
+    2 2-&gt;3 order: 2 conj?: 1
+    3 2-&gt;4 order: 1 conj?: 1
+    4 1-&gt;5 order: 1
+    5 5-&gt;6 order: 1
+    6 6-&gt;7 order: 1
+    7 1-&gt;8 order: 1
+    8 8-&gt;9 order: 1</code></pre>
+</div>
+</div>
+<p>The important information here is <code>chi</code> and <code>nbrs</code>, which tell us that if we look from atom 0 to atom 1, we need to rotate counter-clockwise to go from atom 2 to atom 5 (or from atom 5 to atom 8).</p>
+
+
+</section>
+
+ ]]></description>
+  <category>tutorial</category>
+  <category>documentation</category>
+  <category>stereochemistry</category>
+  <guid>https://greglandrum.github.io/rdkit-blog/posts/2025-12-21-Chiral-atoms.html</guid>
+  <pubDate>Sat, 20 Dec 2025 23:00:00 GMT</pubDate>
+</item>
 <item>
   <title>Building synthon spaces with combinatorial reactions</title>
   <link>https://greglandrum.github.io/rdkit-blog/posts/2025-12-14-Reaction-synthons.html</link>
@@ -28177,187 +28308,6 @@ font-style: inherit;">"DASH_AM1BCC_CHARGES"</span>))</span></code></pre></div>
   <category>3d</category>
   <guid>https://greglandrum.github.io/rdkit-blog/posts/2025-07-24-writing-partial-charges-to-sd-files.html</guid>
   <pubDate>Wed, 23 Jul 2025 22:00:00 GMT</pubDate>
-</item>
-<item>
-  <title>Please stop saying “The Tanimoto similarity is”</title>
-  <link>https://greglandrum.github.io/rdkit-blog/posts/2025-07-17-naming-similarity-metrics.html</link>
-  <description><![CDATA[ 
-
-
-
-
-<p>At both ICCS and the CADD GRC this year I noticed multiple people, either in talks or on posters, reporting the “Tanimoto similarity” between two (or more) molecules. This is an unfortunate shorthand because it leaves out a critical piece of information: what fingerprint did you use when doing the Tanimoto calculation? Without knowing that, it’s really not possible to make sense of what the reported similarity values actually mean.</p>
-<p>This isn’t one of those examples of me being pedantic (or cranky); the Tanimoto similarities calculated using different fingerprints can be very, very different. I’ve written several blogs posts about this with more details, a couple of examples are <a href="https://greglandrum.github.io/rdkit-blog/posts/2021-05-18-fingerprint-thresholds1.html">this post looking at the “noise threshold” of various fingerprints</a> and <a href="https://greglandrum.github.io/rdkit-blog/posts/2021-05-21-similarity-search-thresholds.html">this one looking at what typical similarity values are between “closely related” compounds</a>.</p>
-<p>As a quick illustration of this, I calculated the similarities between esomeprazole and lansoprazole, two molecules that look (to me at least) pretty similar:</p>
-<div class="quarto-figure quarto-figure-center">
-<figure class="figure">
-<p><img src="https://greglandrum.github.io/rdkit-blog/posts/2025-07-17-naming-similarity-metrics_files/figure-html/49e4f7ab-1-image.png" class="img-fluid figure-img"></p>
-<figcaption>image.png</figcaption>
-</figure>
-</div>
-<p>The Tanimoto similarity between these two molecules using the RDKit fingerprint is 0.79, using the Morgan2 fingerprint it’s 0.43. That’s a huge difference. If I had just said that the similarity was 0.43 and you guessed that I was using the RDKit fingerprint, which has a noise threshold of 0.51, you would conclude that the molecules are really not similar at all. With the Morgan2 fingerprint, on the other hand, 0.43 indicates two closely related molecules.</p>
-<p>My concrete, and very easy to implement, suggestion: if you report a similarity value (in a talk, poster, paper, etc.) you should always mention the fingerprint used. So do something like “The Tanimoto similarity calculated using Morgan2 fingerprints was 0.43”. It’s not a lot of extra words, but it does allow your audience to understand what you actually did. And hopefully that’s a good thing.</p>
-<p>The rest of this post is just the code to produce the image above, generate fingerprints, and calculate similarities.</p>
-<div id="ef81c872" class="cell" data-execution_count="3">
-<div class="sourceCode cell-code" id="cb1" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb1-1"><span class="im" style="color: #00769E;
-background-color: null;
-font-style: inherit;">from</span> rdkit <span class="im" style="color: #00769E;
-background-color: null;
-font-style: inherit;">import</span> Chem</span>
-<span id="cb1-2"><span class="im" style="color: #00769E;
-background-color: null;
-font-style: inherit;">from</span> rdkit.Chem.Draw <span class="im" style="color: #00769E;
-background-color: null;
-font-style: inherit;">import</span> IPythonConsole</span>
-<span id="cb1-3"><span class="im" style="color: #00769E;
-background-color: null;
-font-style: inherit;">from</span> rdkit.Chem <span class="im" style="color: #00769E;
-background-color: null;
-font-style: inherit;">import</span> Draw</span>
-<span id="cb1-4"><span class="im" style="color: #00769E;
-background-color: null;
-font-style: inherit;">from</span> rdkit.Chem <span class="im" style="color: #00769E;
-background-color: null;
-font-style: inherit;">import</span> rdFingerprintGenerator</span>
-<span id="cb1-5"><span class="im" style="color: #00769E;
-background-color: null;
-font-style: inherit;">from</span> rdkit <span class="im" style="color: #00769E;
-background-color: null;
-font-style: inherit;">import</span> DataStructs</span>
-<span id="cb1-6"></span>
-<span id="cb1-7"><span class="im" style="color: #00769E;
-background-color: null;
-font-style: inherit;">import</span> rdkit</span>
-<span id="cb1-8"><span class="bu" style="color: null;
-background-color: null;
-font-style: inherit;">print</span>(rdkit.__version__)</span></code></pre></div>
-<div class="cell-output cell-output-stdout">
-<pre><code>2025.03.4</code></pre>
-</div>
-</div>
-<div id="e06ac98c" class="cell" data-execution_count="9">
-<div class="sourceCode cell-code" id="cb3" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb3-1">esomeprazole <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> Chem.MolFromSmiles(<span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">'COc1ccc2nc([nH]c2c1)[S@](=O)Cc1ncc(C)c(OC)c1C'</span>)</span>
-<span id="cb3-2">lansoprazole <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> Chem.MolFromSmiles(<span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">'FC(F)(F)COc1ccnc(c1C)CS(=O)c2[nH]c3ccccc3n2'</span>)</span>
-<span id="cb3-3">Draw.MolsToGridImage([esomeprazole, lansoprazole], </span>
-<span id="cb3-4">    legends<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span>[<span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">'esomeprazole'</span>,<span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">'lansoprazole'</span>], molsPerRow<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span><span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">2</span>, subImgSize<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span>(<span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">300</span>, <span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">250</span>))</span></code></pre></div>
-<div class="cell-output cell-output-display" data-execution_count="9">
-<div>
-<figure class="figure">
-<p><img src="https://greglandrum.github.io/rdkit-blog/posts/2025-07-17-naming-similarity-metrics_files/figure-html/cell-3-output-1.png" class="img-fluid figure-img"></p>
-</figure>
-</div>
-</div>
-</div>
-<div id="f115df66" class="cell" data-execution_count="5">
-<div class="sourceCode cell-code" id="cb4" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb4-1">rdk_fpg <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> rdFingerprintGenerator.GetRDKitFPGenerator()</span>
-<span id="cb4-2">mfp_fpg <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> rdFingerprintGenerator.GetMorganGenerator(radius<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span><span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">2</span>)</span>
-<span id="cb4-3">rdk_fps <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> [rdk_fpg.GetFingerprint(mol) <span class="cf" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">for</span> mol <span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">in</span> [esomeprazole, lansoprazole]]</span>
-<span id="cb4-4">mfp_fps <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> [mfp_fpg.GetFingerprint(mol) <span class="cf" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">for</span> mol <span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">in</span> [esomeprazole, lansoprazole]]</span>
-<span id="cb4-5"><span class="bu" style="color: null;
-background-color: null;
-font-style: inherit;">print</span>(<span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">'RDKit fingerprint similarity:'</span>, DataStructs.TanimotoSimilarity(rdk_fps[<span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">0</span>], rdk_fps[<span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">1</span>]))</span>
-<span id="cb4-6"><span class="bu" style="color: null;
-background-color: null;
-font-style: inherit;">print</span>(<span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">'Morgan fingerprint similarity:'</span>, DataStructs.TanimotoSimilarity(mfp_fps[<span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">0</span>], mfp_fps[<span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">1</span>]))</span></code></pre></div>
-<div class="cell-output cell-output-stdout">
-<pre><code>RDKit fingerprint similarity: 0.7943722943722944
-Morgan fingerprint similarity: 0.4264705882352941</code></pre>
-</div>
-</div>
-<p>Out of curiousity, what are the Dice similarities between those fingerprints?</p>
-<div id="3ef5bdff" class="cell" data-execution_count="6">
-<div class="sourceCode cell-code" id="cb6" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb6-1"><span class="bu" style="color: null;
-background-color: null;
-font-style: inherit;">print</span>(<span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">'RDKit fingerprint similarity:'</span>, DataStructs.DiceSimilarity(rdk_fps[<span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">0</span>], rdk_fps[<span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">1</span>]))</span>
-<span id="cb6-2"><span class="bu" style="color: null;
-background-color: null;
-font-style: inherit;">print</span>(<span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">'Morgan fingerprint similarity:'</span>, DataStructs.DiceSimilarity(mfp_fps[<span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">0</span>], mfp_fps[<span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">1</span>]))</span></code></pre></div>
-<div class="cell-output cell-output-stdout">
-<pre><code>RDKit fingerprint similarity: 0.8854041013268998
-Morgan fingerprint similarity: 0.5979381443298969</code></pre>
-</div>
-</div>
-
-
-
- ]]></description>
-  <category>similarity</category>
-  <category>fingerprints</category>
-  <category>rants</category>
-  <guid>https://greglandrum.github.io/rdkit-blog/posts/2025-07-17-naming-similarity-metrics.html</guid>
-  <pubDate>Wed, 16 Jul 2025 22:00:00 GMT</pubDate>
 </item>
 </channel>
 </rss>
