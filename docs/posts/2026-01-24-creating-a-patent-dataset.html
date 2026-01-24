@@ -1,0 +1,1564 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en"><head>
+
+<meta charset="utf-8">
+<meta name="generator" content="quarto-1.6.43">
+
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+
+<meta name="dcterms.date" content="2026-01-24">
+<meta name="description" content="Another collection of sets of related compounds">
+
+<title>Creating a patent data set – RDKit blog</title>
+<style>
+code{white-space: pre-wrap;}
+span.smallcaps{font-variant: small-caps;}
+div.columns{display: flex; gap: min(4vw, 1.5em);}
+div.column{flex: auto; overflow-x: auto;}
+div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+ul.task-list{list-style: none;}
+ul.task-list li input[type="checkbox"] {
+  width: 0.8em;
+  margin: 0 0.8em 0.2em -1em; /* quarto-specific, see https://github.com/quarto-dev/quarto-cli/issues/4556 */ 
+  vertical-align: middle;
+}
+/* CSS for syntax highlighting */
+pre > code.sourceCode { white-space: pre; position: relative; }
+pre > code.sourceCode > span { line-height: 1.25; }
+pre > code.sourceCode > span:empty { height: 1.2em; }
+.sourceCode { overflow: visible; }
+code.sourceCode > span { color: inherit; text-decoration: inherit; }
+div.sourceCode { margin: 1em 0; }
+pre.sourceCode { margin: 0; }
+@media screen {
+div.sourceCode { overflow: auto; }
+}
+@media print {
+pre > code.sourceCode { white-space: pre-wrap; }
+pre > code.sourceCode > span { display: inline-block; text-indent: -5em; padding-left: 5em; }
+}
+pre.numberSource code
+  { counter-reset: source-line 0; }
+pre.numberSource code > span
+  { position: relative; left: -4em; counter-increment: source-line; }
+pre.numberSource code > span > a:first-child::before
+  { content: counter(source-line);
+    position: relative; left: -1em; text-align: right; vertical-align: baseline;
+    border: none; display: inline-block;
+    -webkit-touch-callout: none; -webkit-user-select: none;
+    -khtml-user-select: none; -moz-user-select: none;
+    -ms-user-select: none; user-select: none;
+    padding: 0 4px; width: 4em;
+  }
+pre.numberSource { margin-left: 3em;  padding-left: 4px; }
+div.sourceCode
+  {   }
+@media screen {
+pre > code.sourceCode > span > a:first-child::before { text-decoration: underline; }
+}
+</style>
+
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.5.1/jquery.min.js" integrity="sha512-bLT0Qm9VnAYZDflyKcBaQ2gg0hSYNQrJ8RilYldYQ1FxQYoCLtUjuuRuZo+fjqhx/qtq/1itJ0C2ejDxltZVFg==" crossorigin="anonymous"></script><script src="../site_libs/quarto-nav/quarto-nav.js"></script>
+<script src="../site_libs/quarto-nav/headroom.min.js"></script>
+<script src="../site_libs/clipboard/clipboard.min.js"></script>
+<script src="../site_libs/quarto-search/autocomplete.umd.js"></script>
+<script src="../site_libs/quarto-search/fuse.min.js"></script>
+<script src="../site_libs/quarto-search/quarto-search.js"></script>
+<meta name="quarto:offset" content="../">
+<link href="../posts/icons/favicon.ico" rel="icon">
+<script src="../site_libs/quarto-html/quarto.js"></script>
+<script src="../site_libs/quarto-html/popper.min.js"></script>
+<script src="../site_libs/quarto-html/tippy.umd.min.js"></script>
+<script src="../site_libs/quarto-html/anchor.min.js"></script>
+<link href="../site_libs/quarto-html/tippy.css" rel="stylesheet">
+<link href="../site_libs/quarto-html/quarto-syntax-highlighting-d4d76bf8491c20bad77d141916dc28e1.css" rel="stylesheet" class="quarto-color-scheme" id="quarto-text-highlighting-styles">
+<link href="../site_libs/quarto-html/quarto-syntax-highlighting-dark-4379b0ccadffce622b03caf4c46266b3.css" rel="prefetch" class="quarto-color-scheme quarto-color-alternate" id="quarto-text-highlighting-styles">
+<script src="../site_libs/bootstrap/bootstrap.min.js"></script>
+<link href="../site_libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
+<link href="../site_libs/bootstrap/bootstrap-40840319e1d09552a0f54992bf705f97.min.css" rel="stylesheet" append-hash="true" class="quarto-color-scheme" id="quarto-bootstrap" data-mode="light">
+<link href="../site_libs/bootstrap/bootstrap-dark-f86ed83de42dc3a6349cec1bcdefd5d4.min.css" rel="prefetch" append-hash="true" class="quarto-color-scheme quarto-color-alternate" id="quarto-bootstrap" data-mode="dark">
+<script id="quarto-search-options" type="application/json">{
+  "location": "navbar",
+  "copy-button": false,
+  "collapse-after": 3,
+  "panel-placement": "end",
+  "type": "overlay",
+  "limit": 50,
+  "keyboard-shortcut": [
+    "f",
+    "/",
+    "s"
+  ],
+  "show-item-context": false,
+  "language": {
+    "search-no-results-text": "No results",
+    "search-matching-documents-text": "matching documents",
+    "search-copy-link-title": "Copy link to search",
+    "search-hide-matches-text": "Hide additional matches",
+    "search-more-match-text": "more match in this document",
+    "search-more-matches-text": "more matches in this document",
+    "search-clear-button-title": "Clear",
+    "search-text-placeholder": "",
+    "search-detached-cancel-button-title": "Cancel",
+    "search-submit-button-title": "Submit",
+    "search-label": "Search"
+  }
+}</script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.6/require.min.js" integrity="sha512-c3Nl8+7g4LMSTdrm621y7kf9v3SDPnhxLNhcjFJbKECVnmZHTdo+IRO05sNLTH/D3vA6u1X32ehoLC7WFVdheg==" crossorigin="anonymous"></script>
+
+<script type="application/javascript">define('jquery', [],function() {return window.jQuery;})</script>
+
+
+<link rel="stylesheet" href="../styles.css">
+</head>
+
+<body class="nav-fixed">
+
+<div id="quarto-search-results"></div>
+  <header id="quarto-header" class="headroom fixed-top">
+    <nav class="navbar navbar-expand-lg " data-bs-theme="dark">
+      <div class="navbar-container container-fluid">
+      <div class="navbar-brand-container mx-auto">
+    <a class="navbar-brand" href="../index.html">
+    <span class="navbar-title">RDKit blog</span>
+    </a>
+  </div>
+            <div id="quarto-search" class="" title="Search"></div>
+          <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarCollapse" aria-controls="navbarCollapse" role="menu" aria-expanded="false" aria-label="Toggle navigation" onclick="if (window.quartoToggleHeadroom) { window.quartoToggleHeadroom(); }">
+  <span class="navbar-toggler-icon"></span>
+</button>
+          <div class="collapse navbar-collapse" id="navbarCollapse">
+            <ul class="navbar-nav navbar-nav-scroll ms-auto">
+  <li class="nav-item">
+    <a class="nav-link" href="../about.html"> 
+<span class="menu-text">RDKit experiments, tips, and tutorials</span></a>
+  </li>  
+  <li class="nav-item compact">
+    <a class="nav-link" href="https://github.com/rdkit/rdkit"> <i class="bi bi-github" role="img">
+</i> 
+<span class="menu-text"></span></a>
+  </li>  
+  <li class="nav-item compact">
+    <a class="nav-link" href="https://bsky.app/profile/rdkit.bsky.social"> <i class="bi bi-twitter" role="img">
+</i> 
+<span class="menu-text"></span></a>
+  </li>  
+  <li class="nav-item compact">
+    <a class="nav-link" href="https://www.linkedin.com/groups/8192558/"> <i class="bi bi-linkedin" role="img">
+</i> 
+<span class="menu-text"></span></a>
+  </li>  
+  <li class="nav-item compact">
+    <a class="nav-link" href="../index.xml"> <i class="bi bi-rss" role="img">
+</i> 
+<span class="menu-text"></span></a>
+  </li>  
+</ul>
+          </div> <!-- /navcollapse -->
+            <div class="quarto-navbar-tools">
+  <a href="" class="quarto-color-scheme-toggle quarto-navigation-tool  px-1" onclick="window.quartoToggleColorScheme(); return false;" title="Toggle dark mode"><i class="bi"></i></a>
+</div>
+      </div> <!-- /container-fluid -->
+    </nav>
+</header>
+<!-- content -->
+<div id="quarto-content" class="quarto-container page-columns page-rows-contents page-layout-article page-navbar">
+<!-- sidebar -->
+<!-- margin-sidebar -->
+    <div id="quarto-margin-sidebar" class="sidebar margin-sidebar">
+        <nav id="TOC" role="doc-toc" class="toc-active">
+    <h2 id="toc-title">On this page</h2>
+   
+  <ul>
+  <li><a href="#creating-the-data-sets" id="toc-creating-the-data-sets" class="nav-link active" data-scroll-target="#creating-the-data-sets">Creating the data sets</a></li>
+  <li><a href="#looking-at-the-some-results-with-umap" id="toc-looking-at-the-some-results-with-umap" class="nav-link" data-scroll-target="#looking-at-the-some-results-with-umap">Looking at the some results with UMAP</a></li>
+  </ul>
+</nav>
+    </div>
+<!-- main -->
+<main class="content" id="quarto-document-content">
+
+<header id="title-block-header" class="quarto-title-block default">
+<div class="quarto-title">
+<h1 class="title">Creating a patent data set</h1>
+  <div class="quarto-categories">
+    <div class="quarto-category">datasets</div>
+    <div class="quarto-category">exploration</div>
+    <div class="quarto-category">patents</div>
+  </div>
+  </div>
+
+<div>
+  <div class="description">
+    Another collection of sets of related compounds
+  </div>
+</div>
+
+
+<div class="quarto-title-meta">
+
+    
+    <div>
+    <div class="quarto-title-meta-heading">Published</div>
+    <div class="quarto-title-meta-contents">
+      <p class="date">January 24, 2026</p>
+    </div>
+  </div>
+  
+    
+  </div>
+  
+
+
+</header>
+
+
+<p>For a while I’ve been meaning to put together a collection of sets of related compounds for use in teaching and some other experiments. I’ll do that by taking compounds from patent data found in ChEMBL.</p>
+<blockquote class="blockquote">
+<p>I could also have worked with SureChEMBL for this, but ChEMBL is easier for me to work with (since I always have a copy of ChEMBL arounnd) and contains enough patent data for my purposes. I will probably also take advantage of the fact that there is bioactivity data associated with these compounds in ChEMBL at some point in the future.</p>
+</blockquote>
+<p>In this post I put together the queries, grab the data, and do a bit of initial exploration. I’ll do more with these in the future</p>
+<p>If you’re interested in the data sets themselves, you can find them <a href="https://github.com/greglandrum/rdkit_blog/tree/master/data/patent_datasets">in the source blog repo</a>.</p>
+<div id="dd1778d8-3622-484a-b83b-9179fa0a82ae" class="cell" data-execution_count="1">
+<div class="sourceCode cell-code" id="cb1"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> rdkit <span class="im">import</span> Chem</span>
+<span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> rdkit.Chem <span class="im">import</span> Draw</span>
+<span id="cb1-3"><a href="#cb1-3" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> rdkit.Chem.Draw <span class="im">import</span> IPythonConsole</span>
+<span id="cb1-4"><a href="#cb1-4" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> rdkit</span>
+<span id="cb1-5"><a href="#cb1-5" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> pandas <span class="im">as</span> pd</span>
+<span id="cb1-6"><a href="#cb1-6" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> matplotlib <span class="im">import</span> pyplot <span class="im">as</span> plt</span>
+<span id="cb1-7"><a href="#cb1-7" aria-hidden="true" tabindex="-1"></a>plt.style.use(<span class="st">'tableau-colorblind10'</span>)</span>
+<span id="cb1-8"><a href="#cb1-8" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-9"><a href="#cb1-9" aria-hidden="true" tabindex="-1"></a><span class="op">%</span>load_ext sql</span>
+<span id="cb1-10"><a href="#cb1-10" aria-hidden="true" tabindex="-1"></a><span class="op">%</span>matplotlib inline</span>
+<span id="cb1-11"><a href="#cb1-11" aria-hidden="true" tabindex="-1"></a><span class="op">%</span>config SqlMagic.feedback<span class="op">=</span><span class="dv">0</span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+<section id="creating-the-data-sets" class="level1">
+<h1>Creating the data sets</h1>
+<p>Look at the number of compounds in the ChEMBL patents:</p>
+<div id="d4a20979-3d5a-4fd8-9e2d-31dd4069e558" class="cell" data-execution_count="3">
+<div class="sourceCode cell-code" id="cb2"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a><span class="op">%</span>sql postgresql:<span class="op">//</span>localhost<span class="op">/</span>chembl_36 <span class="op">\</span></span>
+<span id="cb2-2"><a href="#cb2-2" aria-hidden="true" tabindex="-1"></a>  select patent_id,chembl_id,count(distinct molregno) mrn_count <span class="im">from</span> docs join compound_records using (doc_id) <span class="op">\</span></span>
+<span id="cb2-3"><a href="#cb2-3" aria-hidden="true" tabindex="-1"></a>   where patent_id <span class="kw">is</span> <span class="kw">not</span> null <span class="op">\</span></span>
+<span id="cb2-4"><a href="#cb2-4" aria-hidden="true" tabindex="-1"></a>   group by (patent_id,chembl_id)<span class="op">\</span></span>
+<span id="cb2-5"><a href="#cb2-5" aria-hidden="true" tabindex="-1"></a>   order by mrn_count desc limit <span class="dv">10</span><span class="op">;</span> </span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-display" data-execution_count="3">
+<table class="caption-top table table-sm table-striped small" data-quarto-postprocess="true">
+<thead>
+<tr class="header">
+<th data-quarto-table-cell-role="th">patent_id</th>
+<th data-quarto-table-cell-role="th">chembl_id</th>
+<th data-quarto-table-cell-role="th">mrn_count</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>US-9718790-B2</td>
+<td>CHEMBL5725546</td>
+<td>2236</td>
+</tr>
+<tr class="even">
+<td>US-20130252896-A1</td>
+<td>CHEMBL4420062</td>
+<td>1901</td>
+</tr>
+<tr class="odd">
+<td>US-11286268-B1</td>
+<td>CHEMBL5729040</td>
+<td>1775</td>
+</tr>
+<tr class="even">
+<td>US-8466108-B2</td>
+<td>CHEMBL4419170</td>
+<td>1689</td>
+</tr>
+<tr class="odd">
+<td>US-11618753-B2</td>
+<td>CHEMBL5729657</td>
+<td>1530</td>
+</tr>
+<tr class="even">
+<td>US-9302989-B2</td>
+<td>CHEMBL3886617</td>
+<td>1518</td>
+</tr>
+<tr class="odd">
+<td>US-9796708-B2</td>
+<td>CHEMBL5726550</td>
+<td>1352</td>
+</tr>
+<tr class="even">
+<td>US-11124486-B2</td>
+<td>CHEMBL5728711</td>
+<td>1227</td>
+</tr>
+<tr class="odd">
+<td>US-10774051-B2</td>
+<td>CHEMBL5727936</td>
+<td>1204</td>
+</tr>
+<tr class="even">
+<td>US-9303033-B2</td>
+<td>CHEMBL3886195</td>
+<td>1175</td>
+</tr>
+</tbody>
+</table>
+
+<span style="font-style:italic;text-align:center;">Truncated to <a href="https://jupysql.ploomber.io/en/latest/api/configuration.html#displaylimit">displaylimit</a> of 10.</span>
+</div>
+</div>
+<p>I’m not looking for patents with that many compounds… let’s limit it to between 50 and 300:</p>
+<div id="a3c80337-ae7e-4783-8612-67deba46f495" class="cell" data-execution_count="4">
+<div class="sourceCode cell-code" id="cb3"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a><span class="op">%</span>sql postgresql:<span class="op">//</span>localhost<span class="op">/</span>chembl_36 <span class="op">\</span></span>
+<span id="cb3-2"><a href="#cb3-2" aria-hidden="true" tabindex="-1"></a>  select count(<span class="op">*</span>) <span class="im">from</span> (select patent_id,chembl_id,count(distinct molregno) mrn_count<span class="op">\</span></span>
+<span id="cb3-3"><a href="#cb3-3" aria-hidden="true" tabindex="-1"></a>                        <span class="im">from</span> docs join compound_records using (doc_id) <span class="op">\</span></span>
+<span id="cb3-4"><a href="#cb3-4" aria-hidden="true" tabindex="-1"></a>                        where patent_id <span class="kw">is</span> <span class="kw">not</span> null <span class="op">\</span></span>
+<span id="cb3-5"><a href="#cb3-5" aria-hidden="true" tabindex="-1"></a>                        group by (patent_id,chembl_id)<span class="op">\</span></span>
+<span id="cb3-6"><a href="#cb3-6" aria-hidden="true" tabindex="-1"></a>                        order by mrn_count desc) tmp <span class="op">\</span></span>
+<span id="cb3-7"><a href="#cb3-7" aria-hidden="true" tabindex="-1"></a>    where mrn_count<span class="op">&gt;</span><span class="dv">50</span> <span class="kw">and</span> mrn_count<span class="op">&lt;</span><span class="dv">300</span><span class="op">;</span> </span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-display" data-execution_count="4">
+<table class="caption-top table table-sm table-striped small" data-quarto-postprocess="true">
+<thead>
+<tr class="header">
+<th data-quarto-table-cell-role="th">count</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>2721</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+<p>That’s a lot</p>
+<p>Create a temporary table with the count of the number of unique compounds in each of the patents that contains between 50 and 300 compounds.</p>
+<div id="93182bbd-0e5d-498c-8b86-d1536f33460b" class="cell" data-execution_count="8">
+<div class="sourceCode cell-code" id="cb4"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a><span class="op">%</span>sql postgresql:<span class="op">//</span>localhost<span class="op">/</span>chembl_36 <span class="op">\</span></span>
+<span id="cb4-2"><a href="#cb4-2" aria-hidden="true" tabindex="-1"></a>  drop table <span class="cf">if</span> exists patents</span>
+<span id="cb4-3"><a href="#cb4-3" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-4"><a href="#cb4-4" aria-hidden="true" tabindex="-1"></a><span class="op">%</span>sql postgresql:<span class="op">//</span>localhost<span class="op">/</span>chembl_36 <span class="op">\</span></span>
+<span id="cb4-5"><a href="#cb4-5" aria-hidden="true" tabindex="-1"></a>  select <span class="op">*</span> into temporary table patents <span class="im">from</span> <span class="op">\</span></span>
+<span id="cb4-6"><a href="#cb4-6" aria-hidden="true" tabindex="-1"></a>    (select patent_id,chembl_id,doc_id,count(distinct molregno) mrn_count<span class="op">\</span></span>
+<span id="cb4-7"><a href="#cb4-7" aria-hidden="true" tabindex="-1"></a>     <span class="im">from</span> docs join compound_records using (doc_id) <span class="op">\</span></span>
+<span id="cb4-8"><a href="#cb4-8" aria-hidden="true" tabindex="-1"></a>     where patent_id <span class="kw">is</span> <span class="kw">not</span> null <span class="op">\</span></span>
+<span id="cb4-9"><a href="#cb4-9" aria-hidden="true" tabindex="-1"></a>     group by (patent_id,chembl_id,doc_id)<span class="op">\</span></span>
+<span id="cb4-10"><a href="#cb4-10" aria-hidden="true" tabindex="-1"></a>     order by mrn_count desc) tmp <span class="op">\</span></span>
+<span id="cb4-11"><a href="#cb4-11" aria-hidden="true" tabindex="-1"></a>  where mrn_count<span class="op">&gt;</span><span class="dv">50</span> <span class="kw">and</span> mrn_count<span class="op">&lt;</span><span class="dv">300</span><span class="op">;</span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-display" data-execution_count="8">
+<table class="caption-top" data-quarto-postprocess="true">
+<tbody>
+</tbody>
+</table>
+</div>
+</div>
+<div id="56d10d21-b7c9-4857-b3af-be2ab6cf6fe2" class="cell" data-execution_count="9">
+<div class="sourceCode cell-code" id="cb5"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a><span class="op">%</span>sql postgresql:<span class="op">//</span>localhost<span class="op">/</span>chembl_36 <span class="op">\</span></span>
+<span id="cb5-2"><a href="#cb5-2" aria-hidden="true" tabindex="-1"></a>   select count(<span class="op">*</span>) <span class="im">from</span> patents<span class="op">;</span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-display" data-execution_count="9">
+<table class="caption-top table table-sm table-striped small" data-quarto-postprocess="true">
+<thead>
+<tr class="header">
+<th data-quarto-table-cell-role="th">count</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>2721</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+<div id="d49004bb-f55d-47c4-9f93-5f31ae1195fd" class="cell" data-execution_count="10">
+<div class="sourceCode cell-code" id="cb6"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb6-1"><a href="#cb6-1" aria-hidden="true" tabindex="-1"></a><span class="op">%</span>sql postgresql:<span class="op">//</span>localhost<span class="op">/</span>chembl_36 <span class="op">\</span></span>
+<span id="cb6-2"><a href="#cb6-2" aria-hidden="true" tabindex="-1"></a>   select count(<span class="op">*</span>) <span class="im">from</span> (select distinct on (doc_id) doc_id <span class="im">from</span> patents) tmp<span class="op">;</span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-display" data-execution_count="10">
+<table class="caption-top table table-sm table-striped small" data-quarto-postprocess="true">
+<thead>
+<tr class="header">
+<th data-quarto-table-cell-role="th">count</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>2721</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+<p>For each of those patents, get the counts of the number of activity values for each single-protein assay in the patent. Also pulls info about the assay itself</p>
+<div id="2a3477cf-5d0b-4b5b-b0d0-056b974a9916" class="cell" data-execution_count="11">
+<div class="sourceCode cell-code" id="cb7"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb7-1"><a href="#cb7-1" aria-hidden="true" tabindex="-1"></a><span class="op">%</span>sql postgresql:<span class="op">//</span>localhost<span class="op">/</span>chembl_36 <span class="op">\</span></span>
+<span id="cb7-2"><a href="#cb7-2" aria-hidden="true" tabindex="-1"></a>  drop table <span class="cf">if</span> exists patent_all_targets</span>
+<span id="cb7-3"><a href="#cb7-3" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb7-4"><a href="#cb7-4" aria-hidden="true" tabindex="-1"></a><span class="op">%</span>sql postgresql:<span class="op">//</span>localhost<span class="op">/</span>chembl_36 <span class="op">\</span></span>
+<span id="cb7-5"><a href="#cb7-5" aria-hidden="true" tabindex="-1"></a>   select assays.chembl_id assay_chembl_id,target_dictionary.chembl_id target_chembl_id,<span class="op">\</span></span>
+<span id="cb7-6"><a href="#cb7-6" aria-hidden="true" tabindex="-1"></a>          pref_name,target_type,count(distinct molregno) act_count, tid, assay_id,assays.doc_id<span class="op">\</span></span>
+<span id="cb7-7"><a href="#cb7-7" aria-hidden="true" tabindex="-1"></a>   into temporary table patent_all_targets <span class="op">\</span></span>
+<span id="cb7-8"><a href="#cb7-8" aria-hidden="true" tabindex="-1"></a>   <span class="im">from</span> patents join assays using (doc_id) join activities using (assay_id) <span class="op">\</span></span>
+<span id="cb7-9"><a href="#cb7-9" aria-hidden="true" tabindex="-1"></a>       join target_dictionary using (tid) <span class="op">\</span></span>
+<span id="cb7-10"><a href="#cb7-10" aria-hidden="true" tabindex="-1"></a>   where pchembl_value <span class="kw">is</span> <span class="kw">not</span> null <span class="kw">and</span> target_type<span class="op">=</span><span class="st">'SINGLE PROTEIN'</span>\</span>
+<span id="cb7-11"><a href="#cb7-11" aria-hidden="true" tabindex="-1"></a>   group by (assays.chembl_id,target_dictionary.chembl_id,pref_name,target_type,tid, assay_id,assays.doc_id) <span class="op">\</span></span>
+<span id="cb7-12"><a href="#cb7-12" aria-hidden="true" tabindex="-1"></a>   order by act_count desc<span class="op">;</span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-display" data-execution_count="11">
+<table class="caption-top" data-quarto-postprocess="true">
+<tbody>
+</tbody>
+</table>
+</div>
+</div>
+<div id="71941a37-252c-4932-9796-e4080c7f2824" class="cell" data-execution_count="12">
+<div class="sourceCode cell-code" id="cb8"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb8-1"><a href="#cb8-1" aria-hidden="true" tabindex="-1"></a><span class="op">%</span>sql postgresql:<span class="op">//</span>localhost<span class="op">/</span>chembl_36 <span class="op">\</span></span>
+<span id="cb8-2"><a href="#cb8-2" aria-hidden="true" tabindex="-1"></a>   select count(<span class="op">*</span>) <span class="im">from</span> (select distinct on (doc_id) doc_id <span class="im">from</span> patent_all_targets) tmp<span class="op">;</span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-display" data-execution_count="12">
+<table class="caption-top table table-sm table-striped small" data-quarto-postprocess="true">
+<thead>
+<tr class="header">
+<th data-quarto-table-cell-role="th">count</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>2334</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+<p>Get the most populated target for each patent. We will call this the target for the patent (though this is clearly a crude assumption).</p>
+<p>The <code>distinct on (doc_id)</code> thing combined with the <code>order by doc_id, act_count desc</code> is the way to get the row for each <code>doc_id</code> that has the highest <code>act_count</code> in postgresql.</p>
+<div id="1b7f04b2-cad8-4d12-98fe-c70c36b910d3" class="cell" data-execution_count="13">
+<div class="sourceCode cell-code" id="cb9"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb9-1"><a href="#cb9-1" aria-hidden="true" tabindex="-1"></a><span class="op">%</span>sql postgresql:<span class="op">//</span>localhost<span class="op">/</span>chembl_36 <span class="op">\</span></span>
+<span id="cb9-2"><a href="#cb9-2" aria-hidden="true" tabindex="-1"></a>  drop table <span class="cf">if</span> exists patent_targets</span>
+<span id="cb9-3"><a href="#cb9-3" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-4"><a href="#cb9-4" aria-hidden="true" tabindex="-1"></a><span class="op">%</span>sql postgresql:<span class="op">//</span>localhost<span class="op">/</span>chembl_36 <span class="op">\</span></span>
+<span id="cb9-5"><a href="#cb9-5" aria-hidden="true" tabindex="-1"></a>   select distinct on (doc_id) <span class="op">\</span></span>
+<span id="cb9-6"><a href="#cb9-6" aria-hidden="true" tabindex="-1"></a>      assay_chembl_id,target_chembl_id,pref_name,act_count,tid,assay_id,doc_id <span class="op">\</span></span>
+<span id="cb9-7"><a href="#cb9-7" aria-hidden="true" tabindex="-1"></a>    into temporary table patent_targets <span class="op">\</span></span>
+<span id="cb9-8"><a href="#cb9-8" aria-hidden="true" tabindex="-1"></a>    <span class="im">from</span> patent_all_targets order by doc_id, act_count desc<span class="op">;</span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-display" data-execution_count="13">
+<table class="caption-top" data-quarto-postprocess="true">
+<tbody>
+</tbody>
+</table>
+</div>
+</div>
+<div id="ab047c38-2608-4342-bdbf-2edd2ca34eeb" class="cell" data-execution_count="14">
+<div class="sourceCode cell-code" id="cb10"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb10-1"><a href="#cb10-1" aria-hidden="true" tabindex="-1"></a><span class="op">%</span>sql select count(distinct target_chembl_id) <span class="im">from</span> patent_targets<span class="op">;</span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-display" data-execution_count="14">
+<table class="caption-top table table-sm table-striped small" data-quarto-postprocess="true">
+<thead>
+<tr class="header">
+<th data-quarto-table-cell-role="th">count</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>641</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+<p>Find the most popular targets and the number of patents assigned to each:</p>
+<div id="0272f75f-49c7-4ecd-a85f-9b04535b330c" class="cell" data-execution_count="15">
+<div class="sourceCode cell-code" id="cb11"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb11-1"><a href="#cb11-1" aria-hidden="true" tabindex="-1"></a><span class="op">%</span>sql postgresql:<span class="op">//</span>localhost<span class="op">/</span>chembl_36 <span class="op">\</span></span>
+<span id="cb11-2"><a href="#cb11-2" aria-hidden="true" tabindex="-1"></a> select target_chembl_id,pref_name,count(distinct doc_id) num_patents,tid <span class="op">\</span></span>
+<span id="cb11-3"><a href="#cb11-3" aria-hidden="true" tabindex="-1"></a>  <span class="im">from</span> patent_targets <span class="op">\</span></span>
+<span id="cb11-4"><a href="#cb11-4" aria-hidden="true" tabindex="-1"></a>  group by (target_chembl_id,pref_name,tid) <span class="op">\</span></span>
+<span id="cb11-5"><a href="#cb11-5" aria-hidden="true" tabindex="-1"></a>  order by num_patents desc limit <span class="dv">10</span><span class="op">;</span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-display" data-execution_count="15">
+<table class="caption-top table table-sm table-striped small" data-quarto-postprocess="true">
+<thead>
+<tr class="header">
+<th data-quarto-table-cell-role="th">target_chembl_id</th>
+<th data-quarto-table-cell-role="th">pref_name</th>
+<th data-quarto-table-cell-role="th">num_patents</th>
+<th data-quarto-table-cell-role="th">tid</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>CHEMBL5251</td>
+<td>Tyrosine-protein kinase BTK</td>
+<td>61</td>
+<td>100097</td>
+</tr>
+<tr class="even">
+<td>CHEMBL6136</td>
+<td>Lysine-specific histone demethylase 1A</td>
+<td>56</td>
+<td>102439</td>
+</tr>
+<tr class="odd">
+<td>CHEMBL1741186</td>
+<td>Nuclear receptor ROR-gamma</td>
+<td>40</td>
+<td>103982</td>
+</tr>
+<tr class="even">
+<td>CHEMBL2000</td>
+<td>Plasma kallikrein</td>
+<td>32</td>
+<td>23</td>
+</tr>
+<tr class="odd">
+<td>CHEMBL1163125</td>
+<td>Bromodomain-containing protein 4</td>
+<td>30</td>
+<td>103454</td>
+</tr>
+<tr class="even">
+<td>CHEMBL4409</td>
+<td>cAMP and cAMP-inhibited cGMP 3',5'-cyclic phosphodiesterase 10A</td>
+<td>29</td>
+<td>100010</td>
+</tr>
+<tr class="odd">
+<td>CHEMBL2815</td>
+<td>High affinity nerve growth factor receptor</td>
+<td>28</td>
+<td>11902</td>
+</tr>
+<tr class="even">
+<td>CHEMBL3130</td>
+<td>Phosphatidylinositol 4,5-bisphosphate 3-kinase catalytic subunit delta isoform</td>
+<td>26</td>
+<td>11177</td>
+</tr>
+<tr class="odd">
+<td>CHEMBL6175</td>
+<td>Lysine-specific demethylase 4C</td>
+<td>25</td>
+<td>102452</td>
+</tr>
+<tr class="even">
+<td>CHEMBL2973</td>
+<td>Rho-associated protein kinase 2</td>
+<td>24</td>
+<td>11149</td>
+</tr>
+</tbody>
+</table>
+
+<span style="font-style:italic;text-align:center;">Truncated to <a href="https://jupysql.ploomber.io/en/latest/api/configuration.html#displaylimit">displaylimit</a> of 10.</span>
+</div>
+</div>
+<div id="52419a11-5ec1-4c18-aaad-571a3cbf38c1" class="cell" data-execution_count="17">
+<div class="sourceCode cell-code" id="cb12"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb12-1"><a href="#cb12-1" aria-hidden="true" tabindex="-1"></a>d <span class="op">=</span> <span class="op">%</span>sql postgresql:<span class="op">//</span>localhost<span class="op">/</span>chembl_36 <span class="op">\</span></span>
+<span id="cb12-2"><a href="#cb12-2" aria-hidden="true" tabindex="-1"></a> select target_chembl_id,num_patents <span class="im">from</span> <span class="op">\</span></span>
+<span id="cb12-3"><a href="#cb12-3" aria-hidden="true" tabindex="-1"></a>    (select target_chembl_id,pref_name,count(distinct doc_id) num_patents,tid <span class="op">\</span></span>
+<span id="cb12-4"><a href="#cb12-4" aria-hidden="true" tabindex="-1"></a>     <span class="im">from</span> patent_targets <span class="op">\</span></span>
+<span id="cb12-5"><a href="#cb12-5" aria-hidden="true" tabindex="-1"></a>     group by (target_chembl_id,pref_name,tid) ) tmp<span class="op">\</span></span>
+<span id="cb12-6"><a href="#cb12-6" aria-hidden="true" tabindex="-1"></a>  where num_patents <span class="op">&gt;</span><span class="dv">20</span> <span class="op">\</span></span>
+<span id="cb12-7"><a href="#cb12-7" aria-hidden="true" tabindex="-1"></a>  order by num_patents desc<span class="op">;</span></span>
+<span id="cb12-8"><a href="#cb12-8" aria-hidden="true" tabindex="-1"></a>d</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-display" data-execution_count="17">
+<table class="caption-top table table-sm table-striped small" data-quarto-postprocess="true">
+<thead>
+<tr class="header">
+<th data-quarto-table-cell-role="th">target_chembl_id</th>
+<th data-quarto-table-cell-role="th">num_patents</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>CHEMBL5251</td>
+<td>61</td>
+</tr>
+<tr class="even">
+<td>CHEMBL6136</td>
+<td>56</td>
+</tr>
+<tr class="odd">
+<td>CHEMBL1741186</td>
+<td>40</td>
+</tr>
+<tr class="even">
+<td>CHEMBL2000</td>
+<td>32</td>
+</tr>
+<tr class="odd">
+<td>CHEMBL1163125</td>
+<td>30</td>
+</tr>
+<tr class="even">
+<td>CHEMBL4409</td>
+<td>29</td>
+</tr>
+<tr class="odd">
+<td>CHEMBL2815</td>
+<td>28</td>
+</tr>
+<tr class="even">
+<td>CHEMBL3130</td>
+<td>26</td>
+</tr>
+<tr class="odd">
+<td>CHEMBL6175</td>
+<td>25</td>
+</tr>
+<tr class="even">
+<td>CHEMBL2973</td>
+<td>24</td>
+</tr>
+</tbody>
+</table>
+
+<span style="font-style:italic;text-align:center;">Truncated to <a href="https://jupysql.ploomber.io/en/latest/api/configuration.html#displaylimit">displaylimit</a> of 10.</span>
+</div>
+</div>
+<div id="67a56398" class="cell" data-execution_count="18">
+<div class="sourceCode cell-code" id="cb13"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb13-1"><a href="#cb13-1" aria-hidden="true" tabindex="-1"></a><span class="bu">len</span>(d)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-display" data-execution_count="18">
+<pre><code>13</code></pre>
+</div>
+</div>
+<p>Write out the compounds for those 13 targets:</p>
+<div id="f0897e38-8968-4253-a04a-c509e7613888" class="cell" data-execution_count="19">
+<div class="sourceCode cell-code" id="cb15"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb15-1"><a href="#cb15-1" aria-hidden="true" tabindex="-1"></a><span class="op">%</span>config SqlMagic.named_parameters<span class="op">=</span><span class="st">"enabled"</span> </span>
+<span id="cb15-2"><a href="#cb15-2" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> cid,_ <span class="kw">in</span> d:</span>
+<span id="cb15-3"><a href="#cb15-3" aria-hidden="true" tabindex="-1"></a>    targetd <span class="op">=</span> <span class="op">%</span>sql postgresql:<span class="op">//</span>localhost<span class="op">/</span>chembl_36 <span class="op">\</span></span>
+<span id="cb15-4"><a href="#cb15-4" aria-hidden="true" tabindex="-1"></a>      select patent_id, patents.chembl_id patent_chembl_id, chembl_id_lookup.chembl_id compound_chembl_id,<span class="op">\</span></span>
+<span id="cb15-5"><a href="#cb15-5" aria-hidden="true" tabindex="-1"></a>           canonical_smiles <span class="op">\</span></span>
+<span id="cb15-6"><a href="#cb15-6" aria-hidden="true" tabindex="-1"></a>        <span class="im">from</span> patents join patent_targets using (doc_id) <span class="op">\</span></span>
+<span id="cb15-7"><a href="#cb15-7" aria-hidden="true" tabindex="-1"></a>         join compound_records using (doc_id) join molecule_hierarchy using (molregno) <span class="op">\</span></span>
+<span id="cb15-8"><a href="#cb15-8" aria-hidden="true" tabindex="-1"></a>         join compound_structures cs on (cs.molregno<span class="op">=</span>parent_molregno) <span class="op">\</span></span>
+<span id="cb15-9"><a href="#cb15-9" aria-hidden="true" tabindex="-1"></a>         join chembl_id_lookup on (parent_molregno<span class="op">=</span>entity_id <span class="kw">and</span> entity_type<span class="op">=</span><span class="st">'COMPOUND'</span>)<span class="op">\</span></span>
+<span id="cb15-10"><a href="#cb15-10" aria-hidden="true" tabindex="-1"></a>        where target_chembl_id<span class="op">=</span>:cid</span>
+<span id="cb15-11"><a href="#cb15-11" aria-hidden="true" tabindex="-1"></a>    </span>
+<span id="cb15-12"><a href="#cb15-12" aria-hidden="true" tabindex="-1"></a>    targetd <span class="op">=</span> targetd.DataFrame()</span>
+<span id="cb15-13"><a href="#cb15-13" aria-hidden="true" tabindex="-1"></a>    targetd.to_csv(<span class="ss">f'../data/patent_datasets/target_</span><span class="sc">{</span>cid<span class="sc">}</span><span class="ss">.csv'</span>,index<span class="op">=</span><span class="va">False</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+<div id="30b89512-899c-423a-91b5-d3b3ecebae79" class="cell" data-execution_count="20">
+<div class="sourceCode cell-code" id="cb16"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb16-1"><a href="#cb16-1" aria-hidden="true" tabindex="-1"></a><span class="op">!</span>head ..<span class="op">/</span>data<span class="op">/</span>patent_datasets<span class="op">/</span>target_CHEMBL1163125.csv</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>patent_id,patent_chembl_id,compound_chembl_id,canonical_smiles
+US-8975417-B2,CHEMBL3638496,CHEMBL3650854,COc1ccc(Cn2nc3c(c2C)C(c2ccc(Cl)cc2)N(c2ccc(=O)n(C)c2)C3=O)cc1
+US-8975417-B2,CHEMBL3638496,CHEMBL3650855,Cc1[nH]nc2c1C(c1ccc(Cl)cc1)N(c1ccc(=O)n(C)c1)C2=O
+US-8975417-B2,CHEMBL3638496,CHEMBL3650856,Cc1c2c(nn1C)C(=O)N(c1ccc(=O)n(C)c1)C2c1ccc(Cl)cc1
+US-8975417-B2,CHEMBL3638496,CHEMBL3650857,CC1=NN(C)C2C(=O)N(c3ccc(=O)n(C)c3)C(c3ccc(Cl)cc3)C12
+US-8975417-B2,CHEMBL3638496,CHEMBL3650858,Cc1[nH]nc2c1C(c1ccc(Cl)cc1)N(c1cc(Cl)c(=O)n(C)c1)C2=O
+US-8975417-B2,CHEMBL3638496,CHEMBL3650859,Cc1c2c(nn1C)C(=O)N(c1cc(Cl)c(=O)n(C)c1)C2c1ccc(Cl)cc1
+US-8975417-B2,CHEMBL3638496,CHEMBL3650860,Cc1c2c(nn1C)C(=O)N(c1cc(Cl)c(=O)n(C)c1)[C@@H]2c1ccc(Cl)cc1
+US-8975417-B2,CHEMBL3638496,CHEMBL3650861,Cc1c2c(nn1C)C(=O)N(c1cc(Cl)c(=O)n(C)c1)[C@H]2c1ccc(Cl)cc1
+US-8975417-B2,CHEMBL3638496,CHEMBL3650862,Cn1cc(N2C(=O)c3n[nH]cc3C2c2ccc(Cl)cc2)cc(Cl)c1=O</code></pre>
+</div>
+</div>
+</section>
+<section id="looking-at-the-some-results-with-umap" class="level1">
+<h1>Looking at the some results with UMAP</h1>
+<p>Let’s do a bit of visualization workn by grabbing the data for a single target:</p>
+<div id="b66661d6-1202-48dd-a17c-59299ede1574" class="cell" data-execution_count="21">
+<div class="sourceCode cell-code" id="cb18"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb18-1"><a href="#cb18-1" aria-hidden="true" tabindex="-1"></a>target_id <span class="op">=</span> <span class="st">'CHEMBL5251'</span></span>
+<span id="cb18-2"><a href="#cb18-2" aria-hidden="true" tabindex="-1"></a><span class="op">%</span>sql postgresql:<span class="op">//</span>localhost<span class="op">/</span>chembl_36 <span class="op">\</span></span>
+<span id="cb18-3"><a href="#cb18-3" aria-hidden="true" tabindex="-1"></a>  drop table <span class="cf">if</span> exists patent_compounds</span>
+<span id="cb18-4"><a href="#cb18-4" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb18-5"><a href="#cb18-5" aria-hidden="true" tabindex="-1"></a><span class="op">%</span>sql postgresql:<span class="op">//</span>localhost<span class="op">/</span>chembl_36 <span class="op">\</span></span>
+<span id="cb18-6"><a href="#cb18-6" aria-hidden="true" tabindex="-1"></a>  select patent_id,patents.chembl_id patent_chembl_id,chembl_id_lookup.chembl_id compound_chembl_id,canonical_smiles <span class="op">\</span></span>
+<span id="cb18-7"><a href="#cb18-7" aria-hidden="true" tabindex="-1"></a>    into temporary table patent_compounds <span class="op">\</span></span>
+<span id="cb18-8"><a href="#cb18-8" aria-hidden="true" tabindex="-1"></a>    <span class="im">from</span> patents join patent_targets using (doc_id) <span class="op">\</span></span>
+<span id="cb18-9"><a href="#cb18-9" aria-hidden="true" tabindex="-1"></a>     join compound_records using (doc_id) join molecule_hierarchy using (molregno) join compound_structures cs on (cs.molregno<span class="op">=</span>parent_molregno) <span class="op">\</span></span>
+<span id="cb18-10"><a href="#cb18-10" aria-hidden="true" tabindex="-1"></a>     join chembl_id_lookup on (parent_molregno<span class="op">=</span>entity_id <span class="kw">and</span> entity_type<span class="op">=</span><span class="st">'COMPOUND'</span>)<span class="op">\</span></span>
+<span id="cb18-11"><a href="#cb18-11" aria-hidden="true" tabindex="-1"></a>    where target_chembl_id<span class="op">=</span>:target_id<span class="op">;</span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-display" data-execution_count="21">
+<table class="caption-top" data-quarto-postprocess="true">
+<tbody>
+</tbody>
+</table>
+</div>
+</div>
+<div id="b0f878ad-d721-4a59-86b4-011e6286c373" class="cell" data-execution_count="22">
+<div class="sourceCode cell-code" id="cb19"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb19-1"><a href="#cb19-1" aria-hidden="true" tabindex="-1"></a><span class="op">%</span>sql select count(<span class="op">*</span>) <span class="im">from</span> patent_compounds</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-display" data-execution_count="22">
+<table class="caption-top table table-sm table-striped small" data-quarto-postprocess="true">
+<thead>
+<tr class="header">
+<th data-quarto-table-cell-role="th">count</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>8450</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+<div id="ee898d7d-bff2-4c62-9912-2846a1c16802" class="cell" data-execution_count="23">
+<div class="sourceCode cell-code" id="cb20"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb20-1"><a href="#cb20-1" aria-hidden="true" tabindex="-1"></a><span class="op">%</span>sql select <span class="op">*</span> <span class="im">from</span> patent_compounds limit <span class="dv">10</span><span class="op">;</span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-display" data-execution_count="23">
+<table class="caption-top table table-sm table-striped small" data-quarto-postprocess="true">
+<thead>
+<tr class="header">
+<th data-quarto-table-cell-role="th">patent_id</th>
+<th data-quarto-table-cell-role="th">patent_chembl_id</th>
+<th data-quarto-table-cell-role="th">compound_chembl_id</th>
+<th data-quarto-table-cell-role="th">canonical_smiles</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>US-8618107-B2</td>
+<td>CHEMBL3639120</td>
+<td>CHEMBL3670078</td>
+<td>Cc1c(-c2cc(Nc3cc4n(n3)CCN(C)C4)c(=O)[nH]n2)cccc1N1CCn2c(cc3c2CCCC3)C1=O</td>
+</tr>
+<tr class="even">
+<td>US-8618107-B2</td>
+<td>CHEMBL3639120</td>
+<td>CHEMBL3670079</td>
+<td>Cc1c(-c2cc(Nc3cc4n(n3)CCN(C)C4)c(=O)[nH]n2)cccc1N1CCn2c(cc3ccccc32)C1=O</td>
+</tr>
+<tr class="odd">
+<td>US-8618107-B2</td>
+<td>CHEMBL3639120</td>
+<td>CHEMBL3670080</td>
+<td>Cc1c(-c2cc(Nc3cc4n(n3)CCN(C)C4)c(=O)n(C)n2)cccc1N1Cc2c(sc3ccccc23)C1=O</td>
+</tr>
+<tr class="even">
+<td>US-8618107-B2</td>
+<td>CHEMBL3639120</td>
+<td>CHEMBL3670081</td>
+<td>Cn1cc(-c2cccc(N3CCc4c(sc5c4CCCC5)C3=O)c2CO)cc(Nc2ccncn2)c1=O</td>
+</tr>
+<tr class="odd">
+<td>US-8618107-B2</td>
+<td>CHEMBL3639120</td>
+<td>CHEMBL3670082</td>
+<td>Cn1cc(-c2cccc(N3CCc4c(sc5c4CC(C)(C)C5)C3=O)c2CO)cc(Nc2ccncn2)c1=O</td>
+</tr>
+<tr class="even">
+<td>US-8618107-B2</td>
+<td>CHEMBL3639120</td>
+<td>CHEMBL3670083</td>
+<td>Cn1cc(-c2cccc(N3CCn4c(cc5c4CCCC5)C3=O)c2CO)cc(Nc2cc(C3CC3)n[nH]2)c1=O</td>
+</tr>
+<tr class="odd">
+<td>US-8618107-B2</td>
+<td>CHEMBL3639120</td>
+<td>CHEMBL3670084</td>
+<td>Cn1cc(-c2cccc(N3CCn4c(cc5c4CCCC5)C3=O)c2CO)cc(Nc2ccc(N3CCOCC3)cn2)c1=O</td>
+</tr>
+<tr class="even">
+<td>US-8618107-B2</td>
+<td>CHEMBL3639120</td>
+<td>CHEMBL3670085</td>
+<td>CC(=O)N1CCn2nc(Nc3cc(-c4cccc(N5CCn6c(cc7c6CCCC7)C5=O)c4CO)cn(C)c3=O)cc2C1</td>
+</tr>
+<tr class="odd">
+<td>US-8618107-B2</td>
+<td>CHEMBL3639120</td>
+<td>CHEMBL3670086</td>
+<td>Cn1cc(-c2cccc(N3CCn4c(cc5c4CCCC5)C3=O)c2CO)cc(Nc2ccncn2)c1=O</td>
+</tr>
+<tr class="even">
+<td>US-8618107-B2</td>
+<td>CHEMBL3639120</td>
+<td>CHEMBL3670087</td>
+<td>Cn1cc(-c2cccc(N3CCn4c(cc5c4CCCC5)C3=O)c2CO)cc(Nc2cc3n(n2)CCOC3)c1=O</td>
+</tr>
+</tbody>
+</table>
+
+<span style="font-style:italic;text-align:center;">Truncated to <a href="https://jupysql.ploomber.io/en/latest/api/configuration.html#displaylimit">displaylimit</a> of 10.</span>
+</div>
+</div>
+<p>Start with a subset of 12 patents, sorted by number of compounds they contain.</p>
+<p>We will have a bunch of duplicate compounds. For this exercise, pick each compound only once:</p>
+<div id="aaa3a574-cb85-4800-95d5-699d83877d81" class="cell" data-execution_count="24">
+<div class="sourceCode cell-code" id="cb21"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb21-1"><a href="#cb21-1" aria-hidden="true" tabindex="-1"></a>d <span class="op">=</span> <span class="op">%</span>sql <span class="op">\</span></span>
+<span id="cb21-2"><a href="#cb21-2" aria-hidden="true" tabindex="-1"></a>  select distinct on (compound_chembl_id) <span class="op">*</span> <span class="im">from</span> patent_compounds <span class="op">\</span></span>
+<span id="cb21-3"><a href="#cb21-3" aria-hidden="true" tabindex="-1"></a>   join (select patent_id <span class="im">from</span> patent_compounds group by patent_id <span class="op">\</span></span>
+<span id="cb21-4"><a href="#cb21-4" aria-hidden="true" tabindex="-1"></a>         order by count(distinct compound_chembl_id) desc <span class="op">\</span></span>
+<span id="cb21-5"><a href="#cb21-5" aria-hidden="true" tabindex="-1"></a>         limit <span class="dv">12</span>) tmp <span class="op">\</span></span>
+<span id="cb21-6"><a href="#cb21-6" aria-hidden="true" tabindex="-1"></a>   using (patent_id)<span class="op">\</span></span>
+<span id="cb21-7"><a href="#cb21-7" aria-hidden="true" tabindex="-1"></a>   order by compound_chembl_id, patent_id<span class="op">;</span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+<div id="c165a996-148a-477a-98e4-6990d2d7b8d8" class="cell" data-execution_count="25">
+<div class="sourceCode cell-code" id="cb22"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb22-1"><a href="#cb22-1" aria-hidden="true" tabindex="-1"></a>df <span class="op">=</span> d.DataFrame()</span>
+<span id="cb22-2"><a href="#cb22-2" aria-hidden="true" tabindex="-1"></a>df.head()</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-display" data-execution_count="25">
+<div>
+
+
+<table class="dataframe caption-top table table-sm table-striped small" data-quarto-postprocess="true" data-border="1">
+<thead>
+<tr class="header">
+<th data-quarto-table-cell-role="th"></th>
+<th data-quarto-table-cell-role="th">patent_id</th>
+<th data-quarto-table-cell-role="th">patent_chembl_id</th>
+<th data-quarto-table-cell-role="th">compound_chembl_id</th>
+<th data-quarto-table-cell-role="th">canonical_smiles</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td data-quarto-table-cell-role="th">0</td>
+<td>US-10828300-B2</td>
+<td>CHEMBL5728085</td>
+<td>CHEMBL2216827</td>
+<td>C=CC(=O)Nc1cccc(Nc2nc(Nc3ccc(Oc4ccnc(C(=O)NC)c...</td>
+</tr>
+<tr class="even">
+<td data-quarto-table-cell-role="th">1</td>
+<td>US-10828300-B2</td>
+<td>CHEMBL5728085</td>
+<td>CHEMBL3301625</td>
+<td>C=CC(=O)Nc1cccc(Nc2nc(Nc3ccc(OCCOC)cc3)ncc2F)c1</td>
+</tr>
+<tr class="odd">
+<td data-quarto-table-cell-role="th">2</td>
+<td>US-9447106-B2</td>
+<td>CHEMBL3886959</td>
+<td>CHEMBL3889791</td>
+<td>C=CC(=O)Nc1cc(C2CCNc3c(C(N)=O)c(-c4ccc(Oc5cccc...</td>
+</tr>
+<tr class="even">
+<td data-quarto-table-cell-role="th">3</td>
+<td>US-9447106-B2</td>
+<td>CHEMBL3886959</td>
+<td>CHEMBL3890068</td>
+<td>C=CC(=O)Nc1ccccc1C1CCNc2c(C(N)=O)c(-c3ccc(OCCO...</td>
+</tr>
+<tr class="odd">
+<td data-quarto-table-cell-role="th">4</td>
+<td>US-9447106-B2</td>
+<td>CHEMBL3886959</td>
+<td>CHEMBL3890197</td>
+<td>NC(=O)c1c(-c2ccc(Oc3ccccc3)cc2)nn2c1NC(=O)C21C...</td>
+</tr>
+</tbody>
+</table>
+
+</div>
+</div>
+</div>
+<div id="db55f06c-655d-4155-973a-13abbb4d6366" class="cell" data-execution_count="26">
+<div class="sourceCode cell-code" id="cb23"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb23-1"><a href="#cb23-1" aria-hidden="true" tabindex="-1"></a>df.shape,<span class="bu">len</span>(<span class="bu">set</span>(df[<span class="st">'canonical_smiles'</span>]))</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-display" data-execution_count="26">
+<pre><code>((1656, 4), 1656)</code></pre>
+</div>
+</div>
+<p>Add fingerprints:</p>
+<div id="c96eef5f-73a6-431f-848e-d7cdd1ffe648" class="cell" data-execution_count="27">
+<div class="sourceCode cell-code" id="cb25"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb25-1"><a href="#cb25-1" aria-hidden="true" tabindex="-1"></a>df[<span class="st">'Mol'</span>] <span class="op">=</span> df[<span class="st">'canonical_smiles'</span>].<span class="bu">apply</span>(Chem.MolFromSmiles)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+<div id="9cd2793a-8b00-4bfc-948f-1c6a94ab66aa" class="cell" data-execution_count="28">
+<div class="sourceCode cell-code" id="cb26"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb26-1"><a href="#cb26-1" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> rdkit.Chem <span class="im">import</span> rdFingerprintGenerator</span>
+<span id="cb26-2"><a href="#cb26-2" aria-hidden="true" tabindex="-1"></a>fpg <span class="op">=</span> rdFingerprintGenerator.GetMorganGenerator(radius<span class="op">=</span><span class="dv">3</span>,fpSize<span class="op">=</span><span class="dv">2048</span>)</span>
+<span id="cb26-3"><a href="#cb26-3" aria-hidden="true" tabindex="-1"></a>df[<span class="st">'cmfp3'</span>] <span class="op">=</span> df[<span class="st">'Mol'</span>].<span class="bu">apply</span>(fpg.GetCountFingerprintAsNumPy)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+<p>Now do UMAP using the Dice similarity metric. I did a bit of exploration to come up with the values of <code>n_neighbors</code> and <code>min_dist</code> used here.</p>
+<div id="f49dad34-0a1c-47f6-8af7-11a297484cc4" class="cell" data-execution_count="29">
+<div class="sourceCode cell-code" id="cb27"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb27-1"><a href="#cb27-1" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> umap</span>
+<span id="cb27-2"><a href="#cb27-2" aria-hidden="true" tabindex="-1"></a>fitter <span class="op">=</span> umap.UMAP(n_neighbors<span class="op">=</span><span class="dv">8</span>,min_dist<span class="op">=</span><span class="fl">0.4</span>,metric<span class="op">=</span><span class="st">'dice'</span>,n_jobs<span class="op">=</span><span class="dv">4</span>)</span>
+<span id="cb27-3"><a href="#cb27-3" aria-hidden="true" tabindex="-1"></a>pts <span class="op">=</span> fitter.fit_transform(df[<span class="st">'cmfp3'</span>].tolist())</span>
+<span id="cb27-4"><a href="#cb27-4" aria-hidden="true" tabindex="-1"></a>df[<span class="st">'X'</span>] <span class="op">=</span> pts[:,<span class="dv">0</span>]</span>
+<span id="cb27-5"><a href="#cb27-5" aria-hidden="true" tabindex="-1"></a>df[<span class="st">'Y'</span>] <span class="op">=</span> pts[:,<span class="dv">1</span>]</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stderr">
+<pre><code>/home/glandrum/mambaforge/envs/rdkit_blog/lib/python3.12/site-packages/sklearn/utils/deprecation.py:151: FutureWarning: 'force_all_finite' was renamed to 'ensure_all_finite' in 1.6 and will be removed in 1.8.
+  warnings.warn(
+/home/glandrum/mambaforge/envs/rdkit_blog/lib/python3.12/site-packages/umap/umap_.py:1887: UserWarning: gradient function is not yet implemented for dice distance metric; inverse_transform will be unavailable
+  warn(</code></pre>
+</div>
+</div>
+<p>And do a scatter plot of the results:</p>
+<div id="f8a3ffad-f6a2-4790-aad1-cb17fab8f422" class="cell" data-execution_count="30">
+<div class="sourceCode cell-code" id="cb29"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb29-1"><a href="#cb29-1" aria-hidden="true" tabindex="-1"></a>plt.figure(figsize<span class="op">=</span>(<span class="dv">6</span>,<span class="dv">6</span>))</span>
+<span id="cb29-2"><a href="#cb29-2" aria-hidden="true" tabindex="-1"></a>markers <span class="op">=</span> <span class="st">'ovs*+d'</span></span>
+<span id="cb29-3"><a href="#cb29-3" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> i,pid <span class="kw">in</span> <span class="bu">enumerate</span>(<span class="bu">set</span>(df[<span class="st">'patent_chembl_id'</span>])):</span>
+<span id="cb29-4"><a href="#cb29-4" aria-hidden="true" tabindex="-1"></a>    tdf <span class="op">=</span> df[df[<span class="st">'patent_chembl_id'</span>]<span class="op">==</span>pid]</span>
+<span id="cb29-5"><a href="#cb29-5" aria-hidden="true" tabindex="-1"></a>    plt.scatter(tdf[<span class="st">'X'</span>],tdf[<span class="st">'Y'</span>],label<span class="op">=</span>pid,marker<span class="op">=</span>markers[i<span class="op">%</span><span class="bu">len</span>(markers)],s<span class="op">=</span><span class="dv">20</span>,linewidth<span class="op">=</span><span class="dv">0</span>)<span class="op">;</span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="2026-01-24-creating-a-patent-dataset_files/figure-html/cell-28-output-1.png" class="img-fluid figure-img"></p>
+</figure>
+</div>
+</div>
+</div>
+<p>Look at a couple of different targets together</p>
+<div id="651ad469" class="cell" data-execution_count="31">
+<div class="sourceCode cell-code" id="cb30"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb30-1"><a href="#cb30-1" aria-hidden="true" tabindex="-1"></a>dfs <span class="op">=</span> []</span>
+<span id="cb30-2"><a href="#cb30-2" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> target_id <span class="kw">in</span> (<span class="st">'CHEMBL3864'</span>,<span class="st">'CHEMBL3130'</span>,<span class="st">'CHEMBL4409'</span>):</span>
+<span id="cb30-3"><a href="#cb30-3" aria-hidden="true" tabindex="-1"></a>    <span class="op">%</span>sql postgresql:<span class="op">//</span>localhost<span class="op">/</span>chembl_36 <span class="op">\</span></span>
+<span id="cb30-4"><a href="#cb30-4" aria-hidden="true" tabindex="-1"></a>      drop table <span class="cf">if</span> exists patent_compounds</span>
+<span id="cb30-5"><a href="#cb30-5" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb30-6"><a href="#cb30-6" aria-hidden="true" tabindex="-1"></a>    <span class="op">%</span>sql postgresql:<span class="op">//</span>localhost<span class="op">/</span>chembl_36 <span class="op">\</span></span>
+<span id="cb30-7"><a href="#cb30-7" aria-hidden="true" tabindex="-1"></a>      select patent_id,patents.chembl_id patent_chembl_id,chembl_id_lookup.chembl_id compound_chembl_id,canonical_smiles <span class="op">\</span></span>
+<span id="cb30-8"><a href="#cb30-8" aria-hidden="true" tabindex="-1"></a>        into temporary table patent_compounds <span class="op">\</span></span>
+<span id="cb30-9"><a href="#cb30-9" aria-hidden="true" tabindex="-1"></a>        <span class="im">from</span> patents join patent_targets using (doc_id) <span class="op">\</span></span>
+<span id="cb30-10"><a href="#cb30-10" aria-hidden="true" tabindex="-1"></a>         join compound_records using (doc_id) join molecule_hierarchy using (molregno) join compound_structures cs on (cs.molregno<span class="op">=</span>parent_molregno) <span class="op">\</span></span>
+<span id="cb30-11"><a href="#cb30-11" aria-hidden="true" tabindex="-1"></a>         join chembl_id_lookup on (parent_molregno<span class="op">=</span>entity_id <span class="kw">and</span> entity_type<span class="op">=</span><span class="st">'COMPOUND'</span>)<span class="op">\</span></span>
+<span id="cb30-12"><a href="#cb30-12" aria-hidden="true" tabindex="-1"></a>        where target_chembl_id<span class="op">=</span>:target_id<span class="op">;</span></span>
+<span id="cb30-13"><a href="#cb30-13" aria-hidden="true" tabindex="-1"></a>    d <span class="op">=</span> <span class="op">%</span>sql <span class="op">\</span></span>
+<span id="cb30-14"><a href="#cb30-14" aria-hidden="true" tabindex="-1"></a>  select distinct on (compound_chembl_id) <span class="op">*</span> <span class="im">from</span> patent_compounds <span class="op">\</span></span>
+<span id="cb30-15"><a href="#cb30-15" aria-hidden="true" tabindex="-1"></a>   join (select patent_id <span class="im">from</span> patent_compounds group by patent_id <span class="op">\</span></span>
+<span id="cb30-16"><a href="#cb30-16" aria-hidden="true" tabindex="-1"></a>         order by count(distinct compound_chembl_id) desc <span class="op">\</span></span>
+<span id="cb30-17"><a href="#cb30-17" aria-hidden="true" tabindex="-1"></a>         limit <span class="dv">12</span>) tmp <span class="op">\</span></span>
+<span id="cb30-18"><a href="#cb30-18" aria-hidden="true" tabindex="-1"></a>   using (patent_id)<span class="op">\</span></span>
+<span id="cb30-19"><a href="#cb30-19" aria-hidden="true" tabindex="-1"></a>   order by compound_chembl_id, patent_id<span class="op">;</span></span>
+<span id="cb30-20"><a href="#cb30-20" aria-hidden="true" tabindex="-1"></a>    df <span class="op">=</span> d.DataFrame()</span>
+<span id="cb30-21"><a href="#cb30-21" aria-hidden="true" tabindex="-1"></a>    df[<span class="st">'target_chembl_id'</span>] <span class="op">=</span> target_id</span>
+<span id="cb30-22"><a href="#cb30-22" aria-hidden="true" tabindex="-1"></a>    dfs.append(df)</span>
+<span id="cb30-23"><a href="#cb30-23" aria-hidden="true" tabindex="-1"></a>hybrid <span class="op">=</span> pd.concat(dfs)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+<div id="25f75684" class="cell" data-execution_count="32">
+<div class="sourceCode cell-code" id="cb31"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb31-1"><a href="#cb31-1" aria-hidden="true" tabindex="-1"></a>hybrid.shape</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-display" data-execution_count="32">
+<pre><code>(4642, 5)</code></pre>
+</div>
+</div>
+<div id="7a3c1926" class="cell" data-execution_count="33">
+<div class="sourceCode cell-code" id="cb33"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb33-1"><a href="#cb33-1" aria-hidden="true" tabindex="-1"></a>hybrid[<span class="st">'Mol'</span>] <span class="op">=</span> hybrid[<span class="st">'canonical_smiles'</span>].<span class="bu">apply</span>(Chem.MolFromSmiles)</span>
+<span id="cb33-2"><a href="#cb33-2" aria-hidden="true" tabindex="-1"></a>fpg <span class="op">=</span> rdFingerprintGenerator.GetMorganGenerator(radius<span class="op">=</span><span class="dv">3</span>,fpSize<span class="op">=</span><span class="dv">2048</span>)</span>
+<span id="cb33-3"><a href="#cb33-3" aria-hidden="true" tabindex="-1"></a>hybrid[<span class="st">'cmfp3'</span>] <span class="op">=</span> hybrid[<span class="st">'Mol'</span>].<span class="bu">apply</span>(fpg.GetCountFingerprintAsNumPy)</span>
+<span id="cb33-4"><a href="#cb33-4" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb33-5"><a href="#cb33-5" aria-hidden="true" tabindex="-1"></a>fitter <span class="op">=</span> umap.UMAP(n_neighbors<span class="op">=</span><span class="dv">8</span>,min_dist<span class="op">=</span><span class="fl">0.4</span>,metric<span class="op">=</span><span class="st">'dice'</span>,n_jobs<span class="op">=</span><span class="dv">4</span>)</span>
+<span id="cb33-6"><a href="#cb33-6" aria-hidden="true" tabindex="-1"></a>pts <span class="op">=</span> fitter.fit_transform(hybrid[<span class="st">'cmfp3'</span>].tolist())</span>
+<span id="cb33-7"><a href="#cb33-7" aria-hidden="true" tabindex="-1"></a>hybrid[<span class="st">'X'</span>] <span class="op">=</span> pts[:,<span class="dv">0</span>]</span>
+<span id="cb33-8"><a href="#cb33-8" aria-hidden="true" tabindex="-1"></a>hybrid[<span class="st">'Y'</span>] <span class="op">=</span> pts[:,<span class="dv">1</span>]</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stderr">
+<pre><code>/home/glandrum/mambaforge/envs/rdkit_blog/lib/python3.12/site-packages/sklearn/utils/deprecation.py:151: FutureWarning: 'force_all_finite' was renamed to 'ensure_all_finite' in 1.6 and will be removed in 1.8.
+  warnings.warn(
+/home/glandrum/mambaforge/envs/rdkit_blog/lib/python3.12/site-packages/umap/umap_.py:1887: UserWarning: gradient function is not yet implemented for dice distance metric; inverse_transform will be unavailable
+  warn(
+/home/glandrum/mambaforge/envs/rdkit_blog/lib/python3.12/site-packages/umap/spectral.py:548: UserWarning: Spectral initialisation failed! The eigenvector solver
+failed. This is likely due to too small an eigengap. Consider
+adding some noise or jitter to your data.
+
+Falling back to random initialisation!
+  warn(</code></pre>
+</div>
+</div>
+<div id="85c4c619" class="cell" data-execution_count="34">
+<div class="sourceCode cell-code" id="cb35"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb35-1"><a href="#cb35-1" aria-hidden="true" tabindex="-1"></a>plt.figure(figsize<span class="op">=</span>(<span class="dv">6</span>,<span class="dv">6</span>))</span>
+<span id="cb35-2"><a href="#cb35-2" aria-hidden="true" tabindex="-1"></a>markers <span class="op">=</span> <span class="st">'ovs*+d'</span></span>
+<span id="cb35-3"><a href="#cb35-3" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> i,pid <span class="kw">in</span> <span class="bu">enumerate</span>(<span class="bu">set</span>(hybrid[<span class="st">'patent_chembl_id'</span>])):</span>
+<span id="cb35-4"><a href="#cb35-4" aria-hidden="true" tabindex="-1"></a>    tdf <span class="op">=</span> hybrid[hybrid[<span class="st">'patent_chembl_id'</span>]<span class="op">==</span>pid]</span>
+<span id="cb35-5"><a href="#cb35-5" aria-hidden="true" tabindex="-1"></a>    plt.scatter(tdf[<span class="st">'X'</span>],tdf[<span class="st">'Y'</span>],label<span class="op">=</span>pid,marker<span class="op">=</span>markers[i<span class="op">%</span><span class="bu">len</span>(markers)],s<span class="op">=</span><span class="dv">20</span>,linewidth<span class="op">=</span><span class="dv">0</span>)<span class="op">;</span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="2026-01-24-creating-a-patent-dataset_files/figure-html/cell-32-output-1.png" class="img-fluid figure-img"></p>
+</figure>
+</div>
+</div>
+</div>
+<p>Color by target id instead of patent:</p>
+<div id="1b692936" class="cell" data-execution_count="40">
+<div class="sourceCode cell-code" id="cb36"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb36-1"><a href="#cb36-1" aria-hidden="true" tabindex="-1"></a>plt.figure(figsize<span class="op">=</span>(<span class="dv">6</span>,<span class="dv">6</span>))</span>
+<span id="cb36-2"><a href="#cb36-2" aria-hidden="true" tabindex="-1"></a>markers <span class="op">=</span> <span class="st">'ovs*+d'</span></span>
+<span id="cb36-3"><a href="#cb36-3" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> i,tid <span class="kw">in</span> <span class="bu">enumerate</span>(<span class="bu">set</span>(hybrid[<span class="st">'target_chembl_id'</span>])):</span>
+<span id="cb36-4"><a href="#cb36-4" aria-hidden="true" tabindex="-1"></a>    d <span class="op">=</span> <span class="op">%</span>sql postgresql:<span class="op">//</span>localhost<span class="op">/</span>chembl_36 <span class="op">\</span></span>
+<span id="cb36-5"><a href="#cb36-5" aria-hidden="true" tabindex="-1"></a>      select pref_name <span class="im">from</span> target_dictionary where chembl_id<span class="op">=</span>:tid</span>
+<span id="cb36-6"><a href="#cb36-6" aria-hidden="true" tabindex="-1"></a>    <span class="bu">print</span>(<span class="ss">f'</span><span class="sc">{</span>tid<span class="sc">}</span><span class="ss">: </span><span class="sc">{</span>d[<span class="dv">0</span>][<span class="dv">0</span>]<span class="sc">}</span><span class="ss">'</span>)</span>
+<span id="cb36-7"><a href="#cb36-7" aria-hidden="true" tabindex="-1"></a>    tdf <span class="op">=</span> hybrid[hybrid[<span class="st">'target_chembl_id'</span>]<span class="op">==</span>tid]</span>
+<span id="cb36-8"><a href="#cb36-8" aria-hidden="true" tabindex="-1"></a>    <span class="cf">for</span> j,pid <span class="kw">in</span> <span class="bu">enumerate</span>(<span class="bu">set</span>(tdf[<span class="st">'patent_chembl_id'</span>])):</span>
+<span id="cb36-9"><a href="#cb36-9" aria-hidden="true" tabindex="-1"></a>        pdf <span class="op">=</span> tdf[tdf[<span class="st">'patent_chembl_id'</span>]<span class="op">==</span>pid]</span>
+<span id="cb36-10"><a href="#cb36-10" aria-hidden="true" tabindex="-1"></a>        plt.scatter(pdf[<span class="st">'X'</span>],pdf[<span class="st">'Y'</span>],label<span class="op">=</span>pid,marker<span class="op">=</span>markers[j<span class="op">%</span><span class="bu">len</span>(markers)],s<span class="op">=</span><span class="dv">20</span>,linewidth<span class="op">=</span><span class="dv">0</span>,c<span class="op">=</span><span class="ss">f'C</span><span class="sc">{</span>i<span class="sc">}</span><span class="ss">'</span>)<span class="op">;</span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>CHEMBL4409: cAMP and cAMP-inhibited cGMP 3',5'-cyclic phosphodiesterase 10A
+CHEMBL3130: Phosphatidylinositol 4,5-bisphosphate 3-kinase catalytic subunit delta isoform
+CHEMBL3864: Tyrosine-protein phosphatase non-receptor type 11</code></pre>
+</div>
+<div class="cell-output cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="2026-01-24-creating-a-patent-dataset_files/figure-html/cell-33-output-2.png" class="img-fluid figure-img"></p>
+</figure>
+</div>
+</div>
+</div>
+<p>That’s enough for now… these compound sets are sure to show up in future blog posts.</p>
+
+
+</section>
+
+</main> <!-- /main -->
+<script id="quarto-html-after-body" type="application/javascript">
+window.document.addEventListener("DOMContentLoaded", function (event) {
+  const toggleBodyColorMode = (bsSheetEl) => {
+    const mode = bsSheetEl.getAttribute("data-mode");
+    const bodyEl = window.document.querySelector("body");
+    if (mode === "dark") {
+      bodyEl.classList.add("quarto-dark");
+      bodyEl.classList.remove("quarto-light");
+    } else {
+      bodyEl.classList.add("quarto-light");
+      bodyEl.classList.remove("quarto-dark");
+    }
+  }
+  const toggleBodyColorPrimary = () => {
+    const bsSheetEl = window.document.querySelector("link#quarto-bootstrap");
+    if (bsSheetEl) {
+      toggleBodyColorMode(bsSheetEl);
+    }
+  }
+  toggleBodyColorPrimary();  
+  const disableStylesheet = (stylesheets) => {
+    for (let i=0; i < stylesheets.length; i++) {
+      const stylesheet = stylesheets[i];
+      stylesheet.rel = 'prefetch';
+    }
+  }
+  const enableStylesheet = (stylesheets) => {
+    for (let i=0; i < stylesheets.length; i++) {
+      const stylesheet = stylesheets[i];
+      stylesheet.rel = 'stylesheet';
+    }
+  }
+  const manageTransitions = (selector, allowTransitions) => {
+    const els = window.document.querySelectorAll(selector);
+    for (let i=0; i < els.length; i++) {
+      const el = els[i];
+      if (allowTransitions) {
+        el.classList.remove('notransition');
+      } else {
+        el.classList.add('notransition');
+      }
+    }
+  }
+  const toggleGiscusIfUsed = (isAlternate, darkModeDefault) => {
+    const baseTheme = document.querySelector('#giscus-base-theme')?.value ?? 'light';
+    const alternateTheme = document.querySelector('#giscus-alt-theme')?.value ?? 'dark';
+    let newTheme = '';
+    if(darkModeDefault) {
+      newTheme = isAlternate ? baseTheme : alternateTheme;
+    } else {
+      newTheme = isAlternate ? alternateTheme : baseTheme;
+    }
+    const changeGiscusTheme = () => {
+      // From: https://github.com/giscus/giscus/issues/336
+      const sendMessage = (message) => {
+        const iframe = document.querySelector('iframe.giscus-frame');
+        if (!iframe) return;
+        iframe.contentWindow.postMessage({ giscus: message }, 'https://giscus.app');
+      }
+      sendMessage({
+        setConfig: {
+          theme: newTheme
+        }
+      });
+    }
+    const isGiscussLoaded = window.document.querySelector('iframe.giscus-frame') !== null;
+    if (isGiscussLoaded) {
+      changeGiscusTheme();
+    }
+  }
+  const toggleColorMode = (alternate) => {
+    // Switch the stylesheets
+    const alternateStylesheets = window.document.querySelectorAll('link.quarto-color-scheme.quarto-color-alternate');
+    manageTransitions('#quarto-margin-sidebar .nav-link', false);
+    if (alternate) {
+      enableStylesheet(alternateStylesheets);
+      for (const sheetNode of alternateStylesheets) {
+        if (sheetNode.id === "quarto-bootstrap") {
+          toggleBodyColorMode(sheetNode);
+        }
+      }
+    } else {
+      disableStylesheet(alternateStylesheets);
+      toggleBodyColorPrimary();
+    }
+    manageTransitions('#quarto-margin-sidebar .nav-link', true);
+    // Switch the toggles
+    const toggles = window.document.querySelectorAll('.quarto-color-scheme-toggle');
+    for (let i=0; i < toggles.length; i++) {
+      const toggle = toggles[i];
+      if (toggle) {
+        if (alternate) {
+          toggle.classList.add("alternate");     
+        } else {
+          toggle.classList.remove("alternate");
+        }
+      }
+    }
+    // Hack to workaround the fact that safari doesn't
+    // properly recolor the scrollbar when toggling (#1455)
+    if (navigator.userAgent.indexOf('Safari') > 0 && navigator.userAgent.indexOf('Chrome') == -1) {
+      manageTransitions("body", false);
+      window.scrollTo(0, 1);
+      setTimeout(() => {
+        window.scrollTo(0, 0);
+        manageTransitions("body", true);
+      }, 40);  
+    }
+  }
+  const isFileUrl = () => { 
+    return window.location.protocol === 'file:';
+  }
+  const hasAlternateSentinel = () => {  
+    let styleSentinel = getColorSchemeSentinel();
+    if (styleSentinel !== null) {
+      return styleSentinel === "alternate";
+    } else {
+      return false;
+    }
+  }
+  const setStyleSentinel = (alternate) => {
+    const value = alternate ? "alternate" : "default";
+    if (!isFileUrl()) {
+      window.localStorage.setItem("quarto-color-scheme", value);
+    } else {
+      localAlternateSentinel = value;
+    }
+  }
+  const getColorSchemeSentinel = () => {
+    if (!isFileUrl()) {
+      const storageValue = window.localStorage.getItem("quarto-color-scheme");
+      return storageValue != null ? storageValue : localAlternateSentinel;
+    } else {
+      return localAlternateSentinel;
+    }
+  }
+  const darkModeDefault = false;
+  let localAlternateSentinel = darkModeDefault ? 'alternate' : 'default';
+  // Dark / light mode switch
+  window.quartoToggleColorScheme = () => {
+    // Read the current dark / light value 
+    let toAlternate = !hasAlternateSentinel();
+    toggleColorMode(toAlternate);
+    setStyleSentinel(toAlternate);
+    toggleGiscusIfUsed(toAlternate, darkModeDefault);
+  };
+  // Ensure there is a toggle, if there isn't float one in the top right
+  if (window.document.querySelector('.quarto-color-scheme-toggle') === null) {
+    const a = window.document.createElement('a');
+    a.classList.add('top-right');
+    a.classList.add('quarto-color-scheme-toggle');
+    a.href = "";
+    a.onclick = function() { try { window.quartoToggleColorScheme(); } catch {} return false; };
+    const i = window.document.createElement("i");
+    i.classList.add('bi');
+    a.appendChild(i);
+    window.document.body.appendChild(a);
+  }
+  // Switch to dark mode if need be
+  if (hasAlternateSentinel()) {
+    toggleColorMode(true);
+  } else {
+    toggleColorMode(false);
+  }
+  const icon = "";
+  const anchorJS = new window.AnchorJS();
+  anchorJS.options = {
+    placement: 'right',
+    icon: icon
+  };
+  anchorJS.add('.anchored');
+  const isCodeAnnotation = (el) => {
+    for (const clz of el.classList) {
+      if (clz.startsWith('code-annotation-')) {                     
+        return true;
+      }
+    }
+    return false;
+  }
+  const onCopySuccess = function(e) {
+    // button target
+    const button = e.trigger;
+    // don't keep focus
+    button.blur();
+    // flash "checked"
+    button.classList.add('code-copy-button-checked');
+    var currentTitle = button.getAttribute("title");
+    button.setAttribute("title", "Copied!");
+    let tooltip;
+    if (window.bootstrap) {
+      button.setAttribute("data-bs-toggle", "tooltip");
+      button.setAttribute("data-bs-placement", "left");
+      button.setAttribute("data-bs-title", "Copied!");
+      tooltip = new bootstrap.Tooltip(button, 
+        { trigger: "manual", 
+          customClass: "code-copy-button-tooltip",
+          offset: [0, -8]});
+      tooltip.show();    
+    }
+    setTimeout(function() {
+      if (tooltip) {
+        tooltip.hide();
+        button.removeAttribute("data-bs-title");
+        button.removeAttribute("data-bs-toggle");
+        button.removeAttribute("data-bs-placement");
+      }
+      button.setAttribute("title", currentTitle);
+      button.classList.remove('code-copy-button-checked');
+    }, 1000);
+    // clear code selection
+    e.clearSelection();
+  }
+  const getTextToCopy = function(trigger) {
+      const codeEl = trigger.previousElementSibling.cloneNode(true);
+      for (const childEl of codeEl.children) {
+        if (isCodeAnnotation(childEl)) {
+          childEl.remove();
+        }
+      }
+      return codeEl.innerText;
+  }
+  const clipboard = new window.ClipboardJS('.code-copy-button:not([data-in-quarto-modal])', {
+    text: getTextToCopy
+  });
+  clipboard.on('success', onCopySuccess);
+  if (window.document.getElementById('quarto-embedded-source-code-modal')) {
+    const clipboardModal = new window.ClipboardJS('.code-copy-button[data-in-quarto-modal]', {
+      text: getTextToCopy,
+      container: window.document.getElementById('quarto-embedded-source-code-modal')
+    });
+    clipboardModal.on('success', onCopySuccess);
+  }
+    var localhostRegex = new RegExp(/^(?:http|https):\/\/localhost\:?[0-9]*\//);
+    var mailtoRegex = new RegExp(/^mailto:/);
+      var filterRegex = new RegExp("https:\/\/greglandrum\.github\.io\/rdkit-blog\/");
+    var isInternal = (href) => {
+        return filterRegex.test(href) || localhostRegex.test(href) || mailtoRegex.test(href);
+    }
+    // Inspect non-navigation links and adorn them if external
+ 	var links = window.document.querySelectorAll('a[href]:not(.nav-link):not(.navbar-brand):not(.toc-action):not(.sidebar-link):not(.sidebar-item-toggle):not(.pagination-link):not(.no-external):not([aria-hidden]):not(.dropdown-item):not(.quarto-navigation-tool):not(.about-link)');
+    for (var i=0; i<links.length; i++) {
+      const link = links[i];
+      if (!isInternal(link.href)) {
+        // undo the damage that might have been done by quarto-nav.js in the case of
+        // links that we want to consider external
+        if (link.dataset.originalHref !== undefined) {
+          link.href = link.dataset.originalHref;
+        }
+      }
+    }
+  function tippyHover(el, contentFn, onTriggerFn, onUntriggerFn) {
+    const config = {
+      allowHTML: true,
+      maxWidth: 500,
+      delay: 100,
+      arrow: false,
+      appendTo: function(el) {
+          return el.parentElement;
+      },
+      interactive: true,
+      interactiveBorder: 10,
+      theme: 'quarto',
+      placement: 'bottom-start',
+    };
+    if (contentFn) {
+      config.content = contentFn;
+    }
+    if (onTriggerFn) {
+      config.onTrigger = onTriggerFn;
+    }
+    if (onUntriggerFn) {
+      config.onUntrigger = onUntriggerFn;
+    }
+    window.tippy(el, config); 
+  }
+  const noterefs = window.document.querySelectorAll('a[role="doc-noteref"]');
+  for (var i=0; i<noterefs.length; i++) {
+    const ref = noterefs[i];
+    tippyHover(ref, function() {
+      // use id or data attribute instead here
+      let href = ref.getAttribute('data-footnote-href') || ref.getAttribute('href');
+      try { href = new URL(href).hash; } catch {}
+      const id = href.replace(/^#\/?/, "");
+      const note = window.document.getElementById(id);
+      if (note) {
+        return note.innerHTML;
+      } else {
+        return "";
+      }
+    });
+  }
+  const xrefs = window.document.querySelectorAll('a.quarto-xref');
+  const processXRef = (id, note) => {
+    // Strip column container classes
+    const stripColumnClz = (el) => {
+      el.classList.remove("page-full", "page-columns");
+      if (el.children) {
+        for (const child of el.children) {
+          stripColumnClz(child);
+        }
+      }
+    }
+    stripColumnClz(note)
+    if (id === null || id.startsWith('sec-')) {
+      // Special case sections, only their first couple elements
+      const container = document.createElement("div");
+      if (note.children && note.children.length > 2) {
+        container.appendChild(note.children[0].cloneNode(true));
+        for (let i = 1; i < note.children.length; i++) {
+          const child = note.children[i];
+          if (child.tagName === "P" && child.innerText === "") {
+            continue;
+          } else {
+            container.appendChild(child.cloneNode(true));
+            break;
+          }
+        }
+        if (window.Quarto?.typesetMath) {
+          window.Quarto.typesetMath(container);
+        }
+        return container.innerHTML
+      } else {
+        if (window.Quarto?.typesetMath) {
+          window.Quarto.typesetMath(note);
+        }
+        return note.innerHTML;
+      }
+    } else {
+      // Remove any anchor links if they are present
+      const anchorLink = note.querySelector('a.anchorjs-link');
+      if (anchorLink) {
+        anchorLink.remove();
+      }
+      if (window.Quarto?.typesetMath) {
+        window.Quarto.typesetMath(note);
+      }
+      if (note.classList.contains("callout")) {
+        return note.outerHTML;
+      } else {
+        return note.innerHTML;
+      }
+    }
+  }
+  for (var i=0; i<xrefs.length; i++) {
+    const xref = xrefs[i];
+    tippyHover(xref, undefined, function(instance) {
+      instance.disable();
+      let url = xref.getAttribute('href');
+      let hash = undefined; 
+      if (url.startsWith('#')) {
+        hash = url;
+      } else {
+        try { hash = new URL(url).hash; } catch {}
+      }
+      if (hash) {
+        const id = hash.replace(/^#\/?/, "");
+        const note = window.document.getElementById(id);
+        if (note !== null) {
+          try {
+            const html = processXRef(id, note.cloneNode(true));
+            instance.setContent(html);
+          } finally {
+            instance.enable();
+            instance.show();
+          }
+        } else {
+          // See if we can fetch this
+          fetch(url.split('#')[0])
+          .then(res => res.text())
+          .then(html => {
+            const parser = new DOMParser();
+            const htmlDoc = parser.parseFromString(html, "text/html");
+            const note = htmlDoc.getElementById(id);
+            if (note !== null) {
+              const html = processXRef(id, note);
+              instance.setContent(html);
+            } 
+          }).finally(() => {
+            instance.enable();
+            instance.show();
+          });
+        }
+      } else {
+        // See if we can fetch a full url (with no hash to target)
+        // This is a special case and we should probably do some content thinning / targeting
+        fetch(url)
+        .then(res => res.text())
+        .then(html => {
+          const parser = new DOMParser();
+          const htmlDoc = parser.parseFromString(html, "text/html");
+          const note = htmlDoc.querySelector('main.content');
+          if (note !== null) {
+            // This should only happen for chapter cross references
+            // (since there is no id in the URL)
+            // remove the first header
+            if (note.children.length > 0 && note.children[0].tagName === "HEADER") {
+              note.children[0].remove();
+            }
+            const html = processXRef(null, note);
+            instance.setContent(html);
+          } 
+        }).finally(() => {
+          instance.enable();
+          instance.show();
+        });
+      }
+    }, function(instance) {
+    });
+  }
+      let selectedAnnoteEl;
+      const selectorForAnnotation = ( cell, annotation) => {
+        let cellAttr = 'data-code-cell="' + cell + '"';
+        let lineAttr = 'data-code-annotation="' +  annotation + '"';
+        const selector = 'span[' + cellAttr + '][' + lineAttr + ']';
+        return selector;
+      }
+      const selectCodeLines = (annoteEl) => {
+        const doc = window.document;
+        const targetCell = annoteEl.getAttribute("data-target-cell");
+        const targetAnnotation = annoteEl.getAttribute("data-target-annotation");
+        const annoteSpan = window.document.querySelector(selectorForAnnotation(targetCell, targetAnnotation));
+        const lines = annoteSpan.getAttribute("data-code-lines").split(",");
+        const lineIds = lines.map((line) => {
+          return targetCell + "-" + line;
+        })
+        let top = null;
+        let height = null;
+        let parent = null;
+        if (lineIds.length > 0) {
+            //compute the position of the single el (top and bottom and make a div)
+            const el = window.document.getElementById(lineIds[0]);
+            top = el.offsetTop;
+            height = el.offsetHeight;
+            parent = el.parentElement.parentElement;
+          if (lineIds.length > 1) {
+            const lastEl = window.document.getElementById(lineIds[lineIds.length - 1]);
+            const bottom = lastEl.offsetTop + lastEl.offsetHeight;
+            height = bottom - top;
+          }
+          if (top !== null && height !== null && parent !== null) {
+            // cook up a div (if necessary) and position it 
+            let div = window.document.getElementById("code-annotation-line-highlight");
+            if (div === null) {
+              div = window.document.createElement("div");
+              div.setAttribute("id", "code-annotation-line-highlight");
+              div.style.position = 'absolute';
+              parent.appendChild(div);
+            }
+            div.style.top = top - 2 + "px";
+            div.style.height = height + 4 + "px";
+            div.style.left = 0;
+            let gutterDiv = window.document.getElementById("code-annotation-line-highlight-gutter");
+            if (gutterDiv === null) {
+              gutterDiv = window.document.createElement("div");
+              gutterDiv.setAttribute("id", "code-annotation-line-highlight-gutter");
+              gutterDiv.style.position = 'absolute';
+              const codeCell = window.document.getElementById(targetCell);
+              const gutter = codeCell.querySelector('.code-annotation-gutter');
+              gutter.appendChild(gutterDiv);
+            }
+            gutterDiv.style.top = top - 2 + "px";
+            gutterDiv.style.height = height + 4 + "px";
+          }
+          selectedAnnoteEl = annoteEl;
+        }
+      };
+      const unselectCodeLines = () => {
+        const elementsIds = ["code-annotation-line-highlight", "code-annotation-line-highlight-gutter"];
+        elementsIds.forEach((elId) => {
+          const div = window.document.getElementById(elId);
+          if (div) {
+            div.remove();
+          }
+        });
+        selectedAnnoteEl = undefined;
+      };
+        // Handle positioning of the toggle
+    window.addEventListener(
+      "resize",
+      throttle(() => {
+        elRect = undefined;
+        if (selectedAnnoteEl) {
+          selectCodeLines(selectedAnnoteEl);
+        }
+      }, 10)
+    );
+    function throttle(fn, ms) {
+    let throttle = false;
+    let timer;
+      return (...args) => {
+        if(!throttle) { // first call gets through
+            fn.apply(this, args);
+            throttle = true;
+        } else { // all the others get throttled
+            if(timer) clearTimeout(timer); // cancel #2
+            timer = setTimeout(() => {
+              fn.apply(this, args);
+              timer = throttle = false;
+            }, ms);
+        }
+      };
+    }
+      // Attach click handler to the DT
+      const annoteDls = window.document.querySelectorAll('dt[data-target-cell]');
+      for (const annoteDlNode of annoteDls) {
+        annoteDlNode.addEventListener('click', (event) => {
+          const clickedEl = event.target;
+          if (clickedEl !== selectedAnnoteEl) {
+            unselectCodeLines();
+            const activeEl = window.document.querySelector('dt[data-target-cell].code-annotation-active');
+            if (activeEl) {
+              activeEl.classList.remove('code-annotation-active');
+            }
+            selectCodeLines(clickedEl);
+            clickedEl.classList.add('code-annotation-active');
+          } else {
+            // Unselect the line
+            unselectCodeLines();
+            clickedEl.classList.remove('code-annotation-active');
+          }
+        });
+      }
+  const findCites = (el) => {
+    const parentEl = el.parentElement;
+    if (parentEl) {
+      const cites = parentEl.dataset.cites;
+      if (cites) {
+        return {
+          el,
+          cites: cites.split(' ')
+        };
+      } else {
+        return findCites(el.parentElement)
+      }
+    } else {
+      return undefined;
+    }
+  };
+  var bibliorefs = window.document.querySelectorAll('a[role="doc-biblioref"]');
+  for (var i=0; i<bibliorefs.length; i++) {
+    const ref = bibliorefs[i];
+    const citeInfo = findCites(ref);
+    if (citeInfo) {
+      tippyHover(citeInfo.el, function() {
+        var popup = window.document.createElement('div');
+        citeInfo.cites.forEach(function(cite) {
+          var citeDiv = window.document.createElement('div');
+          citeDiv.classList.add('hanging-indent');
+          citeDiv.classList.add('csl-entry');
+          var biblioDiv = window.document.getElementById('ref-' + cite);
+          if (biblioDiv) {
+            citeDiv.innerHTML = biblioDiv.innerHTML;
+          }
+          popup.appendChild(citeDiv);
+        });
+        return popup.innerHTML;
+      });
+    }
+  }
+});
+</script>
+<script src="https://utteranc.es/client.js" repo="greglandrum/rdkit-blog" issue-term="pathname" theme="github-light" crossorigin="anonymous" async="">
+</script>
+</div> <!-- /content -->
+<footer class="footer">
+  <div class="nav-footer">
+    <div class="nav-footer-left">
+<p>Copyright (C) 2025 Greg Landrum</p>
+</div>   
+    <div class="nav-footer-center">
+      &nbsp;
+    </div>
+    <div class="nav-footer-right">
+<p><a href="https://www.rdkit.org"><img src="https://www.rdkit.org/logo.small.png" class="img-fluid" alt="RDKit" width="64"></a></p>
+</div>
+  </div>
+</footer>
+
+
+
+
+</body></html>
