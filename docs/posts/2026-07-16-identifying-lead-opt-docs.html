@@ -213,6 +213,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 </header>
 
 
+<p><em>Updated</em> 26.07.2026 to fix some of the preliminary queries. This did not affect the results.</p>
 <p>I’ve had a long-running interest in data from lead-optimization projects in drug discovery. I talked about this recently at the <a href="https://www.ebi.ac.uk/about/events/events/public-event/2026/ebi-9/">2nd CheMBL User Group Meeting</a>. There’s a <a href="https://www.ebi.ac.uk/about/events/wp-content/uploads/2026/06/4-Greg-Landrum_2nd-ChEMBL-UGM_Exploring-groups-of-related-compounds-from-ChEMBL.pdf">copy of my slides</a> as well as a <a href="https://www.ebi.ac.uk/about/events/events/public-event/2026/ebi-9/#vf-tabs__section-d85def33-a0d0-4164-824f-7fd3c90cba43">recording of the talk</a> there. As part of that (and mentioned in the talk), I’m trying to come up with a collection of sets of compounds from lead-optimization papers in ChEMBL.</p>
 <p>This post is the next step in that process.</p>
 <p>Here’s the TL;DR on the results of the analysis:</p>
@@ -266,13 +267,13 @@ Wed Jul  8 09:44:01 2026</code></pre>
 <span id="cb3-2"><a href="#cb3-2" aria-hidden="true" tabindex="-1"></a>select <span class="op">*</span> <span class="im">from</span> (<span class="op">\</span></span>
 <span id="cb3-3"><a href="#cb3-3" aria-hidden="true" tabindex="-1"></a>   select assay_id,assays.chembl_id assay_chembl_id,count(distinct(molregno)) cnt,description  <span class="op">\</span></span>
 <span id="cb3-4"><a href="#cb3-4" aria-hidden="true" tabindex="-1"></a>          <span class="im">from</span> activities join docs using (doc_id) join assays using(assay_id) <span class="op">\</span></span>
-<span id="cb3-5"><a href="#cb3-5" aria-hidden="true" tabindex="-1"></a>          where standard_type <span class="op">=</span> <span class="st">'Ki'</span> <span class="kw">or</span> standard_type<span class="op">=</span><span class="st">'IC50'</span> <span class="kw">and</span> confidence_score<span class="op">=</span><span class="dv">9</span> <span class="kw">and</span> assay_type<span class="op">=</span><span class="st">'B'</span> <span class="kw">and</span> relationship_type<span class="op">=</span><span class="st">'D'</span> \</span>
+<span id="cb3-5"><a href="#cb3-5" aria-hidden="true" tabindex="-1"></a>          where (standard_type <span class="op">=</span> <span class="st">'Ki'</span> <span class="kw">or</span> standard_type<span class="op">=</span><span class="st">'IC50'</span>) <span class="kw">and</span> confidence_score<span class="op">=</span><span class="dv">9</span> <span class="kw">and</span> assay_type<span class="op">=</span><span class="st">'B'</span> <span class="kw">and</span> relationship_type<span class="op">=</span><span class="st">'D'</span> \</span>
 <span id="cb3-6"><a href="#cb3-6" aria-hidden="true" tabindex="-1"></a>          <span class="kw">and</span> pchembl_value <span class="kw">is</span> <span class="kw">not</span> null <span class="kw">and</span> ((doc_type<span class="op">=</span><span class="st">'PATENT'</span>) <span class="kw">or</span> (doc_type<span class="op">=</span><span class="st">'PUBLICATION'</span> <span class="kw">and</span> doi <span class="kw">is</span> <span class="kw">not</span> null))<span class="op">\</span></span>
 <span id="cb3-7"><a href="#cb3-7" aria-hidden="true" tabindex="-1"></a>          group by (assay_id,assays.chembl_id,description) order by cnt desc) tmp <span class="op">\</span></span>
 <span id="cb3-8"><a href="#cb3-8" aria-hidden="true" tabindex="-1"></a>   where cnt<span class="op">&lt;</span><span class="dv">100</span> <span class="kw">and</span> cnt<span class="op">&gt;</span><span class="dv">30</span><span class="op">;</span></span>
 <span id="cb3-9"><a href="#cb3-9" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f'</span><span class="sc">{</span><span class="bu">len</span>(d)<span class="sc">}</span><span class="ss"> assays found'</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 <div class="cell-output cell-output-stdout">
-<pre><code>8597 assays found</code></pre>
+<pre><code>6488 assays found</code></pre>
 </div>
 </div>
 <p>To make the rest of the work more efficient, I’m going to create a bunch of extra tables in my local copy of the ChEMBL database. I’ll collect those in a schema called <code>lead_opt</code>:</p>
@@ -694,13 +695,13 @@ Wed Jul  8 09:44:01 2026</code></pre>
 <span id="cb31-4"><a href="#cb31-4" aria-hidden="true" tabindex="-1"></a>          <span class="im">from</span> lead_opt.filtered_activities join docs using (doc_id) <span class="op">\</span></span>
 <span id="cb31-5"><a href="#cb31-5" aria-hidden="true" tabindex="-1"></a>            join (select doc_id <span class="im">from</span> lead_opt.doc_assay_count where assay_count<span class="op">&gt;</span><span class="dv">5</span>) tmp2 using (doc_id) <span class="op">\</span></span>
 <span id="cb31-6"><a href="#cb31-6" aria-hidden="true" tabindex="-1"></a>            join assays using(assay_id) <span class="op">\</span></span>
-<span id="cb31-7"><a href="#cb31-7" aria-hidden="true" tabindex="-1"></a>          where standard_type <span class="op">=</span> <span class="st">'Ki'</span> <span class="kw">or</span> standard_type<span class="op">=</span><span class="st">'IC50'</span> <span class="kw">and</span> confidence_score<span class="op">=</span><span class="dv">9</span> <span class="kw">and</span> assay_type<span class="op">=</span><span class="st">'B'</span> <span class="kw">and</span> relationship_type<span class="op">=</span><span class="st">'D'</span> \</span>
+<span id="cb31-7"><a href="#cb31-7" aria-hidden="true" tabindex="-1"></a>          where (standard_type <span class="op">=</span> <span class="st">'Ki'</span> <span class="kw">or</span> standard_type<span class="op">=</span><span class="st">'IC50'</span>) <span class="kw">and</span> confidence_score<span class="op">=</span><span class="dv">9</span> <span class="kw">and</span> assay_type<span class="op">=</span><span class="st">'B'</span> <span class="kw">and</span> relationship_type<span class="op">=</span><span class="st">'D'</span> \</span>
 <span id="cb31-8"><a href="#cb31-8" aria-hidden="true" tabindex="-1"></a>          <span class="kw">and</span> pchembl_value <span class="kw">is</span> <span class="kw">not</span> null <span class="kw">and</span> ((doc_type<span class="op">=</span><span class="st">'PATENT'</span>) <span class="kw">or</span> (doc_type<span class="op">=</span><span class="st">'PUBLICATION'</span> <span class="kw">and</span> doi <span class="kw">is</span> <span class="kw">not</span> null))<span class="op">\</span></span>
 <span id="cb31-9"><a href="#cb31-9" aria-hidden="true" tabindex="-1"></a>          group by (docs.doc_id,docs.chembl_id) order by cnt desc) tmp <span class="op">\</span></span>
 <span id="cb31-10"><a href="#cb31-10" aria-hidden="true" tabindex="-1"></a>   where cnt<span class="op">&lt;</span><span class="dv">100</span> <span class="kw">and</span> cnt<span class="op">&gt;</span><span class="dv">30</span><span class="op">;</span></span>
 <span id="cb31-11"><a href="#cb31-11" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f'</span><span class="sc">{</span><span class="bu">len</span>(d)<span class="sc">}</span><span class="ss"> docs found'</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 <div class="cell-output cell-output-stdout">
-<pre><code>3757 docs found</code></pre>
+<pre><code>3158 docs found</code></pre>
 </div>
 </div>
 <p>Create a few more utility tables:</p>
