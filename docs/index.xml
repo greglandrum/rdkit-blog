@@ -10,7 +10,2190 @@
 <atom:link href="https://greglandrum.github.io/rdkit-blog/index.xml" rel="self" type="application/rss+xml"/>
 <description>RDKit experiments, tips, and tutorials</description>
 <generator>quarto-1.6.43</generator>
-<lastBuildDate>Wed, 15 Jul 2026 22:00:00 GMT</lastBuildDate>
+<lastBuildDate>Mon, 24 Aug 2026 22:00:00 GMT</lastBuildDate>
+<item>
+  <title>Scaffolds for the Lead-Optimization Datasets</title>
+  <link>https://greglandrum.github.io/rdkit-blog/posts/2026-08-25-finding-lead-scaffolds.html</link>
+  <description><![CDATA[ 
+
+
+
+
+<section id="a-set-of-scaffolds-from-chembl-lead-optimization-papers" class="level1">
+<h1>A set of scaffolds from CheMBL lead-optimization papers</h1>
+<p>I started looking at collecting a set of scaffolds from med chem papers <a href="https://rdkit.blogspot.com/2015/05/a-set-of-scaffolds-from-chembl-papers.html">a long time ago</a>. I’ve gone back and refined the analysis a few times, but I haven’t written anything about it. This is an update for the most recent refinement I’ve done.</p>
+<p>Instead of general ChEMBL papers, here I use sets of compounds from lead-optimization datasets (terminolog and explanations <a href="https://greglandrum.github.io/rdkit-blog/posts/2026-07-16-identifying-lead-opt-docs.html">in this blog post</a>. The general idea remains the same: approximate the scaffold for the compounds in a document as the maximum common substructure that covers a large fraction (generally 90%) of the compounds in the paper. In the previous analysis I used a fuzzy MCS that ignored atom types. I will repeat that here but also look for a specific MCS (i.e.&nbsp;one with specific atom types). In an attempt to only focus on the chemical series that was actually explored in the paper, for this analysis I use only the “local” compounds, those that are not present in a large number of other documents.</p>
+<p><strong>TL;DR</strong> After some experimentation, I ended up using specific MCSs (all atoms specified) to locate scaffolds in the lead-optimization data sets. I define a scaffold as the MCS that hits at least 80% of the molecules in the data set. In order to ensure that the scaffolds are of reasonable size, I only keep scaffolds where the number of atoms is at least 60% of the average number of atoms for molecules in the data set.</p>
+</section>
+<section id="on-to-the-work" class="level1">
+<h1>On to the work</h1>
+<section id="start-with-the-preliminaries" class="level2">
+<h2 class="anchored" data-anchor-id="start-with-the-preliminaries">Start with the preliminaries</h2>
+<p>We need to do a bunch of imports and define some functions we’ll use later.</p>
+<div id="cell-5" class="cell" data-execution_count="1">
+<div class="sourceCode cell-code" id="cb1" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb1-1"><span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">import</span> numpy</span>
+<span id="cb1-2"><span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">from</span> rdkit.Chem.Draw <span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">import</span> IPythonConsole</span>
+<span id="cb1-3"><span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">import</span> pandas <span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">as</span> pd</span>
+<span id="cb1-4"><span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">from</span> rdkit.Chem <span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">import</span> PandasTools</span>
+<span id="cb1-5"><span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">from</span> rdkit <span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">import</span> Chem</span>
+<span id="cb1-6"><span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">from</span> rdkit.Chem <span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">import</span> rdFMCS <span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">as</span> MCS</span>
+<span id="cb1-7"><span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">from</span> rdkit.Chem <span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">import</span> Draw</span>
+<span id="cb1-8"><span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">from</span> rdkit.Chem <span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">import</span> rdDepictor</span>
+<span id="cb1-9">rdDepictor.SetPreferCoordGen(<span class="va" style="color: #111111;
+background-color: null;
+font-style: inherit;">True</span>)</span>
+<span id="cb1-10"><span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">import</span> pickle</span>
+<span id="cb1-11"><span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">from</span> rdkit <span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">import</span> rdBase</span>
+<span id="cb1-12"><span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">print</span>(rdBase.rdkitVersion)</span>
+<span id="cb1-13"><span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">%</span>load_ext sql</span>
+<span id="cb1-14"><span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">%</span>config SqlMagic.feedback <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> <span class="va" style="color: #111111;
+background-color: null;
+font-style: inherit;">False</span></span>
+<span id="cb1-15"><span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">%</span>config SqlMagic.named_parameters<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span><span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"enabled"</span></span>
+<span id="cb1-16"><span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">import</span> time</span>
+<span id="cb1-17"><span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">print</span>(time.asctime())</span></code></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>2026.03.5
+Tue Aug 25 15:14:10 2026</code></pre>
+</div>
+</div>
+<div id="cell-6" class="cell" data-execution_count="2">
+<div class="sourceCode cell-code" id="cb3" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb3-1"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># define a function to convert a query molecule to SVG</span></span>
+<span id="cb3-2"></span>
+<span id="cb3-3"><span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">from</span> IPython.display <span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">import</span> SVG</span>
+<span id="cb3-4"><span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">from</span> rdkit.Chem <span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">import</span> rdDepictor</span>
+<span id="cb3-5"><span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">from</span> rdkit.Chem.Draw <span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">import</span> rdMolDraw2D</span>
+<span id="cb3-6"><span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">def</span> moltosvg(mol,molSize<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span>(<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">450</span>,<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">250</span>),kekulize<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span><span class="va" style="color: #111111;
+background-color: null;
+font-style: inherit;">True</span>):</span>
+<span id="cb3-7">    mc <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> Chem.Mol(mol.ToBinary())</span>
+<span id="cb3-8">    <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">if</span> kekulize:</span>
+<span id="cb3-9">        <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">try</span>:</span>
+<span id="cb3-10">            Chem.Kekulize(mc)</span>
+<span id="cb3-11">        <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">except</span>:</span>
+<span id="cb3-12">            mc <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> Chem.Mol(mol)</span>
+<span id="cb3-13">    <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">if</span> <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">not</span> mc.GetNumConformers():</span>
+<span id="cb3-14">        rdDepictor.Compute2DCoords(mc)</span>
+<span id="cb3-15">    drawer <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> rdMolDraw2D.MolDraw2DSVG(molSize[<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">0</span>],molSize[<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">1</span>])</span>
+<span id="cb3-16">    <span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># the MolDraw2D code is not very good at dealing with atom queries,</span></span>
+<span id="cb3-17">    <span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># this is a workaround</span></span>
+<span id="cb3-18">    opts <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> drawer.drawOptions()</span>
+<span id="cb3-19">    <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">for</span> atom <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">in</span> mc.GetAtoms():</span>
+<span id="cb3-20">        <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">if</span> atom.HasQuery() <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">and</span> atom.DescribeQuery().find(<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'AtomAtomicNum'</span>)<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">!=</span><span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">0</span>:</span>
+<span id="cb3-21">            opts.atomLabels[atom.GetIdx()]<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span>atom.GetSmarts()</span>
+<span id="cb3-22">    drawer.DrawMolecule(mc)</span>
+<span id="cb3-23">    drawer.FinishDrawing()</span>
+<span id="cb3-24">    svg <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> drawer.GetDrawingText()</span>
+<span id="cb3-25">    <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">return</span> svg</span></code></pre></div>
+</div>
+<div id="cell-7" class="cell" data-execution_count="3">
+<div class="sourceCode cell-code" id="cb4" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb4-1"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># define a function to find the MCS for a set of molecules and return some summary info about that MCS</span></span>
+<span id="cb4-2"></span>
+<span id="cb4-3"><span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">import</span> time</span>
+<span id="cb4-4"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># we will use a namedtuple to return the results</span></span>
+<span id="cb4-5"><span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">from</span> collections <span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">import</span> namedtuple</span>
+<span id="cb4-6">MCSRes<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span>namedtuple(<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'MCSRes'</span>,(<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'smarts'</span>,<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'numAtoms'</span>,<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'numMols'</span>,<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'avgNumMolAtoms'</span>,<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'mcsTime'</span>))</span>
+<span id="cb4-7"></span>
+<span id="cb4-8"><span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">def</span> MCS_Report(ms,printSmarts<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span><span class="va" style="color: #111111;
+background-color: null;
+font-style: inherit;">True</span>,</span>
+<span id="cb4-9">               atomCompare<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span>MCS.AtomCompare.CompareAny,</span>
+<span id="cb4-10">               bondCompare<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span>MCS.BondCompare.CompareAny,</span>
+<span id="cb4-11">               completeRingsOnly<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span><span class="va" style="color: #111111;
+background-color: null;
+font-style: inherit;">True</span>,</span>
+<span id="cb4-12">               <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">**</span>kwargs):</span>
+<span id="cb4-13">    t1<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span>time.time()</span>
+<span id="cb4-14">    mcs <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> MCS.FindMCS(ms,atomCompare<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span>atomCompare,bondCompare<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span>bondCompare,timeout<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span><span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">30</span>,completeRingsOnly<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span>completeRingsOnly,</span>
+<span id="cb4-15">                      <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">**</span>kwargs)</span>
+<span id="cb4-16">    t2<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span>time.time()</span>
+<span id="cb4-17">    nAts <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> numpy.array([x.GetNumAtoms() <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">for</span> x <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">in</span> ms])</span>
+<span id="cb4-18">    <span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">print</span>(<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'Mean nAts </span><span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">%.1f</span><span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">, mcs nAts: </span><span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">%d</span><span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'</span><span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">%</span>(nAts.mean(),mcs.numAtoms))</span>
+<span id="cb4-19">    <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">if</span> printSmarts: </span>
+<span id="cb4-20">        <span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">print</span>(mcs.smartsString)</span>
+<span id="cb4-21">    mcsM <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> Chem.MolFromSmarts(mcs.smartsString)         </span>
+<span id="cb4-22">    mcsM.UpdatePropertyCache(<span class="va" style="color: #111111;
+background-color: null;
+font-style: inherit;">False</span>)</span>
+<span id="cb4-23">    Chem.SetHybridization(mcsM)</span>
+<span id="cb4-24">    svg <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> moltosvg(mcsM,kekulize<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span><span class="va" style="color: #111111;
+background-color: null;
+font-style: inherit;">False</span>)</span>
+<span id="cb4-25">    tpl <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> MCSRes(mcs.smartsString,mcs.numAtoms,<span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">len</span>(ms),nAts,t2<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">-</span>t1)</span>
+<span id="cb4-26">    <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">return</span> tpl,svg</span></code></pre></div>
+</div>
+</section>
+<section id="grab-the-data" class="level2">
+<h2 class="anchored" data-anchor-id="grab-the-data">Grab the data</h2>
+<p>Load the lead optimization sets from the earlier blog post:</p>
+<div id="cell-9" class="cell" data-execution_count="4">
+<div class="sourceCode cell-code" id="cb5" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb5-1"><span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">with</span> <span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">open</span>(<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'./results/lead_optimization_sets.pkl'</span>,<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'rb'</span>) <span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">as</span> f:</span>
+<span id="cb5-2">    df <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> pickle.load(f)</span>
+<span id="cb5-3"></span>
+<span id="cb5-4">df.shape</span></code></pre></div>
+<div class="cell-output cell-output-display" data-execution_count="4">
+<pre><code>(37295, 7)</code></pre>
+</div>
+</div>
+<div id="cell-10" class="cell" data-execution_count="5">
+<div class="sourceCode cell-code" id="cb7" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb7-1">df.head()</span></code></pre></div>
+<div class="cell-output cell-output-display" data-execution_count="5">
+<div>
+
+
+<table class="dataframe caption-top table table-sm table-striped small" data-quarto-postprocess="true" data-border="1">
+<thead>
+<tr class="header">
+<th data-quarto-table-cell-role="th"></th>
+<th data-quarto-table-cell-role="th">doc_id</th>
+<th data-quarto-table-cell-role="th">doc_chembl_id</th>
+<th data-quarto-table-cell-role="th">molregno</th>
+<th data-quarto-table-cell-role="th">compound_chembl_id</th>
+<th data-quarto-table-cell-role="th">compound_type</th>
+<th data-quarto-table-cell-role="th">assay_count</th>
+<th data-quarto-table-cell-role="th">canonical_smiles</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td data-quarto-table-cell-role="th">0</td>
+<td>37919</td>
+<td>CHEMBL1140586</td>
+<td>416886</td>
+<td>CHEMBL250403</td>
+<td>local</td>
+<td>34</td>
+<td>CCCN1CCO[C@H](c2cccc(O)c2)C1</td>
+</tr>
+<tr class="even">
+<td data-quarto-table-cell-role="th">1</td>
+<td>37919</td>
+<td>CHEMBL1140586</td>
+<td>3854</td>
+<td>CHEMBL53</td>
+<td>reference</td>
+<td>3</td>
+<td>CN1CCc2cccc3c2[C@H]1Cc1ccc(O)c(O)c1-3</td>
+</tr>
+<tr class="odd">
+<td data-quarto-table-cell-role="th">2</td>
+<td>37919</td>
+<td>CHEMBL1140586</td>
+<td>19316</td>
+<td>CHEMBL589</td>
+<td>reference</td>
+<td>3</td>
+<td>CCCN(CCC)CCc1cccc2c1CC(=O)N2</td>
+</tr>
+<tr class="even">
+<td data-quarto-table-cell-role="th">3</td>
+<td>37919</td>
+<td>CHEMBL1140586</td>
+<td>88815</td>
+<td>CHEMBL301265</td>
+<td>reference</td>
+<td>3</td>
+<td>CCCN[C@H]1CCc2nc(N)sc2C1</td>
+</tr>
+<tr class="odd">
+<td data-quarto-table-cell-role="th">4</td>
+<td>37919</td>
+<td>CHEMBL1140586</td>
+<td>259724</td>
+<td>CHEMBL155731</td>
+<td>local</td>
+<td>3</td>
+<td>CCCN1CCC[C@@H]2Cc3nc(N)ncc3C[C@H]21</td>
+</tr>
+</tbody>
+</table>
+
+</div>
+</div>
+</div>
+<p>Look at the compounds from one of the papers:</p>
+<div id="cell-12" class="cell" data-execution_count="6">
+<div class="sourceCode cell-code" id="cb8" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb8-1">doc_df <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> df[(df[<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'doc_chembl_id'</span>]<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">==</span><span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'CHEMBL1140586'</span>) <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">&amp;</span> (df[<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'compound_type'</span>]<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">==</span><span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'local'</span>)]</span>
+<span id="cb8-2">doc_df.shape</span></code></pre></div>
+<div class="cell-output cell-output-display" data-execution_count="6">
+<pre><code>(44, 7)</code></pre>
+</div>
+</div>
+<div id="cell-13" class="cell" data-execution_count="7">
+<div class="sourceCode cell-code" id="cb10" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb10-1">ms <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> doc_df[<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'canonical_smiles'</span>].<span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">apply</span>(Chem.MolFromSmiles).to_list()</span>
+<span id="cb10-2">Draw.MolsToGridImage(ms[:<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">12</span>],molsPerRow<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span><span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">4</span>,legends<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span>doc_df[<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'compound_chembl_id'</span>].to_list())</span></code></pre></div>
+<div class="cell-output cell-output-display" data-execution_count="7">
+<div>
+<figure class="figure">
+<p><img src="https://greglandrum.github.io/rdkit-blog/posts/2026-08-25-finding-lead-scaffolds_files/figure-html/cell-8-output-1.png" class="img-fluid figure-img"></p>
+</figure>
+</div>
+</div>
+</div>
+<p>And run the MCS analysis:</p>
+<div id="cell-15" class="cell" data-execution_count="8">
+<div class="sourceCode cell-code" id="cb11" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb11-1">tpl,svg<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span>MCS_Report(ms,threshold<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span><span class="fl" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">0.9</span>,completeRingsOnly<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span><span class="va" style="color: #111111;
+background-color: null;
+font-style: inherit;">True</span>)</span>
+<span id="cb11-2">SVG(svg)</span></code></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>Mean nAts 17.6, mcs nAts: 15
+[#6]-&amp;!@[#6]-&amp;!@[#7]1-&amp;@[#6]-&amp;@[#6]-&amp;@[#8]-&amp;@[#6](-&amp;@[#6]-&amp;@1)-&amp;!@[#6]1:&amp;@[#6]:&amp;@[#6]:&amp;@[#6]:&amp;@[#6](:&amp;@[#6]:&amp;@1)-&amp;!@[#8,#6,#7,#16,#17]</code></pre>
+</div>
+<div class="cell-output cell-output-display" data-execution_count="8">
+<div>
+<figure class="figure">
+<p><img src="https://greglandrum.github.io/rdkit-blog/posts/2026-08-25-finding-lead-scaffolds_files/figure-html/cell-9-output-2.svg" class="img-fluid figure-img"></p>
+</figure>
+</div>
+</div>
+</div>
+<p>Repeat that, but don’t do fuzzy MCS:</p>
+<div id="cell-17" class="cell" data-execution_count="9">
+<div class="sourceCode cell-code" id="cb13" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb13-1">tpl,svg<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span>MCS_Report(ms,threshold<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span><span class="fl" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">0.9</span>,completeRingsOnly<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span><span class="va" style="color: #111111;
+background-color: null;
+font-style: inherit;">True</span>,</span>
+<span id="cb13-2">        atomCompare<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span>MCS.AtomCompare.CompareElements)</span>
+<span id="cb13-3">SVG(svg)</span></code></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>Mean nAts 17.6, mcs nAts: 15
+[#6]-,=;!@[#6]-&amp;!@[#6]-&amp;!@[#7]1-&amp;@[#6]-&amp;@[#6]-&amp;@[#8]-&amp;@[#6](-&amp;@[#6]-&amp;@1)-&amp;!@[#6]1:&amp;@[#6]:&amp;@[#6]:&amp;@[#6]:&amp;@[#6]:&amp;@[#6]:&amp;@1</code></pre>
+</div>
+<div class="cell-output cell-output-display" data-execution_count="9">
+<div>
+<figure class="figure">
+<p><img src="https://greglandrum.github.io/rdkit-blog/posts/2026-08-25-finding-lead-scaffolds_files/figure-html/cell-10-output-2.svg" class="img-fluid figure-img"></p>
+</figure>
+</div>
+</div>
+</div>
+<p>Run all of the papers and save the results, this takes a while:</p>
+<div id="cell-19" class="cell" data-execution_count="6">
+<div class="sourceCode cell-code" id="cb15" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb15-1"><span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">import</span> pickle</span>
+<span id="cb15-2"></span>
+<span id="cb15-3"></span>
+<span id="cb15-4"><span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">def</span> run_doc(df, doc_id, threshold<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span><span class="fl" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">0.9</span>):</span>
+<span id="cb15-5">    doc_df <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> df[(df[<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'doc_chembl_id'</span>] <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">==</span> doc_id)</span>
+<span id="cb15-6">                <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">&amp;</span> (df[<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'compound_type'</span>] <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">==</span> <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'local'</span>)]</span>
+<span id="cb15-7"></span>
+<span id="cb15-8">    ms <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> doc_df[<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'canonical_smiles'</span>].<span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">apply</span>(Chem.MolFromSmiles).to_list()</span>
+<span id="cb15-9">    <span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">print</span>(<span class="ss" style="color: #20794D;
+background-color: null;
+font-style: inherit;">f'</span><span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">{</span><span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">len</span>(ms)<span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">}</span><span class="ss" style="color: #20794D;
+background-color: null;
+font-style: inherit;"> molecules found for document </span><span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">{</span>doc_id<span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">}</span><span class="ss" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'</span>)</span>
+<span id="cb15-10">    <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">if</span> <span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">len</span>(ms) <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">&lt;</span> <span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">2</span>:</span>
+<span id="cb15-11">        <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">return</span> <span class="va" style="color: #111111;
+background-color: null;
+font-style: inherit;">None</span></span>
+<span id="cb15-12">    tpl, svg <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> MCS_Report(ms, threshold<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span>threshold, completeRingsOnly<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span><span class="va" style="color: #111111;
+background-color: null;
+font-style: inherit;">True</span>)</span>
+<span id="cb15-13">    smis <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> doc_df[<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'canonical_smiles'</span>].to_list()</span>
+<span id="cb15-14">    <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">return</span> (doc_id, smis, tpl, svg)</span></code></pre></div>
+</div>
+<div id="cell-20" class="cell">
+<div class="sourceCode cell-code" id="cb16" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb16-1">results <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> []</span>
+<span id="cb16-2">seen <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> [x[<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">0</span>][<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">0</span>] <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">for</span> x <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">in</span> results <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">if</span> x <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">is</span> <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">not</span> <span class="va" style="color: #111111;
+background-color: null;
+font-style: inherit;">None</span>]</span>
+<span id="cb16-3"></span>
+<span id="cb16-4">doc_ids <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> df[<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'doc_chembl_id'</span>].unique()</span>
+<span id="cb16-5">nrows <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> <span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">len</span>(doc_ids)</span>
+<span id="cb16-6"><span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">for</span> i,did <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">in</span> <span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">enumerate</span>(doc_ids):</span>
+<span id="cb16-7">    <span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">print</span>(<span class="ss" style="color: #20794D;
+background-color: null;
+font-style: inherit;">f'Doing row </span><span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">{</span>i<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">+</span><span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">1</span><span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">}</span><span class="ss" style="color: #20794D;
+background-color: null;
+font-style: inherit;"> of </span><span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">{</span>nrows<span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">}</span><span class="ss" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'</span>)</span>
+<span id="cb16-8">    <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">if</span> did <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">in</span> seen:</span>
+<span id="cb16-9">        <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">continue</span></span>
+<span id="cb16-10">    tpl <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> run_doc(df,did)</span>
+<span id="cb16-11">    results.append(tpl)</span>
+<span id="cb16-12">    <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">if</span> <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">not</span> (i<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">+</span><span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">1</span>)<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">%</span><span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">100</span>:</span>
+<span id="cb16-13">        pickle.dump(results,<span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">open</span>(<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'../data/scaffolds_lead_opt.pkl'</span>,<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'wb+'</span>))</span>
+<span id="cb16-14">pickle.dump(results,<span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">open</span>(<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'../data/scaffolds_lead_opt.pkl'</span>,<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'wb+'</span>))</span></code></pre></div>
+</div>
+<p>Write a CSV file too:</p>
+<div id="cell-22" class="cell">
+<div class="sourceCode cell-code" id="cb17" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb17-1">tmp <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> []</span>
+<span id="cb17-2"><span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">for</span> row <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">in</span> results:</span>
+<span id="cb17-3">    tmp.append((row[<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">0</span>],row[<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">2</span>].smarts,<span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">str</span>(row[<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">2</span>].numAtoms<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">/</span>row[<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">2</span>].avgNumMolAtoms.mean())))</span>
+<span id="cb17-4"><span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">with</span> <span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">open</span>(<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'../data/scaffolds_lead_opt.txt'</span>,<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'w+'</span>) <span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">as</span> outf:</span>
+<span id="cb17-5">    <span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">print</span>(<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'doc_chembl_id</span><span class="ch" style="color: #20794D;
+background-color: null;
+font-style: inherit;">\t</span><span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">smarts</span><span class="ch" style="color: #20794D;
+background-color: null;
+font-style: inherit;">\t</span><span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">fraction_of_average_molecule_size'</span>,<span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">file</span><span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span>outf)</span>
+<span id="cb17-6">    <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">for</span> row <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">in</span> tmp:</span>
+<span id="cb17-7">        <span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">print</span>(<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'</span><span class="ch" style="color: #20794D;
+background-color: null;
+font-style: inherit;">\t</span><span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'</span>.join(row),<span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">file</span><span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span>outf)</span></code></pre></div>
+</div>
+<div id="cell-23" class="cell" data-execution_count="10">
+<div class="sourceCode cell-code" id="cb18" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb18-1"><span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">import</span> pickle</span>
+<span id="cb18-2">results <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> pickle.load(<span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">open</span>(<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'../data/scaffolds_lead_opt.pkl'</span>,<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'rb'</span>))</span></code></pre></div>
+</div>
+<div id="cell-24" class="cell" data-execution_count="11">
+<div class="sourceCode cell-code" id="cb19" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb19-1"><span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">len</span>(results)</span></code></pre></div>
+<div class="cell-output cell-output-display" data-execution_count="11">
+<pre><code>770</code></pre>
+</div>
+</div>
+<p>Repeat, but use the atom types (elements) in the MCS:</p>
+<div id="cell-26" class="cell" data-execution_count="7">
+<div class="sourceCode cell-code" id="cb21" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb21-1"><span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">import</span> pickle</span>
+<span id="cb21-2"></span>
+<span id="cb21-3"></span>
+<span id="cb21-4"><span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">def</span> run_doc2(df, doc_id, threshold<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span><span class="fl" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">0.9</span>):</span>
+<span id="cb21-5">    doc_df <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> df[(df[<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'doc_chembl_id'</span>] <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">==</span> doc_id)</span>
+<span id="cb21-6">                <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">&amp;</span> (df[<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'compound_type'</span>] <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">==</span> <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'local'</span>)]</span>
+<span id="cb21-7"></span>
+<span id="cb21-8">    ms <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> doc_df[<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'canonical_smiles'</span>].<span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">apply</span>(Chem.MolFromSmiles).to_list()</span>
+<span id="cb21-9">    <span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">print</span>(<span class="ss" style="color: #20794D;
+background-color: null;
+font-style: inherit;">f'</span><span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">{</span><span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">len</span>(ms)<span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">}</span><span class="ss" style="color: #20794D;
+background-color: null;
+font-style: inherit;"> molecules found for document </span><span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">{</span>doc_id<span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">}</span><span class="ss" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'</span>)</span>
+<span id="cb21-10">    <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">if</span> <span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">len</span>(ms) <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">&lt;</span> <span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">2</span>:</span>
+<span id="cb21-11">        <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">return</span> <span class="va" style="color: #111111;
+background-color: null;
+font-style: inherit;">None</span></span>
+<span id="cb21-12">    tpl, svg <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> MCS_Report(ms,</span>
+<span id="cb21-13">                          threshold<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span>threshold,</span>
+<span id="cb21-14">                          completeRingsOnly<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span><span class="va" style="color: #111111;
+background-color: null;
+font-style: inherit;">True</span>,</span>
+<span id="cb21-15">                          atomCompare<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span>MCS.AtomCompare.CompareElements)</span>
+<span id="cb21-16">    smis <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> doc_df[<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'canonical_smiles'</span>].to_list()</span>
+<span id="cb21-17">    <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">return</span> (doc_id, smis, tpl, svg)</span></code></pre></div>
+</div>
+<div id="cell-27" class="cell">
+<div class="sourceCode cell-code" id="cb22" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb22-1">results2 <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> []</span>
+<span id="cb22-2">seen <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> [x[<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">0</span>] <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">for</span> x <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">in</span> results2 <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">if</span> x <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">is</span> <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">not</span> <span class="va" style="color: #111111;
+background-color: null;
+font-style: inherit;">None</span>]</span>
+<span id="cb22-3"></span>
+<span id="cb22-4">doc_ids <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> df[<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'doc_chembl_id'</span>].unique()</span>
+<span id="cb22-5">nrows <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> <span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">len</span>(doc_ids)</span>
+<span id="cb22-6"><span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">for</span> i,did <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">in</span> <span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">enumerate</span>(doc_ids):</span>
+<span id="cb22-7">    <span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">print</span>(<span class="ss" style="color: #20794D;
+background-color: null;
+font-style: inherit;">f'Doing row </span><span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">{</span>i<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">+</span><span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">1</span><span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">}</span><span class="ss" style="color: #20794D;
+background-color: null;
+font-style: inherit;"> of </span><span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">{</span>nrows<span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">}</span><span class="ss" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'</span>)</span>
+<span id="cb22-8">    <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">if</span> did <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">in</span> seen:</span>
+<span id="cb22-9">        <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">continue</span></span>
+<span id="cb22-10">    tpl <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> run_doc2(df,did)</span>
+<span id="cb22-11">    results2.append(tpl)</span>
+<span id="cb22-12">    <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">if</span> <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">not</span> (i<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">+</span><span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">1</span>)<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">%</span><span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">100</span>:</span>
+<span id="cb22-13">      pickle.dump(results2,<span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">open</span>(<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'../data/scaffolds_lead_opt_specific.pkl'</span>,<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'wb+'</span>))</span>
+<span id="cb22-14">pickle.dump(results2,<span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">open</span>(<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'../data/scaffolds_lead_opt_specific.pkl'</span>,<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'wb+'</span>))</span></code></pre></div>
+</div>
+<div id="cell-28" class="cell">
+<div class="sourceCode cell-code" id="cb23" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb23-1">tmp <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> []</span>
+<span id="cb23-2"><span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">for</span> row <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">in</span> results2:</span>
+<span id="cb23-3">    tmp.append((row[<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">0</span>], row[<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">2</span>].smarts,</span>
+<span id="cb23-4">                <span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">str</span>(row[<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">2</span>].numAtoms <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">/</span> row[<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">2</span>].avgNumMolAtoms.mean())))</span>
+<span id="cb23-5"><span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">with</span> <span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">open</span>(<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'../data/scaffolds_lead_opt_specific.txt'</span>, <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'w+'</span>) <span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">as</span> outf:</span>
+<span id="cb23-6">    <span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">print</span>(<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'doc_chembl_id</span><span class="ch" style="color: #20794D;
+background-color: null;
+font-style: inherit;">\t</span><span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">smarts</span><span class="ch" style="color: #20794D;
+background-color: null;
+font-style: inherit;">\t</span><span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">fraction_of_average_molecule_size'</span>,</span>
+<span id="cb23-7">          <span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">file</span><span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span>outf)</span>
+<span id="cb23-8">    <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">for</span> row <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">in</span> tmp:</span>
+<span id="cb23-9">        <span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">print</span>(<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'</span><span class="ch" style="color: #20794D;
+background-color: null;
+font-style: inherit;">\t</span><span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'</span>.join(row), <span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">file</span><span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span>outf)</span></code></pre></div>
+</div>
+</section>
+</section>
+<section id="look-at-some-results" class="level1">
+<h1>Look at some results</h1>
+<p>The data is organized in a dictionary with one entry per paper.</p>
+<p>The <code>MCS_Report()</code> function defined above prints out the mean number of atoms per molecule in the input along with the size of the MCS. This is intended to help assess whether or not the MCS is actually a scaffold.</p>
+<p>How many “scaffolds” of each type do we have in total?</p>
+<div id="cell-33" class="cell" data-execution_count="4">
+<div class="sourceCode cell-code" id="cb24" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb24-1"><span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">import</span> pickle</span>
+<span id="cb24-2">results <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> pickle.load(<span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">open</span>(<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'../data/scaffolds_lead_opt.pkl'</span>, <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'rb'</span>))</span>
+<span id="cb24-3">results2 <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> pickle.load(<span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">open</span>(<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'../data/scaffolds_lead_opt_specific.pkl'</span>, <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'rb'</span>))</span></code></pre></div>
+</div>
+<div id="cell-34" class="cell" data-execution_count="9">
+<div class="sourceCode cell-code" id="cb25" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb25-1"><span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">len</span>(results),<span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">len</span>(results2)</span></code></pre></div>
+<div class="cell-output cell-output-display" data-execution_count="9">
+<pre><code>(770, 770)</code></pre>
+</div>
+</div>
+<p>Convert to dataframes:</p>
+<div id="cell-36" class="cell" data-execution_count="5">
+<div class="sourceCode cell-code" id="cb27" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb27-1">tbl <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> []</span>
+<span id="cb27-2"><span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">for</span> row <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">in</span> results:</span>
+<span id="cb27-3">    doc_id,smis,tpl,svg <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> row</span>
+<span id="cb27-4">    m <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> Chem.MolFromSmarts(tpl.smarts)</span>
+<span id="cb27-5">    m.UpdatePropertyCache(<span class="va" style="color: #111111;
+background-color: null;
+font-style: inherit;">False</span>)</span>
+<span id="cb27-6">    rdDepictor.Compute2DCoords(m)</span>
+<span id="cb27-7">    tbl.append((doc_id,tpl.numAtoms,tpl.avgNumMolAtoms.mean(),tpl.smarts,tpl.mcsTime))</span>
+<span id="cb27-8">scaff_df <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> pd.DataFrame(data<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span>tbl,columns<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span>(<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'doc_chembl_id'</span>,<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'numAtoms'</span>,<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'avgNumMolAtoms'</span>,<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'smarts'</span>,<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'time'</span>))</span>
+<span id="cb27-9"></span>
+<span id="cb27-10">tbl2 <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> []</span>
+<span id="cb27-11"><span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">for</span> row <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">in</span> results2:</span>
+<span id="cb27-12">    doc_id,smis,tpl,svg <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> row</span>
+<span id="cb27-13">    m <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> Chem.MolFromSmarts(tpl.smarts)</span>
+<span id="cb27-14">    m.UpdatePropertyCache(<span class="va" style="color: #111111;
+background-color: null;
+font-style: inherit;">False</span>)</span>
+<span id="cb27-15">    rdDepictor.Compute2DCoords(m)</span>
+<span id="cb27-16">    tbl2.append((doc_id,tpl.numAtoms,tpl.avgNumMolAtoms.mean(),tpl.smarts,tpl.mcsTime))</span>
+<span id="cb27-17">scaff_df2 <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> pd.DataFrame(data<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span>tbl2,columns<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span>(<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'doc_chembl_id'</span>,<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'numAtoms'</span>,<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'avgNumMolAtoms'</span>,<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'smarts'</span>,<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'time'</span>))</span>
+<span id="cb27-18">scaff_df2.head(<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">5</span>)</span></code></pre></div>
+<div class="cell-output cell-output-display" data-execution_count="5">
+<div>
+
+
+<table class="dataframe caption-top table table-sm table-striped small" data-quarto-postprocess="true" data-border="1">
+<thead>
+<tr class="header">
+<th data-quarto-table-cell-role="th"></th>
+<th data-quarto-table-cell-role="th">doc_chembl_id</th>
+<th data-quarto-table-cell-role="th">numAtoms</th>
+<th data-quarto-table-cell-role="th">avgNumMolAtoms</th>
+<th data-quarto-table-cell-role="th">smarts</th>
+<th data-quarto-table-cell-role="th">time</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td data-quarto-table-cell-role="th">0</td>
+<td>CHEMBL1140586</td>
+<td>15</td>
+<td>17.590909</td>
+<td>[#6]-,=;!@[#6]-&amp;!@[#6]-&amp;!@[#7]1-&amp;@[#6]-&amp;@[#6]-...</td>
+<td>0.004567</td>
+</tr>
+<tr class="even">
+<td data-quarto-table-cell-role="th">1</td>
+<td>CHEMBL1143305</td>
+<td>16</td>
+<td>32.612903</td>
+<td>[#7]-&amp;!@[#6]1:&amp;@[#6]:&amp;@[#6]:&amp;@[#6]:&amp;@[#6]:&amp;@[#...</td>
+<td>0.290015</td>
+</tr>
+<tr class="odd">
+<td data-quarto-table-cell-role="th">2</td>
+<td>CHEMBL1152282</td>
+<td>16</td>
+<td>31.641026</td>
+<td>[#7]-&amp;!@[#6]1:&amp;@[#6]:&amp;@[#6]:&amp;@[#6]:&amp;@[#6]:&amp;@[#...</td>
+<td>0.008485</td>
+</tr>
+<tr class="even">
+<td data-quarto-table-cell-role="th">3</td>
+<td>CHEMBL1153392</td>
+<td>17</td>
+<td>20.146341</td>
+<td>[#6]-&amp;!@[#6]1:&amp;@[#6]:&amp;@[#6](-&amp;!@[#7]-&amp;!@[#6]2:...</td>
+<td>0.033392</td>
+</tr>
+<tr class="odd">
+<td data-quarto-table-cell-role="th">4</td>
+<td>CHEMBL1136951</td>
+<td>6</td>
+<td>29.787879</td>
+<td>[#6]-&amp;!@[#6]1:,-;@[#6]:,-;@[#6]:,-;@[#6]:,-;@[...</td>
+<td>0.015072</td>
+</tr>
+</tbody>
+</table>
+
+</div>
+</div>
+</div>
+<p>How many scaffolds are reasonably sized, containing more than six atoms?</p>
+<div id="cell-38" class="cell" data-execution_count="16">
+<div class="sourceCode cell-code" id="cb28" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb28-1"><span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">len</span>(scaff_df[scaff_df.numAtoms <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">&gt;</span> <span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">6</span>]), <span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">len</span>(scaff_df2[scaff_df2.numAtoms <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">&gt;</span> <span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">6</span>])</span></code></pre></div>
+<div class="cell-output cell-output-display" data-execution_count="16">
+<pre><code>(764, 735)</code></pre>
+</div>
+</div>
+<p>How many make up a large percentage of the average molecule size: containing at least 60% as many atoms?</p>
+<div id="cell-40" class="cell" data-execution_count="17">
+<div class="sourceCode cell-code" id="cb30" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb30-1"><span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">len</span>(scaff_df[scaff_df.numAtoms <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">/</span> scaff_df.avgNumMolAtoms <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">&gt;</span> <span class="fl" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">0.6</span>]), <span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">len</span>(</span>
+<span id="cb30-2">    scaff_df2[scaff_df2.numAtoms <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">/</span> scaff_df2.avgNumMolAtoms <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">&gt;</span> <span class="fl" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">0.6</span>])</span></code></pre></div>
+<div class="cell-output cell-output-display" data-execution_count="17">
+<pre><code>(471, 285)</code></pre>
+</div>
+</div>
+<p>Not bad! It’s still worth looking at the ones that are super small:</p>
+<div id="cell-42" class="cell" data-execution_count="12">
+<div class="sourceCode cell-code" id="cb32" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb32-1">scaff_df[scaff_df.numAtoms <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">&lt;=</span> <span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">6</span>].head()</span></code></pre></div>
+<div class="cell-output cell-output-display" data-execution_count="12">
+<div>
+
+
+<table class="dataframe caption-top table table-sm table-striped small" data-quarto-postprocess="true" data-border="1">
+<thead>
+<tr class="header">
+<th data-quarto-table-cell-role="th"></th>
+<th data-quarto-table-cell-role="th">doc_chembl_id</th>
+<th data-quarto-table-cell-role="th">numAtoms</th>
+<th data-quarto-table-cell-role="th">avgNumMolAtoms</th>
+<th data-quarto-table-cell-role="th">smarts</th>
+<th data-quarto-table-cell-role="th">time</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td data-quarto-table-cell-role="th">159</td>
+<td>CHEMBL4196006</td>
+<td>6</td>
+<td>15.809524</td>
+<td>[#6]1:&amp;@[#6]:&amp;@[#6]:&amp;@[#6]:&amp;@[#6]:&amp;@[#6]:&amp;@1</td>
+<td>0.007589</td>
+</tr>
+<tr class="even">
+<td data-quarto-table-cell-role="th">187</td>
+<td>CHEMBL4342498</td>
+<td>2</td>
+<td>33.600000</td>
+<td>[#8,#6]=,-;!@[#6,#7,#8]</td>
+<td>30.139387</td>
+</tr>
+<tr class="odd">
+<td data-quarto-table-cell-role="th">222</td>
+<td>CHEMBL4402562</td>
+<td>4</td>
+<td>20.441176</td>
+<td>[#8,#6,#7]=,-;!@[#6,#16](-,=;!@[#8,#6,#7])-,=;...</td>
+<td>0.001956</td>
+</tr>
+<tr class="even">
+<td data-quarto-table-cell-role="th">663</td>
+<td>CHEMBL6087400</td>
+<td>6</td>
+<td>17.228070</td>
+<td>[#6]1:,-;@[#6]:,-;@[#6]:,-;@[#6]:,-;@[#6]:,-;@...</td>
+<td>0.036301</td>
+</tr>
+<tr class="odd">
+<td data-quarto-table-cell-role="th">700</td>
+<td>CHEMBL6103656</td>
+<td>6</td>
+<td>17.742857</td>
+<td>[#6]1:,-;@[#6]-,:;@[#6,#7]-,:;@[#6,#7]-,:;@[#7...</td>
+<td>0.284387</td>
+</tr>
+</tbody>
+</table>
+
+</div>
+</div>
+</div>
+<div id="cell-43" class="cell" data-execution_count="13">
+<div class="sourceCode cell-code" id="cb33" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb33-1">scaff_df2[scaff_df2.numAtoms <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">&lt;=</span> <span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">6</span>].head()</span></code></pre></div>
+<div class="cell-output cell-output-display" data-execution_count="13">
+<div>
+
+
+<table class="dataframe caption-top table table-sm table-striped small" data-quarto-postprocess="true" data-border="1">
+<thead>
+<tr class="header">
+<th data-quarto-table-cell-role="th"></th>
+<th data-quarto-table-cell-role="th">doc_chembl_id</th>
+<th data-quarto-table-cell-role="th">numAtoms</th>
+<th data-quarto-table-cell-role="th">avgNumMolAtoms</th>
+<th data-quarto-table-cell-role="th">smarts</th>
+<th data-quarto-table-cell-role="th">time</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td data-quarto-table-cell-role="th">4</td>
+<td>CHEMBL1136951</td>
+<td>6</td>
+<td>29.787879</td>
+<td>[#6]-&amp;!@[#6]1:,-;@[#6]:,-;@[#6]:,-;@[#6]:,-;@[...</td>
+<td>0.015072</td>
+</tr>
+<tr class="even">
+<td data-quarto-table-cell-role="th">27</td>
+<td>CHEMBL2034824</td>
+<td>2</td>
+<td>36.095238</td>
+<td>[#6]-&amp;!@[#6]</td>
+<td>30.271687</td>
+</tr>
+<tr class="odd">
+<td data-quarto-table-cell-role="th">54</td>
+<td>CHEMBL3352559</td>
+<td>6</td>
+<td>23.371429</td>
+<td>[#6]1:&amp;@[#6]:&amp;@[#6]:&amp;@[#6]:&amp;@[#6]:&amp;@[#6]:&amp;@1</td>
+<td>0.005176</td>
+</tr>
+<tr class="even">
+<td data-quarto-table-cell-role="th">86</td>
+<td>CHEMBL3785091</td>
+<td>3</td>
+<td>28.728395</td>
+<td>[#8]=,-;!@[#6]-&amp;!@[#6]</td>
+<td>0.013217</td>
+</tr>
+<tr class="odd">
+<td data-quarto-table-cell-role="th">106</td>
+<td>CHEMBL4011608</td>
+<td>6</td>
+<td>18.257143</td>
+<td>[#6]1:&amp;@[#6]:&amp;@[#6]:&amp;@[#6]:&amp;@[#6]:&amp;@[#6]:&amp;@1</td>
+<td>0.006619</td>
+</tr>
+</tbody>
+</table>
+
+</div>
+</div>
+</div>
+<p>Look at compounds from one of those documents:</p>
+<div id="cell-45" class="cell" data-execution_count="14">
+<div class="sourceCode cell-code" id="cb34" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb34-1">a <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> [x <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">for</span> x <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">in</span> results2 <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">if</span> x[<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">0</span>]<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">==</span><span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'CHEMBL4342498'</span>][<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">0</span>]</span>
+<span id="cb34-2"><span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">print</span>(<span class="ss" style="color: #20794D;
+background-color: null;
+font-style: inherit;">f'There are </span><span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">{</span><span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">len</span>(a[<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">1</span>])<span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">}</span><span class="ss" style="color: #20794D;
+background-color: null;
+font-style: inherit;"> molecules for this document'</span>)</span>
+<span id="cb34-3">mols <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> [Chem.MolFromSmiles(y) <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">for</span> y <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">in</span> a[<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">1</span>]]</span>
+<span id="cb34-4">Draw.MolsToGridImage(mols[:<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">16</span>],molsPerRow<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span><span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">4</span>)</span></code></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>There are 35 molecules for this document</code></pre>
+</div>
+<div class="cell-output cell-output-display" data-execution_count="14">
+<div>
+<figure class="figure">
+<p><img src="https://greglandrum.github.io/rdkit-blog/posts/2026-08-25-finding-lead-scaffolds_files/figure-html/cell-26-output-2.png" class="img-fluid figure-img"></p>
+</figure>
+</div>
+</div>
+</div>
+<p>There is clearly a scaffold there, it just doesn’t cover 90% of the molecules.</p>
+<p>The molecules that don’t match the scaffold:</p>
+<div id="cell-48" class="cell" data-execution_count="15">
+<div class="sourceCode cell-code" id="cb36" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb36-1">Draw.MolsToGridImage([x <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">for</span> x <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">in</span> mols <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">if</span> <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">not</span> x.HasSubstructMatch(Chem.MolFromSmarts(<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'C1C(=O)Nc2ccccc12'</span>))],molsPerRow<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span><span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">4</span>)</span></code></pre></div>
+<div class="cell-output cell-output-display" data-execution_count="15">
+<div>
+<figure class="figure">
+<p><img src="https://greglandrum.github.io/rdkit-blog/posts/2026-08-25-finding-lead-scaffolds_files/figure-html/cell-27-output-1.png" class="img-fluid figure-img"></p>
+</figure>
+</div>
+</div>
+</div>
+<p>What if we only require that the scaffold cover 80 or 85% of the molecules?</p>
+<p>Start with the fuzzy MCS:</p>
+<div id="cell-51" class="cell" data-execution_count="10">
+<div class="sourceCode cell-code" id="cb37" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb37-1">tpl <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> run_doc(df, <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'CHEMBL4342498'</span>, threshold<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span><span class="fl" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">0.8</span>)</span></code></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>35 molecules found for document CHEMBL4342498
+Mean nAts 33.6, mcs nAts: 28
+[#8]=&amp;!@[#6]1:&amp;@[#7]:&amp;@[#6](-&amp;!@[#7]2-&amp;@[#6]-&amp;@[#6]-&amp;@[#6]3(-&amp;@[#6]-&amp;@[#6]-&amp;@2)-&amp;@[#6]-&amp;@[#7](-&amp;@[#6]2:&amp;@[#6]-&amp;@3:&amp;@[#6](:&amp;@[#6]:&amp;@[#6](:&amp;@[#6]:&amp;@2)-&amp;!@[#9,#7,#8])-&amp;!@[#9])-&amp;!@[#6]):&amp;@[#7]:&amp;@[#6]2:&amp;@[#6]:&amp;@1-,:;@[#6]-,:;@[#6]-,:;@[#6]-,:;@[#6,#7]-,:;@2</code></pre>
+</div>
+</div>
+<p>Now the specific MCS:</p>
+<div id="cell-53" class="cell" data-execution_count="11">
+<div class="sourceCode cell-code" id="cb39" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb39-1">tpl2 <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> run_doc2(df, <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'CHEMBL4342498'</span>, threshold<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span><span class="fl" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">0.85</span>)</span></code></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>35 molecules found for document CHEMBL4342498
+Mean nAts 33.6, mcs nAts: 23
+[#8]=&amp;!@[#6]1:&amp;@[#7]:&amp;@[#6](-&amp;!@[#7]2-&amp;@[#6]-&amp;@[#6]-&amp;@[#6]3(-&amp;@[#6]-&amp;@[#6]-&amp;@2)-&amp;@[#6]-&amp;@[#7](-&amp;@[#6]2:&amp;@[#6]-&amp;@3:&amp;@[#6](:&amp;@[#6]:&amp;@[#6]:&amp;@[#6]:&amp;@2)-&amp;!@[#9])-&amp;!@[#6]):&amp;@[#7]:&amp;@[#6]:&amp;@[#6]:&amp;@1</code></pre>
+</div>
+</div>
+<div id="cell-54" class="cell" data-execution_count="26">
+<div class="sourceCode cell-code" id="cb41" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb41-1">tpl2 <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> run_doc2(df, <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'CHEMBL4342498'</span>, threshold<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span><span class="fl" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">0.85</span>)</span></code></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>35 molecules found for document CHEMBL4342498
+Mean nAts 33.6, mcs nAts: 2
+[#8]=,-;!@[#6]</code></pre>
+</div>
+</div>
+<p>Repeat the run and only require that the scaffold match 80% of the molecules in the documents where the MCS covered less than 60% of the average number of atoms</p>
+<div id="cell-56" class="cell">
+<div class="sourceCode cell-code" id="cb43" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb43-1">relaxed_results2 <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> []</span>
+<span id="cb43-2"></span>
+<span id="cb43-3">scaff_df2[<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'scaff_frac'</span>] <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> scaff_df2.numAtoms <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">/</span> scaff_df2.avgNumMolAtoms</span>
+<span id="cb43-4"></span>
+<span id="cb43-5">to_expand <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> scaff_df2[scaff_df2.scaff_frac <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">&lt;</span> <span class="fl" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">0.6</span>]</span>
+<span id="cb43-6"></span>
+<span id="cb43-7">doc_ids <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> to_expand.doc_chembl_id.unique().tolist()</span>
+<span id="cb43-8">nrows <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> <span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">len</span>(doc_ids)</span>
+<span id="cb43-9"><span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">for</span> i, did <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">in</span> <span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">enumerate</span>(doc_ids):</span>
+<span id="cb43-10">    <span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">print</span>(<span class="ss" style="color: #20794D;
+background-color: null;
+font-style: inherit;">f'Doing row </span><span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">{</span>i<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">+</span><span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">1</span><span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">}</span><span class="ss" style="color: #20794D;
+background-color: null;
+font-style: inherit;"> of </span><span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">{</span>nrows<span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">}</span><span class="ss" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'</span>)</span>
+<span id="cb43-11">    tpl <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> run_doc2(df, did, threshold<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span><span class="fl" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">0.8</span>)</span>
+<span id="cb43-12">    relaxed_results2.append(tpl)</span>
+<span id="cb43-13"></span>
+<span id="cb43-14">pickle.dump(relaxed_results2, <span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">open</span>(<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'../data/scaffolds_lead_opt_specific_relaxed.pkl'</span>, <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'wb+'</span>))</span></code></pre></div>
+</div>
+<div id="cell-57" class="cell" data-execution_count="8">
+<div class="sourceCode cell-code" id="cb44" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb44-1">relaxed_results2 <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> pickle.load(<span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">open</span>(<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'../data/scaffolds_lead_opt_specific_relaxed.pkl'</span>, <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'rb'</span>))</span></code></pre></div>
+</div>
+<div id="cell-58" class="cell" data-execution_count="9">
+<div class="sourceCode cell-code" id="cb45" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb45-1">tbl2 <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> []</span>
+<span id="cb45-2"><span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">for</span> row <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">in</span> relaxed_results2:</span>
+<span id="cb45-3">    doc_id, smis, tpl, svg <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> row</span>
+<span id="cb45-4">    m <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> Chem.MolFromSmarts(tpl.smarts)</span>
+<span id="cb45-5">    m.UpdatePropertyCache(<span class="va" style="color: #111111;
+background-color: null;
+font-style: inherit;">False</span>)</span>
+<span id="cb45-6">    rdDepictor.Compute2DCoords(m)</span>
+<span id="cb45-7">    tbl2.append((doc_id, tpl.numAtoms, tpl.avgNumMolAtoms.mean(), tpl.smarts,</span>
+<span id="cb45-8">                 tpl.mcsTime))</span>
+<span id="cb45-9">relaxed_scaff_df2 <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> pd.DataFrame(data<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span>tbl2,</span>
+<span id="cb45-10">                         columns<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span>(<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'doc_chembl_id'</span>, <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'numAtoms'</span>,</span>
+<span id="cb45-11">                                  <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'avgNumMolAtoms'</span>, <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'smarts'</span>, <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'time'</span>))</span>
+<span id="cb45-12">relaxed_scaff_df2.head(<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">5</span>)</span></code></pre></div>
+<div class="cell-output cell-output-display" data-execution_count="9">
+<div>
+
+
+<table class="dataframe caption-top table table-sm table-striped small" data-quarto-postprocess="true" data-border="1">
+<thead>
+<tr class="header">
+<th data-quarto-table-cell-role="th"></th>
+<th data-quarto-table-cell-role="th">doc_chembl_id</th>
+<th data-quarto-table-cell-role="th">numAtoms</th>
+<th data-quarto-table-cell-role="th">avgNumMolAtoms</th>
+<th data-quarto-table-cell-role="th">smarts</th>
+<th data-quarto-table-cell-role="th">time</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td data-quarto-table-cell-role="th">0</td>
+<td>CHEMBL1143305</td>
+<td>19</td>
+<td>32.612903</td>
+<td>[#7]-&amp;!@[#6]1:&amp;@[#6]:&amp;@[#6]:&amp;@[#6]:&amp;@[#6]:&amp;@[#...</td>
+<td>1.477257</td>
+</tr>
+<tr class="even">
+<td data-quarto-table-cell-role="th">1</td>
+<td>CHEMBL1152282</td>
+<td>22</td>
+<td>31.641026</td>
+<td>[#7]-&amp;!@[#6]1:&amp;@[#6]:&amp;@[#6]:&amp;@[#6]:&amp;@[#6]:&amp;@[#...</td>
+<td>7.046058</td>
+</tr>
+<tr class="odd">
+<td data-quarto-table-cell-role="th">2</td>
+<td>CHEMBL1136951</td>
+<td>12</td>
+<td>29.787879</td>
+<td>[#6]1:&amp;@[#6]:&amp;@[#6]:&amp;@[#6]2:&amp;@[#6](:&amp;@[#6]:&amp;@1...</td>
+<td>0.206350</td>
+</tr>
+<tr class="even">
+<td data-quarto-table-cell-role="th">3</td>
+<td>CHEMBL1136988</td>
+<td>25</td>
+<td>32.085714</td>
+<td>[#6]1:&amp;@[#6]:&amp;@[#6]:&amp;@[#6](:&amp;@[#6]:&amp;@[#6]:&amp;@1)...</td>
+<td>15.545042</td>
+</tr>
+<tr class="odd">
+<td data-quarto-table-cell-role="th">4</td>
+<td>CHEMBL1153522</td>
+<td>16</td>
+<td>28.151515</td>
+<td>[#6]1:&amp;@[#6]:&amp;@[#6]:&amp;@[#6](:&amp;@[#6]:&amp;@[#6]:&amp;@1)...</td>
+<td>1.069422</td>
+</tr>
+</tbody>
+</table>
+
+</div>
+</div>
+</div>
+<p>Repeat the run again and only require that the scaffold match 70% of the molecules in the documents where the MCS from the 80% threshold covered less than 60% of the average number of atoms</p>
+<div id="cell-61" class="cell">
+<div class="sourceCode cell-code" id="cb46" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb46-1">relaxed_results3 <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> []</span>
+<span id="cb46-2"></span>
+<span id="cb46-3">relaxed_scaff_df2[</span>
+<span id="cb46-4">    <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'scaff_frac'</span>] <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> relaxed_scaff_df2.numAtoms <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">/</span> relaxed_scaff_df2.avgNumMolAtoms</span>
+<span id="cb46-5"></span>
+<span id="cb46-6">to_expand <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> relaxed_scaff_df2[relaxed_scaff_df2.scaff_frac <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">&lt;</span> <span class="fl" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">0.6</span>]</span>
+<span id="cb46-7"></span>
+<span id="cb46-8">doc_ids <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> to_expand.doc_chembl_id.unique().tolist()</span>
+<span id="cb46-9">nrows <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> <span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">len</span>(doc_ids)</span>
+<span id="cb46-10"><span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">for</span> i, did <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">in</span> <span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">enumerate</span>(doc_ids):</span>
+<span id="cb46-11">    <span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">print</span>(<span class="ss" style="color: #20794D;
+background-color: null;
+font-style: inherit;">f'Doing row </span><span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">{</span>i<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">+</span><span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">1</span><span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">}</span><span class="ss" style="color: #20794D;
+background-color: null;
+font-style: inherit;"> of </span><span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">{</span>nrows<span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">}</span><span class="ss" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'</span>)</span>
+<span id="cb46-12">    tpl <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> run_doc2(df, did, threshold<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span><span class="fl" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">0.7</span>)</span>
+<span id="cb46-13">    relaxed_results3.append(tpl)</span>
+<span id="cb46-14"></span>
+<span id="cb46-15">pickle.dump(relaxed_results3,</span>
+<span id="cb46-16">            <span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">open</span>(<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'../data/scaffolds_lead_opt_specific_very_relaxed.pkl'</span>, <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'wb+'</span>))</span></code></pre></div>
+</div>
+<div id="cell-62" class="cell" data-execution_count="10">
+<div class="sourceCode cell-code" id="cb47" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb47-1">relaxed_results3 <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> pickle.load(<span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">open</span>(<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'../data/scaffolds_lead_opt_specific_very_relaxed.pkl'</span>, <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'rb'</span>))</span></code></pre></div>
+</div>
+<div id="cell-63" class="cell" data-execution_count="11">
+<div class="sourceCode cell-code" id="cb48" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb48-1">tbl2 <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> []</span>
+<span id="cb48-2"><span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">for</span> row <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">in</span> relaxed_results3:</span>
+<span id="cb48-3">    doc_id, smis, tpl, svg <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> row</span>
+<span id="cb48-4">    m <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> Chem.MolFromSmarts(tpl.smarts)</span>
+<span id="cb48-5">    m.UpdatePropertyCache(<span class="va" style="color: #111111;
+background-color: null;
+font-style: inherit;">False</span>)</span>
+<span id="cb48-6">    rdDepictor.Compute2DCoords(m)</span>
+<span id="cb48-7">    tbl2.append((doc_id, tpl.numAtoms, tpl.avgNumMolAtoms.mean(), tpl.smarts,</span>
+<span id="cb48-8">                 tpl.mcsTime))</span>
+<span id="cb48-9">relaxed_scaff_df3 <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> pd.DataFrame(data<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span>tbl2,</span>
+<span id="cb48-10">                                 columns<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span>(<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'doc_chembl_id'</span>, <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'numAtoms'</span>,</span>
+<span id="cb48-11">                                          <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'avgNumMolAtoms'</span>, <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'smarts'</span>, <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'time'</span>))</span>
+<span id="cb48-12"></span>
+<span id="cb48-13">relaxed_scaff_df3[<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'scaff_frac'</span>] <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> relaxed_scaff_df3.numAtoms <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">/</span> relaxed_scaff_df3.avgNumMolAtoms</span>
+<span id="cb48-14"></span>
+<span id="cb48-15"><span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">len</span>(relaxed_scaff_df3[relaxed_scaff_df3.scaff_frac <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">&gt;</span> <span class="fl" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">0.6</span>])</span></code></pre></div>
+<div class="cell-output cell-output-display" data-execution_count="11">
+<pre><code>98</code></pre>
+</div>
+</div>
+<div id="cell-64" class="cell" data-execution_count="13">
+<div class="sourceCode cell-code" id="cb50" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb50-1">scaff_df2[<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'scaff_frac'</span>] <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> scaff_df2.numAtoms <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">/</span> scaff_df2.avgNumMolAtoms</span>
+<span id="cb50-2">relaxed_scaff_df2[<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'scaff_frac'</span>] <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> relaxed_scaff_df2.numAtoms <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">/</span> relaxed_scaff_df2.avgNumMolAtoms</span>
+<span id="cb50-3"></span></code></pre></div>
+</div>
+<p>Combine the sets of scaffolds that we’ve found so far:</p>
+<div id="cell-66" class="cell" data-execution_count="14">
+<div class="sourceCode cell-code" id="cb51" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb51-1">combined_df <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> pd.concat([scaff_df2[scaff_df2.scaff_frac<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">&gt;</span><span class="fl" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">0.6</span>], relaxed_scaff_df2[relaxed_scaff_df2.scaff_frac<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">&gt;</span><span class="fl" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">0.6</span>], relaxed_scaff_df3[relaxed_scaff_df3.scaff_frac<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">&gt;</span><span class="fl" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">0.6</span>]])</span>
+<span id="cb51-2"><span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">print</span>(combined_df.shape)</span>
+<span id="cb51-3">combined_df.head()</span></code></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>(500, 6)</code></pre>
+</div>
+<div class="cell-output cell-output-display" data-execution_count="14">
+<div>
+
+
+<table class="dataframe caption-top table table-sm table-striped small" data-quarto-postprocess="true" data-border="1">
+<thead>
+<tr class="header">
+<th data-quarto-table-cell-role="th"></th>
+<th data-quarto-table-cell-role="th">doc_chembl_id</th>
+<th data-quarto-table-cell-role="th">numAtoms</th>
+<th data-quarto-table-cell-role="th">avgNumMolAtoms</th>
+<th data-quarto-table-cell-role="th">smarts</th>
+<th data-quarto-table-cell-role="th">time</th>
+<th data-quarto-table-cell-role="th">scaff_frac</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td data-quarto-table-cell-role="th">0</td>
+<td>CHEMBL1140586</td>
+<td>15</td>
+<td>17.590909</td>
+<td>[#6]-,=;!@[#6]-&amp;!@[#6]-&amp;!@[#7]1-&amp;@[#6]-&amp;@[#6]-...</td>
+<td>0.004567</td>
+<td>0.852713</td>
+</tr>
+<tr class="even">
+<td data-quarto-table-cell-role="th">3</td>
+<td>CHEMBL1153392</td>
+<td>17</td>
+<td>20.146341</td>
+<td>[#6]-&amp;!@[#6]1:&amp;@[#6]:&amp;@[#6](-&amp;!@[#7]-&amp;!@[#6]2:...</td>
+<td>0.033392</td>
+<td>0.843826</td>
+</tr>
+<tr class="odd">
+<td data-quarto-table-cell-role="th">6</td>
+<td>CHEMBL1138529</td>
+<td>26</td>
+<td>41.187500</td>
+<td>[#6]-&amp;!@[#7]1:&amp;@[#6]:&amp;@[#7]:&amp;@[#6]:&amp;@[#6]:&amp;@1-...</td>
+<td>30.205141</td>
+<td>0.631259</td>
+</tr>
+<tr class="even">
+<td data-quarto-table-cell-role="th">9</td>
+<td>CHEMBL1156284</td>
+<td>35</td>
+<td>40.967742</td>
+<td>[#6]-&amp;!@[#6](-&amp;!@[#8]-&amp;!@[#6]1-&amp;@[#6]-&amp;@[#7]2-...</td>
+<td>30.035294</td>
+<td>0.854331</td>
+</tr>
+<tr class="odd">
+<td data-quarto-table-cell-role="th">10</td>
+<td>CHEMBL1212923</td>
+<td>16</td>
+<td>25.967742</td>
+<td>[#6](=&amp;!@[#8])-&amp;!@[#7]1-&amp;@[#6]-&amp;@[#6]-&amp;@[#7](-...</td>
+<td>0.175085</td>
+<td>0.616149</td>
+</tr>
+</tbody>
+</table>
+
+</div>
+</div>
+</div>
+<p>Make sure we don’t have duplicates in there:</p>
+<div id="cell-68" class="cell" data-execution_count="15">
+<div class="sourceCode cell-code" id="cb53" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb53-1"><span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">len</span>(<span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">set</span>(combined_df.doc_chembl_id.tolist()))</span></code></pre></div>
+<div class="cell-output cell-output-display" data-execution_count="15">
+<pre><code>500</code></pre>
+</div>
+</div>
+<p>And save those</p>
+<div id="cell-70" class="cell" data-execution_count="16">
+<div class="sourceCode cell-code" id="cb55" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb55-1">combined_df.to_csv(<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'../data/scaffolds_lead_opt_specific_combined.csv'</span>,index<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span><span class="va" style="color: #111111;
+background-color: null;
+font-style: inherit;">False</span>)</span></code></pre></div>
+</div>
+<p>Now let’s look at some of them:</p>
+<div id="cell-72" class="cell" data-execution_count="18">
+<div class="sourceCode cell-code" id="cb56" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb56-1">scaffs <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> [Chem.MolFromSmarts(x) <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">for</span> x <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">in</span> combined_df.smarts.tolist()]</span>
+<span id="cb56-2">Draw.MolsToGridImage(scaffs[:<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">16</span>],molsPerRow<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span><span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">4</span>,legends<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span>combined_df.doc_chembl_id.tolist()[:<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">16</span>], subImgSize<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span>(<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">300</span>,<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">300</span>))</span></code></pre></div>
+<div class="cell-output cell-output-display" data-execution_count="18">
+<div>
+<figure class="figure">
+<p><img src="https://greglandrum.github.io/rdkit-blog/posts/2026-08-25-finding-lead-scaffolds_files/figure-html/cell-42-output-1.png" class="img-fluid figure-img"></p>
+</figure>
+</div>
+</div>
+</div>
+<p>We could do a bit of cleaning up here, but these don’t look terrible.</p>
+</section>
+<section id="wrapping-up" class="level1">
+<h1>Wrapping up</h1>
+<p>There’s a lot more we can do with this set of scaffolds. There are more posts to come…</p>
+
+
+</section>
+
+ ]]></description>
+  <category>datasets</category>
+  <category>exploration</category>
+  <guid>https://greglandrum.github.io/rdkit-blog/posts/2026-08-25-finding-lead-scaffolds.html</guid>
+  <pubDate>Mon, 24 Aug 2026 22:00:00 GMT</pubDate>
+  <media:content url="https://greglandrum.github.io/rdkit-blog/posts/images/blog/finding-lead-scaffolds-1.png" medium="image" type="image/png" height="72" width="144"/>
+</item>
 <item>
   <title>Identifying lead-optimization data sets in ChEMBL</title>
   <link>https://greglandrum.github.io/rdkit-blog/posts/2026-07-16-identifying-lead-opt-docs.html</link>
@@ -20489,134 +22672,6 @@ font-style: inherit;">;</span></span></code></pre></div>
   <guid>https://greglandrum.github.io/rdkit-blog/posts/2025-08-30-confgen-scaling.html</guid>
   <pubDate>Fri, 29 Aug 2025 22:00:00 GMT</pubDate>
   <media:content url="https://greglandrum.github.io/rdkit-blog/posts/images/blog/confgen-scaling-1.png" medium="image" type="image/png" height="76" width="144"/>
-</item>
-<item>
-  <title>How the 2D/3D flag in Mol blocks is used</title>
-  <link>https://greglandrum.github.io/rdkit-blog/posts/2025-08-22-interpreting-the-2d3d-flag.html</link>
-  <description><![CDATA[ 
-
-
-
-
-<p>[This is an expanded version of a section which will be added to the RDKit documentation to clarify an important detail about the way Mol and SD files are parsed.]</p>
-<section id="background" class="level1">
-<h1>Background</h1>
-<p>Mol blocks, Mol files, and SD files can describe 2D or 3D molecules and include a flag (called “dimensional code” in the spec) to indicate whether the coordinates are 2D or 3D. The flag shows up in the second line of the Mol block, and is present in both V2000:</p>
-<pre><code>nitrogen
-     RDKit          2D
-
-  2  1  0  0  0  0  0  0  0  0999 V2000
-    0.0000    0.0000    0.0000 N   0  0  0  0  0  0  0  0  0  0  0  0
-   -0.0000   -1.5000    0.0000 N   0  0  0  0  0  0  0  0  0  0  0  0
-  1  2  3  0
-M  END</code></pre>
-<p>and V3000 mol blocks:</p>
-<pre><code>nitrogen
-     RDKit          2D
-
-  0  0  0  0  0  0  0  0  0  0999 V3000
-M  V30 BEGIN CTAB
-M  V30 COUNTS 2 1 0 0 0
-M  V30 BEGIN ATOM
-M  V30 1 N 0.000000 0.000000 0.000000 0
-M  V30 2 N -0.000000 -1.500000 0.000000 0
-M  V30 END ATOM
-M  V30 BEGIN BOND
-M  V30 1 3 1 2
-M  V30 END BOND
-M  V30 END CTAB
-M  END</code></pre>
-<p>The CTFile specification says the following about this flag: &gt; The “dimensional code” is maintained explicitly. Thus “3D” really means 3D, &gt; although “2D” will be interpreted as 3D if any non-zero Z-coordinates are &gt; found</p>
-<p>That’s simple (and logical) enough, but of course in the real world things are more complicated. Files found “in the wild” include every possible combination of 2D/3D flag and 2D/3D coordinates, so we need to decide how to interpret these combinations. Things are made more complicated by the possible presence of wedged bonds in the Mol block. Wedged bonds are typically a signal that something is known about the stereochemistry of the molecule; how do we combine this information with the coordinates?</p>
-<blockquote class="blockquote">
-<p><em>Aside on 2D vs 3D coordinates</em>: in Mol blocks X, Y, and Z coordinates are always provided (if any of them are missing, they are set to zero). It’s also possible to have 3D coordinates for planar molecules. For the purposes of this discussion, “2D” coordinates means that all Z coordinates are zero, and a “2D” RDKit molecule is one where the (default) conformer is marked as being 2D (i.e.&nbsp;the conformer’s <code>Is3D()</code> method returns <code>False</code>).</p>
-</blockquote>
-</section>
-<section id="what-the-rdkit-does" class="level1">
-<h1>What the RDKit does</h1>
-<p>The following table describes how the RDKit interprets all possible combinations of dimensionality flag, coordinate dimensionality, and the presence or absence of wedged bonds:</p>
-<table class="caption-top table">
-<thead>
-<tr class="header">
-<th>flag</th>
-<th>coords</th>
-<th>wedging</th>
-<th>result</th>
-<th>notes</th>
-</tr>
-</thead>
-<tbody>
-<tr class="odd">
-<td>2D</td>
-<td>2D</td>
-<td>no</td>
-<td>2D</td>
-<td>no chirality</td>
-</tr>
-<tr class="even">
-<td>3D</td>
-<td>2D</td>
-<td>no</td>
-<td>3D</td>
-<td>no chirality</td>
-</tr>
-<tr class="odd">
-<td>3D</td>
-<td>3D</td>
-<td>no</td>
-<td>3D</td>
-<td>chirality from coords</td>
-</tr>
-<tr class="even">
-<td>2D</td>
-<td>3D</td>
-<td>no</td>
-<td>3D</td>
-<td>chirality from coords</td>
-</tr>
-<tr class="odd">
-<td>2D</td>
-<td>2D</td>
-<td>yes</td>
-<td>2D</td>
-<td>chirality from wedging</td>
-</tr>
-<tr class="even">
-<td>3D</td>
-<td>2D</td>
-<td>yes</td>
-<td>2D</td>
-<td>chirality from wedging</td>
-</tr>
-<tr class="odd">
-<td>3D</td>
-<td>3D</td>
-<td>yes</td>
-<td>3D</td>
-<td>chirality from coords</td>
-</tr>
-<tr class="even">
-<td>2D</td>
-<td>3D</td>
-<td>yes</td>
-<td>3D</td>
-<td>chirality from coords</td>
-</tr>
-</tbody>
-</table>
-<p>This is consistent with what the specification says except for the case where the 3D flag is set for 2D coordinates and a wedge is present, in which case we ignore the 3D flag, mark the conformer as 2D, and set the stereochemistry based on the wedging.</p>
-<p>In cases where no 2D/3D flag is provided, the default value of the flag is 2D.</p>
-<p>In a 2D structure, wedging is interpreted as a signal to indicate that stereochemistry is present and to indicate what the stereochemistry is (i.e.&nbsp;the stereochemistry is determined based on the 2D coordinates and the direction of the wedge).</p>
-<p>When 3D coordinates are provided, stereochemistry is perceived from the coordinates themselves. If wedging is also present it will be ignored; the 3D signal is “stronger” than the wedging signal. The exception to this rule is <a href="https://www.rdkit.org/docs/RDKit_Book.html#atropisomeric-bonds">atropisomeric bonds</a>, where the wedged bond indicates that atropisomerism should be perceived, but the direction of the wedge is ignored.</p>
-
-
-</section>
-
- ]]></description>
-  <category>documentation</category>
-  <category>technical</category>
-  <guid>https://greglandrum.github.io/rdkit-blog/posts/2025-08-22-interpreting-the-2d3d-flag.html</guid>
-  <pubDate>Thu, 21 Aug 2025 22:00:00 GMT</pubDate>
 </item>
 </channel>
 </rss>
