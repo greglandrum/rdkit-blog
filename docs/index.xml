@@ -10,7 +10,666 @@
 <atom:link href="https://greglandrum.github.io/rdkit-blog/index.xml" rel="self" type="application/rss+xml"/>
 <description>RDKit experiments, tips, and tutorials</description>
 <generator>quarto-1.6.43</generator>
-<lastBuildDate>Mon, 24 Aug 2026 22:00:00 GMT</lastBuildDate>
+<lastBuildDate>Mon, 07 Sep 2026 22:00:00 GMT</lastBuildDate>
+<item>
+  <title>Introducing Searching Synthon Spaces by Shape</title>
+  <link>https://greglandrum.github.io/rdkit-blog/posts/2026-09-08-shape-synthon-search.html</link>
+  <description><![CDATA[ 
+
+
+
+
+<section id="shape-searching-in-synthon-spaces" class="level1">
+<h1>Shape Searching in Synthon Spaces</h1>
+<p><strong>Note</strong> this is a guest post written by Dave Cosgrove (GitHub: <span class="citation" data-cites="DavidACosgrove">@DavidACosgrove</span>).</p>
+<p>Substructure and fingerprint similarity searching in synthon spaces was introduced in the RDKit in <a href="https://greglandrum.github.io/rdkit-blog/posts/2024-12-03-introducing-synthon-search.html">December 2024</a>. The motivation behind this method of searching synthon-based libraries such as ChemSpaces’s <a href="https://chem-space.com/freedom-space">FreedomSpace</a> or Enamine’s <a href="https://enamine.net/compound-collections/real-compounds/real-database">REAL</a> is that enumerating the individual compounds for search is infeasible - the libraries expand to tens of billions of compounds which cannot be stored and searched with current hardware.</p>
+<p>Similarity search has now been extended to include 3D shapes, where the problems of searching are even more pronounced since the similarity measure (in this case using the RDKit’s new rdGaussianShape module) is significantly slower and it is normally necessary to use multiple conformations of the synthons and any potential hits.</p>
+<section id="algorithm-overview" class="level2">
+<h2 class="anchored" data-anchor-id="algorithm-overview">Algorithm Overview</h2>
+<p>The algorithm is the same as that used for fingerprint similarity, but with a different similarity measure.</p>
+<p>Briefly:</p>
+<p>A database is prepared of synthon shapes, which only needs to be done once.</p>
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="https://greglandrum.github.io/rdkit-blog/posts/images/blog/2026-09-08-create_synthon_db.png" class="img-fluid figure-img"></p>
+<figcaption>Create Synthon Shapes</figcaption>
+</figure>
+</div>
+<p>The query molecule is split into fragments and shapes created for them:</p>
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="https://greglandrum.github.io/rdkit-blog/posts/images/blog/2026-09-08-create_fragment_shapes.png" class="img-fluid figure-img"></p>
+<figcaption>Create Fragment Shapes</figcaption>
+</figure>
+</div>
+<p>The fragments are compared to the synthons and lists of the matches created:</p>
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="https://greglandrum.github.io/rdkit-blog/posts/images/blog/2026-09-08-compare.png" class="img-fluid figure-img"></p>
+<figcaption>Compare Fragments to Synthons</figcaption>
+</figure>
+</div>
+<p>For those fragment sets that have matching synthons, build the product and compare with the query. If it matches according to the appropriate acceptance, it’s a hit:</p>
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="https://greglandrum.github.io/rdkit-blog/posts/images/blog/2026-09-08-check.png" class="img-fluid figure-img"></p>
+<figcaption>Check Product Against Query</figcaption>
+</figure>
+</div>
+<p>For shape similarity searching, each synthon is represented by an <code>rdGaussianShape.ShapeInput</code> object containing 1 or more conformations and the final similarity check involves a conformational expansion of the possible hit and shape similarity calculation.</p>
+<p>The algorithm is very similar to that of <a href="https://pubs.acs.org/doi/10.1021/acs.jcim.3c01865#">Cheng and Beroza</a> although theirs was implemented using proprietary software from <a href="https://www.eyesopen.com">OpenEye</a>.</p>
+</section>
+<section id="the-synthon-shape-database" class="level2">
+<h2 class="anchored" data-anchor-id="the-synthon-shape-database">The Synthon Shape Database</h2>
+<p>The synthon shape database should be prepared in advance in much the same way as the fingerprint database. The synthons are each built into a small representative molecule using other synthons in the same reaction set, the molecule is trimmed to remove extraneous side chains from the other synthons, a conformational expansion performed and the added portions removed to leave conformers just of the original synthon. The conformers are optionally pruned to discard very similar shapes and the <code>ShapeInput</code> object stored in the file. Database preparation can take some hours on an average multi-threaded machine. By default, the RDKit’s distance geometry method is used for conformer generation, largely using default settings. An example of how this might be done is given below.</p>
+<pre><code>synthonspace = rdSynthonSpaceSearch.SynthonSpace()
+synthonspace.ReadTextFile(textFile)
+print(f"Number of reactions : {synthonspace.GetNumReactions()}")
+print(f"Number of products : {rdSynthonSpaceSearch.FormattedIntegerString(synthonspace.GetNumProducts())}")
+print(f"Number of synthons : {synthonspace.GetNumSynthons()}")
+shapeBuildParams = rdSynthonSpaceSearch.ShapeBuildParams()
+shapeBuildParams.numConfs = 100
+shapeBuildParams.numThreads = -1
+shapeBuildParams.maxSynthonAtoms = 30
+shapeBuildParams.rmsThreshold = 0.5
+shapeBuildParams.interimWrites = 10000
+shapeBuildParams.timeOut = 60
+shapeBuildParams.useProgressBar = 60
+shapeBuildParams.interimFile = f"{dbFile}.bu"
+shapeBuildParams.randomSeed = 0xdac
+synthonspace.BuildSynthonShapes(shapeBuildParams)
+synthonspace.WriteDBFile(dbFile)</code></pre>
+<p>Some parameters of note:</p>
+<ul>
+<li><code>timeOut</code> is applied to each run of the distance geometry function</li>
+<li><code>useProgressBar</code> defaults to 0. If a positive integer is given, a progress bar of that number of characters in width is used, much like Python’s <code>tqdm</code> module</li>
+<li><code>interimFile</code> Because the database generation is a lengthy calculation, it’s convenient to be able to restart in the event of an interruption. This file is written after every <code>interimWrites</code> synthons have been processed, and can be used as input to a new database creation process.</li>
+</ul>
+</section>
+<section id="running-the-search" class="level2">
+<h2 class="anchored" data-anchor-id="running-the-search">Running the search</h2>
+<p>The search requires a single conformer of a query of interest. If a multi-conformer query is given, only the first conformer will be considered. A sample search is given below:</p>
+<pre><code>synthonspace = rdSynthonSpaceSearch.SynthonSpace()
+synthonspace.ReadDBFile(dbfile, 8)
+print(f"Number of reactions : {synthonspace.GetNumReactions()}")
+print(f"Number of products : {synthonspace.GetNumProducts()}")
+print(f"Number of synthons : {synthonspace.GetNumSynthons()}")
+synthonspace.ReportSynthonUsage()
+
+ssparams = rdSynthonSpaceSearch.SynthonSpaceSearchParams()
+ssparams.maxHits = 1000
+ssparams.fragSimilarityAdjuster = 0.1
+ssparams.approxSimilarityAdjuster = 0.1
+ssparams.similarityCutoff = 0.8
+ssparams.numThreads = -1
+ssparams.timeOut = 0
+ssparams.useProgressBar = 60
+ssparams.bestHit = True
+ssparams.randomSeed = 0xdac
+ssparams.numConformers = 50
+ssparams.confRMSThreshold = 0.25
+
+results = synthonspace.ShapeSearch(query, ssparams)</code></pre>
+<p>Because the RDKit’s conformation generator is a stochastic process, to be sure of obtaining the same results for the same query it is important to supply the same seed to the random number generator, which is passed to the <code>rdDistGeom</code> object. The parameters <code>numConformers</code> and <code>confRMSThreshold</code> are also passed to the <code>rdDistGeom</code> object. The more conformers that are generated for a potential hit, the more likely it is to produce a match to the query shape, if the molecule is capable of doing so, but the longer the search times. The default value of <code>numConformers</code> is set to 100, but no investigation has been carried out to see if that is a good value.</p>
+</section>
+<section id="the-possible-hits-file" class="level2">
+<h2 class="anchored" data-anchor-id="the-possible-hits-file">The Possible Hits File</h2>
+<p>As described above, the search proceeds in two stages: first, the list of all synthon combinations that could be a hit is produced, and second that list is processed into full molecules that are compared against the query. Unless you ask for a small number of hits via the <code>maxHits</code> parameter, the second stage is normally the rate-determining step, and can take many multiples of the first step for all the search modes. The checking of the synthon combinations is an <a href="https://en.wikipedia.org/wiki/Embarrassingly_parallel">embarrassingly parallel</a> problem. Whilst the search code can be run in multi-threaded mode, that is limited by the number of CPUs on the host machine. There is now a possibility to write the synthon combinations to an intermediate text file, which can then be processed in chunks and can therefore be parallelised over multiple machines for improved throughput. In the code below, a fingerprint search is performed, the interim results saved to file <code>fp_poss_hits_a.txt</code> and the search then terminates with no results. The second invocation of <code>FingerprintSearch</code> then processes lines 0 to 200 of that file. The <code>rdSynthonSpaceSearch.SynthonSpace</code> object used in the second search can be empty, or a completely different one from that used to create the possible hits file.</p>
+<pre><code>synthonspace = rdSynthonSpaceSearch.SynthonSpace()
+synthonspace.ReadDBFile(fName)
+params = rdSynthonSpaceSearch.SynthonSpaceSearchParams()
+params.maxHits = -1
+params.similarityCutoff = 0.45
+params.possibleHitsFile = "fp_poss_hits_a.txt"
+params.writePossibleHitsAndStop = True
+query = Chem.MolFromSmiles("O=C(Nc1c(CNC=O)cc[s]1)c1nccnc1") 
+fpgen = rdFingerprintGenerator.GetRDKitFPGenerator(fpSize=2048, useBondOrder=True)
+results = synthonspace.FingerprintSearch(query, fpgen, params)
+
+othersynthonspace = rdSynthonSpaceSearch.SynthonSpace()
+results = othersynthonspace.FingerprintSearch(query, fpgen, params, 0, 200)
+self.assertEqual(196, len(results.GetHitMolecules()))</code></pre>
+<p>Substructure and shape similarity searching is achieved analogously with the appropriate searchers and parameters.</p>
+<p>The format of the possible hits file is the concatenated SMILES strings of the synthons and the product name:</p>
+<pre><code>O=C(NC1COC1)[1*].O=C(Nc1c(CN[1*])cc[s]1)[2*].Fc1nccnc1[2*] 277310376-742385846;584456271-623025187;487354835-896308859;urea-3
+NC(NC(CCNC([1*])=O)=O)=O.O=C(Nc1c(CN[1*])cc[s]1)[2*].Fc1nccnc1[2*] 888118853-423043383;584456271-623025187;487354835-896308859;urea-3
+CCC(CC)(CNC([1*])=O)CO.O=C(Nc1c(CN[1*])cc[s]1)[2*].Fc1nccnc1[2*] 217429287-784394165;584456271-623025187;487354835-896308859;urea-3</code></pre>
+<p>The SMILES strings are ready to be passed to <code>rdmolops.molzip</code> so can be processed independently of the synthon searching code if desired. For example, if you have access to a GPU, you could use NVIDIA’s <a href="https://greglandrum.github.io/rdkit-blog/posts/2026-02-28-nvmolkit-clustering.html">nvMolKit</a> for fingerprint analysis or building conformers to check against the query.</p>
+<section id="two-step-searching" class="level3">
+<h3 class="anchored" data-anchor-id="two-step-searching">Two step searching</h3>
+<p>The first stage of the search, generating the synthon combinations that might be hits is generally best done on a large multi-processor machine that can store the whole <code>SynthonSpace</code> in memory and process it in parallel. The comparison of fragments to synthons is parallelised very efficiently so that normally all the processors are busy for the bulk of the time.</p>
+<p>The second stage, processing the possible hits, probably read from file, can be efficiently done on a large array of small processors since the molecules are handled one at a time and the file can be processed in a very large number of small pieces. On a rented system like AWS or GCP this is likely to be a more cost-effective way of proceeding. In addition, the number of processes running in parallel in the second stage is not limited by the largest multi-processor machine available to rent.</p>
+</section>
+</section>
+<section id="excluded-volumes" class="level2">
+<h2 class="anchored" data-anchor-id="excluded-volumes">Excluded Volumes</h2>
+<p>If performing a shape search of a molecule conformation from a crystal structure of a protein-ligand complex, it may be useful to constrain the results by use of an excluded volume. Normally this would be a scoop of the active site i.e.&nbsp;a subset of the protein structure containing just those atoms within a cutoff distance of a ligand atom. The search can then measure the overlap volume between any hits and this excluded volume. The overlap with the excluded volume is stored as 2 properties on the hit molecule; <code>ExcludedVolume</code> is the raw volume, <code>MeanExcludedVolume</code> is the raw volume divided by the number of clashing atoms. The latter is the number of atoms in the hit that are within 2 carbon atom radii of an atom in the excluded volume and is intended to distinguish between a small portion of the molecule that protrudes deeply into the excluded volume (a high value expected) and a large portion of the molecule bumping gently into the volume, which should give a relatively low value.</p>
+<p>In the diagram below, the bi-phenyl slightly bumps into the active site (pink circles), so would give a relatively low mean excluded volume.</p>
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="https://greglandrum.github.io/rdkit-blog/posts/images/blog/2026-09-08-low_mean_exc_vol.png" class="img-fluid figure-img"></p>
+<figcaption>Low Mean Excluded Volume</figcaption>
+</figure>
+</div>
+<p>In the tri-phenyl below, however, the third ring now clashes fully with the active site, so the mean excluded volume would be higher since 6 atoms are fully within the active site.</p>
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="https://greglandrum.github.io/rdkit-blog/posts/images/blog/2026-09-08-high_mean_exc_vol.png" class="img-fluid figure-img"></p>
+<figcaption>High Mean Excluded Volume</figcaption>
+</figure>
+</div>
+<p>If desired, a cutoff can be applied to either of these values such that hits that exceed the value are not reported.</p>
+</section>
+<section id="the-conformer-generator" class="level2">
+<h2 class="anchored" data-anchor-id="the-conformer-generator">The Conformer Generator</h2>
+<p>By default, the default RDKit conformer generator is used for generating conformers of both the synthons in the database and potential hits for checking. However, there is the possibility to provide your own. This can be a more precisely defined or non-default set of settings for the RDKit’s generator, or another generator entirely. All that is required is a function that takes a SMILES string and a number of conformers and returns an RDKit molecule containing the conformers. An example of setting the conformer generator for a database build is:</p>
+<pre><code>def makeConformers(smiles, numConfs):
+  mol = Chem.AddHs(Chem.MolFromSmiles(smiles))
+  rdDistGeom.EmbedMultipleConfs(mol, 10, randomSeed=0xdac)
+  mol = Chem.RemoveHs(mol)
+  return mol
+
+buildParams = rdSynthonSpaceSearch.ShapeBuildParams()
+buildParams.numThreads = 1
+buildParams.setUserConformerGenerator(makeConformers)</code></pre>
+<p>In this case it’s a trivial re-use of the default RDKit generator. The process for the searching is directly analogous.</p>
+<section id="the-conformer-generator-and-the-gil" class="level3">
+<h3 class="anchored" data-anchor-id="the-conformer-generator-and-the-gil">The Conformer Generator and the GIL</h3>
+<p>The <a href="https://realpython.com/python-gil/">Global Interpreter Lock or GIL</a> is a feature of Python that hampers its use on multiple threads. If you supply your own conformer generator as a Python function as above, this will seriously interfere with the parallelisation of the hit verification step on multiple threads. This is one instance where using the possible hits file is advantageous - each process has a separate GIL so more than one instance of the conformer generator can run at the same time.</p>
+</section>
+</section>
+<section id="timings" class="level2">
+<h2 class="anchored" data-anchor-id="timings">Timings</h2>
+<p>Expect a long wait - this is an expensive calculation. A typical search of <a href="https://chem-space.com/freedom-space">FreedomSpace 5.0</a> takes about 5 CPU days to do the first stage, and then similar amounts of time to do the second stage, depending on how many possible hits are identified and how many of them are assessed. However, this is orders of magnitude faster than the alternative of enumeration and search, which, as discussed above, is probably not feasible for the libraries of the size of FreedomSpace 5.0 and offerings from other vendors.</p>
+</section>
+<section id="example-results" class="level2">
+<h2 class="anchored" data-anchor-id="example-results">Example Results</h2>
+<p>As an example, this is from a search of a small randomly-selected fraction of <a href="https://enamine.net/compound-collections/real-compounds/real-database">Enamine REAL</a> using <a href="https://en.wikipedia.org/wiki/Gefitinib">gefitinib</a> as the query. The conformation used was downloaded from <a href="https://pubchem.ncbi.nlm.nih.gov/compound/Gefitinib">PubChem</a></p>
+<div id="9b6820bf-9201-4e42-b6ed-34df09930713" class="cell" data-execution_count="23">
+<div class="sourceCode cell-code" id="cb6" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb6-1"><span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">from</span> rdkit <span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">import</span> Chem</span>
+<span id="cb6-2"><span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">from</span> rdkit <span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">import</span> rdBase</span>
+<span id="cb6-3"><span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">from</span> rdkit.Chem <span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">import</span> Draw</span>
+<span id="cb6-4"><span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">from</span> rdkit.Chem.Draw <span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">import</span> IPythonConsole, rdDepictor</span>
+<span id="cb6-5">rdDepictor.SetPreferCoordGen(<span class="va" style="color: #111111;
+background-color: null;
+font-style: inherit;">True</span>)</span>
+<span id="cb6-6">IPythonConsole.molSize <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> (<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">500</span>,<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">500</span>)</span>
+<span id="cb6-7">IPythonConsole.molSize_3d <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> (<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">800</span>,<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">500</span>)</span></code></pre></div>
+</div>
+<div id="7d7057c9-4dbb-4e2a-83fe-c5d1e8ed0850" class="cell" data-execution_count="24">
+<div class="sourceCode cell-code" id="cb7" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb7-1">iressa_3d <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> Chem.MolFromSmiles(<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'COc1cc2ncnc(Nc3ccc(F)c(Cl)c3)c2cc1OCCCN1CCOCC1 |(5.9801,-1.2502,0.9623;5.1811,-0.9472,-0.1795;3.8472,-1.21,-0.089;3.368,-2.4651,-0.476;2.0139,-2.7828,-0.4028;1.5715,-3.9953,-0.7797;0.2453,-4.2162,-0.6749;-0.6872,-3.3559,-0.235;-0.2104,-2.1519,0.1338;-1.1577,-1.2093,0.6057;-2.5153,-1.0034,0.3137;-3.0195,-1.3245,-0.9503;-4.3685,-1.1204,-1.2408;-5.2195,-0.5937,-0.2691;-6.5134,-0.4026,-0.5639;-4.7214,-0.2715,0.9935;-5.7668,0.3787,2.1969;-3.3725,-0.4761,1.2841;1.1345,-1.7975,0.0753;1.6085,-0.533,0.4663;2.9636,-0.2513,0.38;3.4187,0.9841,0.7617;3.4679,1.9878,-0.2429;3.2337,3.3454,0.4057;1.8687,3.4141,1.083;0.8065,3.1706,0.1093;-0.5076,3.1433,0.7665;-1.6,2.8996,-0.2708;-1.5666,3.9138,-1.2756;-0.3035,3.9266,-1.942;0.8208,4.194,-0.9454)|'</span>)</span>
+<span id="cb7-2">iressa_2d <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> Chem.MolFromSmiles(Chem.MolToSmiles(iressa_3d))</span>
+<span id="cb7-3">iressa_2d</span></code></pre></div>
+<div class="cell-output cell-output-display" data-execution_count="24">
+<div>
+<figure class="figure">
+<p><img src="https://greglandrum.github.io/rdkit-blog/posts/2026-09-08-shape-synthon-search_files/figure-html/cell-3-output-1.png" class="img-fluid figure-img"></p>
+</figure>
+</div>
+</div>
+</div>
+<div id="f72c1103-2835-44cb-bbf1-3093b3f9c05e" class="cell" data-execution_count="25">
+<div class="sourceCode cell-code" id="cb8" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb8-1">IPythonConsole.drawMol3D(iressa_3d)</span></code></pre></div>
+<div class="cell-output cell-output-display">
+<div id="3dmolviewer_1788627432915553" style="position: relative; width: 800px; height: 500px;">
+        <p id="3dmolwarning_1788627432915553" style="background-color:#ffcccc;color:black">3Dmol.js failed to load for some reason.  Please check your browser console for error messages.<br></p>
+        </div>
+<script>
+
+var loadScriptAsync = function(uri){
+  return new Promise((resolve, reject) => {
+    //this is to ignore the existence of requirejs amd
+    var savedexports, savedmodule;
+    if (typeof exports !== 'undefined') savedexports = exports;
+    else exports = {}
+    if (typeof module !== 'undefined') savedmodule = module;
+    else module = {}
+
+    var tag = document.createElement('script');
+    tag.src = uri;
+    tag.async = true;
+    tag.onload = () => {
+        exports = savedexports;
+        module = savedmodule;
+        resolve();
+    };
+  var firstScriptTag = document.getElementsByTagName('script')[0];
+  firstScriptTag.parentNode.insertBefore(tag, firstScriptTag);
+});
+};
+
+if(typeof $3Dmolpromise === 'undefined') {
+$3Dmolpromise = null;
+  $3Dmolpromise = loadScriptAsync('https://cdn.jsdelivr.net/npm/3dmol@2.5.4/build/3Dmol-min.js');
+}
+
+var viewer_1788627432915553 = null;
+var warn = document.getElementById("3dmolwarning_1788627432915553");
+if(warn) {
+    warn.parentNode.removeChild(warn);
+}
+$3Dmolpromise.then(function() {
+viewer_1788627432915553 = $3Dmol.createViewer(document.getElementById("3dmolviewer_1788627432915553"),{backgroundColor:"white"});
+viewer_1788627432915553.zoomTo();
+    viewer_1788627432915553.removeAllModels();
+    viewer_1788627432915553.addModel("\n     RDKit          3D\n\n 31 34  0  0  0  0  0  0  0  0999 V2000\n    5.9801   -1.2502    0.9623 C   0  0  0  0  0  0  0  0  0  0  0  0\n    5.1811   -0.9472   -0.1795 O   0  0  0  0  0  0  0  0  0  0  0  0\n    3.8472   -1.2100   -0.0890 C   0  0  0  0  0  0  0  0  0  0  0  0\n    3.3680   -2.4651   -0.4760 C   0  0  0  0  0  0  0  0  0  0  0  0\n    2.0139   -2.7828   -0.4028 C   0  0  0  0  0  0  0  0  0  0  0  0\n    1.5715   -3.9953   -0.7797 N   0  0  0  0  0  0  0  0  0  0  0  0\n    0.2453   -4.2162   -0.6749 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -0.6872   -3.3559   -0.2350 N   0  0  0  0  0  0  0  0  0  0  0  0\n   -0.2104   -2.1519    0.1338 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -1.1577   -1.2093    0.6057 N   0  0  0  0  0  0  0  0  0  0  0  0\n   -2.5153   -1.0034    0.3137 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -3.0195   -1.3245   -0.9503 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -4.3685   -1.1204   -1.2408 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -5.2195   -0.5937   -0.2691 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -6.5134   -0.4026   -0.5639 F   0  0  0  0  0  0  0  0  0  0  0  0\n   -4.7214   -0.2715    0.9935 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -5.7668    0.3787    2.1969 Cl  0  0  0  0  0  0  0  0  0  0  0  0\n   -3.3725   -0.4761    1.2841 C   0  0  0  0  0  0  0  0  0  0  0  0\n    1.1345   -1.7975    0.0753 C   0  0  0  0  0  0  0  0  0  0  0  0\n    1.6085   -0.5330    0.4663 C   0  0  0  0  0  0  0  0  0  0  0  0\n    2.9636   -0.2513    0.3800 C   0  0  0  0  0  0  0  0  0  0  0  0\n    3.4187    0.9841    0.7617 O   0  0  0  0  0  0  0  0  0  0  0  0\n    3.4679    1.9878   -0.2429 C   0  0  0  0  0  0  0  0  0  0  0  0\n    3.2337    3.3454    0.4057 C   0  0  0  0  0  0  0  0  0  0  0  0\n    1.8687    3.4141    1.0830 C   0  0  0  0  0  0  0  0  0  0  0  0\n    0.8065    3.1706    0.1093 N   0  0  0  0  0  0  0  0  0  0  0  0\n   -0.5076    3.1433    0.7665 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -1.6000    2.8996   -0.2708 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -1.5666    3.9138   -1.2756 O   0  0  0  0  0  0  0  0  0  0  0  0\n   -0.3035    3.9266   -1.9420 C   0  0  0  0  0  0  0  0  0  0  0  0\n    0.8208    4.1940   -0.9454 C   0  0  0  0  0  0  0  0  0  0  0  0\n  1  2  1  0\n  2  3  1  0\n  3  4  2  0\n  4  5  1  0\n  5  6  2  0\n  6  7  1  0\n  7  8  2  0\n  8  9  1  0\n  9 10  1  0\n 10 11  1  0\n 11 12  1  0\n 12 13  2  0\n 13 14  1  0\n 14 15  1  0\n 14 16  2  0\n 16 17  1  0\n 16 18  1  0\n  9 19  2  0\n 19 20  1  0\n 20 21  2  0\n 21 22  1  0\n 22 23  1  0\n 23 24  1  0\n 24 25  1  0\n 25 26  1  0\n 26 27  1  0\n 27 28  1  0\n 28 29  1  0\n 29 30  1  0\n 30 31  1  0\n 21  3  1  0\n 31 26  1  0\n 19  5  1  0\n 18 11  2  0\nM  END\n","sdf");
+    viewer_1788627432915553.setStyle({"stick": {}});
+    viewer_1788627432915553.setBackgroundColor("0xeeeeee");
+    viewer_1788627432915553.zoomTo();
+viewer_1788627432915553.render();
+});
+</script>
+</div>
+</div>
+<div id="8a2c11c8-6e86-4f2c-b8f6-9fbc7bc841a3" class="cell" data-execution_count="26">
+<div class="sourceCode cell-code" id="cb9" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb9-1">iressa_hit1 <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> Chem.MolFromSmiles(<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"CCOC[C@@H](CNC(=O)OC(C)(C)C)NC(=O)c1cccnc1Nc1cccc(C(F)(F)F)c1 |(5.2741,-2.3996,-0.8944;5.7417,-1.0145,-0.5028;5.7156,-0.7252,0.7858;4.7152,-0.7582,1.6345;3.5244,0.1243,1.3442;4.027,1.5454,1.4245;3.0384,2.56,1.1822;2.3079,2.773,0.0154;2.4268,2.0869,-1.0113;1.382,3.8138,-0.0236;0.6264,4.0531,-1.1949;-0.2309,2.9123,-1.6274;1.5311,4.5679,-2.2915;-0.3281,5.2054,-0.8669;2.8409,-0.1956,0.1318;1.563,-0.7526,0.2479;0.6722,-0.0039,0.793;1.0982,-2.0545,-0.1638;1.8136,-3.0398,-0.7714;1.2457,-4.257,-1.1411;-0.0839,-4.4966,-0.8956;-0.7923,-3.5396,-0.3006;-0.2596,-2.3361,0.0748;-1.1303,-1.459,0.7324;-2.4765,-1.2025,0.3454;-2.8742,-1.257,-0.9822;-4.1945,-1.0121,-1.3631;-5.1472,-0.7065,-0.4077;-4.74,-0.6522,0.9358;-5.7585,-0.3317,2.0008;-5.3231,-0.9085,3.1973;-6.9174,-0.9833,1.6469;-5.8993,1.0072,2.221;-3.4272,-0.8965,1.2988),wD:4.4|"</span>)</span>
+<span id="cb9-2">iressa_hit1_2d <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> Chem.MolFromSmiles(Chem.MolToSmiles(iressa_hit1))</span>
+<span id="cb9-3">iressa_hit1_2d</span></code></pre></div>
+<div class="cell-output cell-output-display" data-execution_count="26">
+<div>
+<figure class="figure">
+<p><img src="https://greglandrum.github.io/rdkit-blog/posts/2026-09-08-shape-synthon-search_files/figure-html/cell-5-output-1.png" class="img-fluid figure-img"></p>
+</figure>
+</div>
+</div>
+</div>
+<div id="0d49342f-0844-4a18-8081-5215151b797c" class="cell" data-execution_count="27">
+<div class="sourceCode cell-code" id="cb10" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb10-1">IPythonConsole.drawMols3D([iressa_3d, iressa_hit1])</span></code></pre></div>
+<div class="cell-output cell-output-display">
+<div id="3dmolviewer_1788627432931891" style="position: relative; width: 800px; height: 500px;">
+        <p id="3dmolwarning_1788627432931891" style="background-color:#ffcccc;color:black">3Dmol.js failed to load for some reason.  Please check your browser console for error messages.<br></p>
+        </div>
+<script>
+
+var loadScriptAsync = function(uri){
+  return new Promise((resolve, reject) => {
+    //this is to ignore the existence of requirejs amd
+    var savedexports, savedmodule;
+    if (typeof exports !== 'undefined') savedexports = exports;
+    else exports = {}
+    if (typeof module !== 'undefined') savedmodule = module;
+    else module = {}
+
+    var tag = document.createElement('script');
+    tag.src = uri;
+    tag.async = true;
+    tag.onload = () => {
+        exports = savedexports;
+        module = savedmodule;
+        resolve();
+    };
+  var firstScriptTag = document.getElementsByTagName('script')[0];
+  firstScriptTag.parentNode.insertBefore(tag, firstScriptTag);
+});
+};
+
+if(typeof $3Dmolpromise === 'undefined') {
+$3Dmolpromise = null;
+  $3Dmolpromise = loadScriptAsync('https://cdn.jsdelivr.net/npm/3dmol@2.5.4/build/3Dmol-min.js');
+}
+
+var viewer_1788627432931891 = null;
+var warn = document.getElementById("3dmolwarning_1788627432931891");
+if(warn) {
+    warn.parentNode.removeChild(warn);
+}
+$3Dmolpromise.then(function() {
+viewer_1788627432931891 = $3Dmol.createViewer(document.getElementById("3dmolviewer_1788627432931891"),{backgroundColor:"white"});
+viewer_1788627432931891.zoomTo();
+    viewer_1788627432931891.addModel("\n     RDKit          3D\n\n 31 34  0  0  0  0  0  0  0  0999 V2000\n    5.9801   -1.2502    0.9623 C   0  0  0  0  0  0  0  0  0  0  0  0\n    5.1811   -0.9472   -0.1795 O   0  0  0  0  0  0  0  0  0  0  0  0\n    3.8472   -1.2100   -0.0890 C   0  0  0  0  0  0  0  0  0  0  0  0\n    3.3680   -2.4651   -0.4760 C   0  0  0  0  0  0  0  0  0  0  0  0\n    2.0139   -2.7828   -0.4028 C   0  0  0  0  0  0  0  0  0  0  0  0\n    1.5715   -3.9953   -0.7797 N   0  0  0  0  0  0  0  0  0  0  0  0\n    0.2453   -4.2162   -0.6749 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -0.6872   -3.3559   -0.2350 N   0  0  0  0  0  0  0  0  0  0  0  0\n   -0.2104   -2.1519    0.1338 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -1.1577   -1.2093    0.6057 N   0  0  0  0  0  0  0  0  0  0  0  0\n   -2.5153   -1.0034    0.3137 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -3.0195   -1.3245   -0.9503 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -4.3685   -1.1204   -1.2408 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -5.2195   -0.5937   -0.2691 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -6.5134   -0.4026   -0.5639 F   0  0  0  0  0  0  0  0  0  0  0  0\n   -4.7214   -0.2715    0.9935 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -5.7668    0.3787    2.1969 Cl  0  0  0  0  0  0  0  0  0  0  0  0\n   -3.3725   -0.4761    1.2841 C   0  0  0  0  0  0  0  0  0  0  0  0\n    1.1345   -1.7975    0.0753 C   0  0  0  0  0  0  0  0  0  0  0  0\n    1.6085   -0.5330    0.4663 C   0  0  0  0  0  0  0  0  0  0  0  0\n    2.9636   -0.2513    0.3800 C   0  0  0  0  0  0  0  0  0  0  0  0\n    3.4187    0.9841    0.7617 O   0  0  0  0  0  0  0  0  0  0  0  0\n    3.4679    1.9878   -0.2429 C   0  0  0  0  0  0  0  0  0  0  0  0\n    3.2337    3.3454    0.4057 C   0  0  0  0  0  0  0  0  0  0  0  0\n    1.8687    3.4141    1.0830 C   0  0  0  0  0  0  0  0  0  0  0  0\n    0.8065    3.1706    0.1093 N   0  0  0  0  0  0  0  0  0  0  0  0\n   -0.5076    3.1433    0.7665 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -1.6000    2.8996   -0.2708 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -1.5666    3.9138   -1.2756 O   0  0  0  0  0  0  0  0  0  0  0  0\n   -0.3035    3.9266   -1.9420 C   0  0  0  0  0  0  0  0  0  0  0  0\n    0.8208    4.1940   -0.9454 C   0  0  0  0  0  0  0  0  0  0  0  0\n  1  2  1  0\n  2  3  1  0\n  3  4  2  0\n  4  5  1  0\n  5  6  2  0\n  6  7  1  0\n  7  8  2  0\n  8  9  1  0\n  9 10  1  0\n 10 11  1  0\n 11 12  1  0\n 12 13  2  0\n 13 14  1  0\n 14 15  1  0\n 14 16  2  0\n 16 17  1  0\n 16 18  1  0\n  9 19  2  0\n 19 20  1  0\n 20 21  2  0\n 21 22  1  0\n 22 23  1  0\n 23 24  1  0\n 24 25  1  0\n 25 26  1  0\n 26 27  1  0\n 27 28  1  0\n 28 29  1  0\n 29 30  1  0\n 30 31  1  0\n 21  3  1  0\n 31 26  1  0\n 19  5  1  0\n 18 11  2  0\nM  END\n","sdf");
+    viewer_1788627432931891.setStyle({"stick": {}});
+    viewer_1788627432931891.addModel("\n     RDKit          3D\n\n 34 35  0  0  0  0  0  0  0  0999 V2000\n    5.2741   -2.3996   -0.8944 C   0  0  0  0  0  0  0  0  0  0  0  0\n    5.7417   -1.0145   -0.5028 C   0  0  0  0  0  0  0  0  0  0  0  0\n    5.7156   -0.7252    0.7858 O   0  0  0  0  0  0  0  0  0  0  0  0\n    4.7152   -0.7582    1.6345 C   0  0  0  0  0  0  0  0  0  0  0  0\n    3.5244    0.1243    1.3442 C   0  0  1  0  0  0  0  0  0  0  0  0\n    4.0270    1.5454    1.4245 C   0  0  0  0  0  0  0  0  0  0  0  0\n    3.0384    2.5600    1.1822 N   0  0  0  0  0  0  0  0  0  0  0  0\n    2.3079    2.7730    0.0154 C   0  0  0  0  0  0  0  0  0  0  0  0\n    2.4268    2.0869   -1.0113 O   0  0  0  0  0  0  0  0  0  0  0  0\n    1.3820    3.8138   -0.0236 O   0  0  0  0  0  0  0  0  0  0  0  0\n    0.6264    4.0531   -1.1949 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -0.2309    2.9123   -1.6274 C   0  0  0  0  0  0  0  0  0  0  0  0\n    1.5311    4.5679   -2.2915 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -0.3281    5.2054   -0.8669 C   0  0  0  0  0  0  0  0  0  0  0  0\n    2.8409   -0.1956    0.1318 N   0  0  0  0  0  0  0  0  0  0  0  0\n    1.5630   -0.7526    0.2479 C   0  0  0  0  0  0  0  0  0  0  0  0\n    0.6722   -0.0039    0.7930 O   0  0  0  0  0  0  0  0  0  0  0  0\n    1.0982   -2.0545   -0.1638 C   0  0  0  0  0  0  0  0  0  0  0  0\n    1.8136   -3.0398   -0.7714 C   0  0  0  0  0  0  0  0  0  0  0  0\n    1.2457   -4.2570   -1.1411 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -0.0839   -4.4966   -0.8956 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -0.7923   -3.5396   -0.3006 N   0  0  0  0  0  0  0  0  0  0  0  0\n   -0.2596   -2.3361    0.0748 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -1.1303   -1.4590    0.7324 N   0  0  0  0  0  0  0  0  0  0  0  0\n   -2.4765   -1.2025    0.3454 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -2.8742   -1.2570   -0.9822 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -4.1945   -1.0121   -1.3631 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -5.1472   -0.7065   -0.4077 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -4.7400   -0.6522    0.9358 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -5.7585   -0.3317    2.0008 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -5.3231   -0.9085    3.1973 F   0  0  0  0  0  0  0  0  0  0  0  0\n   -6.9174   -0.9833    1.6469 F   0  0  0  0  0  0  0  0  0  0  0  0\n   -5.8993    1.0072    2.2210 F   0  0  0  0  0  0  0  0  0  0  0  0\n   -3.4272   -0.8965    1.2988 C   0  0  0  0  0  0  0  0  0  0  0  0\n  1  2  1  0\n  2  3  1  0\n  3  4  1  0\n  4  5  1  0\n  5  6  1  6\n  6  7  1  0\n  7  8  1  0\n  8  9  2  0\n  8 10  1  0\n 10 11  1  0\n 11 12  1  0\n 11 13  1  0\n 11 14  1  0\n  5 15  1  0\n 15 16  1  0\n 16 17  2  0\n 16 18  1  0\n 18 19  2  0\n 19 20  1  0\n 20 21  2  0\n 21 22  1  0\n 22 23  2  0\n 23 24  1  0\n 24 25  1  0\n 25 26  1  0\n 26 27  2  0\n 27 28  1  0\n 28 29  2  0\n 29 30  1  0\n 30 31  1  0\n 30 32  1  0\n 30 33  1  0\n 29 34  1  0\n 23 18  1  0\n 34 25  2  0\nM  END\n","sdf");
+    viewer_1788627432931891.setStyle({"stick": {}});
+    viewer_1788627432931891.setStyle({"model": 0},{"stick": {"colorscheme": "cyanCarbon"}});
+    viewer_1788627432931891.setStyle({"model": 1},{"stick": {"colorscheme": "redCarbon"}});
+    viewer_1788627432931891.setBackgroundColor("0xeeeeee");
+    viewer_1788627432931891.zoomTo();
+viewer_1788627432931891.render();
+});
+</script>
+</div>
+</div>
+<p>The similarity scores in this example are</p>
+<ul>
+<li>Combined Similarity : 0.520</li>
+<li>Shape Score : 0.721</li>
+<li>Color Score : 0.320</li>
+</ul>
+<p>The Shape Score is the shape Tanimoto (volume in common divided by the volume of the two molecules combined), the Color Score is the equivalent for pharmacophore features represented by Gaussian functions, with the overlap for matching feature types only, and the Combined Similarity is the mean of the two.</p>
+</section>
+<section id="shape-searching-in-fragment-based-lead-discovery" class="level2">
+<h2 class="anchored" data-anchor-id="shape-searching-in-fragment-based-lead-discovery">Shape Searching in Fragment-Based Lead Discovery</h2>
+<p>A significant obstacle in <a href="https://en.wikipedia.org/wiki/Fragment-based_lead_discovery">FBLD</a> is finding ways of linking 2 fragments such that their poses in the active site are largely maintained leading to a strongly active combined molecule. The synthon space searching lends itself readily to searches of the disconnected fragments to find single molecules of similar shape and pharmacophore features that can be directly purchased for testing. Adding an excluded volume gives a useful additional constraint to the hits.</p>
+<p>The <a href="https://openbind.uk">OpenBind initiative</a> have a number of FBLD projects running against anitviral targets. One such is <a href="https://en.wikipedia.org/wiki/RNA-dependent_RNA_polymerase">RdRp</a>. The structures of their screened fragments are available for <a href="https://fragalysis.diamond.ac.uk/viewer/react/preview/target/Flavi_NS5_RdRp/tas/lb32633-1">viewing</a> and download.</p>
+<p>Some initial testing of the synthon space shape searching has been carried using pairs of fragments downloaded from the site above using the FreedomSpace 5.0 library.</p>
+<section id="database-creation" class="level3">
+<h3 class="anchored" data-anchor-id="database-creation">Database Creation</h3>
+<p>The FreedomSpace 5.0 library comprises some 380,000 synthons which can be combined into 296 billion compounds. The shape database was prepared as described above, using only synthons of 50 heavy atoms and fewer, with the RDKit conformer generator and a maximum of 100 conformations per synthon.</p>
+</section>
+<section id="test-1" class="level3">
+<h3 class="anchored" data-anchor-id="test-1">Test 1</h3>
+<p>Two fragments (5f3t and z0103a) were selected by eye as being a few Ångstrom apart and relatively small. The excluded volume was created by selecting all atoms in the protein structure that were within 4Å of an atom in either fragment. It is shown in red below.</p>
+<div id="77567dfa-ba3f-41fc-ac9c-74c313d82e53" class="cell" data-execution_count="28">
+<div class="sourceCode cell-code" id="cb11" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb11-1">frags_2d <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> [Chem.MolFromSmiles(<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"OC(=O)Cc1ccc(OC)c(c1)c2ccccc2"</span>), Chem.MolFromSmiles(<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"CC(=O)NCc1[nH]ccn1"</span>)]</span>
+<span id="cb11-2">Draw.MolsToGridImage(frags_2d, legends<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span>[<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"5f3t"</span>, <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"z0103a"</span>])</span></code></pre></div>
+<div class="cell-output cell-output-display" data-execution_count="28">
+<div>
+<figure class="figure">
+<p><img src="https://greglandrum.github.io/rdkit-blog/posts/2026-09-08-shape-synthon-search_files/figure-html/cell-7-output-1.png" class="img-fluid figure-img"></p>
+</figure>
+</div>
+</div>
+</div>
+<div id="04dd5e63-3176-4b39-bcd3-a8a9bab61f6d" class="cell" data-execution_count="29">
+<div class="sourceCode cell-code" id="cb12" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb12-1">combined_query <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> Chem.MolFromSmiles(<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"CC(=O)NCc1ncc[nH]1.COc1ccc(CC(=O)O)cc1-c1ccccc1 |(-11.629,-40.624,-21.225;-12.944,-41.022,-21.833;-13.266,-42.197,-21.974;-13.726,-40.034,-22.248;-13.348,-39.222,-23.382;-12.966,-37.907,-22.925;-11.741,-37.458,-22.879;-11.837,-36.211,-22.299;-13.101,-35.942,-22.018;-13.818,-37.035,-22.421;-14.536,-43.268,-23.743;-15.603,-43.844,-22.984;-15.548,-43.934,-21.607;-14.598,-43.217,-20.856;-14.567,-43.341,-19.464;-15.475,-44.155,-18.78;-15.354,-44.279,-17.272;-16.437,-43.527,-16.546;-16.907,-44.019,-15.496;-16.811,-42.426,-17.01;-16.433,-44.903,-19.485;-16.52,-44.814,-20.886;-17.518,-45.619,-21.659;-18.218,-45.069,-22.741;-19.095,-45.863,-23.488;-19.325,-47.189,-23.134;-18.64,-47.738,-22.048;-17.727,-46.964,-21.326)|"</span>)</span>
+<span id="cb12-2">exc_vol <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> Chem.MolFromSmiles(<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"C.C=O.CC.CC(C)CCN.CCNC.CCSC.CNC(=O)CCO.CSC.C[C@@H](CN)NC(=O)CCc1c[nH]cn1.C[C@@H](O)CCN.N.N=CN.NCCC(=O)O.NCCO.N[C@@H](CS)C(=O)NCCO.O.cc.ccO.cccc.cnc[nH] |(-13.803,-42.848,-27.927;-8.078,-33.418,-20.925;-9.135,-34.01,-21.221;-17.719,-37.014,-24.861;-16.473,-37.057,-24.003;-14.366,-46.23,-25.785;-15.717,-46.983,-25.843;-16.048,-47.691,-24.537;-16.857,-46.062,-26.283;-16.733,-45.463,-27.693;-17.938,-44.705,-28.035;-17.269,-47.475,-12.988;-17.349,-46.269,-12.057;-16.084,-45.53,-11.991;-15.678,-44.821,-10.942;-18.362,-51.665,-24.42;-19.442,-50.636,-24.833;-19.116,-50.022,-26.49;-20.703,-49.407,-26.934;-11.379,-32.274,-24.867;-11.736,-33.139,-25.988;-11.395,-34.417,-26.029;-10.751,-34.977,-25.135;-11.757,-35.163,-27.306;-12.177,-36.598,-26.992;-13.424,-36.621,-26.327;-21.05,-50.368,-20.427;-20.531,-49.052,-19.311;-19.541,-50.007,-18.118;-21.623,-43.468,-22.372;-21.475,-43.382,-23.885;-22.824,-43.058,-24.534;-23.37,-44.015,-25.3;-20.481,-42.369,-24.237;-19.733,-42.436,-25.343;-19.823,-43.361,-26.148;-18.744,-41.296,-25.597;-17.287,-41.787,-25.602;-16.301,-40.687,-25.837;-15.344,-40.185,-25.019;-14.737,-39.16,-25.705;-15.344,-39.06,-26.883;-16.291,-39.971,-27.017;-20.808,-44.567,-19.157;-20.018,-44.069,-17.947;-19.082,-43.079,-18.363;-20.927,-43.516,-16.807;-21.578,-42.184,-17.21;-20.832,-41.089,-17.046;-9.327,-32.581,-23.601;-11.038,-46.06,-16.658;-11.697,-46.806,-17.529;-12.817,-46.344,-18.064;-7.94,-34.875,-24.335;-7.405,-36.116,-24.908;-8.4,-37.273,-24.778;-8.487,-37.952,-23.44;-9.492,-37.73,-22.727;-7.674,-38.852,-23.189;-19.674,-40.289,-19.274;-18.858,-40.075,-20.48;-18.086,-41.342,-20.849;-17.373,-41.171,-22.064;-9.026,-41.538,-24.393;-10.287,-41.511,-23.654;-11.479,-41.446,-24.609;-11.468,-40.004,-25.715;-10.396,-42.677,-22.637;-11.401,-43.389,-22.592;-9.3,-42.9,-21.874;-9.169,-43.923,-20.818;-10.289,-43.778,-19.781;-10.461,-42.432,-19.373;-20.651,-45.882,-15.168;-15.605,-33.196,-24.359;-15.134,-34.088,-25.322;-16.679,-51.296,-21.019;-15.582,-50.638,-21.554;-15.523,-49.281,-21.461;-23.779,-49.454,-23.134;-22.917,-48.434,-23.499;-22.66,-47.356,-22.635;-23.249,-47.268,-21.397;-11.54,-47.221,-23.259;-12.163,-46.149,-22.634;-13.2,-46.661,-21.996;-13.273,-47.979,-22.169),wD:44.35,64.50,wU:30.21|"</span>, sanitize<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span><span class="va" style="color: #111111;
+background-color: null;
+font-style: inherit;">False</span>)</span>
+<span id="cb12-3">IPythonConsole.drawMols3D([combined_query, exc_vol])</span></code></pre></div>
+<div class="cell-output cell-output-stderr">
+<pre><code>[17:57:12] non-ring atom 74 marked aromatic</code></pre>
+</div>
+<div class="cell-output cell-output-display">
+<div id="3dmolviewer_17886274329422028" style="position: relative; width: 800px; height: 500px;">
+        <p id="3dmolwarning_17886274329422028" style="background-color:#ffcccc;color:black">3Dmol.js failed to load for some reason.  Please check your browser console for error messages.<br></p>
+        </div>
+<script>
+
+var loadScriptAsync = function(uri){
+  return new Promise((resolve, reject) => {
+    //this is to ignore the existence of requirejs amd
+    var savedexports, savedmodule;
+    if (typeof exports !== 'undefined') savedexports = exports;
+    else exports = {}
+    if (typeof module !== 'undefined') savedmodule = module;
+    else module = {}
+
+    var tag = document.createElement('script');
+    tag.src = uri;
+    tag.async = true;
+    tag.onload = () => {
+        exports = savedexports;
+        module = savedmodule;
+        resolve();
+    };
+  var firstScriptTag = document.getElementsByTagName('script')[0];
+  firstScriptTag.parentNode.insertBefore(tag, firstScriptTag);
+});
+};
+
+if(typeof $3Dmolpromise === 'undefined') {
+$3Dmolpromise = null;
+  $3Dmolpromise = loadScriptAsync('https://cdn.jsdelivr.net/npm/3dmol@2.5.4/build/3Dmol-min.js');
+}
+
+var viewer_17886274329422028 = null;
+var warn = document.getElementById("3dmolwarning_17886274329422028");
+if(warn) {
+    warn.parentNode.removeChild(warn);
+}
+$3Dmolpromise.then(function() {
+viewer_17886274329422028 = $3Dmol.createViewer(document.getElementById("3dmolviewer_17886274329422028"),{backgroundColor:"white"});
+viewer_17886274329422028.zoomTo();
+    viewer_17886274329422028.addModel("\n     RDKit          3D\n\n 28 29  0  0  0  0  0  0  0  0999 V2000\n  -11.6290  -40.6240  -21.2250 C   0  0  0  0  0  0  0  0  0  0  0  0\n  -12.9440  -41.0220  -21.8330 C   0  0  0  0  0  0  0  0  0  0  0  0\n  -13.2660  -42.1970  -21.9740 O   0  0  0  0  0  0  0  0  0  0  0  0\n  -13.7260  -40.0340  -22.2480 N   0  0  0  0  0  0  0  0  0  0  0  0\n  -13.3480  -39.2220  -23.3820 C   0  0  0  0  0  0  0  0  0  0  0  0\n  -12.9660  -37.9070  -22.9250 C   0  0  0  0  0  0  0  0  0  0  0  0\n  -11.7410  -37.4580  -22.8790 N   0  0  0  0  0  0  0  0  0  0  0  0\n  -11.8370  -36.2110  -22.2990 C   0  0  0  0  0  0  0  0  0  0  0  0\n  -13.1010  -35.9420  -22.0180 C   0  0  0  0  0  0  0  0  0  0  0  0\n  -13.8180  -37.0350  -22.4210 N   0  0  0  0  0  0  0  0  0  0  0  0\n  -14.5360  -43.2680  -23.7430 C   0  0  0  0  0  0  0  0  0  0  0  0\n  -15.6030  -43.8440  -22.9840 O   0  0  0  0  0  0  0  0  0  0  0  0\n  -15.5480  -43.9340  -21.6070 C   0  0  0  0  0  0  0  0  0  0  0  0\n  -14.5980  -43.2170  -20.8560 C   0  0  0  0  0  0  0  0  0  0  0  0\n  -14.5670  -43.3410  -19.4640 C   0  0  0  0  0  0  0  0  0  0  0  0\n  -15.4750  -44.1550  -18.7800 C   0  0  0  0  0  0  0  0  0  0  0  0\n  -15.3540  -44.2790  -17.2720 C   0  0  0  0  0  0  0  0  0  0  0  0\n  -16.4370  -43.5270  -16.5460 C   0  0  0  0  0  0  0  0  0  0  0  0\n  -16.9070  -44.0190  -15.4960 O   0  0  0  0  0  0  0  0  0  0  0  0\n  -16.8110  -42.4260  -17.0100 O   0  0  0  0  0  0  0  0  0  0  0  0\n  -16.4330  -44.9030  -19.4850 C   0  0  0  0  0  0  0  0  0  0  0  0\n  -16.5200  -44.8140  -20.8860 C   0  0  0  0  0  0  0  0  0  0  0  0\n  -17.5180  -45.6190  -21.6590 C   0  0  0  0  0  0  0  0  0  0  0  0\n  -18.2180  -45.0690  -22.7410 C   0  0  0  0  0  0  0  0  0  0  0  0\n  -19.0950  -45.8630  -23.4880 C   0  0  0  0  0  0  0  0  0  0  0  0\n  -19.3250  -47.1890  -23.1340 C   0  0  0  0  0  0  0  0  0  0  0  0\n  -18.6400  -47.7380  -22.0480 C   0  0  0  0  0  0  0  0  0  0  0  0\n  -17.7270  -46.9640  -21.3260 C   0  0  0  0  0  0  0  0  0  0  0  0\n  1  2  1  0\n  2  3  2  0\n  2  4  1  0\n  4  5  1  0\n  5  6  1  0\n  6  7  2  0\n  7  8  1  0\n  8  9  2  0\n  9 10  1  0\n 11 12  1  0\n 12 13  1  0\n 13 14  1  0\n 14 15  2  0\n 15 16  1  0\n 16 17  1  0\n 17 18  1  0\n 18 19  2  0\n 18 20  1  0\n 16 21  2  0\n 21 22  1  0\n 22 23  1  0\n 23 24  2  0\n 24 25  1  0\n 25 26  2  0\n 26 27  1  0\n 27 28  2  0\n 10  6  1  0\n 22 13  2  0\n 28 23  1  0\nM  END\n","sdf");
+    viewer_17886274329422028.setStyle({"stick": {}});
+    viewer_17886274329422028.addModel("\n     RDKit          3D\n\n 87 68  0  0  0  0  0  0  0  0999 V2000\n  -13.8030  -42.8480  -27.9270 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -8.0780  -33.4180  -20.9250 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -9.1350  -34.0100  -21.2210 O   0  0  0  0  0  0  0  0  0  0  0  0\n  -17.7190  -37.0140  -24.8610 C   0  0  0  0  0  0  0  0  0  0  0  0\n  -16.4730  -37.0570  -24.0030 C   0  0  0  0  0  0  0  0  0  0  0  0\n  -14.3660  -46.2300  -25.7850 C   0  0  0  0  0  0  0  0  0  0  0  0\n  -15.7170  -46.9830  -25.8430 C   0  0  1  0  0  0  0  0  0  0  0  0\n  -16.0480  -47.6910  -24.5370 C   0  0  0  0  0  0  0  0  0  0  0  0\n  -16.8570  -46.0620  -26.2830 C   0  0  0  0  0  0  0  0  0  0  0  0\n  -16.7330  -45.4630  -27.6930 C   0  0  0  0  0  0  0  0  0  0  0  0\n  -17.9380  -44.7050  -28.0350 N   0  0  0  0  0  0  0  0  0  0  0  0\n  -17.2690  -47.4750  -12.9880 C   0  0  0  0  0  0  0  0  0  0  0  0\n  -17.3490  -46.2690  -12.0570 C   0  0  0  0  0  0  0  0  0  0  0  0\n  -16.0840  -45.5300  -11.9910 N   0  0  0  0  0  0  0  0  0  0  0  0\n  -15.6780  -44.8210  -10.9420 C   0  0  0  0  0  0  0  0  0  0  0  0\n  -18.3620  -51.6650  -24.4200 C   0  0  0  0  0  0  0  0  0  0  0  0\n  -19.4420  -50.6360  -24.8330 C   0  0  0  0  0  0  0  0  0  0  0  0\n  -19.1160  -50.0220  -26.4900 S   0  0  0  0  0  0  0  0  0  0  0  0\n  -20.7030  -49.4070  -26.9340 C   0  0  0  0  0  0  0  0  0  0  0  0\n  -11.3790  -32.2740  -24.8670 C   0  0  0  0  0  0  0  0  0  0  0  0\n  -11.7360  -33.1390  -25.9880 N   0  0  0  0  0  0  0  0  0  0  0  0\n  -11.3950  -34.4170  -26.0290 C   0  0  0  0  0  0  0  0  0  0  0  0\n  -10.7510  -34.9770  -25.1350 O   0  0  0  0  0  0  0  0  0  0  0  0\n  -11.7570  -35.1630  -27.3060 C   0  0  0  0  0  0  0  0  0  0  0  0\n  -12.1770  -36.5980  -26.9920 C   0  0  0  0  0  0  0  0  0  0  0  0\n  -13.4240  -36.6210  -26.3270 O   0  0  0  0  0  0  0  0  0  0  0  0\n  -21.0500  -50.3680  -20.4270 C   0  0  0  0  0  0  0  0  0  0  0  0\n  -20.5310  -49.0520  -19.3110 S   0  0  0  0  0  0  0  0  0  0  0  0\n  -19.5410  -50.0070  -18.1180 C   0  0  0  0  0  0  0  0  0  0  0  0\n  -21.6230  -43.4680  -22.3720 C   0  0  0  0  0  0  0  0  0  0  0  0\n  -21.4750  -43.3820  -23.8850 C   0  0  1  0  0  0  0  0  0  0  0  0\n  -22.8240  -43.0580  -24.5340 C   0  0  0  0  0  0  0  0  0  0  0  0\n  -23.3700  -44.0150  -25.3000 N   0  0  0  0  0  0  0  0  0  0  0  0\n  -20.4810  -42.3690  -24.2370 N   0  0  0  0  0  0  0  0  0  0  0  0\n  -19.7330  -42.4360  -25.3430 C   0  0  0  0  0  0  0  0  0  0  0  0\n  -19.8230  -43.3610  -26.1480 O   0  0  0  0  0  0  0  0  0  0  0  0\n  -18.7440  -41.2960  -25.5970 C   0  0  0  0  0  0  0  0  0  0  0  0\n  -17.2870  -41.7870  -25.6020 C   0  0  0  0  0  0  0  0  0  0  0  0\n  -16.3010  -40.6870  -25.8370 C   0  0  0  0  0  0  0  0  0  0  0  0\n  -15.3440  -40.1850  -25.0190 C   0  0  0  0  0  0  0  0  0  0  0  0\n  -14.7370  -39.1600  -25.7050 N   0  0  0  0  0  0  0  0  0  0  0  0\n  -15.3440  -39.0600  -26.8830 C   0  0  0  0  0  0  0  0  0  0  0  0\n  -16.2910  -39.9710  -27.0170 N   0  0  0  0  0  0  0  0  0  0  0  0\n  -20.8080  -44.5670  -19.1570 C   0  0  0  0  0  0  0  0  0  0  0  0\n  -20.0180  -44.0690  -17.9470 C   0  0  1  0  0  0  0  0  0  0  0  0\n  -19.0820  -43.0790  -18.3630 O   0  0  0  0  0  0  0  0  0  0  0  0\n  -20.9270  -43.5160  -16.8070 C   0  0  0  0  0  0  0  0  0  0  0  0\n  -21.5780  -42.1840  -17.2100 C   0  0  0  0  0  0  0  0  0  0  0  0\n  -20.8320  -41.0890  -17.0460 N   0  0  0  0  0  0  0  0  0  0  0  0\n   -9.3270  -32.5810  -23.6010 N   0  0  0  0  0  0  0  0  0  0  0  0\n  -11.0380  -46.0600  -16.6580 N   0  0  0  0  0  0  0  0  0  0  0  0\n  -11.6970  -46.8060  -17.5290 C   0  0  0  0  0  0  0  0  0  0  0  0\n  -12.8170  -46.3440  -18.0640 N   0  0  0  0  0  0  0  0  0  0  0  0\n   -7.9400  -34.8750  -24.3350 N   0  0  0  0  0  0  0  0  0  0  0  0\n   -7.4050  -36.1160  -24.9080 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -8.4000  -37.2730  -24.7780 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -8.4870  -37.9520  -23.4400 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -9.4920  -37.7300  -22.7270 O   0  0  0  0  0  0  0  0  0  0  0  0\n   -7.6740  -38.8520  -23.1890 O   0  0  0  0  0  0  0  0  0  0  0  0\n  -19.6740  -40.2890  -19.2740 N   0  0  0  0  0  0  0  0  0  0  0  0\n  -18.8580  -40.0750  -20.4800 C   0  0  0  0  0  0  0  0  0  0  0  0\n  -18.0860  -41.3420  -20.8490 C   0  0  0  0  0  0  0  0  0  0  0  0\n  -17.3730  -41.1710  -22.0640 O   0  0  0  0  0  0  0  0  0  0  0  0\n   -9.0260  -41.5380  -24.3930 N   0  0  0  0  0  0  0  0  0  0  0  0\n  -10.2870  -41.5110  -23.6540 C   0  0  1  0  0  0  0  0  0  0  0  0\n  -11.4790  -41.4460  -24.6090 C   0  0  0  0  0  0  0  0  0  0  0  0\n  -11.4680  -40.0040  -25.7150 S   0  0  0  0  0  0  0  0  0  0  0  0\n  -10.3960  -42.6770  -22.6370 C   0  0  0  0  0  0  0  0  0  0  0  0\n  -11.4010  -43.3890  -22.5920 O   0  0  0  0  0  0  0  0  0  0  0  0\n   -9.3000  -42.9000  -21.8740 N   0  0  0  0  0  0  0  0  0  0  0  0\n   -9.1690  -43.9230  -20.8180 C   0  0  0  0  0  0  0  0  0  0  0  0\n  -10.2890  -43.7780  -19.7810 C   0  0  0  0  0  0  0  0  0  0  0  0\n  -10.4610  -42.4320  -19.3730 O   0  0  0  0  0  0  0  0  0  0  0  0\n  -20.6510  -45.8820  -15.1680 O   0  0  0  0  0  0  0  0  0  0  0  0\n  -15.6050  -33.1960  -24.3590 C   0  0  0  0  0  0  0  0  0  0  0  0\n  -15.1340  -34.0880  -25.3220 C   0  0  0  0  0  0  0  0  0  0  0  0\n  -16.6790  -51.2960  -21.0190 C   0  0  0  0  0  0  0  0  0  0  0  0\n  -15.5820  -50.6380  -21.5540 C   0  0  0  0  0  0  0  0  0  0  0  0\n  -15.5230  -49.2810  -21.4610 O   0  0  0  0  0  0  0  0  0  0  0  0\n  -23.7790  -49.4540  -23.1340 C   0  0  0  0  0  0  0  0  0  0  0  0\n  -22.9170  -48.4340  -23.4990 C   0  0  0  0  0  0  0  0  0  0  0  0\n  -22.6600  -47.3560  -22.6350 C   0  0  0  0  0  0  0  0  0  0  0  0\n  -23.2490  -47.2680  -21.3970 C   0  0  0  0  0  0  0  0  0  0  0  0\n  -11.5400  -47.2210  -23.2590 C   0  0  0  0  0  0  0  0  0  0  0  0\n  -12.1630  -46.1490  -22.6340 N   0  0  0  0  0  0  0  0  0  0  0  0\n  -13.2000  -46.6610  -21.9960 C   0  0  0  0  0  0  0  0  0  0  0  0\n  -13.2730  -47.9790  -22.1690 N   0  0  0  0  0  0  0  0  0  0  0  0\n  2  3  2  0\n  4  5  1  0\n  7  6  1  1\n  7  8  1  0\n  7  9  1  0\n  9 10  1  0\n 10 11  1  0\n 12 13  1  0\n 13 14  1  0\n 14 15  1  0\n 16 17  1  0\n 17 18  1  0\n 18 19  1  0\n 20 21  1  0\n 21 22  1  0\n 22 23  2  0\n 22 24  1  0\n 24 25  1  0\n 25 26  1  0\n 27 28  1  0\n 28 29  1  0\n 31 30  1  1\n 31 32  1  0\n 32 33  1  0\n 31 34  1  0\n 34 35  1  0\n 35 36  2  0\n 35 37  1  0\n 37 38  1  0\n 38 39  1  0\n 39 40  4  0\n 40 41  4  0\n 41 42  4  0\n 42 43  4  0\n 45 44  1  6\n 45 46  1  0\n 45 47  1  0\n 47 48  1  0\n 48 49  1  0\n 51 52  2  0\n 52 53  1  0\n 54 55  1  0\n 55 56  1  0\n 56 57  1  0\n 57 58  2  0\n 57 59  1  0\n 60 61  1  0\n 61 62  1  0\n 62 63  1  0\n 65 64  1  6\n 65 66  1  0\n 66 67  1  0\n 65 68  1  0\n 68 69  2  0\n 68 70  1  0\n 70 71  1  0\n 71 72  1  0\n 72 73  1  0\n 75 76  4  0\n 77 78  4  0\n 78 79  1  0\n 80 81  4  0\n 81 82  4  0\n 82 83  4  0\n 84 85  4  0\n 85 86  4  0\n 86 87  4  0\n 43 39  4  0\nM  END\n","sdf");
+    viewer_17886274329422028.setStyle({"stick": {}});
+    viewer_17886274329422028.setStyle({"model": 0},{"stick": {"colorscheme": "cyanCarbon"}});
+    viewer_17886274329422028.setStyle({"model": 1},{"stick": {"colorscheme": "redCarbon"}});
+    viewer_17886274329422028.setBackgroundColor("0xeeeeee");
+    viewer_17886274329422028.zoomTo();
+viewer_17886274329422028.render();
+});
+</script>
+</div>
+</div>
+<p>They were used to search the FreedomSpace 5.0 library with a Tversky similarity cutoff of 0.7 and the top million possible hits built and checked for similarity to the query. The search was run on the IRIS cluster at the <a href="https://www.diamond.ac.uk/Home.html">Diamond Light Source</a>. Stage one, identifying possible hits, was run on a 200 CPU machine and took some 8 CPU days (roughly an hour of actual time) and the second stage was run as 200 single CPU jobs each processing 5000 possible hits which took roughly 3 further hours (a total of about 15 CPU days for the full search). The best hit, shown below (in blue in the 3D display), had a Tversky similarity of 0.79 and there were 2852 in total.</p>
+<div id="fe59ef0d-e1f2-46cc-9fde-00e274050dc8" class="cell" data-execution_count="30">
+<div class="sourceCode cell-code" id="cb14" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb14-1">hit0 <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> Chem.MolFromSmiles(<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"O=C(NC[C@@H]1O[C@@H]2CC[C@H]1C2)c1cnn2c(-c3ccccc3)cc(-c3ccccc3)nc12 |(-12.3794,-41.9504,-20.918;-13.1794,-41.6975,-21.8533;-13.1539,-40.4582,-22.561;-12.1732,-39.4818,-22.1691;-12.2942,-38.2614,-23.0128;-11.3779,-37.2651,-22.6782;-12.123,-36.1386,-22.3551;-12.9653,-36.4536,-21.1504;-14.0985,-37.3329,-21.6666;-13.6322,-37.6234,-23.0736;-13.1924,-36.1975,-23.4569;-14.1768,-42.6744,-22.2546;-14.5278,-43.1485,-23.4917;-15.5321,-44.0304,-23.3197;-15.813,-44.118,-22.0355;-16.7249,-44.8471,-21.3565;-17.6648,-45.7511,-21.9995;-17.892,-46.969,-21.3808;-18.7731,-47.9126,-21.9152;-19.4451,-47.6255,-23.1051;-19.2115,-46.3988,-23.7218;-18.327,-45.4694,-23.1703;-16.8105,-44.7445,-19.9613;-15.9786,-43.9116,-19.255;-16.0093,-43.7911,-17.7966;-16.9181,-44.5027,-17.0214;-16.9031,-44.3717,-15.6385;-15.9623,-43.5164,-15.0459;-15.053,-42.8031,-15.7921;-15.0954,-42.9566,-17.1641;-15.0856,-43.2023,-19.9732;-15.0112,-43.3066,-21.3249),wU:4.3,6.6,9.8|"</span>)</span>
+<span id="cb14-2">hit0_2d <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> Chem.MolFromSmiles(Chem.MolToSmiles(hit0))</span>
+<span id="cb14-3">hit0_2d</span></code></pre></div>
+<div class="cell-output cell-output-display" data-execution_count="30">
+<div>
+<figure class="figure">
+<p><img src="https://greglandrum.github.io/rdkit-blog/posts/2026-09-08-shape-synthon-search_files/figure-html/cell-9-output-1.png" class="img-fluid figure-img"></p>
+</figure>
+</div>
+</div>
+</div>
+<div id="ab7f7529-8c54-4726-98a2-9ed1db215458" class="cell" data-execution_count="31">
+<div class="sourceCode cell-code" id="cb15" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb15-1">IPythonConsole.drawMols3D([combined_query, exc_vol, hit0])</span></code></pre></div>
+<div class="cell-output cell-output-stderr">
+<pre><code>[17:57:12] non-ring atom 74 marked aromatic</code></pre>
+</div>
+<div class="cell-output cell-output-display">
+<div id="3dmolviewer_1788627432956175" style="position: relative; width: 800px; height: 500px;">
+        <p id="3dmolwarning_1788627432956175" style="background-color:#ffcccc;color:black">3Dmol.js failed to load for some reason.  Please check your browser console for error messages.<br></p>
+        </div>
+<script>
+
+var loadScriptAsync = function(uri){
+  return new Promise((resolve, reject) => {
+    //this is to ignore the existence of requirejs amd
+    var savedexports, savedmodule;
+    if (typeof exports !== 'undefined') savedexports = exports;
+    else exports = {}
+    if (typeof module !== 'undefined') savedmodule = module;
+    else module = {}
+
+    var tag = document.createElement('script');
+    tag.src = uri;
+    tag.async = true;
+    tag.onload = () => {
+        exports = savedexports;
+        module = savedmodule;
+        resolve();
+    };
+  var firstScriptTag = document.getElementsByTagName('script')[0];
+  firstScriptTag.parentNode.insertBefore(tag, firstScriptTag);
+});
+};
+
+if(typeof $3Dmolpromise === 'undefined') {
+$3Dmolpromise = null;
+  $3Dmolpromise = loadScriptAsync('https://cdn.jsdelivr.net/npm/3dmol@2.5.4/build/3Dmol-min.js');
+}
+
+var viewer_1788627432956175 = null;
+var warn = document.getElementById("3dmolwarning_1788627432956175");
+if(warn) {
+    warn.parentNode.removeChild(warn);
+}
+$3Dmolpromise.then(function() {
+viewer_1788627432956175 = $3Dmol.createViewer(document.getElementById("3dmolviewer_1788627432956175"),{backgroundColor:"white"});
+viewer_1788627432956175.zoomTo();
+    viewer_1788627432956175.addModel("\n     RDKit          3D\n\n 28 29  0  0  0  0  0  0  0  0999 V2000\n  -11.6290  -40.6240  -21.2250 C   0  0  0  0  0  0  0  0  0  0  0  0\n  -12.9440  -41.0220  -21.8330 C   0  0  0  0  0  0  0  0  0  0  0  0\n  -13.2660  -42.1970  -21.9740 O   0  0  0  0  0  0  0  0  0  0  0  0\n  -13.7260  -40.0340  -22.2480 N   0  0  0  0  0  0  0  0  0  0  0  0\n  -13.3480  -39.2220  -23.3820 C   0  0  0  0  0  0  0  0  0  0  0  0\n  -12.9660  -37.9070  -22.9250 C   0  0  0  0  0  0  0  0  0  0  0  0\n  -11.7410  -37.4580  -22.8790 N   0  0  0  0  0  0  0  0  0  0  0  0\n  -11.8370  -36.2110  -22.2990 C   0  0  0  0  0  0  0  0  0  0  0  0\n  -13.1010  -35.9420  -22.0180 C   0  0  0  0  0  0  0  0  0  0  0  0\n  -13.8180  -37.0350  -22.4210 N   0  0  0  0  0  0  0  0  0  0  0  0\n  -14.5360  -43.2680  -23.7430 C   0  0  0  0  0  0  0  0  0  0  0  0\n  -15.6030  -43.8440  -22.9840 O   0  0  0  0  0  0  0  0  0  0  0  0\n  -15.5480  -43.9340  -21.6070 C   0  0  0  0  0  0  0  0  0  0  0  0\n  -14.5980  -43.2170  -20.8560 C   0  0  0  0  0  0  0  0  0  0  0  0\n  -14.5670  -43.3410  -19.4640 C   0  0  0  0  0  0  0  0  0  0  0  0\n  -15.4750  -44.1550  -18.7800 C   0  0  0  0  0  0  0  0  0  0  0  0\n  -15.3540  -44.2790  -17.2720 C   0  0  0  0  0  0  0  0  0  0  0  0\n  -16.4370  -43.5270  -16.5460 C   0  0  0  0  0  0  0  0  0  0  0  0\n  -16.9070  -44.0190  -15.4960 O   0  0  0  0  0  0  0  0  0  0  0  0\n  -16.8110  -42.4260  -17.0100 O   0  0  0  0  0  0  0  0  0  0  0  0\n  -16.4330  -44.9030  -19.4850 C   0  0  0  0  0  0  0  0  0  0  0  0\n  -16.5200  -44.8140  -20.8860 C   0  0  0  0  0  0  0  0  0  0  0  0\n  -17.5180  -45.6190  -21.6590 C   0  0  0  0  0  0  0  0  0  0  0  0\n  -18.2180  -45.0690  -22.7410 C   0  0  0  0  0  0  0  0  0  0  0  0\n  -19.0950  -45.8630  -23.4880 C   0  0  0  0  0  0  0  0  0  0  0  0\n  -19.3250  -47.1890  -23.1340 C   0  0  0  0  0  0  0  0  0  0  0  0\n  -18.6400  -47.7380  -22.0480 C   0  0  0  0  0  0  0  0  0  0  0  0\n  -17.7270  -46.9640  -21.3260 C   0  0  0  0  0  0  0  0  0  0  0  0\n  1  2  1  0\n  2  3  2  0\n  2  4  1  0\n  4  5  1  0\n  5  6  1  0\n  6  7  2  0\n  7  8  1  0\n  8  9  2  0\n  9 10  1  0\n 11 12  1  0\n 12 13  1  0\n 13 14  1  0\n 14 15  2  0\n 15 16  1  0\n 16 17  1  0\n 17 18  1  0\n 18 19  2  0\n 18 20  1  0\n 16 21  2  0\n 21 22  1  0\n 22 23  1  0\n 23 24  2  0\n 24 25  1  0\n 25 26  2  0\n 26 27  1  0\n 27 28  2  0\n 10  6  1  0\n 22 13  2  0\n 28 23  1  0\nM  END\n","sdf");
+    viewer_1788627432956175.setStyle({"stick": {}});
+    viewer_1788627432956175.addModel("\n     RDKit          3D\n\n 87 68  0  0  0  0  0  0  0  0999 V2000\n  -13.8030  -42.8480  -27.9270 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -8.0780  -33.4180  -20.9250 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -9.1350  -34.0100  -21.2210 O   0  0  0  0  0  0  0  0  0  0  0  0\n  -17.7190  -37.0140  -24.8610 C   0  0  0  0  0  0  0  0  0  0  0  0\n  -16.4730  -37.0570  -24.0030 C   0  0  0  0  0  0  0  0  0  0  0  0\n  -14.3660  -46.2300  -25.7850 C   0  0  0  0  0  0  0  0  0  0  0  0\n  -15.7170  -46.9830  -25.8430 C   0  0  1  0  0  0  0  0  0  0  0  0\n  -16.0480  -47.6910  -24.5370 C   0  0  0  0  0  0  0  0  0  0  0  0\n  -16.8570  -46.0620  -26.2830 C   0  0  0  0  0  0  0  0  0  0  0  0\n  -16.7330  -45.4630  -27.6930 C   0  0  0  0  0  0  0  0  0  0  0  0\n  -17.9380  -44.7050  -28.0350 N   0  0  0  0  0  0  0  0  0  0  0  0\n  -17.2690  -47.4750  -12.9880 C   0  0  0  0  0  0  0  0  0  0  0  0\n  -17.3490  -46.2690  -12.0570 C   0  0  0  0  0  0  0  0  0  0  0  0\n  -16.0840  -45.5300  -11.9910 N   0  0  0  0  0  0  0  0  0  0  0  0\n  -15.6780  -44.8210  -10.9420 C   0  0  0  0  0  0  0  0  0  0  0  0\n  -18.3620  -51.6650  -24.4200 C   0  0  0  0  0  0  0  0  0  0  0  0\n  -19.4420  -50.6360  -24.8330 C   0  0  0  0  0  0  0  0  0  0  0  0\n  -19.1160  -50.0220  -26.4900 S   0  0  0  0  0  0  0  0  0  0  0  0\n  -20.7030  -49.4070  -26.9340 C   0  0  0  0  0  0  0  0  0  0  0  0\n  -11.3790  -32.2740  -24.8670 C   0  0  0  0  0  0  0  0  0  0  0  0\n  -11.7360  -33.1390  -25.9880 N   0  0  0  0  0  0  0  0  0  0  0  0\n  -11.3950  -34.4170  -26.0290 C   0  0  0  0  0  0  0  0  0  0  0  0\n  -10.7510  -34.9770  -25.1350 O   0  0  0  0  0  0  0  0  0  0  0  0\n  -11.7570  -35.1630  -27.3060 C   0  0  0  0  0  0  0  0  0  0  0  0\n  -12.1770  -36.5980  -26.9920 C   0  0  0  0  0  0  0  0  0  0  0  0\n  -13.4240  -36.6210  -26.3270 O   0  0  0  0  0  0  0  0  0  0  0  0\n  -21.0500  -50.3680  -20.4270 C   0  0  0  0  0  0  0  0  0  0  0  0\n  -20.5310  -49.0520  -19.3110 S   0  0  0  0  0  0  0  0  0  0  0  0\n  -19.5410  -50.0070  -18.1180 C   0  0  0  0  0  0  0  0  0  0  0  0\n  -21.6230  -43.4680  -22.3720 C   0  0  0  0  0  0  0  0  0  0  0  0\n  -21.4750  -43.3820  -23.8850 C   0  0  1  0  0  0  0  0  0  0  0  0\n  -22.8240  -43.0580  -24.5340 C   0  0  0  0  0  0  0  0  0  0  0  0\n  -23.3700  -44.0150  -25.3000 N   0  0  0  0  0  0  0  0  0  0  0  0\n  -20.4810  -42.3690  -24.2370 N   0  0  0  0  0  0  0  0  0  0  0  0\n  -19.7330  -42.4360  -25.3430 C   0  0  0  0  0  0  0  0  0  0  0  0\n  -19.8230  -43.3610  -26.1480 O   0  0  0  0  0  0  0  0  0  0  0  0\n  -18.7440  -41.2960  -25.5970 C   0  0  0  0  0  0  0  0  0  0  0  0\n  -17.2870  -41.7870  -25.6020 C   0  0  0  0  0  0  0  0  0  0  0  0\n  -16.3010  -40.6870  -25.8370 C   0  0  0  0  0  0  0  0  0  0  0  0\n  -15.3440  -40.1850  -25.0190 C   0  0  0  0  0  0  0  0  0  0  0  0\n  -14.7370  -39.1600  -25.7050 N   0  0  0  0  0  0  0  0  0  0  0  0\n  -15.3440  -39.0600  -26.8830 C   0  0  0  0  0  0  0  0  0  0  0  0\n  -16.2910  -39.9710  -27.0170 N   0  0  0  0  0  0  0  0  0  0  0  0\n  -20.8080  -44.5670  -19.1570 C   0  0  0  0  0  0  0  0  0  0  0  0\n  -20.0180  -44.0690  -17.9470 C   0  0  1  0  0  0  0  0  0  0  0  0\n  -19.0820  -43.0790  -18.3630 O   0  0  0  0  0  0  0  0  0  0  0  0\n  -20.9270  -43.5160  -16.8070 C   0  0  0  0  0  0  0  0  0  0  0  0\n  -21.5780  -42.1840  -17.2100 C   0  0  0  0  0  0  0  0  0  0  0  0\n  -20.8320  -41.0890  -17.0460 N   0  0  0  0  0  0  0  0  0  0  0  0\n   -9.3270  -32.5810  -23.6010 N   0  0  0  0  0  0  0  0  0  0  0  0\n  -11.0380  -46.0600  -16.6580 N   0  0  0  0  0  0  0  0  0  0  0  0\n  -11.6970  -46.8060  -17.5290 C   0  0  0  0  0  0  0  0  0  0  0  0\n  -12.8170  -46.3440  -18.0640 N   0  0  0  0  0  0  0  0  0  0  0  0\n   -7.9400  -34.8750  -24.3350 N   0  0  0  0  0  0  0  0  0  0  0  0\n   -7.4050  -36.1160  -24.9080 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -8.4000  -37.2730  -24.7780 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -8.4870  -37.9520  -23.4400 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -9.4920  -37.7300  -22.7270 O   0  0  0  0  0  0  0  0  0  0  0  0\n   -7.6740  -38.8520  -23.1890 O   0  0  0  0  0  0  0  0  0  0  0  0\n  -19.6740  -40.2890  -19.2740 N   0  0  0  0  0  0  0  0  0  0  0  0\n  -18.8580  -40.0750  -20.4800 C   0  0  0  0  0  0  0  0  0  0  0  0\n  -18.0860  -41.3420  -20.8490 C   0  0  0  0  0  0  0  0  0  0  0  0\n  -17.3730  -41.1710  -22.0640 O   0  0  0  0  0  0  0  0  0  0  0  0\n   -9.0260  -41.5380  -24.3930 N   0  0  0  0  0  0  0  0  0  0  0  0\n  -10.2870  -41.5110  -23.6540 C   0  0  1  0  0  0  0  0  0  0  0  0\n  -11.4790  -41.4460  -24.6090 C   0  0  0  0  0  0  0  0  0  0  0  0\n  -11.4680  -40.0040  -25.7150 S   0  0  0  0  0  0  0  0  0  0  0  0\n  -10.3960  -42.6770  -22.6370 C   0  0  0  0  0  0  0  0  0  0  0  0\n  -11.4010  -43.3890  -22.5920 O   0  0  0  0  0  0  0  0  0  0  0  0\n   -9.3000  -42.9000  -21.8740 N   0  0  0  0  0  0  0  0  0  0  0  0\n   -9.1690  -43.9230  -20.8180 C   0  0  0  0  0  0  0  0  0  0  0  0\n  -10.2890  -43.7780  -19.7810 C   0  0  0  0  0  0  0  0  0  0  0  0\n  -10.4610  -42.4320  -19.3730 O   0  0  0  0  0  0  0  0  0  0  0  0\n  -20.6510  -45.8820  -15.1680 O   0  0  0  0  0  0  0  0  0  0  0  0\n  -15.6050  -33.1960  -24.3590 C   0  0  0  0  0  0  0  0  0  0  0  0\n  -15.1340  -34.0880  -25.3220 C   0  0  0  0  0  0  0  0  0  0  0  0\n  -16.6790  -51.2960  -21.0190 C   0  0  0  0  0  0  0  0  0  0  0  0\n  -15.5820  -50.6380  -21.5540 C   0  0  0  0  0  0  0  0  0  0  0  0\n  -15.5230  -49.2810  -21.4610 O   0  0  0  0  0  0  0  0  0  0  0  0\n  -23.7790  -49.4540  -23.1340 C   0  0  0  0  0  0  0  0  0  0  0  0\n  -22.9170  -48.4340  -23.4990 C   0  0  0  0  0  0  0  0  0  0  0  0\n  -22.6600  -47.3560  -22.6350 C   0  0  0  0  0  0  0  0  0  0  0  0\n  -23.2490  -47.2680  -21.3970 C   0  0  0  0  0  0  0  0  0  0  0  0\n  -11.5400  -47.2210  -23.2590 C   0  0  0  0  0  0  0  0  0  0  0  0\n  -12.1630  -46.1490  -22.6340 N   0  0  0  0  0  0  0  0  0  0  0  0\n  -13.2000  -46.6610  -21.9960 C   0  0  0  0  0  0  0  0  0  0  0  0\n  -13.2730  -47.9790  -22.1690 N   0  0  0  0  0  0  0  0  0  0  0  0\n  2  3  2  0\n  4  5  1  0\n  7  6  1  1\n  7  8  1  0\n  7  9  1  0\n  9 10  1  0\n 10 11  1  0\n 12 13  1  0\n 13 14  1  0\n 14 15  1  0\n 16 17  1  0\n 17 18  1  0\n 18 19  1  0\n 20 21  1  0\n 21 22  1  0\n 22 23  2  0\n 22 24  1  0\n 24 25  1  0\n 25 26  1  0\n 27 28  1  0\n 28 29  1  0\n 31 30  1  1\n 31 32  1  0\n 32 33  1  0\n 31 34  1  0\n 34 35  1  0\n 35 36  2  0\n 35 37  1  0\n 37 38  1  0\n 38 39  1  0\n 39 40  4  0\n 40 41  4  0\n 41 42  4  0\n 42 43  4  0\n 45 44  1  6\n 45 46  1  0\n 45 47  1  0\n 47 48  1  0\n 48 49  1  0\n 51 52  2  0\n 52 53  1  0\n 54 55  1  0\n 55 56  1  0\n 56 57  1  0\n 57 58  2  0\n 57 59  1  0\n 60 61  1  0\n 61 62  1  0\n 62 63  1  0\n 65 64  1  6\n 65 66  1  0\n 66 67  1  0\n 65 68  1  0\n 68 69  2  0\n 68 70  1  0\n 70 71  1  0\n 71 72  1  0\n 72 73  1  0\n 75 76  4  0\n 77 78  4  0\n 78 79  1  0\n 80 81  4  0\n 81 82  4  0\n 82 83  4  0\n 84 85  4  0\n 85 86  4  0\n 86 87  4  0\n 43 39  4  0\nM  END\n","sdf");
+    viewer_1788627432956175.setStyle({"stick": {}});
+    viewer_1788627432956175.addModel("\n     RDKit          3D\n\n 32 37  0  0  0  0  0  0  0  0999 V2000\n  -12.3794  -41.9504  -20.9180 O   0  0  0  0  0  0  0  0  0  0  0  0\n  -13.1794  -41.6975  -21.8533 C   0  0  0  0  0  0  0  0  0  0  0  0\n  -13.1539  -40.4582  -22.5610 N   0  0  0  0  0  0  0  0  0  0  0  0\n  -12.1732  -39.4818  -22.1691 C   0  0  0  0  0  0  0  0  0  0  0  0\n  -12.2942  -38.2614  -23.0128 C   0  0  2  0  0  0  0  0  0  0  0  0\n  -11.3779  -37.2651  -22.6782 O   0  0  0  0  0  0  0  0  0  0  0  0\n  -12.1230  -36.1386  -22.3551 C   0  0  2  0  0  0  0  0  0  0  0  0\n  -12.9653  -36.4536  -21.1504 C   0  0  0  0  0  0  0  0  0  0  0  0\n  -14.0985  -37.3329  -21.6666 C   0  0  0  0  0  0  0  0  0  0  0  0\n  -13.6322  -37.6234  -23.0736 C   0  0  1  0  0  0  0  0  0  0  0  0\n  -13.1924  -36.1975  -23.4569 C   0  0  0  0  0  0  0  0  0  0  0  0\n  -14.1768  -42.6744  -22.2546 C   0  0  0  0  0  0  0  0  0  0  0  0\n  -14.5278  -43.1485  -23.4917 C   0  0  0  0  0  0  0  0  0  0  0  0\n  -15.5321  -44.0304  -23.3197 N   0  0  0  0  0  0  0  0  0  0  0  0\n  -15.8130  -44.1180  -22.0355 N   0  0  0  0  0  0  0  0  0  0  0  0\n  -16.7249  -44.8471  -21.3565 C   0  0  0  0  0  0  0  0  0  0  0  0\n  -17.6648  -45.7511  -21.9995 C   0  0  0  0  0  0  0  0  0  0  0  0\n  -17.8920  -46.9690  -21.3808 C   0  0  0  0  0  0  0  0  0  0  0  0\n  -18.7731  -47.9126  -21.9152 C   0  0  0  0  0  0  0  0  0  0  0  0\n  -19.4451  -47.6255  -23.1051 C   0  0  0  0  0  0  0  0  0  0  0  0\n  -19.2115  -46.3988  -23.7218 C   0  0  0  0  0  0  0  0  0  0  0  0\n  -18.3270  -45.4694  -23.1703 C   0  0  0  0  0  0  0  0  0  0  0  0\n  -16.8105  -44.7445  -19.9613 C   0  0  0  0  0  0  0  0  0  0  0  0\n  -15.9786  -43.9116  -19.2550 C   0  0  0  0  0  0  0  0  0  0  0  0\n  -16.0093  -43.7911  -17.7966 C   0  0  0  0  0  0  0  0  0  0  0  0\n  -16.9181  -44.5027  -17.0214 C   0  0  0  0  0  0  0  0  0  0  0  0\n  -16.9031  -44.3717  -15.6385 C   0  0  0  0  0  0  0  0  0  0  0  0\n  -15.9623  -43.5164  -15.0459 C   0  0  0  0  0  0  0  0  0  0  0  0\n  -15.0530  -42.8031  -15.7921 C   0  0  0  0  0  0  0  0  0  0  0  0\n  -15.0954  -42.9566  -17.1641 C   0  0  0  0  0  0  0  0  0  0  0  0\n  -15.0856  -43.2023  -19.9732 N   0  0  0  0  0  0  0  0  0  0  0  0\n  -15.0112  -43.3066  -21.3249 C   0  0  0  0  0  0  0  0  0  0  0  0\n  1  2  2  0\n  2  3  1  0\n  3  4  1  0\n  5  4  1  1\n  5  6  1  0\n  6  7  1  0\n  7  8  1  1\n  8  9  1  0\n 10  9  1  1\n 10 11  1  0\n  2 12  1  0\n 12 13  1  0\n 13 14  2  0\n 14 15  1  0\n 15 16  1  0\n 16 17  1  0\n 17 18  2  0\n 18 19  1  0\n 19 20  2  0\n 20 21  1  0\n 21 22  2  0\n 16 23  2  0\n 23 24  1  0\n 24 25  1  0\n 25 26  2  0\n 26 27  1  0\n 27 28  2  0\n 28 29  1  0\n 29 30  2  0\n 24 31  2  0\n 31 32  1  0\n 10  5  1  0\n 32 12  2  0\n 11  7  1  0\n 32 15  1  0\n 22 17  1  0\n 30 25  1  0\nM  END\n","sdf");
+    viewer_1788627432956175.setStyle({"stick": {}});
+    viewer_1788627432956175.setStyle({"model": 0},{"stick": {"colorscheme": "cyanCarbon"}});
+    viewer_1788627432956175.setStyle({"model": 1},{"stick": {"colorscheme": "redCarbon"}});
+    viewer_1788627432956175.setStyle({"model": 2},{"stick": {"colorscheme": "blueCarbon"}});
+    viewer_1788627432956175.setBackgroundColor("0xeeeeee");
+    viewer_1788627432956175.zoomTo();
+viewer_1788627432956175.render();
+});
+</script>
+</div>
+</div>
+<p>Another hit, with a different chemistry in the middle, was 1648 in the list, with a Tversky score of 0.70 and is shown below.</p>
+<div id="3e7ab3cf-0da1-4534-824b-f7cb36ddc671" class="cell" data-execution_count="32">
+<div class="sourceCode cell-code" id="cb17" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb17-1">hit1648 <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> Chem.MolFromSmiles(<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"O=C(CN1C[C@]2(CO)C[C@](c3ccccc3)(C1)C2)N[C@H]1C[C@H]2CC[C@@H]1C2 |(-12.4609,-41.246,-21.317;-13.5299,-40.908,-21.9189;-14.6849,-41.8298,-22.0109;-14.4906,-43.0889,-21.3742;-14.413,-43.0618,-19.9504;-15.5104,-43.8711,-19.2968;-15.546,-43.7444,-17.808;-16.5883,-44.5212,-17.256;-16.8343,-43.7152,-20.0176;-16.2912,-44.7253,-21.0029;-17.267,-45.6028,-21.6345;-18.4385,-45.0563,-22.1169;-19.4198,-45.8378,-22.7348;-19.2145,-47.2101,-22.8708;-18.0322,-47.7828,-22.3879;-17.1057,-46.9613,-21.7898;-15.2633,-44.1428,-21.9437;-15.5046,-45.2917,-19.8271;-13.6751,-39.628,-22.5366;-12.6571,-38.6374,-22.5383;-12.1429,-38.1225,-23.8146;-11.8261,-36.6567,-23.5282;-13.1187,-35.9078,-23.5726;-13.8444,-36.4216,-22.3368;-12.9055,-37.4076,-21.701;-11.5792,-36.7069,-22.0156),wD:9.9,19.21,24.26,wU:5.5,21.23|"</span>)</span>
+<span id="cb17-2">hit1648_2d <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> Chem.MolFromSmiles(Chem.MolToSmiles(hit1648))</span>
+<span id="cb17-3">hit1648_2d</span></code></pre></div>
+<div class="cell-output cell-output-display" data-execution_count="32">
+<div>
+<figure class="figure">
+<p><img src="https://greglandrum.github.io/rdkit-blog/posts/2026-09-08-shape-synthon-search_files/figure-html/cell-11-output-1.png" class="img-fluid figure-img"></p>
+</figure>
+</div>
+</div>
+</div>
+<div id="0f69a907-79e2-43eb-ba5c-d1d24cc33b14" class="cell" data-execution_count="33">
+<div class="sourceCode cell-code" id="cb18" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb18-1">IPythonConsole.drawMols3D([combined_query, exc_vol, hit1648])</span></code></pre></div>
+<div class="cell-output cell-output-stderr">
+<pre><code>[17:57:12] non-ring atom 74 marked aromatic</code></pre>
+</div>
+<div class="cell-output cell-output-display">
+<div id="3dmolviewer_17886274329718652" style="position: relative; width: 800px; height: 500px;">
+        <p id="3dmolwarning_17886274329718652" style="background-color:#ffcccc;color:black">3Dmol.js failed to load for some reason.  Please check your browser console for error messages.<br></p>
+        </div>
+<script>
+
+var loadScriptAsync = function(uri){
+  return new Promise((resolve, reject) => {
+    //this is to ignore the existence of requirejs amd
+    var savedexports, savedmodule;
+    if (typeof exports !== 'undefined') savedexports = exports;
+    else exports = {}
+    if (typeof module !== 'undefined') savedmodule = module;
+    else module = {}
+
+    var tag = document.createElement('script');
+    tag.src = uri;
+    tag.async = true;
+    tag.onload = () => {
+        exports = savedexports;
+        module = savedmodule;
+        resolve();
+    };
+  var firstScriptTag = document.getElementsByTagName('script')[0];
+  firstScriptTag.parentNode.insertBefore(tag, firstScriptTag);
+});
+};
+
+if(typeof $3Dmolpromise === 'undefined') {
+$3Dmolpromise = null;
+  $3Dmolpromise = loadScriptAsync('https://cdn.jsdelivr.net/npm/3dmol@2.5.4/build/3Dmol-min.js');
+}
+
+var viewer_17886274329718652 = null;
+var warn = document.getElementById("3dmolwarning_17886274329718652");
+if(warn) {
+    warn.parentNode.removeChild(warn);
+}
+$3Dmolpromise.then(function() {
+viewer_17886274329718652 = $3Dmol.createViewer(document.getElementById("3dmolviewer_17886274329718652"),{backgroundColor:"white"});
+viewer_17886274329718652.zoomTo();
+    viewer_17886274329718652.addModel("\n     RDKit          3D\n\n 28 29  0  0  0  0  0  0  0  0999 V2000\n  -11.6290  -40.6240  -21.2250 C   0  0  0  0  0  0  0  0  0  0  0  0\n  -12.9440  -41.0220  -21.8330 C   0  0  0  0  0  0  0  0  0  0  0  0\n  -13.2660  -42.1970  -21.9740 O   0  0  0  0  0  0  0  0  0  0  0  0\n  -13.7260  -40.0340  -22.2480 N   0  0  0  0  0  0  0  0  0  0  0  0\n  -13.3480  -39.2220  -23.3820 C   0  0  0  0  0  0  0  0  0  0  0  0\n  -12.9660  -37.9070  -22.9250 C   0  0  0  0  0  0  0  0  0  0  0  0\n  -11.7410  -37.4580  -22.8790 N   0  0  0  0  0  0  0  0  0  0  0  0\n  -11.8370  -36.2110  -22.2990 C   0  0  0  0  0  0  0  0  0  0  0  0\n  -13.1010  -35.9420  -22.0180 C   0  0  0  0  0  0  0  0  0  0  0  0\n  -13.8180  -37.0350  -22.4210 N   0  0  0  0  0  0  0  0  0  0  0  0\n  -14.5360  -43.2680  -23.7430 C   0  0  0  0  0  0  0  0  0  0  0  0\n  -15.6030  -43.8440  -22.9840 O   0  0  0  0  0  0  0  0  0  0  0  0\n  -15.5480  -43.9340  -21.6070 C   0  0  0  0  0  0  0  0  0  0  0  0\n  -14.5980  -43.2170  -20.8560 C   0  0  0  0  0  0  0  0  0  0  0  0\n  -14.5670  -43.3410  -19.4640 C   0  0  0  0  0  0  0  0  0  0  0  0\n  -15.4750  -44.1550  -18.7800 C   0  0  0  0  0  0  0  0  0  0  0  0\n  -15.3540  -44.2790  -17.2720 C   0  0  0  0  0  0  0  0  0  0  0  0\n  -16.4370  -43.5270  -16.5460 C   0  0  0  0  0  0  0  0  0  0  0  0\n  -16.9070  -44.0190  -15.4960 O   0  0  0  0  0  0  0  0  0  0  0  0\n  -16.8110  -42.4260  -17.0100 O   0  0  0  0  0  0  0  0  0  0  0  0\n  -16.4330  -44.9030  -19.4850 C   0  0  0  0  0  0  0  0  0  0  0  0\n  -16.5200  -44.8140  -20.8860 C   0  0  0  0  0  0  0  0  0  0  0  0\n  -17.5180  -45.6190  -21.6590 C   0  0  0  0  0  0  0  0  0  0  0  0\n  -18.2180  -45.0690  -22.7410 C   0  0  0  0  0  0  0  0  0  0  0  0\n  -19.0950  -45.8630  -23.4880 C   0  0  0  0  0  0  0  0  0  0  0  0\n  -19.3250  -47.1890  -23.1340 C   0  0  0  0  0  0  0  0  0  0  0  0\n  -18.6400  -47.7380  -22.0480 C   0  0  0  0  0  0  0  0  0  0  0  0\n  -17.7270  -46.9640  -21.3260 C   0  0  0  0  0  0  0  0  0  0  0  0\n  1  2  1  0\n  2  3  2  0\n  2  4  1  0\n  4  5  1  0\n  5  6  1  0\n  6  7  2  0\n  7  8  1  0\n  8  9  2  0\n  9 10  1  0\n 11 12  1  0\n 12 13  1  0\n 13 14  1  0\n 14 15  2  0\n 15 16  1  0\n 16 17  1  0\n 17 18  1  0\n 18 19  2  0\n 18 20  1  0\n 16 21  2  0\n 21 22  1  0\n 22 23  1  0\n 23 24  2  0\n 24 25  1  0\n 25 26  2  0\n 26 27  1  0\n 27 28  2  0\n 10  6  1  0\n 22 13  2  0\n 28 23  1  0\nM  END\n","sdf");
+    viewer_17886274329718652.setStyle({"stick": {}});
+    viewer_17886274329718652.addModel("\n     RDKit          3D\n\n 87 68  0  0  0  0  0  0  0  0999 V2000\n  -13.8030  -42.8480  -27.9270 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -8.0780  -33.4180  -20.9250 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -9.1350  -34.0100  -21.2210 O   0  0  0  0  0  0  0  0  0  0  0  0\n  -17.7190  -37.0140  -24.8610 C   0  0  0  0  0  0  0  0  0  0  0  0\n  -16.4730  -37.0570  -24.0030 C   0  0  0  0  0  0  0  0  0  0  0  0\n  -14.3660  -46.2300  -25.7850 C   0  0  0  0  0  0  0  0  0  0  0  0\n  -15.7170  -46.9830  -25.8430 C   0  0  1  0  0  0  0  0  0  0  0  0\n  -16.0480  -47.6910  -24.5370 C   0  0  0  0  0  0  0  0  0  0  0  0\n  -16.8570  -46.0620  -26.2830 C   0  0  0  0  0  0  0  0  0  0  0  0\n  -16.7330  -45.4630  -27.6930 C   0  0  0  0  0  0  0  0  0  0  0  0\n  -17.9380  -44.7050  -28.0350 N   0  0  0  0  0  0  0  0  0  0  0  0\n  -17.2690  -47.4750  -12.9880 C   0  0  0  0  0  0  0  0  0  0  0  0\n  -17.3490  -46.2690  -12.0570 C   0  0  0  0  0  0  0  0  0  0  0  0\n  -16.0840  -45.5300  -11.9910 N   0  0  0  0  0  0  0  0  0  0  0  0\n  -15.6780  -44.8210  -10.9420 C   0  0  0  0  0  0  0  0  0  0  0  0\n  -18.3620  -51.6650  -24.4200 C   0  0  0  0  0  0  0  0  0  0  0  0\n  -19.4420  -50.6360  -24.8330 C   0  0  0  0  0  0  0  0  0  0  0  0\n  -19.1160  -50.0220  -26.4900 S   0  0  0  0  0  0  0  0  0  0  0  0\n  -20.7030  -49.4070  -26.9340 C   0  0  0  0  0  0  0  0  0  0  0  0\n  -11.3790  -32.2740  -24.8670 C   0  0  0  0  0  0  0  0  0  0  0  0\n  -11.7360  -33.1390  -25.9880 N   0  0  0  0  0  0  0  0  0  0  0  0\n  -11.3950  -34.4170  -26.0290 C   0  0  0  0  0  0  0  0  0  0  0  0\n  -10.7510  -34.9770  -25.1350 O   0  0  0  0  0  0  0  0  0  0  0  0\n  -11.7570  -35.1630  -27.3060 C   0  0  0  0  0  0  0  0  0  0  0  0\n  -12.1770  -36.5980  -26.9920 C   0  0  0  0  0  0  0  0  0  0  0  0\n  -13.4240  -36.6210  -26.3270 O   0  0  0  0  0  0  0  0  0  0  0  0\n  -21.0500  -50.3680  -20.4270 C   0  0  0  0  0  0  0  0  0  0  0  0\n  -20.5310  -49.0520  -19.3110 S   0  0  0  0  0  0  0  0  0  0  0  0\n  -19.5410  -50.0070  -18.1180 C   0  0  0  0  0  0  0  0  0  0  0  0\n  -21.6230  -43.4680  -22.3720 C   0  0  0  0  0  0  0  0  0  0  0  0\n  -21.4750  -43.3820  -23.8850 C   0  0  1  0  0  0  0  0  0  0  0  0\n  -22.8240  -43.0580  -24.5340 C   0  0  0  0  0  0  0  0  0  0  0  0\n  -23.3700  -44.0150  -25.3000 N   0  0  0  0  0  0  0  0  0  0  0  0\n  -20.4810  -42.3690  -24.2370 N   0  0  0  0  0  0  0  0  0  0  0  0\n  -19.7330  -42.4360  -25.3430 C   0  0  0  0  0  0  0  0  0  0  0  0\n  -19.8230  -43.3610  -26.1480 O   0  0  0  0  0  0  0  0  0  0  0  0\n  -18.7440  -41.2960  -25.5970 C   0  0  0  0  0  0  0  0  0  0  0  0\n  -17.2870  -41.7870  -25.6020 C   0  0  0  0  0  0  0  0  0  0  0  0\n  -16.3010  -40.6870  -25.8370 C   0  0  0  0  0  0  0  0  0  0  0  0\n  -15.3440  -40.1850  -25.0190 C   0  0  0  0  0  0  0  0  0  0  0  0\n  -14.7370  -39.1600  -25.7050 N   0  0  0  0  0  0  0  0  0  0  0  0\n  -15.3440  -39.0600  -26.8830 C   0  0  0  0  0  0  0  0  0  0  0  0\n  -16.2910  -39.9710  -27.0170 N   0  0  0  0  0  0  0  0  0  0  0  0\n  -20.8080  -44.5670  -19.1570 C   0  0  0  0  0  0  0  0  0  0  0  0\n  -20.0180  -44.0690  -17.9470 C   0  0  1  0  0  0  0  0  0  0  0  0\n  -19.0820  -43.0790  -18.3630 O   0  0  0  0  0  0  0  0  0  0  0  0\n  -20.9270  -43.5160  -16.8070 C   0  0  0  0  0  0  0  0  0  0  0  0\n  -21.5780  -42.1840  -17.2100 C   0  0  0  0  0  0  0  0  0  0  0  0\n  -20.8320  -41.0890  -17.0460 N   0  0  0  0  0  0  0  0  0  0  0  0\n   -9.3270  -32.5810  -23.6010 N   0  0  0  0  0  0  0  0  0  0  0  0\n  -11.0380  -46.0600  -16.6580 N   0  0  0  0  0  0  0  0  0  0  0  0\n  -11.6970  -46.8060  -17.5290 C   0  0  0  0  0  0  0  0  0  0  0  0\n  -12.8170  -46.3440  -18.0640 N   0  0  0  0  0  0  0  0  0  0  0  0\n   -7.9400  -34.8750  -24.3350 N   0  0  0  0  0  0  0  0  0  0  0  0\n   -7.4050  -36.1160  -24.9080 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -8.4000  -37.2730  -24.7780 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -8.4870  -37.9520  -23.4400 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -9.4920  -37.7300  -22.7270 O   0  0  0  0  0  0  0  0  0  0  0  0\n   -7.6740  -38.8520  -23.1890 O   0  0  0  0  0  0  0  0  0  0  0  0\n  -19.6740  -40.2890  -19.2740 N   0  0  0  0  0  0  0  0  0  0  0  0\n  -18.8580  -40.0750  -20.4800 C   0  0  0  0  0  0  0  0  0  0  0  0\n  -18.0860  -41.3420  -20.8490 C   0  0  0  0  0  0  0  0  0  0  0  0\n  -17.3730  -41.1710  -22.0640 O   0  0  0  0  0  0  0  0  0  0  0  0\n   -9.0260  -41.5380  -24.3930 N   0  0  0  0  0  0  0  0  0  0  0  0\n  -10.2870  -41.5110  -23.6540 C   0  0  1  0  0  0  0  0  0  0  0  0\n  -11.4790  -41.4460  -24.6090 C   0  0  0  0  0  0  0  0  0  0  0  0\n  -11.4680  -40.0040  -25.7150 S   0  0  0  0  0  0  0  0  0  0  0  0\n  -10.3960  -42.6770  -22.6370 C   0  0  0  0  0  0  0  0  0  0  0  0\n  -11.4010  -43.3890  -22.5920 O   0  0  0  0  0  0  0  0  0  0  0  0\n   -9.3000  -42.9000  -21.8740 N   0  0  0  0  0  0  0  0  0  0  0  0\n   -9.1690  -43.9230  -20.8180 C   0  0  0  0  0  0  0  0  0  0  0  0\n  -10.2890  -43.7780  -19.7810 C   0  0  0  0  0  0  0  0  0  0  0  0\n  -10.4610  -42.4320  -19.3730 O   0  0  0  0  0  0  0  0  0  0  0  0\n  -20.6510  -45.8820  -15.1680 O   0  0  0  0  0  0  0  0  0  0  0  0\n  -15.6050  -33.1960  -24.3590 C   0  0  0  0  0  0  0  0  0  0  0  0\n  -15.1340  -34.0880  -25.3220 C   0  0  0  0  0  0  0  0  0  0  0  0\n  -16.6790  -51.2960  -21.0190 C   0  0  0  0  0  0  0  0  0  0  0  0\n  -15.5820  -50.6380  -21.5540 C   0  0  0  0  0  0  0  0  0  0  0  0\n  -15.5230  -49.2810  -21.4610 O   0  0  0  0  0  0  0  0  0  0  0  0\n  -23.7790  -49.4540  -23.1340 C   0  0  0  0  0  0  0  0  0  0  0  0\n  -22.9170  -48.4340  -23.4990 C   0  0  0  0  0  0  0  0  0  0  0  0\n  -22.6600  -47.3560  -22.6350 C   0  0  0  0  0  0  0  0  0  0  0  0\n  -23.2490  -47.2680  -21.3970 C   0  0  0  0  0  0  0  0  0  0  0  0\n  -11.5400  -47.2210  -23.2590 C   0  0  0  0  0  0  0  0  0  0  0  0\n  -12.1630  -46.1490  -22.6340 N   0  0  0  0  0  0  0  0  0  0  0  0\n  -13.2000  -46.6610  -21.9960 C   0  0  0  0  0  0  0  0  0  0  0  0\n  -13.2730  -47.9790  -22.1690 N   0  0  0  0  0  0  0  0  0  0  0  0\n  2  3  2  0\n  4  5  1  0\n  7  6  1  1\n  7  8  1  0\n  7  9  1  0\n  9 10  1  0\n 10 11  1  0\n 12 13  1  0\n 13 14  1  0\n 14 15  1  0\n 16 17  1  0\n 17 18  1  0\n 18 19  1  0\n 20 21  1  0\n 21 22  1  0\n 22 23  2  0\n 22 24  1  0\n 24 25  1  0\n 25 26  1  0\n 27 28  1  0\n 28 29  1  0\n 31 30  1  1\n 31 32  1  0\n 32 33  1  0\n 31 34  1  0\n 34 35  1  0\n 35 36  2  0\n 35 37  1  0\n 37 38  1  0\n 38 39  1  0\n 39 40  4  0\n 40 41  4  0\n 41 42  4  0\n 42 43  4  0\n 45 44  1  6\n 45 46  1  0\n 45 47  1  0\n 47 48  1  0\n 48 49  1  0\n 51 52  2  0\n 52 53  1  0\n 54 55  1  0\n 55 56  1  0\n 56 57  1  0\n 57 58  2  0\n 57 59  1  0\n 60 61  1  0\n 61 62  1  0\n 62 63  1  0\n 65 64  1  6\n 65 66  1  0\n 66 67  1  0\n 65 68  1  0\n 68 69  2  0\n 68 70  1  0\n 70 71  1  0\n 71 72  1  0\n 72 73  1  0\n 75 76  4  0\n 77 78  4  0\n 78 79  1  0\n 80 81  4  0\n 81 82  4  0\n 82 83  4  0\n 84 85  4  0\n 85 86  4  0\n 86 87  4  0\n 43 39  4  0\nM  END\n","sdf");
+    viewer_17886274329718652.setStyle({"stick": {}});
+    viewer_17886274329718652.addModel("\n     RDKit          3D\n\n 26 30  0  0  0  0  0  0  0  0999 V2000\n  -12.4609  -41.2460  -21.3170 O   0  0  0  0  0  0  0  0  0  0  0  0\n  -13.5299  -40.9080  -21.9189 C   0  0  0  0  0  0  0  0  0  0  0  0\n  -14.6849  -41.8298  -22.0109 C   0  0  0  0  0  0  0  0  0  0  0  0\n  -14.4906  -43.0889  -21.3742 N   0  0  0  0  0  0  0  0  0  0  0  0\n  -14.4130  -43.0618  -19.9504 C   0  0  0  0  0  0  0  0  0  0  0  0\n  -15.5104  -43.8711  -19.2968 C   0  0  1  0  0  0  0  0  0  0  0  0\n  -15.5460  -43.7444  -17.8080 C   0  0  0  0  0  0  0  0  0  0  0  0\n  -16.5883  -44.5212  -17.2560 O   0  0  0  0  0  0  0  0  0  0  0  0\n  -16.8343  -43.7152  -20.0176 C   0  0  0  0  0  0  0  0  0  0  0  0\n  -16.2912  -44.7253  -21.0029 C   0  0  1  0  0  0  0  0  0  0  0  0\n  -17.2670  -45.6028  -21.6345 C   0  0  0  0  0  0  0  0  0  0  0  0\n  -18.4385  -45.0563  -22.1169 C   0  0  0  0  0  0  0  0  0  0  0  0\n  -19.4198  -45.8378  -22.7348 C   0  0  0  0  0  0  0  0  0  0  0  0\n  -19.2145  -47.2101  -22.8708 C   0  0  0  0  0  0  0  0  0  0  0  0\n  -18.0322  -47.7828  -22.3879 C   0  0  0  0  0  0  0  0  0  0  0  0\n  -17.1057  -46.9613  -21.7898 C   0  0  0  0  0  0  0  0  0  0  0  0\n  -15.2633  -44.1428  -21.9437 C   0  0  0  0  0  0  0  0  0  0  0  0\n  -15.5046  -45.2917  -19.8271 C   0  0  0  0  0  0  0  0  0  0  0  0\n  -13.6751  -39.6280  -22.5366 N   0  0  0  0  0  0  0  0  0  0  0  0\n  -12.6571  -38.6374  -22.5383 C   0  0  1  0  0  0  0  0  0  0  0  0\n  -12.1429  -38.1225  -23.8146 C   0  0  0  0  0  0  0  0  0  0  0  0\n  -11.8261  -36.6567  -23.5282 C   0  0  1  0  0  0  0  0  0  0  0  0\n  -13.1187  -35.9078  -23.5726 C   0  0  0  0  0  0  0  0  0  0  0  0\n  -13.8444  -36.4216  -22.3368 C   0  0  0  0  0  0  0  0  0  0  0  0\n  -12.9055  -37.4076  -21.7010 C   0  0  2  0  0  0  0  0  0  0  0  0\n  -11.5792  -36.7069  -22.0156 C   0  0  0  0  0  0  0  0  0  0  0  0\n  1  2  2  0\n  2  3  1  0\n  3  4  1  0\n  4  5  1  0\n  5  6  1  0\n  6  7  1  1\n  7  8  1  0\n  6  9  1  0\n  9 10  1  0\n 10 11  1  6\n 11 12  2  0\n 12 13  1  0\n 13 14  2  0\n 14 15  1  0\n 15 16  2  0\n 10 17  1  0\n 10 18  1  0\n  2 19  1  0\n 20 19  1  6\n 20 21  1  0\n 22 21  1  1\n 22 23  1  0\n 23 24  1  0\n 25 24  1  6\n 25 26  1  0\n 17  4  1  0\n 25 20  1  0\n 18  6  1  0\n 26 22  1  0\n 16 11  1  0\nM  END\n","sdf");
+    viewer_17886274329718652.setStyle({"stick": {}});
+    viewer_17886274329718652.setStyle({"model": 0},{"stick": {"colorscheme": "cyanCarbon"}});
+    viewer_17886274329718652.setStyle({"model": 1},{"stick": {"colorscheme": "redCarbon"}});
+    viewer_17886274329718652.setStyle({"model": 2},{"stick": {"colorscheme": "blueCarbon"}});
+    viewer_17886274329718652.setBackgroundColor("0xeeeeee");
+    viewer_17886274329718652.zoomTo();
+viewer_17886274329718652.render();
+});
+</script>
+</div>
+</div>
+<p>Two other pairs of fragments were selected using similarly vague criteria and used to search FreedomSpace 5.0. Despite being the results of preliminary benchmarking and testing investigations, the hits were sufficiently interesting to the OpenBind programme that some were selected for purchase. Results of testing these in the project assays will be reported elsewhere.</p>
+</section>
+</section>
+<section id="medchemicas-thoughts" class="level2">
+<h2 class="anchored" data-anchor-id="medchemicas-thoughts">MedChemica’s Thoughts</h2>
+<p>MedChemica (part of the <a href="https://openbind.uk">OpenBind Consortium</a> project) have <a href="https://www.medchemica.com/consulting/?utm_source=blog+post&amp;utm_medium=website+&amp;utm_campaign=RDKit-shapesynthonsearch-Aug2026">some thoughts about the work</a>.</p>
+</section>
+<section id="acknowledgements" class="level2">
+<h2 class="anchored" data-anchor-id="acknowledgements">Acknowledgements</h2>
+<p>The extension of Synthon Space searching to include shape similarity was funded by the <a href="https://openbind.uk">OpenBind Consortium</a>. Thanks are due to Ed Griffen (MedChemica Limited) and Fergus Imrie (University of Oxford) for their help obtaining the funding and for valuable discussions during development, and particularly the suggestion of adding excluded volumes to the search scoring. The staff at the Diamond Cluster were very helpful with getting me up and running on their IRIS cluster. Lauren Reid (MedChemica Limited) gave great assistance with the RdRp tests.</p>
+<p>Several members of the RDKit community, notably Greg Landrum (ETH Zurich), Dan Nealschneider (Schrödinger) and Brian Kelley (Glysade), were very helpful during implementation, testing and review of the code.</p>
+
+
+</section>
+</section>
+
+ ]]></description>
+  <category>release</category>
+  <category>tutorial</category>
+  <category>guest post</category>
+  <guid>https://greglandrum.github.io/rdkit-blog/posts/2026-09-08-shape-synthon-search.html</guid>
+  <pubDate>Mon, 07 Sep 2026 22:00:00 GMT</pubDate>
+</item>
 <item>
   <title>Scaffolds for the Lead-Optimization Datasets</title>
   <link>https://greglandrum.github.io/rdkit-blog/posts/2026-08-25-finding-lead-scaffolds.html</link>
@@ -22009,669 +22668,6 @@ font-style: inherit;">'A1ERR from 9vci'</span>,interactions)</span></code></pre>
   <category>general</category>
   <guid>https://greglandrum.github.io/rdkit-blog/posts/2025-09-07-UGM-upcoming.html</guid>
   <pubDate>Sat, 06 Sep 2025 22:00:00 GMT</pubDate>
-</item>
-<item>
-  <title>Scaling conformer generation</title>
-  <link>https://greglandrum.github.io/rdkit-blog/posts/2025-08-30-confgen-scaling.html</link>
-  <description><![CDATA[ 
-
-
-
-
-<p>This week the question came up in the lab of how well the conformer generation code scales with the number of threads used. Since generating conformers is embarassingly parallel - the conformers don’t depend on each other (this isn’t quite true if you are doing RMS pruning) - in a perfect world you’d expect more or less linear scaling. So theoretically using 4 times as many threads should take 1/4 as much time as long as the number of threads is less than the number of conformers being generated. In reality, things don’t quite work out this way since the individual conformers can take different amounts of time to generate due to the stochastic nature of the RDKit’s distance-geometry-based algorithm.</p>
-<p>I decided to do a quick test to see how well things scale on my machine.</p>
-<blockquote class="blockquote">
-<p>Aside: this post is looking at runtimes of conformer generation for individual molecules. We can further increase the speed of conformer generation for large sets of molecules by splitting the work across multiple machines. That’s a topic for a different post</p>
-</blockquote>
-<div id="2f30cd5b" class="cell" data-execution_count="12">
-<div class="sourceCode cell-code" id="cb1" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb1-1"><span class="im" style="color: #00769E;
-background-color: null;
-font-style: inherit;">import</span> gzip</span>
-<span id="cb1-2"><span class="im" style="color: #00769E;
-background-color: null;
-font-style: inherit;">from</span> rdkit <span class="im" style="color: #00769E;
-background-color: null;
-font-style: inherit;">import</span> Chem</span>
-<span id="cb1-3"><span class="im" style="color: #00769E;
-background-color: null;
-font-style: inherit;">from</span> rdkit.Chem <span class="im" style="color: #00769E;
-background-color: null;
-font-style: inherit;">import</span> rdDistGeom</span>
-<span id="cb1-4"></span>
-<span id="cb1-5"><span class="im" style="color: #00769E;
-background-color: null;
-font-style: inherit;">import</span> time</span>
-<span id="cb1-6"><span class="im" style="color: #00769E;
-background-color: null;
-font-style: inherit;">from</span> tqdm <span class="im" style="color: #00769E;
-background-color: null;
-font-style: inherit;">import</span> tqdm</span>
-<span id="cb1-7"></span>
-<span id="cb1-8"><span class="im" style="color: #00769E;
-background-color: null;
-font-style: inherit;">from</span> matplotlib <span class="im" style="color: #00769E;
-background-color: null;
-font-style: inherit;">import</span> pyplot <span class="im" style="color: #00769E;
-background-color: null;
-font-style: inherit;">as</span> plt</span>
-<span id="cb1-9"><span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">%</span>matplotlib inline</span>
-<span id="cb1-10">plt.style.use(<span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">'tableau-colorblind10'</span>)</span>
-<span id="cb1-11"></span>
-<span id="cb1-12"><span class="im" style="color: #00769E;
-background-color: null;
-font-style: inherit;">import</span> rdkit</span>
-<span id="cb1-13"><span class="bu" style="color: null;
-background-color: null;
-font-style: inherit;">print</span>(rdkit.__version__)</span></code></pre></div>
-<div class="cell-output cell-output-stdout">
-<pre><code>2025.03.5</code></pre>
-</div>
-</div>
-<p>Start by loading some molecules. This is a set of 370 molecules that are present in both the <a href="https://www.crystallography.net/cod/">COD</a> and <a href="https://www.ebi.ac.uk/chembl/">ChEMBL</a>. I use these (as well as some other COD subsets) a lot for confgen testing:</p>
-<div id="44b269e5" class="cell" data-execution_count="7">
-<div class="sourceCode cell-code" id="cb3" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb3-1">ms <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> [x <span class="cf" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">for</span> x <span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">in</span> Chem.ForwardSDMolSupplier(gzip.<span class="bu" style="color: null;
-background-color: null;
-font-style: inherit;">open</span>(<span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">'../data/COD_2025Jan13.organic.chembl_selected.sdf.gz'</span>),</span>
-<span id="cb3-2">                                          removeHs<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span><span class="va" style="color: #111111;
-background-color: null;
-font-style: inherit;">False</span>) <span class="cf" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">if</span> x <span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">is</span> <span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">not</span> <span class="va" style="color: #111111;
-background-color: null;
-font-style: inherit;">None</span>]</span>
-<span id="cb3-3"><span class="bu" style="color: null;
-background-color: null;
-font-style: inherit;">len</span>(ms)</span></code></pre></div>
-<div class="cell-output cell-output-display" data-execution_count="7">
-<pre><code>370</code></pre>
-</div>
-</div>
-<p>For the purposes of this post we’ll just use 100 of the COD molecules. Add Hs to the mols and create the subset:</p>
-<div id="7e2cac99" class="cell" data-execution_count="9">
-<div class="sourceCode cell-code" id="cb5" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb5-1">ms <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> [Chem.AddHs(m) <span class="cf" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">for</span> m <span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">in</span> ms]</span>
-<span id="cb5-2">ms <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> ms[:<span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">100</span>]</span></code></pre></div>
-</div>
-<p>My linux box has 8 performance cores (each of which can run two hyperthreads) and 8 “efficient” cores, so python thinks I have 24 CPUs available:</p>
-<div id="6aec1e72" class="cell" data-execution_count="10">
-<div class="sourceCode cell-code" id="cb6" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb6-1"><span class="im" style="color: #00769E;
-background-color: null;
-font-style: inherit;">import</span> multiprocessing</span>
-<span id="cb6-2">multiprocessing.cpu_count()</span></code></pre></div>
-<div class="cell-output cell-output-display" data-execution_count="10">
-<pre><code>24</code></pre>
-</div>
-</div>
-<p>I will try thread counts up to 10 to check scaling; a bit beyond the number of physical performance cores on my machine.</p>
-<p>Now try generating both 100 conformer and 400 conformer sets for each molecule using different thread counts and track how long it takes:</p>
-<div id="3ab047dd" class="cell" data-execution_count="15">
-<div class="sourceCode cell-code" id="cb8" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb8-1">threadCounts <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> [<span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">1</span>,<span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">2</span>,<span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">4</span>,<span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">6</span>,<span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">8</span>,<span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">10</span>]</span>
-<span id="cb8-2"></span>
-<span id="cb8-3">params <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> rdDistGeom.ETKDGv3()</span>
-<span id="cb8-4">params.randomSeed <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> <span class="bn" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">0xa100f</span></span>
-<span id="cb8-5"></span>
-<span id="cb8-6">tgtConfs <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> (<span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">100</span>,<span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">400</span>)</span>
-<span id="cb8-7">accum <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> {}</span>
-<span id="cb8-8"><span class="cf" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">for</span> tgt <span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">in</span> tgtConfs:</span>
-<span id="cb8-9">    <span class="bu" style="color: null;
-background-color: null;
-font-style: inherit;">print</span>(<span class="ss" style="color: #20794D;
-background-color: null;
-font-style: inherit;">f"Doing </span><span class="sc" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">{</span>tgt<span class="sc" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">}</span><span class="ss" style="color: #20794D;
-background-color: null;
-font-style: inherit;"> conformers"</span>)</span>
-<span id="cb8-10">    accum[tgt] <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> {}</span>
-<span id="cb8-11">    <span class="cf" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">for</span> tc <span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">in</span> threadCounts:</span>
-<span id="cb8-12">        params.numThreads <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> tc</span>
-<span id="cb8-13">        accum[tgt][tc] <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> []</span>
-<span id="cb8-14">        <span class="bu" style="color: null;
-background-color: null;
-font-style: inherit;">print</span>(<span class="ss" style="color: #20794D;
-background-color: null;
-font-style: inherit;">f"Doing </span><span class="sc" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">{</span>tc<span class="sc" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">}</span><span class="ss" style="color: #20794D;
-background-color: null;
-font-style: inherit;"> threads"</span>)</span>
-<span id="cb8-15">        <span class="cf" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">for</span> m <span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">in</span> tqdm(ms):</span>
-<span id="cb8-16">            t1 <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> time.time()</span>
-<span id="cb8-17">            rdDistGeom.EmbedMultipleConfs(m,tgt,params)</span>
-<span id="cb8-18">            t2 <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> time.time()</span>
-<span id="cb8-19">            accum[tgt][tc].append(t2<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">-</span>t1)</span>
-<span id="cb8-20">        <span class="bu" style="color: null;
-background-color: null;
-font-style: inherit;">print</span>(<span class="ss" style="color: #20794D;
-background-color: null;
-font-style: inherit;">f'</span><span class="ch" style="color: #20794D;
-background-color: null;
-font-style: inherit;">\t</span><span class="sc" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">{</span><span class="bu" style="color: null;
-background-color: null;
-font-style: inherit;">sum</span>(accum[tgt][tc])<span class="sc" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">:.1f}</span><span class="ss" style="color: #20794D;
-background-color: null;
-font-style: inherit;">'</span>)</span></code></pre></div>
-<div class="cell-output cell-output-stdout">
-<pre><code>Doing 100 conformers
-Doing 1 threads</code></pre>
-</div>
-<div class="cell-output cell-output-stderr">
-<pre><code> 83%|█████████████████████████████████████████████████████████████████████████████████▎                | 83/100 [02:25&lt;00:28,  1.65s/it][16:37:31] UFFTYPER: Unrecognized charge state for atom: 0
- 98%|████████████████████████████████████████████████████████████████████████████████████████████████  | 98/100 [02:37&lt;00:00,  2.19it/s][16:37:43] UFFTYPER: Unrecognized charge state for atom: 8
-100%|█████████████████████████████████████████████████████████████████████████████████████████████████| 100/100 [02:39&lt;00:00,  1.59s/it]</code></pre>
-</div>
-<div class="cell-output cell-output-stdout">
-<pre><code>    159.0
-Doing 2 threads</code></pre>
-</div>
-<div class="cell-output cell-output-stderr">
-<pre><code> 83%|█████████████████████████████████████████████████████████████████████████████████▎                | 83/100 [01:17&lt;00:14,  1.15it/s][16:39:02] UFFTYPER: Unrecognized charge state for atom: 0
- 98%|████████████████████████████████████████████████████████████████████████████████████████████████  | 98/100 [01:24&lt;00:00,  3.86it/s][16:39:08] UFFTYPER: Unrecognized charge state for atom: 8
-100%|█████████████████████████████████████████████████████████████████████████████████████████████████| 100/100 [01:25&lt;00:00,  1.18it/s]</code></pre>
-</div>
-<div class="cell-output cell-output-stdout">
-<pre><code>    85.0
-Doing 4 threads</code></pre>
-</div>
-<div class="cell-output cell-output-stderr">
-<pre><code> 83%|█████████████████████████████████████████████████████████████████████████████████▎                | 83/100 [00:42&lt;00:08,  2.12it/s][16:39:51] UFFTYPER: Unrecognized charge state for atom: 0
- 98%|████████████████████████████████████████████████████████████████████████████████████████████████  | 98/100 [00:45&lt;00:00,  6.30it/s][16:39:55] UFFTYPER: Unrecognized charge state for atom: 8
-100%|█████████████████████████████████████████████████████████████████████████████████████████████████| 100/100 [00:46&lt;00:00,  2.17it/s]</code></pre>
-</div>
-<div class="cell-output cell-output-stdout">
-<pre><code>    46.1
-Doing 6 threads</code></pre>
-</div>
-<div class="cell-output cell-output-stderr">
-<pre><code> 83%|█████████████████████████████████████████████████████████████████████████████████▎                | 83/100 [00:29&lt;00:05,  2.93it/s][16:40:25] UFFTYPER: Unrecognized charge state for atom: 0
- 98%|████████████████████████████████████████████████████████████████████████████████████████████████  | 98/100 [00:32&lt;00:00,  9.02it/s][16:40:27] UFFTYPER: Unrecognized charge state for atom: 8
-100%|█████████████████████████████████████████████████████████████████████████████████████████████████| 100/100 [00:32&lt;00:00,  3.09it/s]</code></pre>
-</div>
-<div class="cell-output cell-output-stdout">
-<pre><code>    32.3
-Doing 8 threads</code></pre>
-</div>
-<div class="cell-output cell-output-stderr">
-<pre><code> 83%|█████████████████████████████████████████████████████████████████████████████████▎                | 83/100 [00:24&lt;00:04,  3.57it/s][16:40:52] UFFTYPER: Unrecognized charge state for atom: 0
- 96%|██████████████████████████████████████████████████████████████████████████████████████████████    | 96/100 [00:26&lt;00:00,  8.34it/s][16:40:54] UFFTYPER: Unrecognized charge state for atom: 8
-100%|█████████████████████████████████████████████████████████████████████████████████████████████████| 100/100 [00:26&lt;00:00,  3.74it/s]</code></pre>
-</div>
-<div class="cell-output cell-output-stdout">
-<pre><code>    26.7
-Doing 10 threads</code></pre>
-</div>
-<div class="cell-output cell-output-stderr">
-<pre><code> 83%|█████████████████████████████████████████████████████████████████████████████████▎                | 83/100 [00:25&lt;00:04,  3.44it/s][16:41:19] UFFTYPER: Unrecognized charge state for atom: 0
- 96%|██████████████████████████████████████████████████████████████████████████████████████████████    | 96/100 [00:26&lt;00:00,  7.85it/s][16:41:21] UFFTYPER: Unrecognized charge state for atom: 8
-100%|█████████████████████████████████████████████████████████████████████████████████████████████████| 100/100 [00:27&lt;00:00,  3.67it/s]</code></pre>
-</div>
-<div class="cell-output cell-output-stdout">
-<pre><code>    27.2
-Doing 400 conformers
-Doing 1 threads</code></pre>
-</div>
-<div class="cell-output cell-output-stderr">
-<pre><code> 83%|█████████████████████████████████████████████████████████████████████████████████▎                | 83/100 [09:37&lt;01:48,  6.40s/it][16:50:59] UFFTYPER: Unrecognized charge state for atom: 0
- 98%|████████████████████████████████████████████████████████████████████████████████████████████████  | 98/100 [10:25&lt;00:03,  1.82s/it][16:51:47] UFFTYPER: Unrecognized charge state for atom: 8
-100%|█████████████████████████████████████████████████████████████████████████████████████████████████| 100/100 [10:29&lt;00:00,  6.30s/it]</code></pre>
-</div>
-<div class="cell-output cell-output-stdout">
-<pre><code>    629.9
-Doing 2 threads</code></pre>
-</div>
-<div class="cell-output cell-output-stderr">
-<pre><code> 83%|█████████████████████████████████████████████████████████████████████████████████▎                | 83/100 [05:04&lt;00:57,  3.37s/it][16:56:56] UFFTYPER: Unrecognized charge state for atom: 0
- 98%|████████████████████████████████████████████████████████████████████████████████████████████████  | 98/100 [05:29&lt;00:01,  1.04it/s][16:57:21] UFFTYPER: Unrecognized charge state for atom: 8
-100%|█████████████████████████████████████████████████████████████████████████████████████████████████| 100/100 [05:32&lt;00:00,  3.32s/it]</code></pre>
-</div>
-<div class="cell-output cell-output-stdout">
-<pre><code>    332.1
-Doing 4 threads</code></pre>
-</div>
-<div class="cell-output cell-output-stderr">
-<pre><code> 83%|█████████████████████████████████████████████████████████████████████████████████▎                | 83/100 [02:38&lt;00:29,  1.76s/it][17:00:02] UFFTYPER: Unrecognized charge state for atom: 0
- 98%|████████████████████████████████████████████████████████████████████████████████████████████████  | 98/100 [02:51&lt;00:00,  2.01it/s][17:00:15] UFFTYPER: Unrecognized charge state for atom: 8
-100%|█████████████████████████████████████████████████████████████████████████████████████████████████| 100/100 [02:52&lt;00:00,  1.72s/it]</code></pre>
-</div>
-<div class="cell-output cell-output-stdout">
-<pre><code>    172.4
-Doing 6 threads</code></pre>
-</div>
-<div class="cell-output cell-output-stderr">
-<pre><code> 83%|█████████████████████████████████████████████████████████████████████████████████▎                | 83/100 [01:48&lt;00:20,  1.22s/it][17:02:04] UFFTYPER: Unrecognized charge state for atom: 0
- 98%|████████████████████████████████████████████████████████████████████████████████████████████████  | 98/100 [01:57&lt;00:00,  2.87it/s][17:02:14] UFFTYPER: Unrecognized charge state for atom: 8
-100%|█████████████████████████████████████████████████████████████████████████████████████████████████| 100/100 [01:58&lt;00:00,  1.18s/it]</code></pre>
-</div>
-<div class="cell-output cell-output-stdout">
-<pre><code>    118.4
-Doing 8 threads</code></pre>
-</div>
-<div class="cell-output cell-output-stderr">
-<pre><code> 83%|█████████████████████████████████████████████████████████████████████████████████▎                | 83/100 [01:30&lt;00:17,  1.01s/it][17:03:44] UFFTYPER: Unrecognized charge state for atom: 0
- 98%|████████████████████████████████████████████████████████████████████████████████████████████████  | 98/100 [01:37&lt;00:00,  3.39it/s][17:03:52] UFFTYPER: Unrecognized charge state for atom: 8
-100%|█████████████████████████████████████████████████████████████████████████████████████████████████| 100/100 [01:38&lt;00:00,  1.02it/s]</code></pre>
-</div>
-<div class="cell-output cell-output-stdout">
-<pre><code>    98.1
-Doing 10 threads</code></pre>
-</div>
-<div class="cell-output cell-output-stderr">
-<pre><code> 83%|█████████████████████████████████████████████████████████████████████████████████▎                | 83/100 [01:36&lt;00:18,  1.10s/it][17:05:29] UFFTYPER: Unrecognized charge state for atom: 0
- 98%|████████████████████████████████████████████████████████████████████████████████████████████████  | 98/100 [01:44&lt;00:00,  3.17it/s][17:05:37] UFFTYPER: Unrecognized charge state for atom: 8
-100%|█████████████████████████████████████████████████████████████████████████████████████████████████| 100/100 [01:45&lt;00:00,  1.05s/it]</code></pre>
-</div>
-<div class="cell-output cell-output-stdout">
-<pre><code>    105.4</code></pre>
-</div>
-<div class="cell-output cell-output-stderr">
-<pre><code></code></pre>
-</div>
-</div>
-<p>Calculate the relative runtime for each molecule with each threadcount. If everything is scaling perfectly, we’d expect doubling the number of threads to cut the runtime in half.</p>
-<div id="89efa499" class="cell" data-execution_count="16">
-<div class="sourceCode cell-code" id="cb35" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb35-1">factors <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> {}</span>
-<span id="cb35-2"><span class="cf" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">for</span> nc <span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">in</span> accum:</span>
-<span id="cb35-3">    factors[nc] <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> {}</span>
-<span id="cb35-4">    <span class="cf" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">for</span> tc <span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">in</span> accum[nc]:</span>
-<span id="cb35-5">        <span class="cf" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">if</span> tc<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">==</span><span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">1</span>:</span>
-<span id="cb35-6">            factors[nc][tc] <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> [<span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">1</span>]<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">*</span><span class="bu" style="color: null;
-background-color: null;
-font-style: inherit;">len</span>(ms)</span>
-<span id="cb35-7">        <span class="cf" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">else</span>:</span>
-<span id="cb35-8">            factors[nc][tc] <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> []</span>
-<span id="cb35-9">            <span class="cf" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">for</span> i,m <span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">in</span> <span class="bu" style="color: null;
-background-color: null;
-font-style: inherit;">enumerate</span>(ms):</span>
-<span id="cb35-10">                factors[nc][tc].append(accum[nc][tc][i]<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">/</span>accum[nc][<span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">1</span>][i])</span>
-<span id="cb35-11">            </span></code></pre></div>
-</div>
-<p>Now plot the results.</p>
-<div id="f66fba4d" class="cell" data-execution_count="49">
-<div class="sourceCode cell-code" id="cb36" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb36-1">plt.figure(figsize<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span>(<span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">10</span>,<span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">5</span>))</span>
-<span id="cb36-2">xp <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> [<span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">1</span><span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">+</span>x<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">-</span><span class="fl" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">0.2</span> <span class="cf" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">for</span> x <span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">in</span> <span class="bu" style="color: null;
-background-color: null;
-font-style: inherit;">range</span>(<span class="bu" style="color: null;
-background-color: null;
-font-style: inherit;">len</span>(threadCounts))]</span>
-<span id="cb36-3">widths <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> [<span class="fl" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">0.3</span> <span class="cf" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">for</span> x <span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">in</span> <span class="bu" style="color: null;
-background-color: null;
-font-style: inherit;">range</span>(<span class="bu" style="color: null;
-background-color: null;
-font-style: inherit;">len</span>(threadCounts))]</span>
-<span id="cb36-4">plt.boxplot([factors[<span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">100</span>][tc] <span class="cf" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">for</span> tc <span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">in</span> threadCounts],positions<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span>xp,widths<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span>widths,label<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span><span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">'100 conformers'</span>)<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">;</span></span>
-<span id="cb36-5">xp <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> [<span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">1</span><span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">+</span>x<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">+</span><span class="fl" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">0.2</span> <span class="cf" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">for</span> x <span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">in</span> <span class="bu" style="color: null;
-background-color: null;
-font-style: inherit;">range</span>(<span class="bu" style="color: null;
-background-color: null;
-font-style: inherit;">len</span>(threadCounts))]</span>
-<span id="cb36-6">plt.boxplot([factors[<span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">400</span>][tc] <span class="cf" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">for</span> tc <span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">in</span> threadCounts],positions<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span>xp,widths<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span>widths,label<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span><span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">'400 conformers'</span>)<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">;</span></span>
-<span id="cb36-7">plt.xticks(<span class="bu" style="color: null;
-background-color: null;
-font-style: inherit;">range</span>(<span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">1</span>, <span class="bu" style="color: null;
-background-color: null;
-font-style: inherit;">len</span>(threadCounts) <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">+</span> <span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">1</span>),[<span class="bu" style="color: null;
-background-color: null;
-font-style: inherit;">str</span>(x) <span class="cf" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">for</span> x <span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">in</span> threadCounts])<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">;</span></span>
-<span id="cb36-8">plt.xlabel(<span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">'number of threads'</span>)<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">;</span></span>
-<span id="cb36-9">plt.ylabel(<span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">'scaling factor'</span>)</span>
-<span id="cb36-10">plt.plot((<span class="fl" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">1.7</span>,<span class="fl" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">2.3</span>),(<span class="fl" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">0.5</span>,<span class="fl" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">0.5</span>),<span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">'k--'</span>)<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">;</span></span>
-<span id="cb36-11">plt.plot((<span class="fl" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">2.7</span>,<span class="fl" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">3.3</span>),(<span class="fl" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">0.25</span>,<span class="fl" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">0.25</span>),<span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">'k--'</span>)<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">;</span></span>
-<span id="cb36-12">plt.plot((<span class="fl" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">3.7</span>,<span class="fl" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">4.3</span>),(<span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">1</span><span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">/</span><span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">6</span>,<span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">1</span><span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">/</span><span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">6</span>),<span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">'k--'</span>)<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">;</span></span>
-<span id="cb36-13">plt.plot((<span class="fl" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">4.7</span>,<span class="fl" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">5.3</span>),(<span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">1</span><span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">/</span><span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">8</span>,<span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">1</span><span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">/</span><span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">8</span>),<span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">'k--'</span>)<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">;</span></span>
-<span id="cb36-14">plt.plot((<span class="fl" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">5.7</span>,<span class="fl" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">6.3</span>),(<span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">1</span><span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">/</span><span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">10</span>,<span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">1</span><span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">/</span><span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">10</span>),<span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">'k--'</span>)<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">;</span></span></code></pre></div>
-<div class="cell-output cell-output-display">
-<div>
-<figure class="figure">
-<p><img src="https://greglandrum.github.io/rdkit-blog/posts/2025-08-30-confgen-scaling_files/figure-html/cell-9-output-1.png" class="img-fluid figure-img"></p>
-</figure>
-</div>
-</div>
-</div>
-<p>The left-hand boxplot in each column is the results for 100 conformers, the right-hand boxplot is for 400 conformers. The dashed line in each column shows what you would expect for perfect scaling.</p>
-<p>We can see that on my machine with these molecules the scaling is pretty good up to about 6 threads but that by the time we get to 10 threads we’re deviating pretty strongly from perfect scaling. In fact, the runtime for 10 threads isn’t massively better than it is for 8 (the number of physical performance cores in my machine). Unsurprisingly, the scaling is better for 400 conformers than it is for 100, but even with 400 conformers it’s not really worth increasing from 8 to 10 threads on my machine.</p>
-<p>Based on this analysis, I’d probably go with using either 6 or 8 threads for future confgen work on this machine.</p>
-
-
-
- ]]></description>
-  <category>conformers</category>
-  <category>questions</category>
-  <category>technical</category>
-  <guid>https://greglandrum.github.io/rdkit-blog/posts/2025-08-30-confgen-scaling.html</guid>
-  <pubDate>Fri, 29 Aug 2025 22:00:00 GMT</pubDate>
-  <media:content url="https://greglandrum.github.io/rdkit-blog/posts/images/blog/confgen-scaling-1.png" medium="image" type="image/png" height="76" width="144"/>
 </item>
 </channel>
 </rss>
