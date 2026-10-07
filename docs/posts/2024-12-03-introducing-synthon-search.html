@@ -76,8 +76,8 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <link href="../site_libs/quarto-html/quarto-syntax-highlighting-dark-4379b0ccadffce622b03caf4c46266b3.css" rel="prefetch" class="quarto-color-scheme quarto-color-alternate" id="quarto-text-highlighting-styles">
 <script src="../site_libs/bootstrap/bootstrap.min.js"></script>
 <link href="../site_libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
-<link href="../site_libs/bootstrap/bootstrap-40840319e1d09552a0f54992bf705f97.min.css" rel="stylesheet" append-hash="true" class="quarto-color-scheme" id="quarto-bootstrap" data-mode="light">
-<link href="../site_libs/bootstrap/bootstrap-dark-f86ed83de42dc3a6349cec1bcdefd5d4.min.css" rel="prefetch" append-hash="true" class="quarto-color-scheme quarto-color-alternate" id="quarto-bootstrap" data-mode="dark">
+<link href="../site_libs/bootstrap/bootstrap-53e29d70f03623de13ab2376923601bc.min.css" rel="stylesheet" append-hash="true" class="quarto-color-scheme" id="quarto-bootstrap" data-mode="light">
+<link href="../site_libs/bootstrap/bootstrap-dark-49b061ee4cc441246235e07f99f67764.min.css" rel="prefetch" append-hash="true" class="quarto-color-scheme quarto-color-alternate" id="quarto-bootstrap" data-mode="dark">
 <script id="quarto-search-options" type="application/json">{
   "location": "navbar",
   "copy-button": false,
@@ -216,13 +216,13 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 
 <section id="rapid-searching-of-synthon-spaces" class="level1">
 <h1>Rapid Searching of Synthon Spaces</h1>
-<p><strong>Note</strong> this is a guest post written by Dave Cosgrove (GitHub: <span class="citation" data-cites="DavidACosgrove">@DavidACosgrove</span>).</p>
+<p><strong>Note</strong> this is a guest post written by Dave Cosgrove (GitHub: <span class="citation" data-cites="DavidACosgrove">@DavidACosgrove</span>). <strong>Updated 18th September 2026 to fix some of the example code.</strong></p>
 <p>There are a number of combinatorial libraries now available offering compounds made to order from a vast array of possibilities, such as <a href="https://enamine.net/compound-collections/real-compounds/real-database">Enamine’s REAL</a> or <a href="https://chem-space.com/compounds/freedom-space">ChemSpace’s FreedomSpace</a>. The enumerated versions of these databases run to billions of compounds making them expensive and difficult to manage and search. Several groups have proposed algorithms for the rapid search of these libraries in synthon rather than enumerated form (e.g.&nbsp;<a href="https://doi.org/10.1021/acs.jcim.0c00850">Spacelight</a> and <a href="https://doi.org/10.1021/acs.jcim.3c00290">Liphardt and Sander</a>). This blogpost describes the implementation of substructure and similarity search methods based on the ideas in the latter.</p>
 <p>The examples use the FreedomSpace 2023 library of some 9 billion compounds. The new module, available starting in the 2024.09.3 release, is rdSynthonSpaceSearch. Timings are from my Mac mini M4 Pro (very nice, you should get one!).</p>
 <blockquote class="blockquote">
 <p>Obligatory new functionality disclaimer: this is completely new RDKit functionality and is still a bit experimental. The API and results may change over the next couple of releases as we do more testing and get more feedback from the community</p>
 </blockquote>
-<div id="9e1b6c1c-3bf8-411d-aa34-c760d9c79e5e" class="cell">
+<div id="9e1b6c1c-3bf8-411d-aa34-c760d9c79e5e" class="cell" data-execution_count="3">
 <div class="sourceCode cell-code" id="cb1"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> rdkit <span class="im">import</span> Chem</span>
 <span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> rdkit.Chem <span class="im">import</span> rdSynthonSpaceSearch, rdFingerprintGenerator</span>
 <span id="cb1-3"><a href="#cb1-3" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> rdkit.Chem <span class="im">import</span> Draw</span>
@@ -235,38 +235,41 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <span id="cb1-10"><a href="#cb1-10" aria-hidden="true" tabindex="-1"></a>rdDepictor.SetPreferCoordGen(<span class="va">True</span>)</span>
 <span id="cb1-11"><a href="#cb1-11" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(rdBase.rdkitVersion)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 <div class="cell-output cell-output-stdout">
-<pre><code>2024.09.3</code></pre>
+<pre><code>2026.03.6</code></pre>
 </div>
 </div>
 <p>Load the library and print some information about it.</p>
-<div id="8c96075c-e9a9-4313-a2b3-5fc45501cdf4" class="cell" data-execution_count="2">
+<div id="8c96075c-e9a9-4313-a2b3-5fc45501cdf4" class="cell" data-execution_count="4">
 <div class="sourceCode cell-code" id="cb3"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a>start <span class="op">=</span> time.perf_counter()</span>
 <span id="cb3-2"><a href="#cb3-2" aria-hidden="true" tabindex="-1"></a>synthonspace <span class="op">=</span> rdSynthonSpaceSearch.SynthonSpace()</span>
-<span id="cb3-3"><a href="#cb3-3" aria-hidden="true" tabindex="-1"></a>synthonspace.ReadTextFile(<span class="st">"/Users/david/Projects/FreedomSpace/2023-05_Freedom_synthons.txt"</span>)</span>
+<span id="cb3-3"><a href="#cb3-3" aria-hidden="true" tabindex="-1"></a>synthonspace.ReadTextFile(<span class="st">"/Users/david/Tmp/2023-05_Freedom_synthons.txt"</span>)</span>
 <span id="cb3-4"><a href="#cb3-4" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"Number of reactions : </span><span class="sc">{</span>synthonspace<span class="sc">.</span>GetNumReactions()<span class="sc">}</span><span class="ss">"</span>)</span>
 <span id="cb3-5"><a href="#cb3-5" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"Number of products : </span><span class="sc">{</span>synthonspace<span class="sc">.</span>GetNumProducts()<span class="sc">}</span><span class="ss">"</span>)</span>
 <span id="cb3-6"><a href="#cb3-6" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"Time to load : </span><span class="sc">{</span>time<span class="sc">.</span>perf_counter() <span class="op">-</span> start<span class="sc">:4.2f}</span><span class="ss"> seconds."</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 <div class="cell-output cell-output-stdout">
 <pre><code>Number of reactions : 10
 Number of products : 9360696185
-Time to load : 26.47 seconds.</code></pre>
+Time to load : 31.23 seconds.</code></pre>
 </div>
 </div>
 <p>There’s a binary format that loads much more quickly.</p>
-<div id="903b5221-0dc6-410d-8986-26ef60b6ae0f" class="cell" data-execution_count="3">
-<div class="sourceCode cell-code" id="cb5"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a>synthonspace.WriteDBFile(<span class="st">"/Users/david/Projects/FreedomSpace/2023-05_Freedom_synthons.spc"</span>)</span>
+<div id="903b5221-0dc6-410d-8986-26ef60b6ae0f" class="cell" data-execution_count="5">
+<div class="sourceCode cell-code" id="cb5"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a>synthonspace.WriteDBFile(<span class="st">"/Users/david/Tmp/2023-05_Freedom_synthons.spc"</span>)</span>
 <span id="cb5-2"><a href="#cb5-2" aria-hidden="true" tabindex="-1"></a>start <span class="op">=</span> time.perf_counter()</span>
-<span id="cb5-3"><a href="#cb5-3" aria-hidden="true" tabindex="-1"></a>synthonspace.ReadDBFile(<span class="st">"/Users/david/Projects/FreedomSpace/2023-05_Freedom_synthons.spc"</span>)</span>
+<span id="cb5-3"><a href="#cb5-3" aria-hidden="true" tabindex="-1"></a>synthonspace.ReadDBFile(<span class="st">"/Users/david/Tmp/2023-05_Freedom_synthons.spc"</span>)</span>
 <span id="cb5-4"><a href="#cb5-4" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"Time to load : </span><span class="sc">{</span>time<span class="sc">.</span>perf_counter() <span class="op">-</span> start<span class="sc">:4.2f}</span><span class="ss"> seconds."</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 <div class="cell-output cell-output-stdout">
-<pre><code>Time to load : 4.47 seconds.</code></pre>
+<pre><code>Time to load : 2.20 seconds.</code></pre>
+</div>
+<div class="cell-output cell-output-stderr">
+<pre><code>[11:23:43] Number of synthons : 80021 of which 0 have shapes.</code></pre>
 </div>
 </div>
 <p>If you want more information about the library:</p>
-<div id="b1f00c62-a0ce-457c-97f0-a244408629f2" class="cell" data-execution_count="4">
-<div class="sourceCode cell-code" id="cb7"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb7-1"><a href="#cb7-1" aria-hidden="true" tabindex="-1"></a>synthonspace.Summarise()</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div id="b1f00c62-a0ce-457c-97f0-a244408629f2" class="cell" data-execution_count="6">
+<div class="sourceCode cell-code" id="cb8"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb8-1"><a href="#cb8-1" aria-hidden="true" tabindex="-1"></a>synthonspace.Summarise()</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 <div class="cell-output cell-output-stdout">
-<pre><code>Read from file /Users/david/Projects/FreedomSpace/2023-05_Freedom_synthons.spc
+<pre><code>Read from file /Users/david/Tmp/2023-05_Freedom_synthons.spc
 Number of reactions : 10
 Reaction name a1
   Synthon set 0 has 18662 synthons
@@ -301,14 +304,17 @@ Reaction name a80
   Synthon set 0 has 20 synthons
   Synthon set 1 has 8366 synthons
   Synthon set 2 has 8366 synthons
-Approximate number of molecules in SynthonSpace : 9360696185</code></pre>
+Approximate number of molecules in SynthonSpace : 9 360 696 185
+Number of unique synthons : 80021
+Number of 2 molecule reactions : 7
+Number of 3 molecule reactions : 3</code></pre>
 </div>
 </div>
 <p>##&nbsp;Substructure Searching</p>
-<div id="4feda823-f48c-4832-b2f7-3b72b5b0e30a" class="cell" data-execution_count="5">
-<div class="sourceCode cell-code" id="cb9"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb9-1"><a href="#cb9-1" aria-hidden="true" tabindex="-1"></a>qmol <span class="op">=</span> Chem.MolFromSmarts(<span class="st">"c12ccc(C)cc1[nH]nc2C(=O)NCc1cncs1"</span>)</span>
-<span id="cb9-2"><a href="#cb9-2" aria-hidden="true" tabindex="-1"></a>qmol</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
-<div class="cell-output cell-output-display" data-execution_count="5">
+<div id="4feda823-f48c-4832-b2f7-3b72b5b0e30a" class="cell" data-execution_count="7">
+<div class="sourceCode cell-code" id="cb10"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb10-1"><a href="#cb10-1" aria-hidden="true" tabindex="-1"></a>qmol <span class="op">=</span> Chem.MolFromSmarts(<span class="st">"c12ccc(C)cc1[nH]nc2C(=O)NCc1cncs1"</span>)</span>
+<span id="cb10-2"><a href="#cb10-2" aria-hidden="true" tabindex="-1"></a>qmol</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-display" data-execution_count="7">
 <div>
 <figure class="figure">
 <p><img src="2024-12-03-introducing-synthon-search_files/figure-html/cell-6-output-1.png" class="img-fluid figure-img"></p>
@@ -316,25 +322,31 @@ Approximate number of molecules in SynthonSpace : 9360696185</code></pre>
 </div>
 </div>
 </div>
-<div id="b7bc6431-d9c5-408f-9838-6c55c1c96119" class="cell" data-execution_count="6">
-<div class="sourceCode cell-code" id="cb10"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb10-1"><a href="#cb10-1" aria-hidden="true" tabindex="-1"></a>start <span class="op">=</span> time.perf_counter()</span>
-<span id="cb10-2"><a href="#cb10-2" aria-hidden="true" tabindex="-1"></a>results <span class="op">=</span> synthonspace.SubstructureSearch(qmol)</span>
-<span id="cb10-3"><a href="#cb10-3" aria-hidden="true" tabindex="-1"></a>hits <span class="op">=</span> results.GetHitMolecules()</span>
-<span id="cb10-4"><a href="#cb10-4" aria-hidden="true" tabindex="-1"></a>hit_names <span class="op">=</span> [m.GetProp(<span class="st">"_Name"</span>) <span class="cf">for</span> m <span class="kw">in</span> hits]</span>
-<span id="cb10-5"><a href="#cb10-5" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"Time to search : </span><span class="sc">{</span>time<span class="sc">.</span>perf_counter() <span class="op">-</span> start<span class="sc">:4.2f}</span><span class="ss"> seconds."</span>)</span>
-<span id="cb10-6"><a href="#cb10-6" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"Number of hits : </span><span class="sc">{</span><span class="bu">len</span>(hits)<span class="sc">}</span><span class="ss">"</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div id="b7bc6431-d9c5-408f-9838-6c55c1c96119" class="cell" data-execution_count="8">
+<div class="sourceCode cell-code" id="cb11"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb11-1"><a href="#cb11-1" aria-hidden="true" tabindex="-1"></a>start <span class="op">=</span> time.perf_counter()</span>
+<span id="cb11-2"><a href="#cb11-2" aria-hidden="true" tabindex="-1"></a>results <span class="op">=</span> synthonspace.SubstructureSearch(qmol)</span>
+<span id="cb11-3"><a href="#cb11-3" aria-hidden="true" tabindex="-1"></a>hits <span class="op">=</span> results.GetHitMolecules()</span>
+<span id="cb11-4"><a href="#cb11-4" aria-hidden="true" tabindex="-1"></a>hit_names <span class="op">=</span> [m.GetProp(<span class="st">"_Name"</span>) <span class="cf">for</span> m <span class="kw">in</span> hits]</span>
+<span id="cb11-5"><a href="#cb11-5" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"Time to search : </span><span class="sc">{</span>time<span class="sc">.</span>perf_counter() <span class="op">-</span> start<span class="sc">:4.2f}</span><span class="ss"> seconds."</span>)</span>
+<span id="cb11-6"><a href="#cb11-6" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"Number of hits : </span><span class="sc">{</span><span class="bu">len</span>(hits)<span class="sc">}</span><span class="ss">"</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stderr">
+<pre><code>[11:23:43] Complex queries can be slow.</code></pre>
+</div>
 <div class="cell-output cell-output-stdout">
-<pre><code>Time to search : 0.33 seconds.
+<pre><code>Time to search : 1.14 seconds.
 Number of hits : 108</code></pre>
 </div>
+<div class="cell-output cell-output-stderr">
+<pre><code>[11:23:44] Best approx similarity : 1 and worst : 0.612903</code></pre>
 </div>
-<div id="804b28b3-ba17-42f5-af20-3df82a081dd3" class="cell" data-execution_count="7">
-<div class="sourceCode cell-code" id="cb12"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb12-1"><a href="#cb12-1" aria-hidden="true" tabindex="-1"></a><span class="cf">if</span> hits:</span>
-<span id="cb12-2"><a href="#cb12-2" aria-hidden="true" tabindex="-1"></a>    img <span class="op">=</span> Draw.MolsToGridImage(hits[:<span class="dv">12</span>], legends<span class="op">=</span>hit_names[:<span class="dv">12</span>], molsPerRow<span class="op">=</span><span class="dv">4</span>)</span>
-<span id="cb12-3"><a href="#cb12-3" aria-hidden="true" tabindex="-1"></a><span class="cf">else</span>:</span>
-<span id="cb12-4"><a href="#cb12-4" aria-hidden="true" tabindex="-1"></a>    img <span class="op">=</span> <span class="st">"No Hits"</span></span>
-<span id="cb12-5"><a href="#cb12-5" aria-hidden="true" tabindex="-1"></a>img</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
-<div class="cell-output cell-output-display" data-execution_count="7">
+</div>
+<div id="804b28b3-ba17-42f5-af20-3df82a081dd3" class="cell" data-execution_count="9">
+<div class="sourceCode cell-code" id="cb15"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb15-1"><a href="#cb15-1" aria-hidden="true" tabindex="-1"></a><span class="cf">if</span> hits:</span>
+<span id="cb15-2"><a href="#cb15-2" aria-hidden="true" tabindex="-1"></a>    img <span class="op">=</span> Draw.MolsToGridImage(hits[:<span class="dv">12</span>], legends<span class="op">=</span>hit_names[:<span class="dv">12</span>], molsPerRow<span class="op">=</span><span class="dv">4</span>)</span>
+<span id="cb15-3"><a href="#cb15-3" aria-hidden="true" tabindex="-1"></a><span class="cf">else</span>:</span>
+<span id="cb15-4"><a href="#cb15-4" aria-hidden="true" tabindex="-1"></a>    img <span class="op">=</span> <span class="st">"No Hits"</span></span>
+<span id="cb15-5"><a href="#cb15-5" aria-hidden="true" tabindex="-1"></a>img</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-display" data-execution_count="9">
 <div>
 <figure class="figure">
 <p><img src="2024-12-03-introducing-synthon-search_files/figure-html/cell-8-output-1.png" class="img-fluid figure-img"></p>
@@ -344,10 +356,10 @@ Number of hits : 108</code></pre>
 </div>
 <p>The molecule names are made up of the reaction name and the synthons for that reaction. So the first hit above is made from synthons 2700 and 25231 and reaction a1.</p>
 <p>Complex SMARTS queries are supported, though can take a little longer to run. The maximum number of hits to be returned is capped at 1000 by default. You can obtain an upper bound on the maximum number of hits possible; there may be fewer hits than this in practice, as duplicate matches are counted but not returned and for other more subtle reasons.</p>
-<div id="7f79cbb5-dff1-4b7e-a5e7-af28d77f85a8" class="cell" data-execution_count="8">
-<div class="sourceCode cell-code" id="cb13"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb13-1"><a href="#cb13-1" aria-hidden="true" tabindex="-1"></a>qmol <span class="op">=</span> Chem.MolFromSmarts(<span class="st">"c1c[n,s,o][n,s,o,c]c1C(=O)[$(N1CCCCC1),$(N1CCCC1)]"</span>)</span>
-<span id="cb13-2"><a href="#cb13-2" aria-hidden="true" tabindex="-1"></a>qmol</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
-<div class="cell-output cell-output-display" data-execution_count="8">
+<div id="7f79cbb5-dff1-4b7e-a5e7-af28d77f85a8" class="cell" data-execution_count="10">
+<div class="sourceCode cell-code" id="cb16"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb16-1"><a href="#cb16-1" aria-hidden="true" tabindex="-1"></a>qmol <span class="op">=</span> Chem.MolFromSmarts(<span class="st">"c1c[n,s,o][n,s,o,c]c1C(=O)[$(N1CCCCC1),$(N1CCCC1)]"</span>)</span>
+<span id="cb16-2"><a href="#cb16-2" aria-hidden="true" tabindex="-1"></a>qmol</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-display" data-execution_count="10">
 <div>
 <figure class="figure">
 <p><img src="2024-12-03-introducing-synthon-search_files/figure-html/cell-9-output-1.png" class="img-fluid figure-img"></p>
@@ -355,178 +367,150 @@ Number of hits : 108</code></pre>
 </div>
 </div>
 </div>
-<div id="5d145188-7547-4bd1-a7d8-292beb253cc7" class="cell" data-execution_count="9">
-<div class="sourceCode cell-code" id="cb14"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb14-1"><a href="#cb14-1" aria-hidden="true" tabindex="-1"></a>start <span class="op">=</span> time.perf_counter()</span>
-<span id="cb14-2"><a href="#cb14-2" aria-hidden="true" tabindex="-1"></a>results <span class="op">=</span> synthonspace.SubstructureSearch(qmol)</span>
-<span id="cb14-3"><a href="#cb14-3" aria-hidden="true" tabindex="-1"></a>hits <span class="op">=</span> results.GetHitMolecules()</span>
-<span id="cb14-4"><a href="#cb14-4" aria-hidden="true" tabindex="-1"></a>hit_names <span class="op">=</span> [m.GetProp(<span class="st">"_Name"</span>) <span class="cf">for</span> m <span class="kw">in</span> hits]</span>
-<span id="cb14-5"><a href="#cb14-5" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"Time to search : </span><span class="sc">{</span>time<span class="sc">.</span>perf_counter() <span class="op">-</span> start<span class="sc">:4.2f}</span><span class="ss"> seconds."</span>)</span>
-<span id="cb14-6"><a href="#cb14-6" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"Number of hits : </span><span class="sc">{</span><span class="bu">len</span>(hits)<span class="sc">}</span><span class="ss">"</span>)</span>
-<span id="cb14-7"><a href="#cb14-7" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"Maximum number of hits possible : </span><span class="sc">{</span>results<span class="sc">.</span>GetMaxNumResults<span class="sc">}</span><span class="ss">"</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div id="5d145188-7547-4bd1-a7d8-292beb253cc7" class="cell" data-execution_count="11">
+<div class="sourceCode cell-code" id="cb17"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb17-1"><a href="#cb17-1" aria-hidden="true" tabindex="-1"></a>start <span class="op">=</span> time.perf_counter()</span>
+<span id="cb17-2"><a href="#cb17-2" aria-hidden="true" tabindex="-1"></a>results <span class="op">=</span> synthonspace.SubstructureSearch(qmol)</span>
+<span id="cb17-3"><a href="#cb17-3" aria-hidden="true" tabindex="-1"></a>hits <span class="op">=</span> results.GetHitMolecules()</span>
+<span id="cb17-4"><a href="#cb17-4" aria-hidden="true" tabindex="-1"></a>hit_names <span class="op">=</span> [m.GetProp(<span class="st">"_Name"</span>) <span class="cf">for</span> m <span class="kw">in</span> hits]</span>
+<span id="cb17-5"><a href="#cb17-5" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"Time to search : </span><span class="sc">{</span>time<span class="sc">.</span>perf_counter() <span class="op">-</span> start<span class="sc">:4.2f}</span><span class="ss"> seconds."</span>)</span>
+<span id="cb17-6"><a href="#cb17-6" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"Number of hits : </span><span class="sc">{</span><span class="bu">len</span>(hits)<span class="sc">}</span><span class="ss">"</span>)</span>
+<span id="cb17-7"><a href="#cb17-7" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"Maximum number of hits possible : </span><span class="sc">{</span>results<span class="sc">.</span>GetMaxNumResults()<span class="sc">}</span><span class="ss">"</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stderr">
+<pre><code>[11:23:44] Complex queries can be slow.
+[11:23:45] Best approx similarity : 0.8 and worst : 0.103896</code></pre>
+</div>
 <div class="cell-output cell-output-stdout">
-<pre><code>Time to search : 0.19 seconds.
+<pre><code>Time to search : 1.74 seconds.
 Number of hits : 1000
-Maximum number of hits possible : 2358187</code></pre>
+Maximum number of hits possible : 147687306</code></pre>
 </div>
 </div>
 <p>You can control the number of hits returned, and also get a random sample of the hits, rather than the first N in the list:</p>
-<div id="d6da6906-bd2c-4678-8a92-5677bdb8d050" class="cell" data-execution_count="10">
-<div class="sourceCode cell-code" id="cb16"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb16-1"><a href="#cb16-1" aria-hidden="true" tabindex="-1"></a>params <span class="op">=</span> rdSynthonSpaceSearch.SynthonSpaceSearchParams()</span>
-<span id="cb16-2"><a href="#cb16-2" aria-hidden="true" tabindex="-1"></a>params.maxHits <span class="op">=</span> <span class="dv">12</span></span>
-<span id="cb16-3"><a href="#cb16-3" aria-hidden="true" tabindex="-1"></a>params.randomSample <span class="op">=</span> <span class="va">True</span></span>
-<span id="cb16-4"><a href="#cb16-4" aria-hidden="true" tabindex="-1"></a>start <span class="op">=</span> time.perf_counter()</span>
-<span id="cb16-5"><a href="#cb16-5" aria-hidden="true" tabindex="-1"></a>results <span class="op">=</span> synthonspace.SubstructureSearch(qmol, params)</span>
-<span id="cb16-6"><a href="#cb16-6" aria-hidden="true" tabindex="-1"></a>hits <span class="op">=</span> results.GetHitMolecules()</span>
-<span id="cb16-7"><a href="#cb16-7" aria-hidden="true" tabindex="-1"></a>hit_names <span class="op">=</span> [m.GetProp(<span class="st">"_Name"</span>) <span class="cf">for</span> m <span class="kw">in</span> hits]</span>
-<span id="cb16-8"><a href="#cb16-8" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"Time to search : </span><span class="sc">{</span>time<span class="sc">.</span>perf_counter() <span class="op">-</span> start<span class="sc">:4.2f}</span><span class="ss"> seconds."</span>)</span>
-<span id="cb16-9"><a href="#cb16-9" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"Number of hits : </span><span class="sc">{</span><span class="bu">len</span>(hits)<span class="sc">}</span><span class="ss">"</span>)</span>
-<span id="cb16-10"><a href="#cb16-10" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"Maximum number of hits possible : </span><span class="sc">{</span>results<span class="sc">.</span>GetMaxNumResults<span class="sc">}</span><span class="ss">"</span>)</span>
-<span id="cb16-11"><a href="#cb16-11" aria-hidden="true" tabindex="-1"></a>Draw.MolsToGridImage(hits[:<span class="dv">12</span>], legends<span class="op">=</span>hit_names[:<span class="dv">12</span>], molsPerRow<span class="op">=</span><span class="dv">4</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
-<div class="cell-output cell-output-stdout">
-<pre><code>Time to search : 0.13 seconds.
-Number of hits : 12
-Maximum number of hits possible : 2358187</code></pre>
+<div id="d6da6906-bd2c-4678-8a92-5677bdb8d050" class="cell" data-execution_count="12">
+<div class="sourceCode cell-code" id="cb20"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb20-1"><a href="#cb20-1" aria-hidden="true" tabindex="-1"></a>params <span class="op">=</span> rdSynthonSpaceSearch.SynthonSpaceSearchParams()</span>
+<span id="cb20-2"><a href="#cb20-2" aria-hidden="true" tabindex="-1"></a>params.maxHits <span class="op">=</span> <span class="dv">12</span></span>
+<span id="cb20-3"><a href="#cb20-3" aria-hidden="true" tabindex="-1"></a>params.randomSample <span class="op">=</span> <span class="va">True</span></span>
+<span id="cb20-4"><a href="#cb20-4" aria-hidden="true" tabindex="-1"></a>params.numThreads <span class="op">=</span> <span class="op">-</span><span class="dv">1</span></span>
+<span id="cb20-5"><a href="#cb20-5" aria-hidden="true" tabindex="-1"></a>start <span class="op">=</span> time.perf_counter()</span>
+<span id="cb20-6"><a href="#cb20-6" aria-hidden="true" tabindex="-1"></a>results <span class="op">=</span> synthonspace.SubstructureSearch(qmol, params<span class="op">=</span>params)</span>
+<span id="cb20-7"><a href="#cb20-7" aria-hidden="true" tabindex="-1"></a>hits <span class="op">=</span> results.GetHitMolecules()</span>
+<span id="cb20-8"><a href="#cb20-8" aria-hidden="true" tabindex="-1"></a>hit_names <span class="op">=</span> [m.GetProp(<span class="st">"_Name"</span>) <span class="cf">for</span> m <span class="kw">in</span> hits]</span>
+<span id="cb20-9"><a href="#cb20-9" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"Time to search : </span><span class="sc">{</span>time<span class="sc">.</span>perf_counter() <span class="op">-</span> start<span class="sc">:4.2f}</span><span class="ss"> seconds."</span>)</span>
+<span id="cb20-10"><a href="#cb20-10" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"Number of hits : </span><span class="sc">{</span><span class="bu">len</span>(hits)<span class="sc">}</span><span class="ss">"</span>)</span>
+<span id="cb20-11"><a href="#cb20-11" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"Maximum number of hits possible : </span><span class="sc">{</span>results<span class="sc">.</span>GetMaxNumResults<span class="sc">}</span><span class="ss">"</span>)</span>
+<span id="cb20-12"><a href="#cb20-12" aria-hidden="true" tabindex="-1"></a>Draw.MolsToGridImage(hits[:<span class="dv">12</span>], legends<span class="op">=</span>hit_names[:<span class="dv">12</span>], molsPerRow<span class="op">=</span><span class="dv">4</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stderr">
+<pre><code>[11:23:46] Complex queries can be slow.</code></pre>
 </div>
-<div class="cell-output cell-output-display" data-execution_count="10">
+<div class="cell-output cell-output-stdout">
+<pre><code>Time to search : 1.30 seconds.
+Number of hits : 12
+Maximum number of hits possible : &lt;bound method GetMaxNumResults of &lt;rdkit.Chem.rdSynthonSpaceSearch.SubstructureResult object at 0x11b275240&gt;&gt;</code></pre>
+</div>
+<div class="cell-output cell-output-display" data-execution_count="12">
 <div>
 <figure class="figure">
-<p><img src="2024-12-03-introducing-synthon-search_files/figure-html/cell-11-output-2.png" class="img-fluid figure-img"></p>
+<p><img src="2024-12-03-introducing-synthon-search_files/figure-html/cell-11-output-3.png" class="img-fluid figure-img"></p>
 </figure>
 </div>
 </div>
 </div>
 <p>Having looked at the first 1000 hits, you might want to get the next set in the list. Here we get the 1000 starting at 2000.</p>
-<div id="aac848ef-ff4d-4750-8658-1b84de535f3d" class="cell" data-execution_count="11">
-<div class="sourceCode cell-code" id="cb18"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb18-1"><a href="#cb18-1" aria-hidden="true" tabindex="-1"></a>params <span class="op">=</span> rdSynthonSpaceSearch.SynthonSpaceSearchParams()</span>
-<span id="cb18-2"><a href="#cb18-2" aria-hidden="true" tabindex="-1"></a>params.maxHits <span class="op">=</span> <span class="dv">1000</span></span>
-<span id="cb18-3"><a href="#cb18-3" aria-hidden="true" tabindex="-1"></a>params.hitStart <span class="op">=</span> <span class="dv">2000</span></span>
-<span id="cb18-4"><a href="#cb18-4" aria-hidden="true" tabindex="-1"></a>start <span class="op">=</span> time.perf_counter()</span>
-<span id="cb18-5"><a href="#cb18-5" aria-hidden="true" tabindex="-1"></a>results <span class="op">=</span> synthonspace.SubstructureSearch(qmol, params)</span>
-<span id="cb18-6"><a href="#cb18-6" aria-hidden="true" tabindex="-1"></a>hits <span class="op">=</span> results.GetHitMolecules()</span>
-<span id="cb18-7"><a href="#cb18-7" aria-hidden="true" tabindex="-1"></a>hit_names <span class="op">=</span> [m.GetProp(<span class="st">"_Name"</span>) <span class="cf">for</span> m <span class="kw">in</span> hits]</span>
-<span id="cb18-8"><a href="#cb18-8" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"Time to search : </span><span class="sc">{</span>time<span class="sc">.</span>perf_counter() <span class="op">-</span> start<span class="sc">:4.2f}</span><span class="ss"> seconds."</span>)</span>
-<span id="cb18-9"><a href="#cb18-9" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"Number of hits : </span><span class="sc">{</span><span class="bu">len</span>(hits)<span class="sc">}</span><span class="ss">"</span>)</span>
-<span id="cb18-10"><a href="#cb18-10" aria-hidden="true" tabindex="-1"></a>Draw.MolsToGridImage(hits[:<span class="dv">12</span>], legends<span class="op">=</span>hit_names[:<span class="dv">12</span>], molsPerRow<span class="op">=</span><span class="dv">4</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div id="aac848ef-ff4d-4750-8658-1b84de535f3d" class="cell" data-execution_count="13">
+<div class="sourceCode cell-code" id="cb23"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb23-1"><a href="#cb23-1" aria-hidden="true" tabindex="-1"></a>params <span class="op">=</span> rdSynthonSpaceSearch.SynthonSpaceSearchParams()</span>
+<span id="cb23-2"><a href="#cb23-2" aria-hidden="true" tabindex="-1"></a>params.maxHits <span class="op">=</span> <span class="dv">1000</span></span>
+<span id="cb23-3"><a href="#cb23-3" aria-hidden="true" tabindex="-1"></a>params.hitStart <span class="op">=</span> <span class="dv">2000</span></span>
+<span id="cb23-4"><a href="#cb23-4" aria-hidden="true" tabindex="-1"></a>params.numThreads <span class="op">=</span> <span class="op">-</span><span class="dv">1</span></span>
+<span id="cb23-5"><a href="#cb23-5" aria-hidden="true" tabindex="-1"></a>start <span class="op">=</span> time.perf_counter()</span>
+<span id="cb23-6"><a href="#cb23-6" aria-hidden="true" tabindex="-1"></a>results <span class="op">=</span> synthonspace.SubstructureSearch(qmol, params<span class="op">=</span>params)</span>
+<span id="cb23-7"><a href="#cb23-7" aria-hidden="true" tabindex="-1"></a>hits <span class="op">=</span> results.GetHitMolecules()</span>
+<span id="cb23-8"><a href="#cb23-8" aria-hidden="true" tabindex="-1"></a>hit_names <span class="op">=</span> [m.GetProp(<span class="st">"_Name"</span>) <span class="cf">for</span> m <span class="kw">in</span> hits]</span>
+<span id="cb23-9"><a href="#cb23-9" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"Time to search : </span><span class="sc">{</span>time<span class="sc">.</span>perf_counter() <span class="op">-</span> start<span class="sc">:4.2f}</span><span class="ss"> seconds."</span>)</span>
+<span id="cb23-10"><a href="#cb23-10" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"Number of hits : </span><span class="sc">{</span><span class="bu">len</span>(hits)<span class="sc">}</span><span class="ss">"</span>)</span>
+<span id="cb23-11"><a href="#cb23-11" aria-hidden="true" tabindex="-1"></a>Draw.MolsToGridImage(hits[:<span class="dv">12</span>], legends<span class="op">=</span>hit_names[:<span class="dv">12</span>], molsPerRow<span class="op">=</span><span class="dv">4</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stderr">
+<pre><code>[11:23:47] Complex queries can be slow.
+[11:23:48] Best approx similarity : 0.8 and worst : 0.103896</code></pre>
+</div>
 <div class="cell-output cell-output-stdout">
-<pre><code>Time to search : 0.19 seconds.
+<pre><code>Time to search : 1.22 seconds.
 Number of hits : 1000</code></pre>
 </div>
-<div class="cell-output cell-output-display" data-execution_count="11">
+<div class="cell-output cell-output-display" data-execution_count="13">
 <div>
 <figure class="figure">
-<p><img src="2024-12-03-introducing-synthon-search_files/figure-html/cell-12-output-2.png" class="img-fluid figure-img"></p>
+<p><img src="2024-12-03-introducing-synthon-search_files/figure-html/cell-12-output-3.png" class="img-fluid figure-img"></p>
 </figure>
 </div>
 </div>
 </div>
 <p>It is possible to check the upper bound on the number of hits without building them, just to get an idea of whether you need to refine the search or not.</p>
-<div id="423e46c2-5b53-44f4-9fd8-721abbbedb62" class="cell" data-execution_count="12">
-<div class="sourceCode cell-code" id="cb20"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb20-1"><a href="#cb20-1" aria-hidden="true" tabindex="-1"></a>qmol <span class="op">=</span> Chem.MolFromSmarts(<span class="st">"c12ccc(C)cc1[nH]nc2C(=O)NCc1cncs1"</span>)</span>
-<span id="cb20-2"><a href="#cb20-2" aria-hidden="true" tabindex="-1"></a>params <span class="op">=</span> rdSynthonSpaceSearch.SynthonSpaceSearchParams()</span>
-<span id="cb20-3"><a href="#cb20-3" aria-hidden="true" tabindex="-1"></a>params.buildHits <span class="op">=</span> <span class="va">False</span></span>
-<span id="cb20-4"><a href="#cb20-4" aria-hidden="true" tabindex="-1"></a>results <span class="op">=</span> synthonspace.SubstructureSearch(qmol, params)</span>
-<span id="cb20-5"><a href="#cb20-5" aria-hidden="true" tabindex="-1"></a>hits <span class="op">=</span> results.GetHitMolecules()</span>
-<span id="cb20-6"><a href="#cb20-6" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"Number of hits : </span><span class="sc">{</span><span class="bu">len</span>(hits)<span class="sc">}</span><span class="ss">"</span>)</span>
-<span id="cb20-7"><a href="#cb20-7" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"Maximum number of hits possible : </span><span class="sc">{</span>results<span class="sc">.</span>GetMaxNumResults<span class="sc">}</span><span class="ss">"</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div id="423e46c2-5b53-44f4-9fd8-721abbbedb62" class="cell" data-execution_count="14">
+<div class="sourceCode cell-code" id="cb26"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb26-1"><a href="#cb26-1" aria-hidden="true" tabindex="-1"></a>qmol <span class="op">=</span> Chem.MolFromSmarts(<span class="st">"c12ccc(C)cc1[nH]nc2C(=O)NCc1cncs1"</span>)</span>
+<span id="cb26-2"><a href="#cb26-2" aria-hidden="true" tabindex="-1"></a>params <span class="op">=</span> rdSynthonSpaceSearch.SynthonSpaceSearchParams()</span>
+<span id="cb26-3"><a href="#cb26-3" aria-hidden="true" tabindex="-1"></a>params.buildHits <span class="op">=</span> <span class="va">False</span></span>
+<span id="cb26-4"><a href="#cb26-4" aria-hidden="true" tabindex="-1"></a>results <span class="op">=</span> synthonspace.SubstructureSearch(qmol, params<span class="op">=</span>params)</span>
+<span id="cb26-5"><a href="#cb26-5" aria-hidden="true" tabindex="-1"></a>hits <span class="op">=</span> results.GetHitMolecules()</span>
+<span id="cb26-6"><a href="#cb26-6" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"Number of hits : </span><span class="sc">{</span><span class="bu">len</span>(hits)<span class="sc">}</span><span class="ss">"</span>)</span>
+<span id="cb26-7"><a href="#cb26-7" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"Maximum number of hits possible : </span><span class="sc">{</span>results<span class="sc">.</span>GetMaxNumResults()<span class="sc">}</span><span class="ss">"</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stderr">
+<pre><code>[11:23:48] Complex queries can be slow.</code></pre>
+</div>
 <div class="cell-output cell-output-stdout">
 <pre><code>Number of hits : 0
 Maximum number of hits possible : 108</code></pre>
 </div>
 </div>
 <p>##&nbsp;Similarity Searching Any of the RDKit fingerprint generators can be used, although the similarity metric is hard-coded as Tanimoto on a hashed fingerprint. The search structure is <a href="https://en.wikipedia.org/wiki/Osimertinib">Osimertinib</a> which is paying my pension so deserves acknowledgement. Similarity values are returned in the property “Similarity” on each molecule. If the binary file doesn’t contain fingerprints, they will need to be generated. This can be done ahead of time or it will be done as part of the first search.</p>
-<div id="f5878504-c918-4896-9878-87c4ade063ee" class="cell" data-execution_count="13">
-<div class="sourceCode cell-code" id="cb22"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb22-1"><a href="#cb22-1" aria-hidden="true" tabindex="-1"></a>fpgen <span class="op">=</span> rdFingerprintGenerator.GetRDKitFPGenerator(fpSize<span class="op">=</span><span class="dv">2048</span>)</span>
-<span id="cb22-2"><a href="#cb22-2" aria-hidden="true" tabindex="-1"></a>synthonspace.BuildSynthonFingerprints(fpgen)</span>
-<span id="cb22-3"><a href="#cb22-3" aria-hidden="true" tabindex="-1"></a>qmol <span class="op">=</span> Chem.MolFromSmiles(<span class="st">"C=CC(=O)Nc1cc(Nc2nccc(-c3cn(C)c4ccccc34)n2)c(OC)cc1N(C)CCN(C)C"</span>)</span>
-<span id="cb22-4"><a href="#cb22-4" aria-hidden="true" tabindex="-1"></a>qmol</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
-<div class="cell-output cell-output-stderr">
-<pre><code>[11:01:56] Building the fingerprints may take some time.</code></pre>
+<div id="f5878504-c918-4896-9878-87c4ade063ee" class="cell">
+<div class="sourceCode cell-code" id="cb29"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb29-1"><a href="#cb29-1" aria-hidden="true" tabindex="-1"></a>fpgen <span class="op">=</span> rdFingerprintGenerator.GetRDKitFPGenerator(fpSize<span class="op">=</span><span class="dv">2048</span>)</span>
+<span id="cb29-2"><a href="#cb29-2" aria-hidden="true" tabindex="-1"></a>synthonspace.BuildSynthonFingerprints(fpgen)</span>
+<span id="cb29-3"><a href="#cb29-3" aria-hidden="true" tabindex="-1"></a>qmol <span class="op">=</span> Chem.MolFromSmiles(<span class="st">"C=CC(=O)Nc1cc(Nc2nccc(-c3cn(C)c4ccccc34)n2)c(OC)cc1N(C)CCN(C)C"</span>)</span>
+<span id="cb29-4"><a href="#cb29-4" aria-hidden="true" tabindex="-1"></a>qmol</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </div>
-<div class="cell-output cell-output-display" data-execution_count="13">
-<div>
-<figure class="figure">
-<p><img src="2024-12-03-introducing-synthon-search_files/figure-html/cell-14-output-2.png" class="img-fluid figure-img"></p>
-</figure>
-</div>
-</div>
-</div>
-<div id="a3907cdc-c9b4-4afe-99f7-b0e4c2bf009e" class="cell" data-execution_count="14">
-<div class="sourceCode cell-code" id="cb24"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb24-1"><a href="#cb24-1" aria-hidden="true" tabindex="-1"></a>start <span class="op">=</span> time.perf_counter()</span>
-<span id="cb24-2"><a href="#cb24-2" aria-hidden="true" tabindex="-1"></a>results <span class="op">=</span> synthonspace.FingerprintSearch(qmol, fpgen)</span>
-<span id="cb24-3"><a href="#cb24-3" aria-hidden="true" tabindex="-1"></a>hits <span class="op">=</span> results.GetHitMolecules()</span>
-<span id="cb24-4"><a href="#cb24-4" aria-hidden="true" tabindex="-1"></a>hit_names <span class="op">=</span> [<span class="ss">f'</span><span class="sc">{</span>m<span class="sc">.</span>GetProp(<span class="st">"_Name"</span>)<span class="sc">}</span><span class="ss"> : </span><span class="sc">{</span><span class="bu">float</span>(m.GetProp(<span class="st">"Similarity"</span>))<span class="sc">:4.2f}</span><span class="ss">'</span> <span class="cf">for</span> m <span class="kw">in</span> hits]</span>
-<span id="cb24-5"><a href="#cb24-5" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"Time to search : </span><span class="sc">{</span>time<span class="sc">.</span>perf_counter() <span class="op">-</span> start<span class="sc">:4.2f}</span><span class="ss"> seconds."</span>)</span>
-<span id="cb24-6"><a href="#cb24-6" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"Number of hits : </span><span class="sc">{</span><span class="bu">len</span>(hits)<span class="sc">}</span><span class="ss">"</span>)</span>
-<span id="cb24-7"><a href="#cb24-7" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"Maximum number of hits possible : </span><span class="sc">{</span>results<span class="sc">.</span>GetMaxNumResults<span class="sc">}</span><span class="ss">"</span>)</span>
-<span id="cb24-8"><a href="#cb24-8" aria-hidden="true" tabindex="-1"></a>Draw.MolsToGridImage(hits[:<span class="dv">12</span>], legends<span class="op">=</span>hit_names[:<span class="dv">12</span>], molsPerRow<span class="op">=</span><span class="dv">4</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
-<div class="cell-output cell-output-stdout">
-<pre><code>Time to search : 20.29 seconds.
-Number of hits : 1000
-Maximum number of hits possible : 35911098</code></pre>
-</div>
-<div class="cell-output cell-output-display" data-execution_count="14">
-<div>
-<figure class="figure">
-<p><img src="2024-12-03-introducing-synthon-search_files/figure-html/cell-15-output-2.png" class="img-fluid figure-img"></p>
-</figure>
-</div>
-</div>
+<div id="a3907cdc-c9b4-4afe-99f7-b0e4c2bf009e" class="cell">
+<div class="sourceCode cell-code" id="cb30"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb30-1"><a href="#cb30-1" aria-hidden="true" tabindex="-1"></a>start <span class="op">=</span> time.perf_counter()</span>
+<span id="cb30-2"><a href="#cb30-2" aria-hidden="true" tabindex="-1"></a>results <span class="op">=</span> synthonspace.FingerprintSearch(qmol, fpgen)</span>
+<span id="cb30-3"><a href="#cb30-3" aria-hidden="true" tabindex="-1"></a>hits <span class="op">=</span> results.GetHitMolecules()</span>
+<span id="cb30-4"><a href="#cb30-4" aria-hidden="true" tabindex="-1"></a>hit_names <span class="op">=</span> [<span class="ss">f'</span><span class="sc">{</span>m<span class="sc">.</span>GetProp(<span class="st">"_Name"</span>)<span class="sc">}</span><span class="ss"> : </span><span class="sc">{</span><span class="bu">float</span>(m.GetProp(<span class="st">"Similarity"</span>))<span class="sc">:4.2f}</span><span class="ss">'</span> <span class="cf">for</span> m <span class="kw">in</span> hits]</span>
+<span id="cb30-5"><a href="#cb30-5" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"Time to search : </span><span class="sc">{</span>time<span class="sc">.</span>perf_counter() <span class="op">-</span> start<span class="sc">:4.2f}</span><span class="ss"> seconds."</span>)</span>
+<span id="cb30-6"><a href="#cb30-6" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"Number of hits : </span><span class="sc">{</span><span class="bu">len</span>(hits)<span class="sc">}</span><span class="ss">"</span>)</span>
+<span id="cb30-7"><a href="#cb30-7" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"Maximum number of hits possible : </span><span class="sc">{</span>results<span class="sc">.</span>GetMaxNumResults<span class="sc">}</span><span class="ss">"</span>)</span>
+<span id="cb30-8"><a href="#cb30-8" aria-hidden="true" tabindex="-1"></a>Draw.MolsToGridImage(hits[:<span class="dv">12</span>], legends<span class="op">=</span>hit_names[:<span class="dv">12</span>], molsPerRow<span class="op">=</span><span class="dv">4</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </div>
 <p>The extra runtime is due to 2 factors. The first is that osimertinib is a largish molecule, so many fragments are generated that all need to be compared with the synthons. The second is that the screenout by fingerprint is less efficient, as you can see from the fact that 35911098 hits were possible having passed the initial fragment screening, although many of those won’t make the similarity cutoff when the potential hit molecule is built and checked.</p>
 <p>The similarity cutoff can be raised from the default 0.5 however this can result in large search times if there are few hits that meet the threshold - it may have to check all 35911098 potential hits. Note that in the search below we take a random sample of the results, so the hits are not the same as above.</p>
-<div id="780d92fc-45e0-4546-8eb5-f419a6c26221" class="cell" data-execution_count="15">
-<div class="sourceCode cell-code" id="cb26"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb26-1"><a href="#cb26-1" aria-hidden="true" tabindex="-1"></a>params <span class="op">=</span> rdSynthonSpaceSearch.SynthonSpaceSearchParams()</span>
-<span id="cb26-2"><a href="#cb26-2" aria-hidden="true" tabindex="-1"></a>params.maxHits <span class="op">=</span> <span class="dv">12</span></span>
-<span id="cb26-3"><a href="#cb26-3" aria-hidden="true" tabindex="-1"></a>params.randomSample <span class="op">=</span> <span class="va">True</span></span>
-<span id="cb26-4"><a href="#cb26-4" aria-hidden="true" tabindex="-1"></a>params.similarityCutoff <span class="op">=</span> <span class="fl">0.55</span></span>
-<span id="cb26-5"><a href="#cb26-5" aria-hidden="true" tabindex="-1"></a>start <span class="op">=</span> time.perf_counter()</span>
-<span id="cb26-6"><a href="#cb26-6" aria-hidden="true" tabindex="-1"></a>results <span class="op">=</span> synthonspace.FingerprintSearch(qmol, fpgen, params)</span>
-<span id="cb26-7"><a href="#cb26-7" aria-hidden="true" tabindex="-1"></a>hits <span class="op">=</span> results.GetHitMolecules()</span>
-<span id="cb26-8"><a href="#cb26-8" aria-hidden="true" tabindex="-1"></a>hit_names <span class="op">=</span> [<span class="ss">f'</span><span class="sc">{</span>m<span class="sc">.</span>GetProp(<span class="st">"_Name"</span>)<span class="sc">}</span><span class="ss"> : </span><span class="sc">{</span><span class="bu">float</span>(m.GetProp(<span class="st">"Similarity"</span>))<span class="sc">:4.2f}</span><span class="ss">'</span> <span class="cf">for</span> m <span class="kw">in</span> hits]</span>
-<span id="cb26-9"><a href="#cb26-9" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"Time to search : </span><span class="sc">{</span>time<span class="sc">.</span>perf_counter() <span class="op">-</span> start<span class="sc">:4.2f}</span><span class="ss"> seconds."</span>)</span>
-<span id="cb26-10"><a href="#cb26-10" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"Number of hits : </span><span class="sc">{</span><span class="bu">len</span>(hits)<span class="sc">}</span><span class="ss">"</span>)</span>
-<span id="cb26-11"><a href="#cb26-11" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"Maximum number of hits possible : </span><span class="sc">{</span>results<span class="sc">.</span>GetMaxNumResults<span class="sc">}</span><span class="ss">"</span>)</span>
-<span id="cb26-12"><a href="#cb26-12" aria-hidden="true" tabindex="-1"></a>Draw.MolsToGridImage(hits[:<span class="dv">12</span>], legends<span class="op">=</span>hit_names[:<span class="dv">12</span>], molsPerRow<span class="op">=</span><span class="dv">4</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
-<div class="cell-output cell-output-stdout">
-<pre><code>Time to search : 15.84 seconds.
-Number of hits : 12
-Maximum number of hits possible : 3925204</code></pre>
-</div>
-<div class="cell-output cell-output-display" data-execution_count="15">
-<div>
-<figure class="figure">
-<p><img src="2024-12-03-introducing-synthon-search_files/figure-html/cell-16-output-2.png" class="img-fluid figure-img"></p>
-</figure>
-</div>
-</div>
+<div id="780d92fc-45e0-4546-8eb5-f419a6c26221" class="cell">
+<div class="sourceCode cell-code" id="cb31"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb31-1"><a href="#cb31-1" aria-hidden="true" tabindex="-1"></a>params <span class="op">=</span> rdSynthonSpaceSearch.SynthonSpaceSearchParams()</span>
+<span id="cb31-2"><a href="#cb31-2" aria-hidden="true" tabindex="-1"></a>params.maxHits <span class="op">=</span> <span class="dv">12</span></span>
+<span id="cb31-3"><a href="#cb31-3" aria-hidden="true" tabindex="-1"></a>params.randomSample <span class="op">=</span> <span class="va">True</span></span>
+<span id="cb31-4"><a href="#cb31-4" aria-hidden="true" tabindex="-1"></a>params.similarityCutoff <span class="op">=</span> <span class="fl">0.55</span></span>
+<span id="cb31-5"><a href="#cb31-5" aria-hidden="true" tabindex="-1"></a>params.numThreads <span class="op">=</span> <span class="op">-</span><span class="dv">1</span></span>
+<span id="cb31-6"><a href="#cb31-6" aria-hidden="true" tabindex="-1"></a>start <span class="op">=</span> time.perf_counter()</span>
+<span id="cb31-7"><a href="#cb31-7" aria-hidden="true" tabindex="-1"></a>results <span class="op">=</span> synthonspace.FingerprintSearch(qmol, fpgen, params)</span>
+<span id="cb31-8"><a href="#cb31-8" aria-hidden="true" tabindex="-1"></a>hits <span class="op">=</span> results.GetHitMolecules()</span>
+<span id="cb31-9"><a href="#cb31-9" aria-hidden="true" tabindex="-1"></a>hit_names <span class="op">=</span> [<span class="ss">f'</span><span class="sc">{</span>m<span class="sc">.</span>GetProp(<span class="st">"_Name"</span>)<span class="sc">}</span><span class="ss"> : </span><span class="sc">{</span><span class="bu">float</span>(m.GetProp(<span class="st">"Similarity"</span>))<span class="sc">:4.2f}</span><span class="ss">'</span> <span class="cf">for</span> m <span class="kw">in</span> hits]</span>
+<span id="cb31-10"><a href="#cb31-10" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"Time to search : </span><span class="sc">{</span>time<span class="sc">.</span>perf_counter() <span class="op">-</span> start<span class="sc">:4.2f}</span><span class="ss"> seconds."</span>)</span>
+<span id="cb31-11"><a href="#cb31-11" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"Number of hits : </span><span class="sc">{</span><span class="bu">len</span>(hits)<span class="sc">}</span><span class="ss">"</span>)</span>
+<span id="cb31-12"><a href="#cb31-12" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"Maximum number of hits possible : </span><span class="sc">{</span>results<span class="sc">.</span>GetMaxNumResults<span class="sc">}</span><span class="ss">"</span>)</span>
+<span id="cb31-13"><a href="#cb31-13" aria-hidden="true" tabindex="-1"></a>Draw.MolsToGridImage(hits[:<span class="dv">12</span>], legends<span class="op">=</span>hit_names[:<span class="dv">12</span>], molsPerRow<span class="op">=</span><span class="dv">4</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </div>
 <p>Tanimoto similarities between small molecules with sparsely populated fingerprints are known to be be lower and more granular than similiarties for larger entities. This is relevant because the search starts by comparing fragments from the query molecule with synthons in the database. Only synthons that match the fragment within the cutoff are considered as a basis for a hit. There is a parameter that lowers the similarity cutoff for the fragment comparison compared to the global cutoff, which defaults to 0.1. Thus, if your similarityCutoff is set to 0.5, synthons are considered a match to a fragment if their Tanimoto similarities are above 0.4. If you want a faster search and don’t mind possibly missing some hits, you can lower that difference.</p>
-<div id="d537a3a3-5c0f-420e-b231-9a6a13109db2" class="cell" data-execution_count="16">
-<div class="sourceCode cell-code" id="cb28"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb28-1"><a href="#cb28-1" aria-hidden="true" tabindex="-1"></a>params <span class="op">=</span> rdSynthonSpaceSearch.SynthonSpaceSearchParams()</span>
-<span id="cb28-2"><a href="#cb28-2" aria-hidden="true" tabindex="-1"></a>params.maxHits <span class="op">=</span> <span class="dv">12</span></span>
-<span id="cb28-3"><a href="#cb28-3" aria-hidden="true" tabindex="-1"></a>params.randomSample <span class="op">=</span> <span class="va">True</span></span>
-<span id="cb28-4"><a href="#cb28-4" aria-hidden="true" tabindex="-1"></a>params.similarityCutoff <span class="op">=</span> <span class="fl">0.5</span></span>
-<span id="cb28-5"><a href="#cb28-5" aria-hidden="true" tabindex="-1"></a>params.fragSimilarityAdjuster <span class="op">=</span> <span class="fl">0.0</span></span>
-<span id="cb28-6"><a href="#cb28-6" aria-hidden="true" tabindex="-1"></a>start <span class="op">=</span> time.perf_counter()</span>
-<span id="cb28-7"><a href="#cb28-7" aria-hidden="true" tabindex="-1"></a>results <span class="op">=</span> synthonspace.FingerprintSearch(qmol, fpgen, params)</span>
-<span id="cb28-8"><a href="#cb28-8" aria-hidden="true" tabindex="-1"></a>hits <span class="op">=</span> results.GetHitMolecules()</span>
-<span id="cb28-9"><a href="#cb28-9" aria-hidden="true" tabindex="-1"></a>hit_names <span class="op">=</span> [<span class="ss">f'</span><span class="sc">{</span>m<span class="sc">.</span>GetProp(<span class="st">"_Name"</span>)<span class="sc">}</span><span class="ss"> : </span><span class="sc">{</span><span class="bu">float</span>(m.GetProp(<span class="st">"Similarity"</span>))<span class="sc">:4.2f}</span><span class="ss">'</span> <span class="cf">for</span> m <span class="kw">in</span> hits]</span>
-<span id="cb28-10"><a href="#cb28-10" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"Time to search : </span><span class="sc">{</span>time<span class="sc">.</span>perf_counter() <span class="op">-</span> start<span class="sc">:4.2f}</span><span class="ss"> seconds."</span>)</span>
-<span id="cb28-11"><a href="#cb28-11" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"Number of hits : </span><span class="sc">{</span><span class="bu">len</span>(hits)<span class="sc">}</span><span class="ss">"</span>)</span>
-<span id="cb28-12"><a href="#cb28-12" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"Maximum number of hits possible : </span><span class="sc">{</span>results<span class="sc">.</span>GetMaxNumResults<span class="sc">}</span><span class="ss">"</span>)</span>
-<span id="cb28-13"><a href="#cb28-13" aria-hidden="true" tabindex="-1"></a>Draw.MolsToGridImage(hits[:<span class="dv">12</span>], legends<span class="op">=</span>hit_names[:<span class="dv">12</span>], molsPerRow<span class="op">=</span><span class="dv">4</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
-<div class="cell-output cell-output-stdout">
-<pre><code>Time to search : 15.74 seconds.
-Number of hits : 12
-Maximum number of hits possible : 690134</code></pre>
-</div>
-<div class="cell-output cell-output-display" data-execution_count="16">
-<div>
-<figure class="figure">
-<p><img src="2024-12-03-introducing-synthon-search_files/figure-html/cell-17-output-2.png" class="img-fluid figure-img"></p>
-</figure>
-</div>
-</div>
+<div id="d537a3a3-5c0f-420e-b231-9a6a13109db2" class="cell">
+<div class="sourceCode cell-code" id="cb32"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb32-1"><a href="#cb32-1" aria-hidden="true" tabindex="-1"></a>params <span class="op">=</span> rdSynthonSpaceSearch.SynthonSpaceSearchParams()</span>
+<span id="cb32-2"><a href="#cb32-2" aria-hidden="true" tabindex="-1"></a>params.maxHits <span class="op">=</span> <span class="dv">12</span></span>
+<span id="cb32-3"><a href="#cb32-3" aria-hidden="true" tabindex="-1"></a>params.randomSample <span class="op">=</span> <span class="va">True</span></span>
+<span id="cb32-4"><a href="#cb32-4" aria-hidden="true" tabindex="-1"></a>params.similarityCutoff <span class="op">=</span> <span class="fl">0.5</span></span>
+<span id="cb32-5"><a href="#cb32-5" aria-hidden="true" tabindex="-1"></a>params.fragSimilarityAdjuster <span class="op">=</span> <span class="fl">0.0</span></span>
+<span id="cb32-6"><a href="#cb32-6" aria-hidden="true" tabindex="-1"></a>params.numThreads <span class="op">=</span> <span class="op">-</span><span class="dv">1</span></span>
+<span id="cb32-7"><a href="#cb32-7" aria-hidden="true" tabindex="-1"></a>start <span class="op">=</span> time.perf_counter()</span>
+<span id="cb32-8"><a href="#cb32-8" aria-hidden="true" tabindex="-1"></a>results <span class="op">=</span> synthonspace.FingerprintSearch(qmol, fpgen, params)</span>
+<span id="cb32-9"><a href="#cb32-9" aria-hidden="true" tabindex="-1"></a>hits <span class="op">=</span> results.GetHitMolecules()</span>
+<span id="cb32-10"><a href="#cb32-10" aria-hidden="true" tabindex="-1"></a>hit_names <span class="op">=</span> [<span class="ss">f'</span><span class="sc">{</span>m<span class="sc">.</span>GetProp(<span class="st">"_Name"</span>)<span class="sc">}</span><span class="ss"> : </span><span class="sc">{</span><span class="bu">float</span>(m.GetProp(<span class="st">"Similarity"</span>))<span class="sc">:4.2f}</span><span class="ss">'</span> <span class="cf">for</span> m <span class="kw">in</span> hits]</span>
+<span id="cb32-11"><a href="#cb32-11" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"Time to search : </span><span class="sc">{</span>time<span class="sc">.</span>perf_counter() <span class="op">-</span> start<span class="sc">:4.2f}</span><span class="ss"> seconds."</span>)</span>
+<span id="cb32-12"><a href="#cb32-12" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"Number of hits : </span><span class="sc">{</span><span class="bu">len</span>(hits)<span class="sc">}</span><span class="ss">"</span>)</span>
+<span id="cb32-13"><a href="#cb32-13" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"Maximum number of hits possible : </span><span class="sc">{</span>results<span class="sc">.</span>GetMaxNumResults<span class="sc">}</span><span class="ss">"</span>)</span>
+<span id="cb32-14"><a href="#cb32-14" aria-hidden="true" tabindex="-1"></a>Draw.MolsToGridImage(hits[:<span class="dv">12</span>], legends<span class="op">=</span>hit_names[:<span class="dv">12</span>], molsPerRow<span class="op">=</span><span class="dv">4</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </div>
 <p>As you can see, the potential number of hits it had to check went down to 690134.</p>
 <section id="working-with-synthon-spaces-yourself" class="level2">
