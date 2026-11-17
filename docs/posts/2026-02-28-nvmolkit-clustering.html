@@ -1,0 +1,1075 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en"><head>
+
+<meta charset="utf-8">
+<meta name="generator" content="quarto-1.6.43">
+
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+
+<meta name="dcterms.date" content="2026-02-28">
+<meta name="description" content="A guest post from NVIDIA">
+
+<title>GPU-Accelerated Clustering with nvMolKit – RDKit blog</title>
+<style>
+code{white-space: pre-wrap;}
+span.smallcaps{font-variant: small-caps;}
+div.columns{display: flex; gap: min(4vw, 1.5em);}
+div.column{flex: auto; overflow-x: auto;}
+div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+ul.task-list{list-style: none;}
+ul.task-list li input[type="checkbox"] {
+  width: 0.8em;
+  margin: 0 0.8em 0.2em -1em; /* quarto-specific, see https://github.com/quarto-dev/quarto-cli/issues/4556 */ 
+  vertical-align: middle;
+}
+/* CSS for syntax highlighting */
+pre > code.sourceCode { white-space: pre; position: relative; }
+pre > code.sourceCode > span { line-height: 1.25; }
+pre > code.sourceCode > span:empty { height: 1.2em; }
+.sourceCode { overflow: visible; }
+code.sourceCode > span { color: inherit; text-decoration: inherit; }
+div.sourceCode { margin: 1em 0; }
+pre.sourceCode { margin: 0; }
+@media screen {
+div.sourceCode { overflow: auto; }
+}
+@media print {
+pre > code.sourceCode { white-space: pre-wrap; }
+pre > code.sourceCode > span { display: inline-block; text-indent: -5em; padding-left: 5em; }
+}
+pre.numberSource code
+  { counter-reset: source-line 0; }
+pre.numberSource code > span
+  { position: relative; left: -4em; counter-increment: source-line; }
+pre.numberSource code > span > a:first-child::before
+  { content: counter(source-line);
+    position: relative; left: -1em; text-align: right; vertical-align: baseline;
+    border: none; display: inline-block;
+    -webkit-touch-callout: none; -webkit-user-select: none;
+    -khtml-user-select: none; -moz-user-select: none;
+    -ms-user-select: none; user-select: none;
+    padding: 0 4px; width: 4em;
+  }
+pre.numberSource { margin-left: 3em;  padding-left: 4px; }
+div.sourceCode
+  {   }
+@media screen {
+pre > code.sourceCode > span > a:first-child::before { text-decoration: underline; }
+}
+</style>
+
+
+<script src="../site_libs/quarto-nav/quarto-nav.js"></script>
+<script src="../site_libs/quarto-nav/headroom.min.js"></script>
+<script src="../site_libs/clipboard/clipboard.min.js"></script>
+<script src="../site_libs/quarto-search/autocomplete.umd.js"></script>
+<script src="../site_libs/quarto-search/fuse.min.js"></script>
+<script src="../site_libs/quarto-search/quarto-search.js"></script>
+<meta name="quarto:offset" content="../">
+<link href="../posts/icons/favicon.ico" rel="icon">
+<script src="../site_libs/quarto-html/quarto.js"></script>
+<script src="../site_libs/quarto-html/popper.min.js"></script>
+<script src="../site_libs/quarto-html/tippy.umd.min.js"></script>
+<script src="../site_libs/quarto-html/anchor.min.js"></script>
+<link href="../site_libs/quarto-html/tippy.css" rel="stylesheet">
+<link href="../site_libs/quarto-html/quarto-syntax-highlighting-d4d76bf8491c20bad77d141916dc28e1.css" rel="stylesheet" class="quarto-color-scheme" id="quarto-text-highlighting-styles">
+<link href="../site_libs/quarto-html/quarto-syntax-highlighting-dark-4379b0ccadffce622b03caf4c46266b3.css" rel="prefetch" class="quarto-color-scheme quarto-color-alternate" id="quarto-text-highlighting-styles">
+<script src="../site_libs/bootstrap/bootstrap.min.js"></script>
+<link href="../site_libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
+<link href="../site_libs/bootstrap/bootstrap-40840319e1d09552a0f54992bf705f97.min.css" rel="stylesheet" append-hash="true" class="quarto-color-scheme" id="quarto-bootstrap" data-mode="light">
+<link href="../site_libs/bootstrap/bootstrap-dark-f86ed83de42dc3a6349cec1bcdefd5d4.min.css" rel="prefetch" append-hash="true" class="quarto-color-scheme quarto-color-alternate" id="quarto-bootstrap" data-mode="dark">
+<script id="quarto-search-options" type="application/json">{
+  "location": "navbar",
+  "copy-button": false,
+  "collapse-after": 3,
+  "panel-placement": "end",
+  "type": "overlay",
+  "limit": 50,
+  "keyboard-shortcut": [
+    "f",
+    "/",
+    "s"
+  ],
+  "show-item-context": false,
+  "language": {
+    "search-no-results-text": "No results",
+    "search-matching-documents-text": "matching documents",
+    "search-copy-link-title": "Copy link to search",
+    "search-hide-matches-text": "Hide additional matches",
+    "search-more-match-text": "more match in this document",
+    "search-more-matches-text": "more matches in this document",
+    "search-clear-button-title": "Clear",
+    "search-text-placeholder": "",
+    "search-detached-cancel-button-title": "Cancel",
+    "search-submit-button-title": "Submit",
+    "search-label": "Search"
+  }
+}</script>
+
+
+<link rel="stylesheet" href="../styles.css">
+</head>
+
+<body class="nav-fixed">
+
+<div id="quarto-search-results"></div>
+  <header id="quarto-header" class="headroom fixed-top">
+    <nav class="navbar navbar-expand-lg " data-bs-theme="dark">
+      <div class="navbar-container container-fluid">
+      <div class="navbar-brand-container mx-auto">
+    <a class="navbar-brand" href="../index.html">
+    <span class="navbar-title">RDKit blog</span>
+    </a>
+  </div>
+            <div id="quarto-search" class="" title="Search"></div>
+          <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarCollapse" aria-controls="navbarCollapse" role="menu" aria-expanded="false" aria-label="Toggle navigation" onclick="if (window.quartoToggleHeadroom) { window.quartoToggleHeadroom(); }">
+  <span class="navbar-toggler-icon"></span>
+</button>
+          <div class="collapse navbar-collapse" id="navbarCollapse">
+            <ul class="navbar-nav navbar-nav-scroll ms-auto">
+  <li class="nav-item">
+    <a class="nav-link" href="../about.html"> 
+<span class="menu-text">RDKit experiments, tips, and tutorials</span></a>
+  </li>  
+  <li class="nav-item compact">
+    <a class="nav-link" href="https://github.com/rdkit/rdkit"> <i class="bi bi-github" role="img">
+</i> 
+<span class="menu-text"></span></a>
+  </li>  
+  <li class="nav-item compact">
+    <a class="nav-link" href="https://bsky.app/profile/rdkit.bsky.social"> <i class="bi bi-twitter" role="img">
+</i> 
+<span class="menu-text"></span></a>
+  </li>  
+  <li class="nav-item compact">
+    <a class="nav-link" href="https://www.linkedin.com/groups/8192558/"> <i class="bi bi-linkedin" role="img">
+</i> 
+<span class="menu-text"></span></a>
+  </li>  
+  <li class="nav-item compact">
+    <a class="nav-link" href="../index.xml"> <i class="bi bi-rss" role="img">
+</i> 
+<span class="menu-text"></span></a>
+  </li>  
+</ul>
+          </div> <!-- /navcollapse -->
+            <div class="quarto-navbar-tools">
+  <a href="" class="quarto-color-scheme-toggle quarto-navigation-tool  px-1" onclick="window.quartoToggleColorScheme(); return false;" title="Toggle dark mode"><i class="bi"></i></a>
+</div>
+      </div> <!-- /container-fluid -->
+    </nav>
+</header>
+<!-- content -->
+<div id="quarto-content" class="quarto-container page-columns page-rows-contents page-layout-article page-navbar">
+<!-- sidebar -->
+<!-- margin-sidebar -->
+    <div id="quarto-margin-sidebar" class="sidebar margin-sidebar">
+        <nav id="TOC" role="doc-toc" class="toc-active">
+    <h2 id="toc-title">On this page</h2>
+   
+  <ul>
+  <li><a href="#gpu-accelerated-molecular-clustering-with-nvmolkit" id="toc-gpu-accelerated-molecular-clustering-with-nvmolkit" class="nav-link active" data-scroll-target="#gpu-accelerated-molecular-clustering-with-nvmolkit">GPU-Accelerated Molecular Clustering with nvMolKit</a>
+  <ul class="collapse">
+  <li><a href="#installation" id="toc-installation" class="nav-link" data-scroll-target="#installation">Installation</a></li>
+  <li><a href="#configuration" id="toc-configuration" class="nav-link" data-scroll-target="#configuration">Configuration</a></li>
+  <li><a href="#loading-molecules" id="toc-loading-molecules" class="nav-link" data-scroll-target="#loading-molecules">Loading Molecules</a></li>
+  <li><a href="#workflow-description" id="toc-workflow-description" class="nav-link" data-scroll-target="#workflow-description">Workflow Description</a></li>
+  <li><a href="#rdkit-workflow" id="toc-rdkit-workflow" class="nav-link" data-scroll-target="#rdkit-workflow">RDKit Workflow</a></li>
+  <li><a href="#nvmolkit-workflow" id="toc-nvmolkit-workflow" class="nav-link" data-scroll-target="#nvmolkit-workflow">nvMolKit Workflow</a></li>
+  <li><a href="#performance-comparison---rtx-5080-gpu-vs-ryzen-9-9950x" id="toc-performance-comparison---rtx-5080-gpu-vs-ryzen-9-9950x" class="nav-link" data-scroll-target="#performance-comparison---rtx-5080-gpu-vs-ryzen-9-9950x">Performance Comparison - RTX 5080 GPU vs Ryzen 9 9950X</a></li>
+  <li><a href="#comparing-clustering-results" id="toc-comparing-clustering-results" class="nav-link" data-scroll-target="#comparing-clustering-results">Comparing Clustering Results</a></li>
+  <li><a href="#links" id="toc-links" class="nav-link" data-scroll-target="#links">Links</a></li>
+  </ul></li>
+  </ul>
+</nav>
+    </div>
+<!-- main -->
+<main class="content" id="quarto-document-content">
+
+<header id="title-block-header" class="quarto-title-block default">
+<div class="quarto-title">
+<h1 class="title">GPU-Accelerated Clustering with nvMolKit</h1>
+  <div class="quarto-categories">
+    <div class="quarto-category">clustering</div>
+    <div class="quarto-category">guest post</div>
+  </div>
+  </div>
+
+<div>
+  <div class="description">
+    A guest post from NVIDIA
+  </div>
+</div>
+
+
+<div class="quarto-title-meta">
+
+    
+    <div>
+    <div class="quarto-title-meta-heading">Published</div>
+    <div class="quarto-title-meta-contents">
+      <p class="date">February 28, 2026</p>
+    </div>
+  </div>
+  
+    
+  </div>
+  
+
+
+</header>
+
+
+<section id="gpu-accelerated-molecular-clustering-with-nvmolkit" class="level1">
+<h1>GPU-Accelerated Molecular Clustering with nvMolKit</h1>
+<p><strong>Note</strong>: This is a guest post written by Kevin Boyd at NVIDIA.</p>
+<p><a href="https://github.com/nvidia-digital-bio/nvMolKit">nvMolKit</a> is an open-source library that provides GPU-accelerated implementations of common RDKit cheminformatics operations. The APIs closely mirror RDKit’s, with batching as needed for GPU efficiency, making it easy to drop nvMolKit into existing workflows while achieving significant speedups on large datasets.</p>
+<p>As of January 2026, nvMolKit v0.3 supports: - Batch Morgan fingerprint calculation - Many to many Tanimoto and Cosine similarity calculations - Butina clustering - Batch ETKDG conformer generation - Batch MMFF force field optimization</p>
+<p>In this post, we’ll demonstrate nvMolKit’s capabilities through a molecular clustering workflow. We’ll compute Morgan fingerprints, calculate pairwise Tanimoto similarities, and perform Butina clustering, with both the RDKit and nvMolKit APIs.</p>
+<section id="installation" class="level2">
+<h2 class="anchored" data-anchor-id="installation">Installation</h2>
+<p>nvMolKit is available on conda-forge alongside RDKit. nvMolKit requires an NVIDIA GPU with compute capability 7.0 (V100) or higher. Some nvMolKit results are on the GPU, a CUDA-compatible torch installation can be used to interpret results.</p>
+<div id="cell-3" class="cell" data-execution_count="1">
+<div class="sourceCode cell-code" id="cb1"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="op">!</span>conda install <span class="op">-</span>c conda<span class="op">-</span>forge rdkit nvmolkit <span class="op">-</span>y <span class="op">-</span>q</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>Channels:
+ - conda-forge
+Platform: linux-64
+Collecting package metadata (repodata.json): ...working... done
+Solving environment: ...working... done
+
+# All requested packages already installed.
+</code></pre>
+</div>
+</div>
+<div id="cell-4" class="cell" data-execution_count="10">
+<div class="sourceCode cell-code" id="cb3"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> numpy <span class="im">as</span> np</span>
+<span id="cb3-2"><a href="#cb3-2" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> torch</span>
+<span id="cb3-3"><a href="#cb3-3" aria-hidden="true" tabindex="-1"></a><span class="cf">assert</span> torch.cuda.is_available(), <span class="st">"CUDA is required for nvMolKit"</span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+</section>
+<section id="configuration" class="level2">
+<h2 class="anchored" data-anchor-id="configuration">Configuration</h2>
+<p>We’ll process 20,000 molecules from Enamine REAL for this comparison.</p>
+<div id="cell-6" class="cell" data-execution_count="25">
+<div class="sourceCode cell-code" id="cb4"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Number of molecules to process</span></span>
+<span id="cb4-2"><a href="#cb4-2" aria-hidden="true" tabindex="-1"></a>n_mols <span class="op">=</span> <span class="dv">20000</span></span>
+<span id="cb4-3"><a href="#cb4-3" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-4"><a href="#cb4-4" aria-hidden="true" tabindex="-1"></a><span class="co"># CPU threads for multithreaded RDKit operations</span></span>
+<span id="cb4-5"><a href="#cb4-5" aria-hidden="true" tabindex="-1"></a>n_cpu_threads <span class="op">=</span> <span class="dv">16</span></span>
+<span id="cb4-6"><a href="#cb4-6" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-7"><a href="#cb4-7" aria-hidden="true" tabindex="-1"></a><span class="co"># Morgan fingerprint parameters</span></span>
+<span id="cb4-8"><a href="#cb4-8" aria-hidden="true" tabindex="-1"></a>fp_radius <span class="op">=</span> <span class="dv">3</span></span>
+<span id="cb4-9"><a href="#cb4-9" aria-hidden="true" tabindex="-1"></a>fp_nbits <span class="op">=</span> <span class="dv">1024</span></span>
+<span id="cb4-10"><a href="#cb4-10" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-11"><a href="#cb4-11" aria-hidden="true" tabindex="-1"></a><span class="co"># Butina clustering threshold</span></span>
+<span id="cb4-12"><a href="#cb4-12" aria-hidden="true" tabindex="-1"></a>distance_threshold <span class="op">=</span> <span class="fl">0.6</span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+</section>
+<section id="loading-molecules" class="level2">
+<h2 class="anchored" data-anchor-id="loading-molecules">Loading Molecules</h2>
+<p>First, we’ll parse molecules from SMILES using RDKit. We’ll take the first molecules from the <a href="https://enamine.net/compound-collections/real-compounds/real-database-subsets">Enamine Real 10.4M sample</a></p>
+<div id="cell-8" class="cell" data-execution_count="24">
+<div class="sourceCode cell-code" id="cb5"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> pandas <span class="im">as</span> pd</span>
+<span id="cb5-2"><a href="#cb5-2" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> rdkit.Chem <span class="im">import</span> MolFromSmiles</span>
+<span id="cb5-3"><a href="#cb5-3" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb5-4"><a href="#cb5-4" aria-hidden="true" tabindex="-1"></a>smi_file <span class="op">=</span> <span class="st">"enamine_real_10M.csxmiles"</span></span>
+<span id="cb5-5"><a href="#cb5-5" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb5-6"><a href="#cb5-6" aria-hidden="true" tabindex="-1"></a>smis <span class="op">=</span> pd.read_csv(smi_file, nrows<span class="op">=</span>n_mols, usecols<span class="op">=</span>[<span class="dv">0</span>], sep<span class="op">=</span><span class="st">'</span><span class="ch">\t</span><span class="st">'</span>).iloc[:, <span class="dv">0</span>].to_list()</span>
+<span id="cb5-7"><a href="#cb5-7" aria-hidden="true" tabindex="-1"></a>mols <span class="op">=</span> [MolFromSmiles(smi) <span class="cf">for</span> smi <span class="kw">in</span> smis]</span>
+<span id="cb5-8"><a href="#cb5-8" aria-hidden="true" tabindex="-1"></a>mols <span class="op">=</span> [mol <span class="cf">for</span> mol <span class="kw">in</span> mols <span class="cf">if</span> mol]  <span class="co"># Remove any parse failures</span></span>
+<span id="cb5-9"><a href="#cb5-9" aria-hidden="true" tabindex="-1"></a>n_mols <span class="op">=</span> <span class="bu">len</span>(mols)</span>
+<span id="cb5-10"><a href="#cb5-10" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"Parsed </span><span class="sc">{</span>n_mols<span class="sc">}</span><span class="ss"> molecules"</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>Parsed 20000 molecules</code></pre>
+</div>
+</div>
+</section>
+<section id="workflow-description" class="level2">
+<h2 class="anchored" data-anchor-id="workflow-description">Workflow Description</h2>
+<p>This example workflow consists of 3 steps: 1. <strong>Fingerprinting</strong>: Generate Morgan fingerprints 2. <strong>Similarity</strong>: Compute pairwise Tanimoto distances 3. <strong>Clustering</strong>: Run Butina algorithm on the distance matrix</p>
+</section>
+<section id="rdkit-workflow" class="level2">
+<h2 class="anchored" data-anchor-id="rdkit-workflow">RDKit Workflow</h2>
+<div id="cell-11" class="cell" data-execution_count="20">
+<div class="sourceCode cell-code" id="cb7"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb7-1"><a href="#cb7-1" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> time</span>
+<span id="cb7-2"><a href="#cb7-2" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> rdkit.Chem <span class="im">import</span> rdFingerprintGenerator</span>
+<span id="cb7-3"><a href="#cb7-3" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> rdkit.DataStructs <span class="im">import</span> BulkTanimotoSimilarity</span>
+<span id="cb7-4"><a href="#cb7-4" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> rdkit.ML.Cluster.Butina <span class="im">import</span> ClusterData</span>
+<span id="cb7-5"><a href="#cb7-5" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb7-6"><a href="#cb7-6" aria-hidden="true" tabindex="-1"></a><span class="co"># Step 1: Fingerprinting</span></span>
+<span id="cb7-7"><a href="#cb7-7" aria-hidden="true" tabindex="-1"></a>t_start <span class="op">=</span> time.time()</span>
+<span id="cb7-8"><a href="#cb7-8" aria-hidden="true" tabindex="-1"></a>generator <span class="op">=</span> rdFingerprintGenerator.GetMorganGenerator(radius<span class="op">=</span>fp_radius, fpSize<span class="op">=</span>fp_nbits)</span>
+<span id="cb7-9"><a href="#cb7-9" aria-hidden="true" tabindex="-1"></a>fps <span class="op">=</span> generator.GetFingerprints(mols, numThreads<span class="op">=</span>n_cpu_threads)</span>
+<span id="cb7-10"><a href="#cb7-10" aria-hidden="true" tabindex="-1"></a>t_fp <span class="op">=</span> time.time() <span class="op">-</span> t_start</span>
+<span id="cb7-11"><a href="#cb7-11" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"Fingerprinting: </span><span class="sc">{</span>t_fp<span class="sc">:.2f}</span><span class="ss">s"</span>)</span>
+<span id="cb7-12"><a href="#cb7-12" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb7-13"><a href="#cb7-13" aria-hidden="true" tabindex="-1"></a><span class="co"># Step 2: Pairwise Tanimoto distances</span></span>
+<span id="cb7-14"><a href="#cb7-14" aria-hidden="true" tabindex="-1"></a>t_start <span class="op">=</span> time.time()</span>
+<span id="cb7-15"><a href="#cb7-15" aria-hidden="true" tabindex="-1"></a>distances <span class="op">=</span> []</span>
+<span id="cb7-16"><a href="#cb7-16" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> i <span class="kw">in</span> <span class="bu">range</span>(<span class="bu">len</span>(mols)):</span>
+<span id="cb7-17"><a href="#cb7-17" aria-hidden="true" tabindex="-1"></a>    distances.extend(BulkTanimotoSimilarity(fps[i], fps[:i], returnDistance<span class="op">=</span><span class="va">True</span>))</span>
+<span id="cb7-18"><a href="#cb7-18" aria-hidden="true" tabindex="-1"></a>t_sim <span class="op">=</span> time.time() <span class="op">-</span> t_start</span>
+<span id="cb7-19"><a href="#cb7-19" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"Similarity matrix: </span><span class="sc">{</span>t_sim<span class="sc">:.2f}</span><span class="ss">s"</span>)</span>
+<span id="cb7-20"><a href="#cb7-20" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb7-21"><a href="#cb7-21" aria-hidden="true" tabindex="-1"></a><span class="co"># Step 3: Butina clustering</span></span>
+<span id="cb7-22"><a href="#cb7-22" aria-hidden="true" tabindex="-1"></a>t_start <span class="op">=</span> time.time()</span>
+<span id="cb7-23"><a href="#cb7-23" aria-hidden="true" tabindex="-1"></a>rdkit_clusters <span class="op">=</span> ClusterData(</span>
+<span id="cb7-24"><a href="#cb7-24" aria-hidden="true" tabindex="-1"></a>    np.array(distances),</span>
+<span id="cb7-25"><a href="#cb7-25" aria-hidden="true" tabindex="-1"></a>    n_mols,</span>
+<span id="cb7-26"><a href="#cb7-26" aria-hidden="true" tabindex="-1"></a>    distance_threshold,</span>
+<span id="cb7-27"><a href="#cb7-27" aria-hidden="true" tabindex="-1"></a>    isDistData<span class="op">=</span><span class="va">True</span>,</span>
+<span id="cb7-28"><a href="#cb7-28" aria-hidden="true" tabindex="-1"></a>    distFunc<span class="op">=</span><span class="va">None</span>,</span>
+<span id="cb7-29"><a href="#cb7-29" aria-hidden="true" tabindex="-1"></a>    reordering<span class="op">=</span><span class="va">True</span></span>
+<span id="cb7-30"><a href="#cb7-30" aria-hidden="true" tabindex="-1"></a>)</span>
+<span id="cb7-31"><a href="#cb7-31" aria-hidden="true" tabindex="-1"></a>t_clust <span class="op">=</span> time.time() <span class="op">-</span> t_start</span>
+<span id="cb7-32"><a href="#cb7-32" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"Butina clustering: </span><span class="sc">{</span>t_clust<span class="sc">:.2f}</span><span class="ss">s"</span>)</span>
+<span id="cb7-33"><a href="#cb7-33" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb7-34"><a href="#cb7-34" aria-hidden="true" tabindex="-1"></a>rdkit_total_time <span class="op">=</span> t_fp <span class="op">+</span> t_sim <span class="op">+</span> t_clust</span>
+<span id="cb7-35"><a href="#cb7-35" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"</span><span class="ch">\n</span><span class="ss">Total RDKit time: </span><span class="sc">{</span>rdkit_total_time<span class="sc">:.2f}</span><span class="ss">s"</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>Fingerprinting: 0.04s
+Similarity matrix: 11.17s
+Butina clustering: 7.65s
+
+Total RDKit time: 18.85s</code></pre>
+</div>
+</div>
+</section>
+<section id="nvmolkit-workflow" class="level2">
+<h2 class="anchored" data-anchor-id="nvmolkit-workflow">nvMolKit Workflow</h2>
+<p>Note that we add synchronizes to delimit individual timings, but the entire workflow can be run asynchronously with a single sync at the end</p>
+<div id="cell-13" class="cell" data-execution_count="21">
+<div class="sourceCode cell-code" id="cb9"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb9-1"><a href="#cb9-1" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> nvmolkit.fingerprints <span class="im">import</span> MorganFingerprintGenerator</span>
+<span id="cb9-2"><a href="#cb9-2" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> nvmolkit.similarity <span class="im">import</span> crossTanimotoSimilarity</span>
+<span id="cb9-3"><a href="#cb9-3" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> nvmolkit.clustering <span class="im">import</span> butina</span>
+<span id="cb9-4"><a href="#cb9-4" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-5"><a href="#cb9-5" aria-hidden="true" tabindex="-1"></a><span class="co"># Step 1: Fingerprinting</span></span>
+<span id="cb9-6"><a href="#cb9-6" aria-hidden="true" tabindex="-1"></a>t_start <span class="op">=</span> time.time()</span>
+<span id="cb9-7"><a href="#cb9-7" aria-hidden="true" tabindex="-1"></a>nvmolkit_fpgen <span class="op">=</span> MorganFingerprintGenerator(radius<span class="op">=</span>fp_radius, fpSize<span class="op">=</span>fp_nbits)</span>
+<span id="cb9-8"><a href="#cb9-8" aria-hidden="true" tabindex="-1"></a>nvmolkit_fps <span class="op">=</span> nvmolkit_fpgen.GetFingerprints(mols, num_threads<span class="op">=</span>n_cpu_threads)</span>
+<span id="cb9-9"><a href="#cb9-9" aria-hidden="true" tabindex="-1"></a>torch.cuda.synchronize()</span>
+<span id="cb9-10"><a href="#cb9-10" aria-hidden="true" tabindex="-1"></a>t_fp_nv <span class="op">=</span> time.time() <span class="op">-</span> t_start</span>
+<span id="cb9-11"><a href="#cb9-11" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"Fingerprinting: </span><span class="sc">{</span>t_fp_nv<span class="sc">:.2f}</span><span class="ss">s"</span>)</span>
+<span id="cb9-12"><a href="#cb9-12" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-13"><a href="#cb9-13" aria-hidden="true" tabindex="-1"></a><span class="co"># Step 2: Pairwise Tanimoto similarity -&gt; distances</span></span>
+<span id="cb9-14"><a href="#cb9-14" aria-hidden="true" tabindex="-1"></a>t_start <span class="op">=</span> time.time()</span>
+<span id="cb9-15"><a href="#cb9-15" aria-hidden="true" tabindex="-1"></a>nvmolkit_similarities <span class="op">=</span> crossTanimotoSimilarity(nvmolkit_fps)</span>
+<span id="cb9-16"><a href="#cb9-16" aria-hidden="true" tabindex="-1"></a>torch.cuda.synchronize()</span>
+<span id="cb9-17"><a href="#cb9-17" aria-hidden="true" tabindex="-1"></a>t_sim_nv <span class="op">=</span> time.time() <span class="op">-</span> t_start</span>
+<span id="cb9-18"><a href="#cb9-18" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"Similarity matrix: </span><span class="sc">{</span>t_sim_nv<span class="sc">:.2f}</span><span class="ss">s"</span>)</span>
+<span id="cb9-19"><a href="#cb9-19" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-20"><a href="#cb9-20" aria-hidden="true" tabindex="-1"></a><span class="co"># Step 3: Butina clustering</span></span>
+<span id="cb9-21"><a href="#cb9-21" aria-hidden="true" tabindex="-1"></a>t_start <span class="op">=</span> time.time()</span>
+<span id="cb9-22"><a href="#cb9-22" aria-hidden="true" tabindex="-1"></a>nvmolkit_distances <span class="op">=</span> <span class="fl">1.0</span> <span class="op">-</span> nvmolkit_similarities.torch()</span>
+<span id="cb9-23"><a href="#cb9-23" aria-hidden="true" tabindex="-1"></a>cluster_ids <span class="op">=</span> butina(nvmolkit_distances, distance_threshold).torch()</span>
+<span id="cb9-24"><a href="#cb9-24" aria-hidden="true" tabindex="-1"></a>torch.cuda.synchronize()</span>
+<span id="cb9-25"><a href="#cb9-25" aria-hidden="true" tabindex="-1"></a>t_clust_nv <span class="op">=</span> time.time() <span class="op">-</span> t_start</span>
+<span id="cb9-26"><a href="#cb9-26" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"Butina clustering: </span><span class="sc">{</span>t_clust_nv<span class="sc">:.2f}</span><span class="ss">s"</span>)</span>
+<span id="cb9-27"><a href="#cb9-27" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-28"><a href="#cb9-28" aria-hidden="true" tabindex="-1"></a>nvmolkit_total_time <span class="op">=</span> t_fp_nv <span class="op">+</span> t_sim_nv <span class="op">+</span> t_clust_nv</span>
+<span id="cb9-29"><a href="#cb9-29" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"</span><span class="ch">\n</span><span class="ss">Total nvMolKit time: </span><span class="sc">{</span>nvmolkit_total_time<span class="sc">:.2f}</span><span class="ss">s"</span>)</span>
+<span id="cb9-30"><a href="#cb9-30" aria-hidden="true" tabindex="-1"></a></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>Fingerprinting: 0.05s
+Similarity matrix: 0.02s
+Butina clustering: 0.02s
+
+Total nvMolKit time: 0.09s</code></pre>
+</div>
+</div>
+</section>
+<section id="performance-comparison---rtx-5080-gpu-vs-ryzen-9-9950x" class="level2">
+<h2 class="anchored" data-anchor-id="performance-comparison---rtx-5080-gpu-vs-ryzen-9-9950x">Performance Comparison - RTX 5080 GPU vs Ryzen 9 9950X</h2>
+<p>Let’s visualize the speedup for each step of the workflow.</p>
+<div id="cell-15" class="cell" data-execution_count="22">
+<div class="sourceCode cell-code" id="cb11"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb11-1"><a href="#cb11-1" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> matplotlib.pyplot <span class="im">as</span> plt</span>
+<span id="cb11-2"><a href="#cb11-2" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> numpy <span class="im">as</span> np</span>
+<span id="cb11-3"><a href="#cb11-3" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb11-4"><a href="#cb11-4" aria-hidden="true" tabindex="-1"></a>steps <span class="op">=</span> [<span class="st">'Fingerprinting'</span>, <span class="st">'Similarity'</span>, <span class="st">'Clustering'</span>, <span class="st">'Total'</span>]</span>
+<span id="cb11-5"><a href="#cb11-5" aria-hidden="true" tabindex="-1"></a>rdkit_times <span class="op">=</span> [t_fp, t_sim, t_clust, rdkit_total_time]</span>
+<span id="cb11-6"><a href="#cb11-6" aria-hidden="true" tabindex="-1"></a>nvmolkit_times <span class="op">=</span> [t_fp_nv, t_sim_nv, t_clust_nv, nvmolkit_total_time]</span>
+<span id="cb11-7"><a href="#cb11-7" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb11-8"><a href="#cb11-8" aria-hidden="true" tabindex="-1"></a>x <span class="op">=</span> np.arange(<span class="bu">len</span>(steps))</span>
+<span id="cb11-9"><a href="#cb11-9" aria-hidden="true" tabindex="-1"></a>width <span class="op">=</span> <span class="fl">0.35</span></span>
+<span id="cb11-10"><a href="#cb11-10" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb11-11"><a href="#cb11-11" aria-hidden="true" tabindex="-1"></a>fig, (ax1, ax2) <span class="op">=</span> plt.subplots(<span class="dv">1</span>, <span class="dv">2</span>, figsize<span class="op">=</span>(<span class="dv">14</span>, <span class="dv">5</span>))</span>
+<span id="cb11-12"><a href="#cb11-12" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb11-13"><a href="#cb11-13" aria-hidden="true" tabindex="-1"></a><span class="co"># Time comparison</span></span>
+<span id="cb11-14"><a href="#cb11-14" aria-hidden="true" tabindex="-1"></a>bars1 <span class="op">=</span> ax1.bar(x <span class="op">-</span> width<span class="op">/</span><span class="dv">2</span>, rdkit_times, width, label<span class="op">=</span><span class="st">'RDKit'</span>, color<span class="op">=</span><span class="st">'#1f77b4'</span>)</span>
+<span id="cb11-15"><a href="#cb11-15" aria-hidden="true" tabindex="-1"></a>bars2 <span class="op">=</span> ax1.bar(x <span class="op">+</span> width<span class="op">/</span><span class="dv">2</span>, nvmolkit_times, width, label<span class="op">=</span><span class="st">'nvMolKit'</span>, color<span class="op">=</span><span class="st">'#2ca02c'</span>)</span>
+<span id="cb11-16"><a href="#cb11-16" aria-hidden="true" tabindex="-1"></a>ax1.set_ylabel(<span class="st">'Time (seconds)'</span>)</span>
+<span id="cb11-17"><a href="#cb11-17" aria-hidden="true" tabindex="-1"></a>ax1.set_title(<span class="st">'Execution Time by Step'</span>)</span>
+<span id="cb11-18"><a href="#cb11-18" aria-hidden="true" tabindex="-1"></a>ax1.set_xticks(x)</span>
+<span id="cb11-19"><a href="#cb11-19" aria-hidden="true" tabindex="-1"></a>ax1.set_xticklabels(steps)</span>
+<span id="cb11-20"><a href="#cb11-20" aria-hidden="true" tabindex="-1"></a>ax1.legend()</span>
+<span id="cb11-21"><a href="#cb11-21" aria-hidden="true" tabindex="-1"></a>ax1.set_yscale(<span class="st">'log'</span>)</span>
+<span id="cb11-22"><a href="#cb11-22" aria-hidden="true" tabindex="-1"></a>ax1.grid(axis<span class="op">=</span><span class="st">'y'</span>, alpha<span class="op">=</span><span class="fl">0.3</span>)</span>
+<span id="cb11-23"><a href="#cb11-23" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb11-24"><a href="#cb11-24" aria-hidden="true" tabindex="-1"></a><span class="co"># Speedup</span></span>
+<span id="cb11-25"><a href="#cb11-25" aria-hidden="true" tabindex="-1"></a>speedups <span class="op">=</span> [r<span class="op">/</span>n <span class="cf">for</span> r, n <span class="kw">in</span> <span class="bu">zip</span>(rdkit_times, nvmolkit_times)]</span>
+<span id="cb11-26"><a href="#cb11-26" aria-hidden="true" tabindex="-1"></a>colors <span class="op">=</span> [<span class="st">'#ff7f0e'</span> <span class="cf">if</span> s <span class="op">&gt;</span> <span class="dv">1</span> <span class="cf">else</span> <span class="st">'#d62728'</span> <span class="cf">for</span> s <span class="kw">in</span> speedups]</span>
+<span id="cb11-27"><a href="#cb11-27" aria-hidden="true" tabindex="-1"></a>bars3 <span class="op">=</span> ax2.bar(steps, speedups, color<span class="op">=</span>colors)</span>
+<span id="cb11-28"><a href="#cb11-28" aria-hidden="true" tabindex="-1"></a>ax2.axhline(y<span class="op">=</span><span class="dv">1</span>, color<span class="op">=</span><span class="st">'gray'</span>, linestyle<span class="op">=</span><span class="st">'--'</span>, alpha<span class="op">=</span><span class="fl">0.7</span>)</span>
+<span id="cb11-29"><a href="#cb11-29" aria-hidden="true" tabindex="-1"></a>ax2.set_ylabel(<span class="st">'Speedup (RDKit time / nvMolKit time)'</span>)</span>
+<span id="cb11-30"><a href="#cb11-30" aria-hidden="true" tabindex="-1"></a>ax2.set_title(<span class="st">'nvMolKit Speedup vs RDKit'</span>)</span>
+<span id="cb11-31"><a href="#cb11-31" aria-hidden="true" tabindex="-1"></a>ax2.grid(axis<span class="op">=</span><span class="st">'y'</span>, alpha<span class="op">=</span><span class="fl">0.3</span>)</span>
+<span id="cb11-32"><a href="#cb11-32" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb11-33"><a href="#cb11-33" aria-hidden="true" tabindex="-1"></a><span class="co"># Add speedup labels</span></span>
+<span id="cb11-34"><a href="#cb11-34" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> bar, speedup <span class="kw">in</span> <span class="bu">zip</span>(bars3, speedups):</span>
+<span id="cb11-35"><a href="#cb11-35" aria-hidden="true" tabindex="-1"></a>    ax2.text(bar.get_x() <span class="op">+</span> bar.get_width()<span class="op">/</span><span class="dv">2</span>, bar.get_height() <span class="op">+</span> <span class="fl">0.5</span>, </span>
+<span id="cb11-36"><a href="#cb11-36" aria-hidden="true" tabindex="-1"></a>             <span class="ss">f'</span><span class="sc">{</span>speedup<span class="sc">:.1f}</span><span class="ss">x'</span>, ha<span class="op">=</span><span class="st">'center'</span>, va<span class="op">=</span><span class="st">'bottom'</span>, fontweight<span class="op">=</span><span class="st">'bold'</span>)</span>
+<span id="cb11-37"><a href="#cb11-37" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb11-38"><a href="#cb11-38" aria-hidden="true" tabindex="-1"></a>plt.tight_layout()</span>
+<span id="cb11-39"><a href="#cb11-39" aria-hidden="true" tabindex="-1"></a>plt.show()</span>
+<span id="cb11-40"><a href="#cb11-40" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb11-41"><a href="#cb11-41" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"</span><span class="ch">\n</span><span class="ss">Overall speedup: </span><span class="sc">{</span>rdkit_total_time <span class="op">/</span> nvmolkit_total_time<span class="sc">:.1f}</span><span class="ss">x"</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="2026-02-28-nvmolkit-clustering_files/figure-html/cell-8-output-1.png" class="img-fluid figure-img"></p>
+</figure>
+</div>
+</div>
+<div class="cell-output cell-output-stdout">
+<pre><code>
+Overall speedup: 218.8x</code></pre>
+</div>
+</div>
+<p>RDKit fingerprinting benefits from being the lowest compute workload and from native RDKit multithreading. On this hardware, the performance is about equivalent. We get large speedups from putting similarity and clustering on the GPU. On NVIDIA datacenter GPUs, speedups can be well over 1000x.</p>
+</section>
+<section id="comparing-clustering-results" class="level2">
+<h2 class="anchored" data-anchor-id="comparing-clustering-results">Comparing Clustering Results</h2>
+<p>nvMolKit clusters may or may not be identical to RDKit, but are valid Butina clusters. Potential differences can happen when there are multiple candidate clusters of the same size.</p>
+<div id="cell-18" class="cell" data-execution_count="7">
+<div class="sourceCode cell-code" id="cb13"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb13-1"><a href="#cb13-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Convert cluster IDs to cluster tuples for comparison</span></span>
+<span id="cb13-2"><a href="#cb13-2" aria-hidden="true" tabindex="-1"></a>n_clusters <span class="op">=</span> cluster_ids.<span class="bu">max</span>().item() <span class="op">+</span> <span class="dv">1</span></span>
+<span id="cb13-3"><a href="#cb13-3" aria-hidden="true" tabindex="-1"></a>nvmolkit_clusters <span class="op">=</span> [<span class="bu">tuple</span>(torch.where(cluster_ids <span class="op">==</span> i)[<span class="dv">0</span>].tolist()) <span class="cf">for</span> i <span class="kw">in</span> <span class="bu">range</span>(n_clusters)]</span>
+<span id="cb13-4"><a href="#cb13-4" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"Number of clusters: </span><span class="sc">{</span><span class="bu">len</span>(nvmolkit_clusters)<span class="sc">}</span><span class="ss">"</span>)</span>
+<span id="cb13-5"><a href="#cb13-5" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb13-6"><a href="#cb13-6" aria-hidden="true" tabindex="-1"></a>rdkit_cluster_sizes <span class="op">=</span> <span class="bu">sorted</span>([<span class="bu">len</span>(c) <span class="cf">for</span> c <span class="kw">in</span> rdkit_clusters], reverse<span class="op">=</span><span class="va">True</span>)</span>
+<span id="cb13-7"><a href="#cb13-7" aria-hidden="true" tabindex="-1"></a>nvmolkit_cluster_sizes <span class="op">=</span> <span class="bu">sorted</span>([<span class="bu">len</span>(c) <span class="cf">for</span> c <span class="kw">in</span> nvmolkit_clusters], reverse<span class="op">=</span><span class="va">True</span>)</span>
+<span id="cb13-8"><a href="#cb13-8" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb13-9"><a href="#cb13-9" aria-hidden="true" tabindex="-1"></a>plt.figure()</span>
+<span id="cb13-10"><a href="#cb13-10" aria-hidden="true" tabindex="-1"></a>plt.plot(<span class="bu">range</span>(<span class="bu">len</span>(rdkit_cluster_sizes)), rdkit_cluster_sizes, </span>
+<span id="cb13-11"><a href="#cb13-11" aria-hidden="true" tabindex="-1"></a>         label<span class="op">=</span><span class="st">'RDKit'</span>, linewidth<span class="op">=</span><span class="fl">2.5</span>, alpha<span class="op">=</span><span class="fl">0.9</span>)</span>
+<span id="cb13-12"><a href="#cb13-12" aria-hidden="true" tabindex="-1"></a>plt.plot(<span class="bu">range</span>(<span class="bu">len</span>(nvmolkit_cluster_sizes)), nvmolkit_cluster_sizes, </span>
+<span id="cb13-13"><a href="#cb13-13" aria-hidden="true" tabindex="-1"></a>         label<span class="op">=</span><span class="st">'nvMolKit'</span>, linewidth<span class="op">=</span><span class="fl">2.5</span>, linestyle<span class="op">=</span><span class="st">'--'</span>, alpha<span class="op">=</span><span class="fl">0.9</span>)</span>
+<span id="cb13-14"><a href="#cb13-14" aria-hidden="true" tabindex="-1"></a>plt.xlabel(<span class="st">'Cluster Rank'</span>)</span>
+<span id="cb13-15"><a href="#cb13-15" aria-hidden="true" tabindex="-1"></a>plt.ylabel(<span class="st">'Cluster Size (molecules)'</span>)</span>
+<span id="cb13-16"><a href="#cb13-16" aria-hidden="true" tabindex="-1"></a>plt.title(<span class="st">'Cluster Size Distribution'</span>)</span>
+<span id="cb13-17"><a href="#cb13-17" aria-hidden="true" tabindex="-1"></a>plt.legend()</span>
+<span id="cb13-18"><a href="#cb13-18" aria-hidden="true" tabindex="-1"></a>plt.ylim(<span class="dv">0</span>, <span class="bu">max</span>(rdkit_cluster_sizes) <span class="op">*</span> <span class="fl">1.05</span>)</span>
+<span id="cb13-19"><a href="#cb13-19" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb13-20"><a href="#cb13-20" aria-hidden="true" tabindex="-1"></a>plt.tight_layout()</span>
+<span id="cb13-21"><a href="#cb13-21" aria-hidden="true" tabindex="-1"></a>plt.show()</span>
+<span id="cb13-22"><a href="#cb13-22" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb13-23"><a href="#cb13-23" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"RDKit: </span><span class="sc">{</span><span class="bu">len</span>(rdkit_clusters)<span class="sc">}</span><span class="ss"> clusters, largest has </span><span class="sc">{</span><span class="bu">max</span>(rdkit_cluster_sizes)<span class="sc">}</span><span class="ss"> molecules"</span>)</span>
+<span id="cb13-24"><a href="#cb13-24" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"nvMolKit: </span><span class="sc">{</span><span class="bu">len</span>(nvmolkit_clusters)<span class="sc">}</span><span class="ss"> clusters, largest has </span><span class="sc">{</span><span class="bu">max</span>(nvmolkit_cluster_sizes)<span class="sc">}</span><span class="ss"> molecules"</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>Number of clusters: 14164</code></pre>
+</div>
+<div class="cell-output cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="2026-02-28-nvmolkit-clustering_files/figure-html/cell-9-output-2.png" class="img-fluid figure-img"></p>
+</figure>
+</div>
+</div>
+<div class="cell-output cell-output-stdout">
+<pre><code>RDKit: 14162 clusters, largest has 14 molecules
+nvMolKit: 14164 clusters, largest has 14 molecules</code></pre>
+</div>
+</div>
+</section>
+<section id="links" class="level2">
+<h2 class="anchored" data-anchor-id="links">Links</h2>
+<p>For more information, see the <a href="https://nvidia-digital-bio.github.io/nvMolKit/">nvMolKit documentation</a> and <a href="https://github.com/nvidia-digital-bio/nvMolKit">GitHub repository</a>.</p>
+
+
+</section>
+</section>
+
+</main> <!-- /main -->
+<script id="quarto-html-after-body" type="application/javascript">
+window.document.addEventListener("DOMContentLoaded", function (event) {
+  const toggleBodyColorMode = (bsSheetEl) => {
+    const mode = bsSheetEl.getAttribute("data-mode");
+    const bodyEl = window.document.querySelector("body");
+    if (mode === "dark") {
+      bodyEl.classList.add("quarto-dark");
+      bodyEl.classList.remove("quarto-light");
+    } else {
+      bodyEl.classList.add("quarto-light");
+      bodyEl.classList.remove("quarto-dark");
+    }
+  }
+  const toggleBodyColorPrimary = () => {
+    const bsSheetEl = window.document.querySelector("link#quarto-bootstrap");
+    if (bsSheetEl) {
+      toggleBodyColorMode(bsSheetEl);
+    }
+  }
+  toggleBodyColorPrimary();  
+  const disableStylesheet = (stylesheets) => {
+    for (let i=0; i < stylesheets.length; i++) {
+      const stylesheet = stylesheets[i];
+      stylesheet.rel = 'prefetch';
+    }
+  }
+  const enableStylesheet = (stylesheets) => {
+    for (let i=0; i < stylesheets.length; i++) {
+      const stylesheet = stylesheets[i];
+      stylesheet.rel = 'stylesheet';
+    }
+  }
+  const manageTransitions = (selector, allowTransitions) => {
+    const els = window.document.querySelectorAll(selector);
+    for (let i=0; i < els.length; i++) {
+      const el = els[i];
+      if (allowTransitions) {
+        el.classList.remove('notransition');
+      } else {
+        el.classList.add('notransition');
+      }
+    }
+  }
+  const toggleGiscusIfUsed = (isAlternate, darkModeDefault) => {
+    const baseTheme = document.querySelector('#giscus-base-theme')?.value ?? 'light';
+    const alternateTheme = document.querySelector('#giscus-alt-theme')?.value ?? 'dark';
+    let newTheme = '';
+    if(darkModeDefault) {
+      newTheme = isAlternate ? baseTheme : alternateTheme;
+    } else {
+      newTheme = isAlternate ? alternateTheme : baseTheme;
+    }
+    const changeGiscusTheme = () => {
+      // From: https://github.com/giscus/giscus/issues/336
+      const sendMessage = (message) => {
+        const iframe = document.querySelector('iframe.giscus-frame');
+        if (!iframe) return;
+        iframe.contentWindow.postMessage({ giscus: message }, 'https://giscus.app');
+      }
+      sendMessage({
+        setConfig: {
+          theme: newTheme
+        }
+      });
+    }
+    const isGiscussLoaded = window.document.querySelector('iframe.giscus-frame') !== null;
+    if (isGiscussLoaded) {
+      changeGiscusTheme();
+    }
+  }
+  const toggleColorMode = (alternate) => {
+    // Switch the stylesheets
+    const alternateStylesheets = window.document.querySelectorAll('link.quarto-color-scheme.quarto-color-alternate');
+    manageTransitions('#quarto-margin-sidebar .nav-link', false);
+    if (alternate) {
+      enableStylesheet(alternateStylesheets);
+      for (const sheetNode of alternateStylesheets) {
+        if (sheetNode.id === "quarto-bootstrap") {
+          toggleBodyColorMode(sheetNode);
+        }
+      }
+    } else {
+      disableStylesheet(alternateStylesheets);
+      toggleBodyColorPrimary();
+    }
+    manageTransitions('#quarto-margin-sidebar .nav-link', true);
+    // Switch the toggles
+    const toggles = window.document.querySelectorAll('.quarto-color-scheme-toggle');
+    for (let i=0; i < toggles.length; i++) {
+      const toggle = toggles[i];
+      if (toggle) {
+        if (alternate) {
+          toggle.classList.add("alternate");     
+        } else {
+          toggle.classList.remove("alternate");
+        }
+      }
+    }
+    // Hack to workaround the fact that safari doesn't
+    // properly recolor the scrollbar when toggling (#1455)
+    if (navigator.userAgent.indexOf('Safari') > 0 && navigator.userAgent.indexOf('Chrome') == -1) {
+      manageTransitions("body", false);
+      window.scrollTo(0, 1);
+      setTimeout(() => {
+        window.scrollTo(0, 0);
+        manageTransitions("body", true);
+      }, 40);  
+    }
+  }
+  const isFileUrl = () => { 
+    return window.location.protocol === 'file:';
+  }
+  const hasAlternateSentinel = () => {  
+    let styleSentinel = getColorSchemeSentinel();
+    if (styleSentinel !== null) {
+      return styleSentinel === "alternate";
+    } else {
+      return false;
+    }
+  }
+  const setStyleSentinel = (alternate) => {
+    const value = alternate ? "alternate" : "default";
+    if (!isFileUrl()) {
+      window.localStorage.setItem("quarto-color-scheme", value);
+    } else {
+      localAlternateSentinel = value;
+    }
+  }
+  const getColorSchemeSentinel = () => {
+    if (!isFileUrl()) {
+      const storageValue = window.localStorage.getItem("quarto-color-scheme");
+      return storageValue != null ? storageValue : localAlternateSentinel;
+    } else {
+      return localAlternateSentinel;
+    }
+  }
+  const darkModeDefault = false;
+  let localAlternateSentinel = darkModeDefault ? 'alternate' : 'default';
+  // Dark / light mode switch
+  window.quartoToggleColorScheme = () => {
+    // Read the current dark / light value 
+    let toAlternate = !hasAlternateSentinel();
+    toggleColorMode(toAlternate);
+    setStyleSentinel(toAlternate);
+    toggleGiscusIfUsed(toAlternate, darkModeDefault);
+  };
+  // Ensure there is a toggle, if there isn't float one in the top right
+  if (window.document.querySelector('.quarto-color-scheme-toggle') === null) {
+    const a = window.document.createElement('a');
+    a.classList.add('top-right');
+    a.classList.add('quarto-color-scheme-toggle');
+    a.href = "";
+    a.onclick = function() { try { window.quartoToggleColorScheme(); } catch {} return false; };
+    const i = window.document.createElement("i");
+    i.classList.add('bi');
+    a.appendChild(i);
+    window.document.body.appendChild(a);
+  }
+  // Switch to dark mode if need be
+  if (hasAlternateSentinel()) {
+    toggleColorMode(true);
+  } else {
+    toggleColorMode(false);
+  }
+  const icon = "";
+  const anchorJS = new window.AnchorJS();
+  anchorJS.options = {
+    placement: 'right',
+    icon: icon
+  };
+  anchorJS.add('.anchored');
+  const isCodeAnnotation = (el) => {
+    for (const clz of el.classList) {
+      if (clz.startsWith('code-annotation-')) {                     
+        return true;
+      }
+    }
+    return false;
+  }
+  const onCopySuccess = function(e) {
+    // button target
+    const button = e.trigger;
+    // don't keep focus
+    button.blur();
+    // flash "checked"
+    button.classList.add('code-copy-button-checked');
+    var currentTitle = button.getAttribute("title");
+    button.setAttribute("title", "Copied!");
+    let tooltip;
+    if (window.bootstrap) {
+      button.setAttribute("data-bs-toggle", "tooltip");
+      button.setAttribute("data-bs-placement", "left");
+      button.setAttribute("data-bs-title", "Copied!");
+      tooltip = new bootstrap.Tooltip(button, 
+        { trigger: "manual", 
+          customClass: "code-copy-button-tooltip",
+          offset: [0, -8]});
+      tooltip.show();    
+    }
+    setTimeout(function() {
+      if (tooltip) {
+        tooltip.hide();
+        button.removeAttribute("data-bs-title");
+        button.removeAttribute("data-bs-toggle");
+        button.removeAttribute("data-bs-placement");
+      }
+      button.setAttribute("title", currentTitle);
+      button.classList.remove('code-copy-button-checked');
+    }, 1000);
+    // clear code selection
+    e.clearSelection();
+  }
+  const getTextToCopy = function(trigger) {
+      const codeEl = trigger.previousElementSibling.cloneNode(true);
+      for (const childEl of codeEl.children) {
+        if (isCodeAnnotation(childEl)) {
+          childEl.remove();
+        }
+      }
+      return codeEl.innerText;
+  }
+  const clipboard = new window.ClipboardJS('.code-copy-button:not([data-in-quarto-modal])', {
+    text: getTextToCopy
+  });
+  clipboard.on('success', onCopySuccess);
+  if (window.document.getElementById('quarto-embedded-source-code-modal')) {
+    const clipboardModal = new window.ClipboardJS('.code-copy-button[data-in-quarto-modal]', {
+      text: getTextToCopy,
+      container: window.document.getElementById('quarto-embedded-source-code-modal')
+    });
+    clipboardModal.on('success', onCopySuccess);
+  }
+    var localhostRegex = new RegExp(/^(?:http|https):\/\/localhost\:?[0-9]*\//);
+    var mailtoRegex = new RegExp(/^mailto:/);
+      var filterRegex = new RegExp("https:\/\/greglandrum\.github\.io\/rdkit-blog\/");
+    var isInternal = (href) => {
+        return filterRegex.test(href) || localhostRegex.test(href) || mailtoRegex.test(href);
+    }
+    // Inspect non-navigation links and adorn them if external
+ 	var links = window.document.querySelectorAll('a[href]:not(.nav-link):not(.navbar-brand):not(.toc-action):not(.sidebar-link):not(.sidebar-item-toggle):not(.pagination-link):not(.no-external):not([aria-hidden]):not(.dropdown-item):not(.quarto-navigation-tool):not(.about-link)');
+    for (var i=0; i<links.length; i++) {
+      const link = links[i];
+      if (!isInternal(link.href)) {
+        // undo the damage that might have been done by quarto-nav.js in the case of
+        // links that we want to consider external
+        if (link.dataset.originalHref !== undefined) {
+          link.href = link.dataset.originalHref;
+        }
+      }
+    }
+  function tippyHover(el, contentFn, onTriggerFn, onUntriggerFn) {
+    const config = {
+      allowHTML: true,
+      maxWidth: 500,
+      delay: 100,
+      arrow: false,
+      appendTo: function(el) {
+          return el.parentElement;
+      },
+      interactive: true,
+      interactiveBorder: 10,
+      theme: 'quarto',
+      placement: 'bottom-start',
+    };
+    if (contentFn) {
+      config.content = contentFn;
+    }
+    if (onTriggerFn) {
+      config.onTrigger = onTriggerFn;
+    }
+    if (onUntriggerFn) {
+      config.onUntrigger = onUntriggerFn;
+    }
+    window.tippy(el, config); 
+  }
+  const noterefs = window.document.querySelectorAll('a[role="doc-noteref"]');
+  for (var i=0; i<noterefs.length; i++) {
+    const ref = noterefs[i];
+    tippyHover(ref, function() {
+      // use id or data attribute instead here
+      let href = ref.getAttribute('data-footnote-href') || ref.getAttribute('href');
+      try { href = new URL(href).hash; } catch {}
+      const id = href.replace(/^#\/?/, "");
+      const note = window.document.getElementById(id);
+      if (note) {
+        return note.innerHTML;
+      } else {
+        return "";
+      }
+    });
+  }
+  const xrefs = window.document.querySelectorAll('a.quarto-xref');
+  const processXRef = (id, note) => {
+    // Strip column container classes
+    const stripColumnClz = (el) => {
+      el.classList.remove("page-full", "page-columns");
+      if (el.children) {
+        for (const child of el.children) {
+          stripColumnClz(child);
+        }
+      }
+    }
+    stripColumnClz(note)
+    if (id === null || id.startsWith('sec-')) {
+      // Special case sections, only their first couple elements
+      const container = document.createElement("div");
+      if (note.children && note.children.length > 2) {
+        container.appendChild(note.children[0].cloneNode(true));
+        for (let i = 1; i < note.children.length; i++) {
+          const child = note.children[i];
+          if (child.tagName === "P" && child.innerText === "") {
+            continue;
+          } else {
+            container.appendChild(child.cloneNode(true));
+            break;
+          }
+        }
+        if (window.Quarto?.typesetMath) {
+          window.Quarto.typesetMath(container);
+        }
+        return container.innerHTML
+      } else {
+        if (window.Quarto?.typesetMath) {
+          window.Quarto.typesetMath(note);
+        }
+        return note.innerHTML;
+      }
+    } else {
+      // Remove any anchor links if they are present
+      const anchorLink = note.querySelector('a.anchorjs-link');
+      if (anchorLink) {
+        anchorLink.remove();
+      }
+      if (window.Quarto?.typesetMath) {
+        window.Quarto.typesetMath(note);
+      }
+      if (note.classList.contains("callout")) {
+        return note.outerHTML;
+      } else {
+        return note.innerHTML;
+      }
+    }
+  }
+  for (var i=0; i<xrefs.length; i++) {
+    const xref = xrefs[i];
+    tippyHover(xref, undefined, function(instance) {
+      instance.disable();
+      let url = xref.getAttribute('href');
+      let hash = undefined; 
+      if (url.startsWith('#')) {
+        hash = url;
+      } else {
+        try { hash = new URL(url).hash; } catch {}
+      }
+      if (hash) {
+        const id = hash.replace(/^#\/?/, "");
+        const note = window.document.getElementById(id);
+        if (note !== null) {
+          try {
+            const html = processXRef(id, note.cloneNode(true));
+            instance.setContent(html);
+          } finally {
+            instance.enable();
+            instance.show();
+          }
+        } else {
+          // See if we can fetch this
+          fetch(url.split('#')[0])
+          .then(res => res.text())
+          .then(html => {
+            const parser = new DOMParser();
+            const htmlDoc = parser.parseFromString(html, "text/html");
+            const note = htmlDoc.getElementById(id);
+            if (note !== null) {
+              const html = processXRef(id, note);
+              instance.setContent(html);
+            } 
+          }).finally(() => {
+            instance.enable();
+            instance.show();
+          });
+        }
+      } else {
+        // See if we can fetch a full url (with no hash to target)
+        // This is a special case and we should probably do some content thinning / targeting
+        fetch(url)
+        .then(res => res.text())
+        .then(html => {
+          const parser = new DOMParser();
+          const htmlDoc = parser.parseFromString(html, "text/html");
+          const note = htmlDoc.querySelector('main.content');
+          if (note !== null) {
+            // This should only happen for chapter cross references
+            // (since there is no id in the URL)
+            // remove the first header
+            if (note.children.length > 0 && note.children[0].tagName === "HEADER") {
+              note.children[0].remove();
+            }
+            const html = processXRef(null, note);
+            instance.setContent(html);
+          } 
+        }).finally(() => {
+          instance.enable();
+          instance.show();
+        });
+      }
+    }, function(instance) {
+    });
+  }
+      let selectedAnnoteEl;
+      const selectorForAnnotation = ( cell, annotation) => {
+        let cellAttr = 'data-code-cell="' + cell + '"';
+        let lineAttr = 'data-code-annotation="' +  annotation + '"';
+        const selector = 'span[' + cellAttr + '][' + lineAttr + ']';
+        return selector;
+      }
+      const selectCodeLines = (annoteEl) => {
+        const doc = window.document;
+        const targetCell = annoteEl.getAttribute("data-target-cell");
+        const targetAnnotation = annoteEl.getAttribute("data-target-annotation");
+        const annoteSpan = window.document.querySelector(selectorForAnnotation(targetCell, targetAnnotation));
+        const lines = annoteSpan.getAttribute("data-code-lines").split(",");
+        const lineIds = lines.map((line) => {
+          return targetCell + "-" + line;
+        })
+        let top = null;
+        let height = null;
+        let parent = null;
+        if (lineIds.length > 0) {
+            //compute the position of the single el (top and bottom and make a div)
+            const el = window.document.getElementById(lineIds[0]);
+            top = el.offsetTop;
+            height = el.offsetHeight;
+            parent = el.parentElement.parentElement;
+          if (lineIds.length > 1) {
+            const lastEl = window.document.getElementById(lineIds[lineIds.length - 1]);
+            const bottom = lastEl.offsetTop + lastEl.offsetHeight;
+            height = bottom - top;
+          }
+          if (top !== null && height !== null && parent !== null) {
+            // cook up a div (if necessary) and position it 
+            let div = window.document.getElementById("code-annotation-line-highlight");
+            if (div === null) {
+              div = window.document.createElement("div");
+              div.setAttribute("id", "code-annotation-line-highlight");
+              div.style.position = 'absolute';
+              parent.appendChild(div);
+            }
+            div.style.top = top - 2 + "px";
+            div.style.height = height + 4 + "px";
+            div.style.left = 0;
+            let gutterDiv = window.document.getElementById("code-annotation-line-highlight-gutter");
+            if (gutterDiv === null) {
+              gutterDiv = window.document.createElement("div");
+              gutterDiv.setAttribute("id", "code-annotation-line-highlight-gutter");
+              gutterDiv.style.position = 'absolute';
+              const codeCell = window.document.getElementById(targetCell);
+              const gutter = codeCell.querySelector('.code-annotation-gutter');
+              gutter.appendChild(gutterDiv);
+            }
+            gutterDiv.style.top = top - 2 + "px";
+            gutterDiv.style.height = height + 4 + "px";
+          }
+          selectedAnnoteEl = annoteEl;
+        }
+      };
+      const unselectCodeLines = () => {
+        const elementsIds = ["code-annotation-line-highlight", "code-annotation-line-highlight-gutter"];
+        elementsIds.forEach((elId) => {
+          const div = window.document.getElementById(elId);
+          if (div) {
+            div.remove();
+          }
+        });
+        selectedAnnoteEl = undefined;
+      };
+        // Handle positioning of the toggle
+    window.addEventListener(
+      "resize",
+      throttle(() => {
+        elRect = undefined;
+        if (selectedAnnoteEl) {
+          selectCodeLines(selectedAnnoteEl);
+        }
+      }, 10)
+    );
+    function throttle(fn, ms) {
+    let throttle = false;
+    let timer;
+      return (...args) => {
+        if(!throttle) { // first call gets through
+            fn.apply(this, args);
+            throttle = true;
+        } else { // all the others get throttled
+            if(timer) clearTimeout(timer); // cancel #2
+            timer = setTimeout(() => {
+              fn.apply(this, args);
+              timer = throttle = false;
+            }, ms);
+        }
+      };
+    }
+      // Attach click handler to the DT
+      const annoteDls = window.document.querySelectorAll('dt[data-target-cell]');
+      for (const annoteDlNode of annoteDls) {
+        annoteDlNode.addEventListener('click', (event) => {
+          const clickedEl = event.target;
+          if (clickedEl !== selectedAnnoteEl) {
+            unselectCodeLines();
+            const activeEl = window.document.querySelector('dt[data-target-cell].code-annotation-active');
+            if (activeEl) {
+              activeEl.classList.remove('code-annotation-active');
+            }
+            selectCodeLines(clickedEl);
+            clickedEl.classList.add('code-annotation-active');
+          } else {
+            // Unselect the line
+            unselectCodeLines();
+            clickedEl.classList.remove('code-annotation-active');
+          }
+        });
+      }
+  const findCites = (el) => {
+    const parentEl = el.parentElement;
+    if (parentEl) {
+      const cites = parentEl.dataset.cites;
+      if (cites) {
+        return {
+          el,
+          cites: cites.split(' ')
+        };
+      } else {
+        return findCites(el.parentElement)
+      }
+    } else {
+      return undefined;
+    }
+  };
+  var bibliorefs = window.document.querySelectorAll('a[role="doc-biblioref"]');
+  for (var i=0; i<bibliorefs.length; i++) {
+    const ref = bibliorefs[i];
+    const citeInfo = findCites(ref);
+    if (citeInfo) {
+      tippyHover(citeInfo.el, function() {
+        var popup = window.document.createElement('div');
+        citeInfo.cites.forEach(function(cite) {
+          var citeDiv = window.document.createElement('div');
+          citeDiv.classList.add('hanging-indent');
+          citeDiv.classList.add('csl-entry');
+          var biblioDiv = window.document.getElementById('ref-' + cite);
+          if (biblioDiv) {
+            citeDiv.innerHTML = biblioDiv.innerHTML;
+          }
+          popup.appendChild(citeDiv);
+        });
+        return popup.innerHTML;
+      });
+    }
+  }
+});
+</script>
+<script src="https://utteranc.es/client.js" repo="greglandrum/rdkit-blog" issue-term="pathname" theme="github-light" crossorigin="anonymous" async="">
+</script>
+</div> <!-- /content -->
+<footer class="footer">
+  <div class="nav-footer">
+    <div class="nav-footer-left">
+<p>Copyright (C) 2025 Greg Landrum</p>
+</div>   
+    <div class="nav-footer-center">
+      &nbsp;
+    </div>
+    <div class="nav-footer-right">
+<p><a href="https://www.rdkit.org"><img src="https://www.rdkit.org/logo.small.png" class="img-fluid" alt="RDKit" width="64"></a></p>
+</div>
+  </div>
+</footer>
+
+
+
+
+</body></html>
